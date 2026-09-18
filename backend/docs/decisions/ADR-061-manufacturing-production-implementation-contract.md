@@ -44,7 +44,7 @@ module, joining `sales, inventory, logistics, finance, reporting, hr,
 accounting, procurement` (VERIFIED current list, Phase 0 §1). `depends_on:
 ['sales', 'inventory']` (entitlement dependency, `ADR-055 §7`; `accounting.
 manifest.ts`'s existing `depends_on: ['finance']` is the direct precedent,
-VERIFIED in Phase 0 §1). Financial-event/GL integration (§12) is a Core/
+VERIFIED in Phase 0 §1). Financial-event/GL integration (§13) is a Core/
 Foundation capability every module already uses without a manifest
 dependency on `accounting` itself (the same way `procurement.manifest.ts`
 does not declare `depends_on: ['accounting']` despite posting Financial
@@ -85,7 +85,7 @@ program has not asked for.
 ## 3. Work Order / Production Order aggregate and lifecycle
 
 **New entity `WorkOrder`** (`manufacturing/infrastructure/work-order.entity.ts`):
-`id`, `workOrderNumber` (via `NumberingService`, §15), `finishedProductId`,
+`id`, `workOrderNumber` (via `NumberingService`, §16), `finishedProductId`,
 `quantityPlanned`, `quantityProduced` (running total, updated at each
 Finished Goods Receipt, §7), `warehouseId` (the physical warehouse the
 Work Order executes in — its WIP sub-location is derived from this, §6),
@@ -126,7 +126,22 @@ in_progress -> on_hold -> in_progress
   at a partial quantity, or with a final Finished Goods Receipt exactly
   reaching plan; either way, completion is an explicit action, not an
   implicit threshold-cross, matching this codebase's general preference for
-  explicit state transitions over inferred ones).
+  explicit state transitions over inferred ones). **Hard guard (resolves
+  §6/§7's completion-validation requirement): `completed` may only be
+  entered when this Work Order's own WIP balance is exactly zero** (within
+  the same currency-precision rounding tolerance every other monetary
+  comparison in this codebase already uses — no new tolerance concept).
+  Concretely, this means a Work Order that will finish at less than
+  `quantityPlanned` (a deliberate partial/under-production close) **must
+  first Material-Return whatever unconsumed component value remains** in
+  its WIP (§5/§8) before `completed` is reachable — the transition is
+  rejected, the same fail-closed style `assertCleanForClose`-equivalent
+  guards already use elsewhere in this codebase (INFERRED from the Fiscal
+  Period closing-exception guard pattern surfaced in this session's own
+  earlier Accounting frontend work, not independently re-verified here),
+  not silently allowed to strand value. See §8's revised worked example and
+  §21 for what this implies when the shortfall is genuine physical
+  scrap/spoilage rather than merely unused, returnable material.
 - No `reopen` transition — a completed Work Order is closed permanently, the
   same "append-only once posted" discipline Journal Entries already use
   (Phase 0 §5, INFERRED from `accounting_journal_entries`' own "append-only
@@ -164,7 +179,7 @@ Sales Orders already use — no second reservation mechanism.
 component's on-hand stock in the Work Order's warehouse, decreases the
 matching reservation, increases the Work Order's WIP balance (§6). **Must
 call `InventoryService.recordMovement`** (this is D5's core requirement,
-§13) — never a direct `stock_movements` write, closing exactly the gap
+§14) — never a direct `stock_movements` write, closing exactly the gap
 Phase 0 §6/§11 identified in the legacy path. Partial issue (issuing less
 than `quantityRequired` in one call, issuing across multiple calls) is
 supported by construction — `WorkOrderComponent.quantityIssued` accumulates
@@ -181,68 +196,215 @@ un-costed limbo state).
 
 **Return:** a new movement type `work_order_material_return` — the exact
 reversal of an issue: increases the component's on-hand stock back in the
-originating warehouse, decreases the Work Order's WIP balance, decreases
-`WorkOrderComponent.quantityIssued`. **Must be costed at the same unit cost
-the original issue used**, never a fresh moving-average recomputation at
-return time — this is required specifically so a return-then-reissue cycle
-cannot silently manufacture or destroy WIP value through two different cost
-bases for the same physical units. A return may not exceed the Work Order's
-own cumulative issued quantity for that component (a `WorkOrderComponent`-
-scoped guard, mirroring the existing quantity-variance guard pattern Phase
-0 §5 found already enforcing GRNI's own invariant as a side effect —
-INFERRED as the same *kind* of guard, not a copy of GRNI's specific code).
+originating (real) warehouse, decreases the Work Order's WIP balance,
+decreases `WorkOrderComponent.quantityIssued`. **Corrected costing rule
+(supersedes an earlier, mathematically incomplete draft of this contract
+that specified "the original issue's cost"):** a return is costed at the
+**WIP sub-warehouse's own current moving-average cost for that component,
+in that Work Order's dedicated WIP sub-warehouse** (§6) — not the cost of
+any one specific prior issue. This is necessary, not merely stylistic:
+after two or more issues of the *same* component at *different* real-
+warehouse costs (§8's worked example shows exactly this), the physical
+units inside WIP are fungible and already blended into one running
+average by the same moving-average mechanic every other receipt in this
+codebase already uses (Phase 0 §8, VERIFIED — F08 has never tracked
+per-lot cost identity; "the original issue's cost" is not a well-defined
+quantity once blending has occurred, and specifying it as the rule would
+have been unimplementable as stated). Costing a return at WIP's current
+average — symmetric with how any dispatch anywhere in this codebase is
+already costed at the current average of the warehouse it leaves (Phase 0
+§11, VERIFIED) — is the only rule consistent with the moving-average
+method D1 ratified, and is what §8 proves conserves value exactly. A
+return may not exceed the Work Order's own cumulative issued-minus-already-
+returned quantity for that component (a `WorkOrderComponent`-scoped guard,
+mirroring the existing quantity-variance guard pattern Phase 0 §5 found
+already enforcing GRNI's own invariant as a side effect — INFERRED as the
+same *kind* of guard, not a copy of GRNI's specific code).
 
-## 6. WIP movement and valuation lifecycle
+## 6. WIP movement and valuation lifecycle — WIP isolation model (RESOLVED: Option A)
 
-**WIP is modeled as a real, valued location — not a bare number.** Per D4
-(continuous valuation) and reusing the existing sub-warehouse precedent
-(Phase 0 §15, VERIFIED — the same mechanism that already gives every
-Shipping Company/Vehicle an auto-created Operational Sub-location nested
-under a real `Warehouse`): **each Work Order's execution warehouse gets (or
-reuses) one auto-created WIP sub-`Warehouse`** (`parentWarehouseId` = the
-real warehouse), and `work_order_material_issue` is, at the stock-movement
-level, structurally a **transfer** into that WIP sub-warehouse (reusing
-`transfer_in`/`transfer_out`-style semantics, Phase 0 §6/§15, INFERRED from
-the established transfer mechanism) — **plus** the new GL/valuation
-consequence §12 specifies, which a plain transfer does not carry. WIP's
-"balance" at any moment is simply the on-hand stock value of that
-sub-warehouse, computed the same way any warehouse's stock value is already
-computed (INFERRED from `getStockReport`'s existing aggregation pattern,
-Phase 0 §6/§11 citation) — no new balance-tracking table is required beyond
-`stock_movements` itself, because the WIP sub-warehouse *is* the balance,
-continuously, by construction (satisfying D4 without inventing a parallel
-subledger the way, e.g., a from-scratch WIP ledger would have needed to,
-per Phase 0 §4 Option A's own flagged cost).
+**Resolved explicitly, per the CTO's review: Option A — a dedicated WIP
+sub-warehouse per Work Order, strict one-to-one ownership.** Not Option B
+(a shared WIP location with Work-Order-level provenance tracking).
 
-**Finished Goods Receipt** (§7) is the reverse transfer: WIP sub-warehouse
-→ the real target warehouse, crediting WIP and debiting Finished Goods
-Inventory (§12), at a unit cost derived from the WIP sub-warehouse's own
-accumulated balance for that Work Order (§7).
+**Why A, not B — this is a reuse decision, not an arbitrary preference.**
+The existing Moving Average engine (F08) tracks exactly one running cost
+per **(product, warehouse)** pair (Phase 0 §8/§11, VERIFIED) — it has no
+Work-Order dimension at all. If WIP were a single **shared** location
+(Option B) holding materials for multiple concurrent Work Orders
+simultaneously, a component's moving-average cost inside that shared
+location would blend across *every* Work Order using it — WO-A's and
+WO-B's materials would be financially indistinguishable the moment both had
+issued the same component into the same shared bucket, making an accurate
+per-Work-Order WIP balance impossible **without inventing an entirely new,
+Work-Order-dimensioned costing ledger** — precisely the "second accounting/
+valuation mechanism" `ADR-055 §10` and D1 (use the *existing* Moving
+Average engine) both counsel against. A **dedicated** sub-warehouse per
+Work Order sidesteps this by construction: each Work Order's sub-warehouse
+is its own distinct `warehouseId` to the existing engine, so the engine's
+existing, unmodified per-(product, warehouse) tracking already gives each
+Work Order a correctly isolated, correctly blended running cost per
+component — zero new valuation mechanism required, only new **rows** in
+tables that already exist.
 
-## 7. Finished Goods receipt and inventory integration
+**Mechanics:** reuses the existing sub-warehouse precedent verbatim (Phase
+0 §15, VERIFIED — the same mechanism that already gives every Shipping
+Company/Vehicle an auto-created Operational Sub-location nested under a
+real `Warehouse`, via the existing `parentWarehouseId` self-reference — no
+new entity or table). **On Work Order `release` (§3), exactly one WIP
+sub-`Warehouse` row is auto-created for that Work Order** — deterministically
+coded from the Work Order's own number (e.g. `WIP-<workOrderNumber>`),
+`parentWarehouseId` = the Work Order's real execution warehouse. This
+sub-warehouse belongs to **exactly one** Work Order for its entire
+lifetime — never reused, never shared, and (matching `ADR-055 §8`'s
+"disabled/cancelled ≠ deleted" rule) never deleted even if the Work Order
+is later `cancelled` — it simply remains a permanent, zero-balance,
+inert row.
+
+`work_order_material_issue` moves a component from the real warehouse into
+this dedicated WIP sub-warehouse; `work_order_material_return` moves it
+back; `work_order_finished_goods_output` moves value out of it into the
+real target warehouse as the finished product (§7). None of these are
+generic, un-costed transfers — each explicitly invokes the same valuation
+primitives an existing `'receipt'`/dispatch already uses (read the source
+side's current moving-average cost; apply that cost as the destination
+side's receipt cost), per movement, per §13's table — **not** a bare
+`transfer_in`/`transfer_out` pair with no cost consequence, which is what a
+plain warehouse-to-warehouse transfer is today (Phase 0 did not verify that
+transfers already carry a valuation effect, and this contract does not
+assume they do — Manufacturing's movements carry their own explicit
+valuation calls).
+
+**WIP(WO) balance is never a stored, separately-maintained number.** It is
+always the **computed** current stock value of that one Work Order's
+dedicated sub-warehouse (Σ over every component currently on hand there, at
+that sub-warehouse's own current moving-average cost per component) — the
+same "never cache a balance, always compute it from the ledger" philosophy
+this codebase already applies to GL account balances and trial balances
+(Phase 0 citation of the established convention, not re-verified
+independently this session). No new balance-tracking table is introduced.
+
+**Consequences for the properties the CTO required this model to support:**
+
+- **WO-level WIP balance:** exact, by construction — it is that Work
+  Order's own sub-warehouse's stock value, nothing else's.
+- **Exact return valuation:** the sub-warehouse's own current
+  per-component average (§5, corrected) — well-defined at every point in
+  time because there is only ever one Work Order's material in that
+  sub-warehouse.
+- **FG output valuation:** §7 (revised below), computed purely from this
+  one Work Order's own sub-warehouse balance.
+- **Work Order completion validation:** §3's new hard guard
+  (`WIP(WO).value == 0` to complete) — trivially well-defined per Work
+  Order, since there is no cross-Work-Order value to disentangle.
+- **Concurrent Work Orders:** two Work Orders never contend on each other's
+  WIP rows at all (different `warehouseId`s entirely) — they only briefly
+  contend on the *shared real warehouse's* component stock during their own
+  Issue/Return calls, exactly the existing `pg_advisory_xact_lock`
+  discipline already handles (§12). This is *less* contention than Option B
+  would have created, not more.
+- **Reconciliation:** Month-End's existing Inventory reconciliation (§17)
+  must be confirmed to correctly sum across **every** Work-Order-owned WIP
+  sub-warehouse as ordinary inventory value (there will be one such
+  sub-warehouse per Work Order ever released, not a single shared bucket) —
+  restated and sharpened in §17 below.
+
+## 7. Finished Goods receipt and inventory integration — FG cost formula (RESOLVED)
 
 **New movement type `work_order_finished_goods_output`** — increases the
 finished product's on-hand stock in the Work Order's real (non-WIP)
-warehouse, decreases the WIP sub-warehouse's balance, increments
-`WorkOrder.quantityProduced`. **Cost basis (D1, Actual/Moving Average):**
-unit cost = (sum of all `work_order_material_issue` costs for this Work
-Order to date, net of any `work_order_material_return`s) ÷
-`quantityProduced` including this output event — i.e. a plain average over
-everything issued into this Work Order so far, **not** a per-output-event
-snapshot that would let early and late partial outputs from the same Work
-Order carry different unit costs for materially the same recipe. This unit
-cost is supplied as the `unitCostBase` input into `recordMovement`
-exactly the way a Procurement Goods Receipt or Opening Stock import already
-supplies one for a `'receipt'`-type movement (Phase 0 §8/§11, VERIFIED —
-F08's *"ONE approved opening-stock/receipt cost-input flow"*) — reusing that
-exact, existing mechanism rather than inventing a second one, per
-`ADR-055 §10`.
+warehouse, decreases the Work Order's own dedicated WIP sub-warehouse's
+balance (§6), increments `WorkOrder.quantityProduced`.
+
+**Corrected cost formula (supersedes an earlier, mathematically incomplete
+draft of this contract — the CTO correctly identified that "cumulative WIP
+÷ cumulative quantity produced" double-counts once a second output event
+occurs, because WIP is a *residual* balance, not a cumulative record of
+everything ever produced).** For output event *i*, producing quantity
+`q_i`, where `quantityProduced_before` is this Work Order's
+`quantityProduced` immediately before this event:
+
+```
+remainingPlannedQty_before = quantityPlanned − quantityProduced_before
+unitCost_i                 = WIP(WO).value_before ÷ remainingPlannedQty_before
+valueOutput_i               = unitCost_i × q_i
+WIP(WO).value_after         = WIP(WO).value_before − valueOutput_i
+quantityProduced_after      = quantityProduced_before + q_i
+```
+
+This is the moving-average method (D1) applied one level up: exactly as an
+ordinary dispatch draws down a warehouse's on-hand value at that
+warehouse's *current* average without disturbing the average for what
+remains, an FG output draws down this Work Order's WIP value at its
+*current* value-per-remaining-planned-unit, leaving the correct rate in
+place for the next output or for value added by a subsequent Material
+Issue (which raises `WIP(WO).value` — and therefore the rate for whatever
+is produced next — exactly the way any moving-average receipt raises the
+rate for what is dispensed next). `unitCost_i` is supplied as the
+`unitCostBase` input into `recordMovement` exactly the way a Procurement
+Goods Receipt or Opening Stock import already supplies one for a
+`'receipt'`-type movement (Phase 0 §8/§11, VERIFIED — F08's *"ONE approved
+opening-stock/receipt cost-input flow"*) — reusing that exact, existing
+mechanism rather than inventing a second one, per `ADR-055 §10`.
+
+**Proof this conserves value exactly across multiple partial outputs,
+partial issues, a partial return, and a component cost change between
+issues** — see §8's fully worked numerical example, which traces a single
+Work Order end-to-end and shows total value in (issues, net of a return) =
+total value out (two partial FG outputs), to the cent, with the final
+output correctly driving `WIP(WO).value` to exactly zero (satisfying §3's
+new completion guard) precisely because `remainingPlannedQty` reaches zero
+at the same moment `quantityProduced` reaches `quantityPlanned`.
 
 **Partial output** (a Work Order producing less than `quantityPlanned` in
 one event, or across multiple events before completion) is supported by
-construction, mirroring §5's partial-issue support.
+construction — this is the formula's normal operating case, not an edge
+case bolted on afterward.
 
-## 8. Actual/Moving-Average costing behavior (D1)
+## 8. Worked numerical example (required proof of conservation)
+
+One Work Order, finished good **F**, `quantityPlanned = 10`, one raw
+component **C**. All figures to the cent; no rounding error accumulates
+because every step is exact arithmetic on the figures given.
+
+| Step | Event | Detail | WIP(WO).value after |
+|---|---|---|---|
+| 1 | Material Issue #1 | 12 units of C @ real warehouse's current avg **$5.00** → WIP receipt-costed @ $5.00; WIP's own avg for C = $5.00 | **$60.00** (12 × $5.00) |
+| 2 | *(real warehouse independently receives new stock of C @ $6.00 — unrelated to this Work Order)* | — | $60.00 (unchanged) |
+| 3 | Material Issue #2 | 8 units of C @ real warehouse's *new* current avg **$6.00** → WIP receipt-costed @ $6.00; WIP's own avg for C recomputes: (12×$5.00 + 8×$6.00) ÷ 20 = **$5.40** | **$108.00** (20 × $5.40) |
+| 4 | Material Return | 2 units of C returned, costed at WIP's **current** avg for C = $5.40 (§5, corrected — not "the original issue cost," which is no longer a single well-defined number after step 3's blend) | **$97.20** (18 × $5.40 — self-consistent: $108.00 − $10.80) |
+| 5 | FG Output #1 | Produce 6 of 10 planned. `remainingPlannedQty_before = 10 − 0 = 10`. `unitCost = $97.20 ÷ 10 = $9.72`. `valueOutput = 6 × $9.72 = $58.32` | **$38.88** ($97.20 − $58.32) |
+| 6 | FG Output #2 (final) | Produce remaining 4 of 10. `remainingPlannedQty_before = 10 − 6 = 4`. `unitCost = $38.88 ÷ 4 = $9.72` (unchanged — nothing entered/left WIP between outputs 1 and 2, so the rate cannot have moved, exactly like an untouched moving average). `valueOutput = 4 × $9.72 = $38.88` | **$0.00** ($38.88 − $38.88) |
+
+**Conservation check:**
+
+```
+Total value IN  (issues, net of return) = $60.00 + $48.00 − $10.80 = $97.20
+Total value OUT (both FG outputs)       = $58.32 + $38.88          = $97.20
+```
+
+**Exactly balanced — total material value is neither created nor destroyed**,
+across two partial issues, a component cost change between them, a partial
+return valued at the post-blend average, and two partial FG outputs whose
+combined quantity exactly reaches `quantityPlanned`. `WIP(WO).value`
+reaches exactly `$0.00` at the moment `quantityProduced` reaches
+`quantityPlanned` — satisfying §3's completion guard without any special
+"final output absorbs the remainder" rule, because the formula's
+denominator (`remainingPlannedQty`) and the Work Order's own completion
+condition are the same underlying quantity by construction.
+
+**What happens if a Work Order completes with `quantityProduced <
+quantityPlanned` (a deliberate under-produced close, not shown in the table
+above):** `WIP(WO).value` will **not** be zero at that point (some planned-
+but-unmade quantity's worth of material value is still sitting in WIP) —
+§3's guard rejects `completed` until it is. In Phase 1, the *only* legal
+way to reach zero in that situation is a Material Return of the
+now-unneeded component quantity (§5) — see §21 for the explicit,
+disclosed limitation this implies for genuine physical scrap/spoilage
+(as opposed to merely unused, returnable material), which Phase 1 has no
+separate mechanism for.
+
+## 9. Actual/Moving-Average costing behavior (D1)
 
 Confirmed, no new costing engine: every cost figure in this contract (issue
 cost, WIP balance, finished-goods output cost) is either (a) read live from
@@ -253,7 +415,7 @@ anywhere in this contract's data model, and no code path that could produce
 two different valid answers for "what did this cost" the way a
 standard-vs-actual system would.
 
-## 9. Explicit exclusion of Labor/Overhead absorption from Phase 1 (D2)
+## 10. Explicit exclusion of Labor/Overhead absorption from Phase 1 (D2)
 
 No labor-hour field, no machine-hour field, no overhead-rate config key, no
 overhead-pool entity, and no allocation-rule mechanism appears anywhere in
@@ -262,7 +424,7 @@ construction — there is no code path where a non-material cost could enter
 the calculation, so there is nothing to accidentally invent here even at
 the implementation-detail level.
 
-## 10. Explicit exclusion of Standard Cost and Variance accounting from Phase 1 (D3)
+## 11. Explicit exclusion of Standard Cost and Variance accounting from Phase 1 (D3)
 
 No standard-cost field on `Product`, `BillOfMaterial`, or `WorkOrder`. No
 variance-calculation code path (there is nothing to compare Actual cost
@@ -274,7 +436,7 @@ explicitly disclosed as informational-only, never read by any posting or
 reconciliation code path, so it cannot silently become a variance
 mechanism by accretion.
 
-## 11. Inventory integration contract
+## 12. Inventory integration contract
 
 **Every Manufacturing movement — issue, return, finished-goods output —
 calls `InventoryService.recordMovement`.** None writes `stock_movements`
@@ -288,7 +450,7 @@ warehouse/product pair, the WIP sub-warehouse/product pair, and the target
 warehouse/product pair as applicable, in a stable (sorted) order, exactly
 matching `assembleProduct`'s own existing deadlock-avoidance pattern.
 
-## 12. Financial Event / GL integration contract
+## 13. Financial Event / GL integration contract
 
 **No Manufacturing movement silently inherits "no GL entry."** Per the
 CTO's explicit critical accounting requirement, every movement type is
@@ -297,8 +459,8 @@ specified in full below:
 | Movement type | Inventory effect | Valuation effect | Financial Event | GL effect | Idempotency key | Transaction boundary |
 |---|---|---|---|---|---|---|
 | `work_order_material_issue` | Component stock −qty in real warehouse; +qty in WIP sub-warehouse | Cost = live moving-average of component at issue time (D1) | **YES** — new topic `manufacturing.work_order.material_issued` | `Dr WIP (control function 'wip', NEW) / Cr Inventory (control function 'inventory', EXISTING — same account `handleSupplierInvoicePosted` already resolves, Phase 0 §13)` | `manufacturing:work_order:<workOrderId>:material_issue:<issueLineId>` | Same transaction as the stock movement + reservation decrement; all-or-nothing |
-| `work_order_material_return` | Component stock +qty in real warehouse; −qty in WIP sub-warehouse | Cost = the ORIGINAL issue's unit cost (§5 — never recomputed) | **YES** — new topic `manufacturing.work_order.material_returned` | `Dr Inventory / Cr WIP` (exact reversal of the issue leg) | `manufacturing:work_order:<workOrderId>:material_return:<returnLineId>` | Same transaction as the stock movement; all-or-nothing |
-| `work_order_finished_goods_output` | Finished product stock +qty in real warehouse; −value in WIP sub-warehouse | Cost = cumulative WIP ÷ cumulative quantity produced (§7), supplied as `recordMovement`'s existing `unitCostBase` receipt-cost-input parameter | **YES** — new topic `manufacturing.work_order.finished_goods_received` | `Dr Finished Goods Inventory (control function 'inventory') / Cr WIP (control function 'wip')` | `manufacturing:work_order:<workOrderId>:fg_output:<outputEventId>` | Same transaction as the stock movement + `WorkOrder.quantityProduced` increment; all-or-nothing |
+| `work_order_material_return` | Component stock +qty in real warehouse; −qty in WIP sub-warehouse | Cost = the WIP sub-warehouse's own current moving-average cost for that component at return time (§5, corrected — never the specific prior issue's cost, which is not a well-defined quantity once multiple issues have blended; see §8) | **YES** — new topic `manufacturing.work_order.material_returned` | `Dr Inventory / Cr WIP` (exact reversal of the issue leg, at the return's own current-average cost, not the original issue's amount) | `manufacturing:work_order:<workOrderId>:material_return:<returnLineId>` | Same transaction as the stock movement; all-or-nothing |
+| `work_order_finished_goods_output` | Finished product stock +qty in real warehouse; −value in WIP sub-warehouse | Cost = `WIP(WO).value_before ÷ remainingPlannedQty_before`, evaluated fresh at each output event (§7, corrected — not a single cumulative-average figure; see §8's worked example), supplied as `recordMovement`'s existing `unitCostBase` receipt-cost-input parameter | **YES** — new topic `manufacturing.work_order.finished_goods_received` | `Dr Finished Goods Inventory (control function 'inventory') / Cr WIP (control function 'wip')` | `manufacturing:work_order:<workOrderId>:fg_output:<outputEventId>` | Same transaction as the stock movement + `WorkOrder.quantityProduced` increment; all-or-nothing |
 
 **Explicitly, no movement type above is a `dispatch`, and none is added to
 `INVENTORY_GL_MOVEMENT_TYPES` as currently defined** (that set's existing,
@@ -326,7 +488,7 @@ meaning there is no P&L consequence to recognize in Phase 1 at all. This is
 a direct, mechanical consequence of the ratified decisions, not an
 independent choice made here.
 
-## 13. Legacy `assembleProduct` remediation boundary and compatibility behavior
+## 14. Legacy `assembleProduct` remediation boundary and compatibility behavior
 
 **Contract only — not implemented by this document (per the CTO's explicit
 instruction).** D5 requires `assembleProduct` to stop bypassing
@@ -341,10 +503,10 @@ instruction).** D5 requires `assembleProduct` to stop bypassing
   §11's provenance discipline is not disturbed).
 - **`assembly_consumption`/`assembly_output` join
   `INVENTORY_GL_MOVEMENT_TYPES`-equivalent treatment** via the same
-  Financial-Event-publish mechanism §12 specifies for the new Work Order
+  Financial-Event-publish mechanism §13 specifies for the new Work Order
   movement types — `Dr WIP / Cr Inventory` on consumption,
   `Dr Inventory / Cr WIP` on output, reusing the identical `wip` control
-  function §12 introduces. This means a legacy "instant assembly" becomes,
+  function §13 introduces. This means a legacy "instant assembly" becomes,
   financially, an **instantaneous Work Order** (issue and output in the
   same transaction, WIP balance touched and immediately zeroed again) —
   not a second, parallel accounting treatment. No new control function or
@@ -370,7 +532,7 @@ instruction).** D5 requires `assembleProduct` to stop bypassing
   implementation-planning decision, not an architectural one, and is left
   to the eventual Phase 1 implementation plan.
 
-## 14. Permissions, SoD and approval boundaries
+## 15. Permissions, SoD and approval boundaries
 
 **New permission nodes** (`manufacturing.manifest.ts`), following the
 established fine-grained convention (`ADR-055 §6`, `procurement.*`/
@@ -407,7 +569,7 @@ assembly`'s own existing precedent (Phase 0 §17, VERIFIED) and satisfying
 `ADR-055 §2`'s entitlement-vs-permission separation from the module's first
 commit, not retrofitted later.
 
-## 15. Numbering, audit, idempotency and transactional requirements
+## 16. Numbering, audit, idempotency and transactional requirements
 
 - **Numbering:** `WorkOrder.workOrderNumber` via the existing
   `NumberingService.getNextNumber('work_order')`, the identical mechanism
@@ -422,19 +584,19 @@ commit, not retrofitted later.
   `.completed`, `.cancelled`) follow the same `<domain>.<resource>.<verb>`
   convention already used throughout.
 - **Idempotency:** every Financial Event publish uses a deterministic key
-  per §12's table — no Manufacturing movement can be double-posted by a
+  per §13's table — no Manufacturing movement can be double-posted by a
   retried request, matching the `UNIQUE(idempotencyKey)` guard on
   `accounting_financial_events` every other handler already relies on
   (Phase 0 §13, INFERRED from Wave 1's own established convention).
-- **Transactional requirements:** every movement (§11), its Financial Event
-  publish (§12), its reservation adjustment (§5), and its `WorkOrder`/
+- **Transactional requirements:** every movement (§12), its Financial Event
+  publish (§13), its reservation adjustment (§5), and its `WorkOrder`/
   `WorkOrderComponent` quantity updates happen inside **one** database
   transaction — partial application (e.g. stock moved but no Financial
   Event published, or vice versa) is not a permitted failure mode, matching
   `recordMovement`'s own existing "movements post together or not at all"
   discipline (Phase 0 §6, VERIFIED).
 
-## 16. Month-End / reconciliation implications
+## 17. Month-End / reconciliation implications
 
 **Deferred, not silently ignored.** Because D4 makes WIP a continuously-
 valued real sub-warehouse balance (§6) rather than a period-end-only
@@ -453,7 +615,7 @@ own scope, to be raised the same way the GRNI/Month-End conflict was raised
 and resolved (`ADR-056`) — not resolved unilaterally by whichever session
 finds it.
 
-## 17. Frontend operational workflow and required pages
+## 18. Frontend operational workflow and required pages
 
 New page set under `frontend/src/pages/manufacturing/` (matching every
 existing domain's `pages/<domain>/*.tsx` convention, Phase 0 §20, VERIFIED/
@@ -464,7 +626,7 @@ INFERRED):
   component issued/remaining quantities, running WIP balance, produced
   quantity, and the lifecycle action buttons (release, issue material,
   return material, record finished-goods output, hold/resume, complete,
-  cancel) gated by the permission nodes in §14.
+  cancel) gated by the permission nodes in §15.
 - A `ManufacturingCover.tsx` section-cover page, following the established
   `SectionCover` pattern (this session's own prior work on Accounting/HR
   covers, cited as established convention, not re-opened here) and a new
@@ -473,11 +635,11 @@ INFERRED):
   required shape.
 - **No new page for the legacy `assembleProduct` path** — per Phase 0 §20
   (VERIFIED — it has no frontend today) and this contract's own
-  conservative scope, the legacy path's remediation (§13) is a backend
+  conservative scope, the legacy path's remediation (§14) is a backend
   correctness fix; whether it also finally gets a frontend page is a
   separate, smaller decision not bundled into this contract.
 
-## 18. Migration/data requirements
+## 19. Migration/data requirements
 
 New tables only — no existing table's schema changes (this contract touches
 none of `bill_of_materials`, `bom_components`, `products`, or
@@ -488,14 +650,14 @@ none of `bill_of_materials`, `bom_components`, `products`, or
 - New `ControlFunction` enum value `wip` (an additive enum-value migration,
   the same shape as `grni`'s own addition, Wave 1, cited read-only).
 - Terminology seed migration(s) for every new nav/field/action/value code
-  this contract's frontend (§17) and backend (§14) will need — following
+  this contract's frontend (§18) and backend (§15) will need — following
   the exact idempotent `ON CONFLICT` pattern every terminology migration in
   this codebase already uses.
 
 No seed data beyond terminology. No change to any HR-related table, and no
 change to any Wave 1 (Procurement/Accounting/Month-End) table.
 
-## 19. E2E acceptance matrix and explicit PASS criteria
+## 20. E2E acceptance matrix and explicit PASS criteria
 
 1. Work Order created (`draft`) → released (`WorkOrderComponent` snapshot
    taken, matches live BOM at that instant, reservations created).
@@ -504,35 +666,53 @@ change to any Wave 1 (Procurement/Accounting/Month-End) table.
    balanced, traced end-to-end via direct Postgres queries (not HTTP 200s —
    this session's own established verification discipline, Wave 1, cited
    read-only).
-3. Material returned (partial, ≤ issued) → exact reversal, at the original
-   issue's cost basis, verified by comparing the return's journal amount to
-   the specific issue journal it reverses.
-4. Finished Goods output (partial) → cost = cumulative WIP ÷ cumulative
-   produced at that moment, `Dr Inventory/Cr WIP` journal posted, balanced.
+3. Material returned (partial, ≤ issued) → exact reversal, costed at the
+   WIP sub-warehouse's own current moving-average cost for that component
+   at return time (§5, corrected), verified by direct query against F08's
+   own moving-average state at that instant — **not** against the original
+   issue's journal amount, which is not the correct basis once blending has
+   occurred.
+4. Finished Goods output (partial) → cost = `WIP(WO).value_before ÷
+   remainingPlannedQty_before` at that exact output event (§7, corrected),
+   `Dr Inventory/Cr WIP` journal posted, balanced, and the resulting
+   `WIP(WO).value_after` verified against the same formula's hand-computed
+   expectation.
 5. Full chain: `Work Order → Material Issue(s) → WIP → Finished Goods
    Output(s) → WIP balance returns to zero when quantityProduced ==
    quantityPlanned and no further issues occur` — traced end to end.
-6. No duplicate posting on retried issue/return/output calls (idempotency
-   key re-delivery test, per movement type in §12's table).
-7. Concurrent material issue against the same (warehouse, product) pair
+6. **Numerical multi-output proof (mandatory, mirrors §8 exactly):** a Work
+   Order reproducing §8's worked example step for step — two partial
+   Material Issues of the same component at two different real-warehouse
+   costs, one partial Material Return, and two partial Finished Goods
+   Outputs whose combined quantity exactly reaches `quantityPlanned` — run
+   against live Postgres data, with every intermediate `WIP(WO).value` and
+   every output's `unitCost_i`/`valueOutput_i` matching §8's figures to the
+   cent (`$60.00 → $108.00 → $97.20 (post-return) → $38.88 → $0.00`, both
+   FG outputs costed at `$9.72`/unit), and the total value of both partial
+   outputs (`$58.32 + $38.88 = $97.20`) verified equal to total value
+   issued net of the return (`$60.00 + $48.00 − $10.80 = $97.20`) by direct
+   query — not by trusting the application layer's own arithmetic.
+7. No duplicate posting on retried issue/return/output calls (idempotency
+   key re-delivery test, per movement type in §13's table).
+8. Concurrent material issue against the same (warehouse, product) pair
    from two Work Orders — correctness verified under the existing advisory-
-   lock discipline (§11), matching `ADR-053 §7`'s permanent multi-user
+   lock discipline (§12), matching `ADR-053 §7`'s permanent multi-user
    correctness requirement.
-8. Legacy `assembleProduct` (§13, if implemented in the same phase):
+9. Legacy `assembleProduct` (§14, if implemented in the same phase):
    pre-remediation historical rows unchanged; post-remediation assemblies
    produce the same `Dr WIP/Cr Inventory`/`Dr Inventory/Cr WIP` pair as a
    new Work Order's instantaneous case.
-9. Existing Month-End Phase 1–8 tests re-run **unchanged** — confirms this
-   contract's implementation did not silently alter Wave 1's already-frozen
-   behavior (the same re-verification discipline `ADR-056` already
-   required of GRNI's own Phase 8 addition, cited read-only).
-10. Full regression suite.
+10. Existing Month-End Phase 1–8 tests re-run **unchanged** — confirms this
+    contract's implementation did not silently alter Wave 1's already-frozen
+    behavior (the same re-verification discipline `ADR-056` already
+    required of GRNI's own Phase 8 addition, cited read-only).
+11. Full regression suite.
 
-**PASS criteria:** all ten items above pass, with every Financial Event in
-item 2/3/4 verified balanced (`Σdebit = Σcredit`) by direct query, not
+**PASS criteria:** all eleven items above pass, with every Financial Event
+in item 2/3/4/6 verified balanced (`Σdebit = Σcredit`) by direct query, not
 merely "no error returned."
 
-## 20. Explicit non-goals and deferred policies
+## 21. Explicit non-goals and deferred policies
 
 Not in Phase 1, by ratified decision or explicit scope boundary — restated
 here in one place for a single point of reference:
@@ -545,14 +725,28 @@ here in one place for a single point of reference:
   preserved, not extended).
 - Subcontracting (Phase 0 §10 — not contemplated at all; no proposal made
   here either).
-- Scrap/waste/yield accounting (Phase 0 §9 — not contemplated at all; a
-  Work Order's `quantityProduced` may fall short of `quantityPlanned` with
-  no formal "scrap" event or account — this is a known, disclosed gap, not
-  a silent omission, and would need its own future decision).
+- Scrap/waste/yield accounting (Phase 0 §9 — not contemplated at all). A
+  Work Order's `quantityProduced` may fall short of `quantityPlanned`, but
+  §3's completion guard (`WIP(WO).value == 0` to complete) means the
+  **only** legal Phase 1 mechanism to close such a Work Order is a Material
+  Return of the unneeded component quantity (§5/§8) back into real,
+  on-hand, dispensable stock. **This is only correct when the shortfall is
+  genuine unused material.** If the shortfall is instead genuine physical
+  scrap/spoilage — material actually consumed or destroyed in a failed
+  production attempt, not physically returnable — Phase 1 has no way to
+  distinguish that case from an ordinary return, and forcing a Material
+  Return in that situation would incorrectly re-inflate the real
+  warehouse's on-hand quantity and moving-average cost with material that
+  no longer physically exists. This is a known, disclosed gap, not a
+  silent omission: Phase 1 should only be used where genuine physical
+  scrap is not expected, or where any such scrap is tracked outside this
+  system, until a future phase adds a dedicated scrap/waste event and
+  account — its own future, separately-ratified decision, not something
+  this contract invents a workaround for.
 - Quality-control gating (Phase 0 §16 — the Returns-domain Inspection-
   location pattern is not reused or generalized by this contract; a
   Manufacturing QC gate, if wanted, is a separate future proposal).
-- Maker/checker approval on any Manufacturing action (§14 — none is
+- Maker/checker approval on any Manufacturing action (§15 — none is
   introduced; may be revisited separately).
 - Multi-branch/legal-entity Work Order scoping beyond whatever a Work
   Order's `warehouseId` already implies (Phase 0 §19 — explicitly a Wave 5
@@ -562,7 +756,7 @@ here in one place for a single point of reference:
 
 ---
 
-## 21. Explicit stop
+## 22. Explicit stop
 
 Per the CTO's instruction: this document is the complete deliverable for
 this task. No code, migration, schema, permission, or frontend change
