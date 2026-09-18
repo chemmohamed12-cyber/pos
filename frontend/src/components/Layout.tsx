@@ -122,6 +122,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/accounting/cash-bank', code: 'nav.cash_bank_reconciliation', roles: ['admin'] },
       { to: '/accounting/fixed-assets', code: 'nav.fixed_assets', roles: ['admin'] },
       { to: '/accounting/inventory', code: 'nav.inventory_accounting', roles: ['admin'] },
+      { to: '/accounting/grni', code: 'nav.grni_reconciliation', roles: ['admin'] },
       { to: '/accounting/dimensions', code: 'nav.dimensions', roles: ['admin'] },
       { to: '/accounting/settings', code: 'nav.accounting_settings', roles: ['admin'] },
       { to: '/accounting/reports/balance-sheet', code: 'nav.balance_sheet', roles: ['admin'] },

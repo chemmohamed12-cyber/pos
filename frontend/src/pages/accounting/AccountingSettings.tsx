@@ -1,10 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 
-const FISCAL_CLOSING_REQUEST_TYPE_CODES = ['accounting.fiscal_period.close', 'accounting.fiscal_period.reopen', 'accounting.fiscal_year.close'];
+const FISCAL_CLOSING_REQUEST_TYPE_CODES = [
+  'accounting.fiscal_period.close',
+  'accounting.fiscal_period.reclose',
+  'accounting.fiscal_period.reopen',
+  'accounting.fiscal_year.close',
+];
 
 const ROUNDING_MODES = ['half_up', 'half_even', 'half_down'] as const;
 
@@ -88,6 +94,10 @@ const PRELOAD = [
   'panel.no_currencies_yet',
   'panel.no_fiscal_years_yet',
   'panel.no_tax_codes_yet',
+  'nav.closing_audit',
+  'nav.closing_exceptions',
+  'nav.closing_snapshots',
+  'panel.blocking_exceptions_exist',
 ];
 
 /** F01 — Financial Foundation (ADR-032). Currencies + Fiscal Years/Periods + Tax Codes/Periods — the module-level configuration screens `nav.accounting_settings` was seeded for. */
@@ -98,6 +108,7 @@ export function AccountingSettings() {
   const [currencies, setCurrencies] = useState<Currency[] | null>(null);
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[] | null>(null);
   const [periodsByYear, setPeriodsByYear] = useState<Record<string, FiscalPeriod[]>>({});
+  const [blockingCountByPeriod, setBlockingCountByPeriod] = useState<Record<string, number>>({});
   const [taxCodes, setTaxCodes] = useState<TaxCode[] | null>(null);
   const [taxPeriods, setTaxPeriods] = useState<TaxPeriod[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -165,8 +176,25 @@ export function AccountingSettings() {
     try {
       const p = await api.get<FiscalPeriod[]>(`/accounting/fiscal-years/${fiscalYearId}/periods`);
       setPeriodsByYear((prev) => ({ ...prev, [fiscalYearId]: p }));
+      // ADR-058 (CTO decision 3): visually disable Submit Close when blocking exceptions are open —
+      // the backend (`assertCleanForClose`) already refuses authoritatively regardless of this check.
+      for (const period of p) {
+        if (period.status === 'soft_close' || period.status === 'reopened') {
+          loadBlockingCount(period.id);
+        }
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load fiscal periods.');
+    }
+  }
+
+  async function loadBlockingCount(periodId: string) {
+    try {
+      const exceptions = await api.get<Array<{ severity: string; status: string }>>(`/accounting/fiscal-periods/${periodId}/closing-exceptions`);
+      const count = exceptions.filter((e) => e.severity === 'blocking' && (e.status === 'open' || e.status === 'acknowledged')).length;
+      setBlockingCountByPeriod((prev) => ({ ...prev, [periodId]: count }));
+    } catch {
+      // Non-fatal — the button simply won't be pre-emptively disabled; the backend still enforces.
     }
   }
 
@@ -534,7 +562,7 @@ export function AccountingSettings() {
                         <td>
                           <StatusBadge code={`value.fiscal_period_status.${p.status}`} />
                         </td>
-                        <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                           {p.status === 'open' && (
                             <button className="btn btn-secondary" disabled={busy} onClick={() => transitionPeriod(fy.id, p.id, 'soft_close')}>
                               {t('action.soft_close')}
@@ -545,7 +573,12 @@ export function AccountingSettings() {
                               <button className="btn btn-secondary" disabled={busy} onClick={() => transitionPeriod(fy.id, p.id, 'reopen_from_soft_close')}>
                                 {t('action.reopen_from_soft_close')}
                               </button>
-                              <button className="btn btn-secondary" disabled={busy} onClick={() => submitPeriodClose(fy.id, p.id)}>
+                              <button
+                                className="btn btn-secondary"
+                                disabled={busy || (blockingCountByPeriod[p.id] ?? 0) > 0}
+                                title={(blockingCountByPeriod[p.id] ?? 0) > 0 ? t('panel.blocking_exceptions_exist') : undefined}
+                                onClick={() => submitPeriodClose(fy.id, p.id)}
+                              >
                                 {t('action.submit_period_close')}
                               </button>
                             </>
@@ -556,10 +589,29 @@ export function AccountingSettings() {
                             </button>
                           )}
                           {p.status === 'reopened' && (
-                            <button className="btn btn-secondary" disabled={busy} onClick={() => transitionPeriod(fy.id, p.id, 'close_after_reopen')}>
-                              {t('action.close_after_reopen')}
+                            /* ADR-058 (Wave 1 Frontend Completion) — fixed regression: this used to call the routine
+                               `transitionPeriod(..., 'close_after_reopen')`, which ADR-051 §1.2 removed from the ungated
+                               action list. Reuses the SAME already-unified `submitPeriodClose` the soft_close branch
+                               above uses — it picks the reclose FA-01 request type automatically from the period's
+                               own current state. */
+                            <button
+                              className="btn btn-secondary"
+                              disabled={busy || (blockingCountByPeriod[p.id] ?? 0) > 0}
+                              title={(blockingCountByPeriod[p.id] ?? 0) > 0 ? t('panel.blocking_exceptions_exist') : undefined}
+                              onClick={() => submitPeriodClose(fy.id, p.id)}
+                            >
+                              {t('action.submit_period_close')}
                             </button>
                           )}
+                          <Link to={`/accounting/fiscal-periods/${p.id}/closing-audit`} className="btn btn-secondary">
+                            {t('nav.closing_audit')}
+                          </Link>
+                          <Link to={`/accounting/fiscal-periods/${p.id}/closing-exceptions`} className="btn btn-secondary">
+                            {t('nav.closing_exceptions')}
+                          </Link>
+                          <Link to={`/accounting/fiscal-periods/${p.id}/closing-snapshots`} className="btn btn-secondary">
+                            {t('nav.closing_snapshots')}
+                          </Link>
                         </td>
                       </tr>
                     ))}

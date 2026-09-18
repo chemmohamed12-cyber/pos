@@ -44,6 +44,10 @@ import { ApReconciliation } from './pages/accounting/ApReconciliation';
 import { CashBankReconciliation } from './pages/accounting/CashBankReconciliation';
 import { FixedAssets } from './pages/accounting/FixedAssets';
 import { InventoryAccounting } from './pages/accounting/InventoryAccounting';
+import { GrniReconciliation } from './pages/accounting/GrniReconciliation';
+import { ClosingAudit } from './pages/accounting/ClosingAudit';
+import { ClosingExceptions } from './pages/accounting/ClosingExceptions';
+import { ClosingSnapshots } from './pages/accounting/ClosingSnapshots';
 import { Dimensions } from './pages/accounting/Dimensions';
 import { AccountingSettings } from './pages/accounting/AccountingSettings';
 import { BalanceSheet } from './pages/accounting/BalanceSheet';
@@ -209,6 +213,10 @@ function AppRoutes() {
         <Route path="accounting/cash-bank" element={<CashBankReconciliation />} />
         <Route path="accounting/fixed-assets" element={<FixedAssets />} />
         <Route path="accounting/inventory" element={<InventoryAccounting />} />
+        <Route path="accounting/grni" element={<GrniReconciliation />} />
+        <Route path="accounting/fiscal-periods/:periodId/closing-audit" element={<ClosingAudit />} />
+        <Route path="accounting/fiscal-periods/:periodId/closing-exceptions" element={<ClosingExceptions />} />
+        <Route path="accounting/fiscal-periods/:periodId/closing-snapshots" element={<ClosingSnapshots />} />
         <Route path="accounting/dimensions" element={<Dimensions />} />
         <Route path="accounting/settings" element={<AccountingSettings />} />
         <Route path="accounting/reports/balance-sheet" element={<BalanceSheet />} />

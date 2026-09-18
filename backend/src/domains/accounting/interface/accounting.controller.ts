@@ -30,6 +30,7 @@ import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authenti
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+import { PermissionService } from '../../../foundation/permission/permission.service';
 import { RequireFeature, RequireFeatureGuard } from '../../../foundation/module-registry/require-feature.decorator';
 
 class CreateCurrencyDto {
@@ -409,6 +410,7 @@ export class AccountingController {
     private readonly glAccounts: GLAccountService,
     private readonly closingExceptions: ClosingExceptionService,
     private readonly closingSnapshots: ClosingSnapshotService,
+    private readonly permissions: PermissionService,
   ) {}
 
   @UseGuards(PermissionGuard)
@@ -568,12 +570,23 @@ export class AccountingController {
     return this.closingSnapshots.verify(id);
   }
 
-  /** ADR-051 §2 — every ClosingException ever raised for this period, current status/severity/category included. */
+  /**
+   * ADR-051 §2 — every ClosingException ever raised for this period, current
+   * status/severity/category included. ADR-058 (Wave 1 Frontend Completion,
+   * CTO decision 2): a `HISTORICAL_TEST_ARTIFACT` row is visible only to a
+   * caller who already holds `accounting.closing_exception.annotate_test_
+   * artifact` at `editable` — the same, already-existing node that gates the
+   * ONE path to that category (ADR-051 §3), reused here rather than a new
+   * node. This is a read-visibility filter only: the exception's own
+   * category/severity in the database is never altered by who is looking.
+   */
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.closing_exception.view', 'read-only')
   @Get('fiscal-periods/:id/closing-exceptions')
-  async listClosingExceptions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.closingExceptions.list(id);
+  async listClosingExceptions(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
+    const exceptions = await this.closingExceptions.list(id);
+    const canSeeTestArtifacts = await this.permissions.hasAtLeast(req.user.id, 'accounting.closing_exception.annotate_test_artifact', 'editable');
+    return canSeeTestArtifacts ? exceptions : exceptions.filter((e) => e.category !== 'HISTORICAL_TEST_ARTIFACT');
   }
 
   /** ADR-051 §2 — `open -> acknowledged` only. `resolved` is never reachable through this route (set only by a fresh Closing Audit run no longer reproducing the finding). */
