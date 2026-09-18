@@ -187,6 +187,20 @@ per issue, the same way `PurchaseOrderLine.quantityReceived` already
 accumulates across partial Goods Receipts (Phase 0 §12, INFERRED from the
 established Procurement pattern).
 
+**Hard guard (no over-issue in Phase 1):** `work_order_material_issue` must
+reject any issue event where `quantityIssued_before + issueQuantity >
+quantityRequired` for that `WorkOrderComponent` — the same fail-closed
+style as §3's completion guard and this section's own return-quantity
+guard below. A Work Order's BOM snapshot (§2/§3) is the sole authorization
+for how much of a component may ever be issued against it in Phase 1;
+issuing beyond it is not a partial-issue variant, it is a different
+business event (unplanned/extra consumption) that this contract does not
+define a policy for, and therefore does not allow silently. If a Work
+Order genuinely needs more of a component than its snapshot allows, the
+correct Phase 1 action is to put it `on_hold` and resolve the shortfall at
+the planning level (e.g. a new or amended Work Order) — not an unbounded
+issue against the existing one.
+
 **Consumption:** in this contract, "issue" and "consumption" are the same
 event — once material is issued to a Work Order, it is by definition
 consumed into WIP (there is no further "shelf" state between issue and
@@ -332,6 +346,34 @@ WIP(WO).value_after         = WIP(WO).value_before − valueOutput_i
 quantityProduced_after      = quantityProduced_before + q_i
 ```
 
+**Hard guard (no over-production beyond plan):**
+`work_order_finished_goods_output` must reject any output event where
+`quantityProduced_before + outputQuantity > quantityPlanned` — a Work
+Order can never report more finished output than it planned, even summed
+across many partial output events. This is not merely a business-sanity
+check: it is required for the formula above to stay well-defined, because
+without it `remainingPlannedQty_before` (the formula's divisor) could
+reach zero or go negative before a legitimate final output — an undefined
+division, not merely an undesirable one.
+
+**Explicit costing-policy statement (clarifying the formula above):** at
+each FG output event, the *entire* current `WIP(WO).value` is allocated
+across the Work Order's *remaining planned* production quantity — never
+across only the quantity being output in that one event, and never across
+the Work Order's original `quantityPlanned` re-used unmodified from the
+start. The per-unit cost this formula produces is therefore **not fixed
+for the life of the Work Order**: it is recomputed fresh at every output
+event from whatever `WIP(WO).value` and `remainingPlannedQty` happen to be
+at that instant. One consequence must be stated explicitly, because it is
+easy to miss: **a Material Issue that occurs after a partial FG output
+changes the cost basis of every unit still to be produced**, since it
+raises `WIP(WO).value` without changing `remainingPlannedQty`, which
+raises `unitCost_i` for the next output — exactly the way a
+moving-average receipt anywhere else in this codebase raises the rate for
+what is dispensed next. §8's worked example below is extended with
+precisely this case (a Material Issue occurring after a partial FG
+output) to prove the formula stays value-conserving when it happens.
+
 This is the moving-average method (D1) applied one level up: exactly as an
 ordinary dispatch draws down a warehouse's on-hand value at that
 warehouse's *current* average without disturbing the average for what
@@ -348,8 +390,9 @@ opening-stock/receipt cost-input flow"*) — reusing that exact, existing
 mechanism rather than inventing a second one, per `ADR-055 §10`.
 
 **Proof this conserves value exactly across multiple partial outputs,
-partial issues, a partial return, and a component cost change between
-issues** — see §8's fully worked numerical example, which traces a single
+partial issues, a partial return, a component cost change between issues,
+and a Material Issue occurring between two partial FG outputs** — see
+§8's fully worked numerical example, which traces a single
 Work Order end-to-end and shows total value in (issues, net of a return) =
 total value out (two partial FG outputs), to the cent, with the final
 output correctly driving `WIP(WO).value` to exactly zero (satisfying §3's
@@ -369,29 +412,36 @@ because every step is exact arithmetic on the figures given.
 
 | Step | Event | Detail | WIP(WO).value after |
 |---|---|---|---|
-| 1 | Material Issue #1 | 12 units of C @ real warehouse's current avg **$5.00** → WIP receipt-costed @ $5.00; WIP's own avg for C = $5.00 | **$60.00** (12 × $5.00) |
+| 1 | Material Issue #1 | 12 units of C @ real warehouse's current avg **$5.00** → WIP receipt-costed @ $5.00; WIP's own avg for C = $5.00. Guard check: `quantityIssued_before(0) + 12 ≤ quantityRequired` — passes. | **$60.00** (12 × $5.00) |
 | 2 | *(real warehouse independently receives new stock of C @ $6.00 — unrelated to this Work Order)* | — | $60.00 (unchanged) |
-| 3 | Material Issue #2 | 8 units of C @ real warehouse's *new* current avg **$6.00** → WIP receipt-costed @ $6.00; WIP's own avg for C recomputes: (12×$5.00 + 8×$6.00) ÷ 20 = **$5.40** | **$108.00** (20 × $5.40) |
+| 3 | Material Issue #2 | 8 units of C @ real warehouse's *new* current avg **$6.00** → WIP receipt-costed @ $6.00; WIP's own avg for C recomputes: (12×$5.00 + 8×$6.00) ÷ 20 = **$5.40**. Guard check: `quantityIssued_before(12) + 8 ≤ quantityRequired` — passes. | **$108.00** (20 × $5.40) |
 | 4 | Material Return | 2 units of C returned, costed at WIP's **current** avg for C = $5.40 (§5, corrected — not "the original issue cost," which is no longer a single well-defined number after step 3's blend) | **$97.20** (18 × $5.40 — self-consistent: $108.00 − $10.80) |
-| 5 | FG Output #1 | Produce 6 of 10 planned. `remainingPlannedQty_before = 10 − 0 = 10`. `unitCost = $97.20 ÷ 10 = $9.72`. `valueOutput = 6 × $9.72 = $58.32` | **$38.88** ($97.20 − $58.32) |
-| 6 | FG Output #2 (final) | Produce remaining 4 of 10. `remainingPlannedQty_before = 10 − 6 = 4`. `unitCost = $38.88 ÷ 4 = $9.72` (unchanged — nothing entered/left WIP between outputs 1 and 2, so the rate cannot have moved, exactly like an untouched moving average). `valueOutput = 4 × $9.72 = $38.88` | **$0.00** ($38.88 − $38.88) |
+| 5 | FG Output #1 | Produce 6 of 10 planned. `remainingPlannedQty_before = 10 − 0 = 10`. `unitCost = $97.20 ÷ 10 = $9.72`. `valueOutput = 6 × $9.72 = $58.32`. Guard check: `quantityProduced_before(0) + 6 ≤ 10` — passes. | **$38.88** ($97.20 − $58.32) |
+| 6 | **Material Issue #3** *(occurs after a partial FG output — the case §7's costing-policy clarification addresses)* | 3 more units of C, issued @ real warehouse's *now-current* avg **$7.00** (having moved again since step 3) → WIP receipt-costed @ $7.00. Guard check: `quantityIssued_before(20) + 3 ≤ quantityRequired` — passes for this example's snapshot. §7's formula works in Work-Order-level dollars, not per-component units, so this simply adds value to `WIP(WO).value`. | **$59.88** ($38.88 + 3 × $7.00) |
+| 7 | FG Output #2 (final) | Produce remaining 4 of 10. `remainingPlannedQty_before = 10 − 6 = 4` (**unchanged by the issue** — only `quantityProduced` moves this divisor). `unitCost = $59.88 ÷ 4 = $14.97` — **higher than step 5's $9.72**, exactly because step 6 raised `WIP(WO).value` without changing `remainingPlannedQty`, precisely the effect §7's clarification describes. `valueOutput = 4 × $14.97 = $59.88`. Guard check: `quantityProduced_before(6) + 4 = 10 ≤ 10` — passes, at the exact boundary. | **$0.00** ($59.88 − $59.88) |
 
 **Conservation check:**
 
 ```
-Total value IN  (issues, net of return) = $60.00 + $48.00 − $10.80 = $97.20
-Total value OUT (both FG outputs)       = $58.32 + $38.88          = $97.20
+Total value IN  (issues, net of return) = $60.00 + $48.00 − $10.80 + $21.00 = $118.20
+Total value OUT (both FG outputs)       = $58.32 + $59.88                   = $118.20
 ```
 
 **Exactly balanced — total material value is neither created nor destroyed**,
 across two partial issues, a component cost change between them, a partial
-return valued at the post-blend average, and two partial FG outputs whose
-combined quantity exactly reaches `quantityPlanned`. `WIP(WO).value`
-reaches exactly `$0.00` at the moment `quantityProduced` reaches
-`quantityPlanned` — satisfying §3's completion guard without any special
-"final output absorbs the remainder" rule, because the formula's
-denominator (`remainingPlannedQty`) and the Work Order's own completion
-condition are the same underlying quantity by construction.
+return valued at the post-blend average, a *third* Material Issue occurring
+**after** a partial FG output at yet another new cost, and two partial FG
+outputs whose combined quantity exactly reaches `quantityPlanned` at the
+§7 guard's exact boundary (`10 ≤ 10`). `WIP(WO).value` reaches exactly
+`$0.00` at the moment `quantityProduced` reaches `quantityPlanned` —
+satisfying §3's completion guard without any special "final output absorbs
+the remainder" rule, because the formula's denominator
+(`remainingPlannedQty`) and the Work Order's own completion condition are
+the same underlying quantity by construction. Crucially, the mid-stream
+Material Issue (step 6) **demonstrably changed the cost basis of the
+remaining planned units** — from `$9.72` to `$14.97` per unit — without
+breaking conservation, confirming §7's costing-policy clarification is not
+just descriptive text but a proven property of the formula.
 
 **What happens if a Work Order completes with `quantityProduced <
 quantityPlanned` (a deliberate under-produced close, not shown in the table
@@ -681,17 +731,27 @@ change to any Wave 1 (Procurement/Accounting/Month-End) table.
    Output(s) → WIP balance returns to zero when quantityProduced ==
    quantityPlanned and no further issues occur` — traced end to end.
 6. **Numerical multi-output proof (mandatory, mirrors §8 exactly):** a Work
-   Order reproducing §8's worked example step for step — two partial
-   Material Issues of the same component at two different real-warehouse
-   costs, one partial Material Return, and two partial Finished Goods
-   Outputs whose combined quantity exactly reaches `quantityPlanned` — run
-   against live Postgres data, with every intermediate `WIP(WO).value` and
-   every output's `unitCost_i`/`valueOutput_i` matching §8's figures to the
-   cent (`$60.00 → $108.00 → $97.20 (post-return) → $38.88 → $0.00`, both
-   FG outputs costed at `$9.72`/unit), and the total value of both partial
-   outputs (`$58.32 + $38.88 = $97.20`) verified equal to total value
-   issued net of the return (`$60.00 + $48.00 − $10.80 = $97.20`) by direct
-   query — not by trusting the application layer's own arithmetic.
+   Order reproducing §8's worked example step for step — three Material
+   Issues of the same component at three different real-warehouse costs
+   (the third occurring **after** a partial Finished Goods output), one
+   partial Material Return, and two partial Finished Goods Outputs whose
+   combined quantity exactly reaches `quantityPlanned` at the §7 guard's
+   exact boundary — run against live Postgres data, with every intermediate
+   `WIP(WO).value` and every output's `unitCost_i`/`valueOutput_i` matching
+   §8's figures to the cent (`$60.00 → $108.00 → $97.20 (post-return) →
+   $38.88 (after FG Output #1) → $59.88 (after Material Issue #3) →
+   $0.00`), FG Output #1 costed at `$9.72`/unit and FG Output #2 costed at
+   `$14.97`/unit — the higher post-issue rate proving the mid-stream
+   Material Issue correctly changed the cost basis of the remaining
+   planned units (§7's costing-policy clarification) — and the total value
+   of both partial outputs (`$58.32 + $59.88 = $118.20`) verified equal to
+   total value issued net of the return (`$60.00 + $48.00 + $21.00 −
+   $10.80 = $118.20`) by direct query — not by trusting the application
+   layer's own arithmetic. Also verify as part of the same run: an issue
+   attempting `quantityIssued_before + issueQuantity > quantityRequired`
+   is rejected (§5's guard), and an output attempting
+   `quantityProduced_before + outputQuantity > quantityPlanned` is
+   rejected (§7's guard).
 7. No duplicate posting on retried issue/return/output calls (idempotency
    key re-delivery test, per movement type in §13's table).
 8. Concurrent material issue against the same (warehouse, product) pair
