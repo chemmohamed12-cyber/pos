@@ -1,0 +1,176 @@
+/* Reusable print/document layout — logical properties throughout so it
+   mirrors correctly for Arabic (RTL) vs English (LTR) without a second
+   stylesheet (same approach as Layout.css). */
+
+.print-page {
+  background: #e5e7eb;
+  min-height: 100vh;
+  padding: 24px 0;
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+}
+
+.print-toolbar {
+  max-width: 210mm;
+  margin: 0 auto 16px auto;
+  padding-inline: 12px;
+}
+
+.print-sheet {
+  background: #fff;
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 18mm 16mm;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  color: #1a1d23;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-block-end: 3px solid #14213d;
+  padding-block-end: 14px;
+  margin-block-end: 18px;
+}
+
+.print-brand {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #14213d;
+}
+
+.print-doc-title {
+  text-align: end;
+}
+
+.print-doc-title-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.print-doc-number {
+  font-size: 0.95rem;
+  color: #4b5563;
+  margin-block-start: 2px;
+}
+
+.print-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-block-end: 16px;
+}
+
+.print-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 20px;
+  margin-block-end: 20px;
+  padding: 14px;
+  background: #f8f9fb;
+  border: 1px solid #eceef2;
+  border-radius: 6px;
+}
+
+.print-field-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.print-field-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-block-start: 2px;
+}
+
+.print-lines-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block-end: 16px;
+}
+
+.print-lines-table th,
+.print-lines-table td {
+  border: 1px solid #d7dae0;
+  padding: 8px 10px;
+  text-align: start;
+  font-size: 0.88rem;
+}
+
+.print-lines-table th {
+  background: #14213d;
+  color: #fff;
+}
+
+.print-totals {
+  margin-inline-start: auto;
+  width: 280px;
+  margin-block-end: 20px;
+}
+
+.print-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.92rem;
+  border-block-end: 1px solid #eceef2;
+}
+
+.print-footer-note {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-block-end: 20px;
+}
+
+.print-signatures {
+  display: flex;
+  gap: 30px;
+  margin-block-start: 50px;
+}
+
+.print-signature-block {
+  flex: 1;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.print-signature-line {
+  border-block-end: 1px solid #9ca3af;
+  height: 40px;
+  margin-block-end: 6px;
+}
+
+.print-footer {
+  margin-block-start: 40px;
+  padding-block-start: 10px;
+  border-block-start: 1px solid #eceef2;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    background: #fff;
+    padding: 0;
+  }
+  .print-sheet {
+    box-shadow: none;
+    margin: 0;
+    max-width: none;
+    min-height: 0;
+    padding: 10mm 12mm;
+  }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}

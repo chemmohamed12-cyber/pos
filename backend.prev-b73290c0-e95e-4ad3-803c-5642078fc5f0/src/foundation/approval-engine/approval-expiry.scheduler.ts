@@ -1,0 +1,58 @@
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ApprovalEngineService } from './approval-engine.service';
+import { ConfigurationEngineService } from '../configuration-engine/configuration-engine.service';
+
+/**
+ * FA-01 (contract §4). The scheduled `expire` sweep — same
+ * `OnModuleInit` + `setInterval` + `OnModuleDestroy` shape as
+ * `BackupSchedulerService` and `PreliminaryHoldExpiryScheduler` (the only
+ * scheduling precedents in this codebase; `@nestjs/schedule` is NOT a
+ * dependency and this does not add it).
+ *
+ * Reads `core.approval.expire_sweep_interval_min` for cadence and
+ * `core.approval.expire_sweep_enabled` as the master switch, both live
+ * from the Configuration Engine. Inert under test (`NODE_ENV === 'test'`)
+ * — the sweep is exercised directly via `ApprovalEngineService.expire()`
+ * in the specs, never through a real timer.
+ */
+@Injectable()
+export class ApprovalExpiryScheduler implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ApprovalExpiryScheduler.name);
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    private readonly engine: ApprovalEngineService,
+    private readonly config: ConfigurationEngineService,
+  ) {}
+
+  onModuleInit(): void {
+    if (process.env.NODE_ENV === 'test') return;
+    let intervalMin = 60;
+    try {
+      intervalMin = this.config.get<number>('core.approval.expire_sweep_interval_min');
+    } catch {
+      // config not yet loaded at construction in some boot orders — fall back to the default cadence
+    }
+    this.timer = setInterval(() => {
+      this.runOnce().catch((err) =>
+        this.logger.error('Approval expiry sweep failed', err instanceof Error ? err.stack : String(err)),
+      );
+    }, Math.max(5, intervalMin) * 60 * 1000);
+  }
+
+  onModuleDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  async runOnce(): Promise<void> {
+    let enabled = true;
+    try {
+      enabled = this.config.get<boolean>('core.approval.expire_sweep_enabled');
+    } catch {
+      /* default on */
+    }
+    if (!enabled) return;
+    const { expired } = await this.engine.expire();
+    if (expired > 0) this.logger.log(`Approval expiry sweep: ${expired} stale request(s) expired.`);
+  }
+}

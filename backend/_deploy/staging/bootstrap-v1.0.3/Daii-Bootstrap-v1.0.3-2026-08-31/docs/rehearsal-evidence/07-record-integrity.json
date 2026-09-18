@@ -1,0 +1,22 @@
+{
+  "before": {
+    "treasury_accounts": 2,
+    "treasury_account_types": 5,
+    "users": 1,
+    "credentials": 1,
+    "roles": 9,
+    "terminology_entries": 754
+  },
+  "after": {
+    "treasury_accounts": 2,
+    "treasury_account_types": 5,
+    "users": 1,
+    "credentials": 1,
+    "roles": 9,
+    "terminology_entries": 754
+  },
+  "legacyAcctId": "76c30f35-48cb-bc34-86eb-f6ebbad994fb",
+  "newAcctId": "67f8907c-5502-46c1-97c4-7fec3a0d8915",
+  "legacyUserId": "eeb0d906-10f7-5178-626e-1be78d91cd64",
+  "newUserId": "b4a2524c-da0e-4d42-a928-7d72331a9a7b"
+}

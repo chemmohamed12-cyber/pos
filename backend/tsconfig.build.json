@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    "tools",
+    "_deploy",
+    "archive",
+    "node_modules.incident-backup-2026-09-15",
+    "public.pre-v1.0.3",
+    "storage",
+    "tmp"
+  ]
+}
