@@ -124,6 +124,11 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/accounting/inventory', code: 'nav.inventory_accounting', roles: ['admin'] },
       { to: '/accounting/grni', code: 'nav.grni_reconciliation', roles: ['admin'] },
       { to: '/accounting/dimensions', code: 'nav.dimensions', roles: ['admin'] },
+      // Frontend Gap Closure (2026-09-19) — Fiscal Period / Month-End Closing's own operational
+      // entry point (Fiscal Periods -> Period row -> Closing Audit/Exceptions/Reclose/Black Box,
+      // all already built under ADR-058). Placed right before Settings, which it was extracted
+      // from — not a "settings" concept, an operational workflow.
+      { to: '/accounting/fiscal-periods', code: 'nav.fiscal_periods', roles: ['admin'] },
       { to: '/accounting/settings', code: 'nav.accounting_settings', roles: ['admin'] },
       { to: '/accounting/reports/balance-sheet', code: 'nav.balance_sheet', roles: ['admin'] },
       { to: '/accounting/reports/profit-and-loss', code: 'nav.profit_and_loss', roles: ['admin'] },
