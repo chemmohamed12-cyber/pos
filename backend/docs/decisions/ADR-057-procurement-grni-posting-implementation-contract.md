@@ -242,3 +242,47 @@ new one.
 8. Full regression suite.
 
 Proceeding to implementation.
+
+## Addendum — real defect found and fixed during Acceptance Matrix item 6
+
+Live E2E verification (a genuine partial receipt/partial invoice: 7 of 10
+units received, 5 of 7 invoiced) surfaced a **pre-existing sign-convention
+bug in `ApReconciliationService`**, inherited verbatim into
+`GrniReconciliationService` because it was built as that service's direct
+mirror.
+
+**The bug:** `LedgerService.getAccountLedger`'s `closingBalanceBase` is
+unconditionally `Σdebit − Σcredit`, regardless of an account's own
+`normalBalance`. `getAllSupplierBalances`/`getAllGrniBalances` both report a
+**positive** balance when the credit-normal liability increases (correct).
+Comparing the two directly (`subledgerTotalBase − glBalanceBase`, the
+formula both reconciliation services used) therefore manufactured a
+permanent, roughly-double-magnitude phantom drift for any non-zero
+AP/GRNI balance — proven live: AP showed `subledgerTotalBase: 780,
+glBalanceBase: -780, driftBase: 1560` on a balance that was, in fact,
+perfectly matched. This had been latent in `ApReconciliationService` since
+before this session (part of the already-`ADR-051`-frozen Month-End scope)
+and was masked only because every earlier check in this program happened to
+run while AP's net balance was at or near zero.
+
+**The fix:** both services now normalize the GL balance by the account's own
+`normalBalance` (`gl.account.normalBalance`, already returned by
+`getAccountLedger`) before diffing — multiply by `-1` for a credit-normal
+account, `1` for debit-normal, entirely in parameterized SQL `NUMERIC`
+(ADR-035 D4 discipline preserved, no JS-side ledger arithmetic introduced).
+Confirmed AR/Cash-Bank/Inventory are unaffected (debit-normal, their own
+subledger conventions already align) — the fix is scoped to exactly the two
+credit-normal accounts.
+
+**Verified, not assumed:** re-ran both reconciliations live after the fix —
+AP and GRNI both correctly report `matched`, `driftBase: 0.0000`. Per
+`ADR-056`'s explicit "re-verify all [reconciliation types'] existing tests
+still pass unchanged" requirement (this fix touches `ApReconciliationService`,
+one of the five originally-frozen types), the full Month-End Phase 1-8
+regression suite was re-run after this fix — see the Phase 8 evidence report
+for the exact result. This is a "bug against approved design → fix and
+proceed" case per the CTO directive's own §7 rule, not an accounting-policy
+change: the *intended* behavior of AP/GRNI reconciliation was always "report
+matched when subledger and GL genuinely agree" — this fix makes that true
+for the first time for any non-zero credit-normal balance, it does not
+change what "matched" means.
