@@ -19,6 +19,7 @@ interface LeaveRequest {
   reason: string | null;
   status: 'submitted' | 'approved';
   createdAt: string;
+  approvalState: 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'expired' | null;
 }
 
 const LEAVE_TYPES = ['annual', 'sick', 'unpaid', 'other'] as const;
@@ -36,6 +37,7 @@ export function HrLeaveRequests() {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   preload([
     'nav.hr_leave_requests',
@@ -46,10 +48,14 @@ export function HrLeaveRequests() {
     'field.reason',
     'field.status',
     'field.created_at',
+    'field.actions',
     'action.submit_leave_request',
+    'action.cancel_leave_request',
     'panel.no_leave_requests_yet',
     'value.leave_request_status.submitted',
     'value.leave_request_status.approved',
+    'value.leave_request_status.rejected',
+    'value.leave_request_status.cancelled',
     ...LEAVE_TYPES.map((lt) => `value.leave_type.${lt}`),
   ]);
 
@@ -88,9 +94,30 @@ export function HrLeaveRequests() {
     }
   }
 
+  async function cancelRequest(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.post(`/hr/leave-requests/${id}/cancel`);
+      await loadRequests();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to cancel leave request.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const employeeLabel = (id: string) => {
     const emp = employees.find((e) => e.id === id);
     return emp ? `${emp.code} — ${emp.fullName}` : id.slice(0, 8);
+  };
+
+  /** The local `status` column only ever holds `submitted|approved` (see the entity's own doc comment) — "rejected"/"cancelled" are read from the linked ApprovalRequest's own state instead of being duplicated here. */
+  const displayStatus = (r: LeaveRequest) => {
+    if (r.status === 'approved') return 'approved';
+    if (r.approvalState === 'rejected') return 'rejected';
+    if (r.approvalState === 'withdrawn') return 'cancelled';
+    return 'submitted';
   };
 
   return (
@@ -161,6 +188,7 @@ export function HrLeaveRequests() {
               <th>{t('field.reason')}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.created_at')}</th>
+              <th>{t('field.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -172,9 +200,16 @@ export function HrLeaveRequests() {
                 <td>{r.endDate}</td>
                 <td>{r.reason ?? '—'}</td>
                 <td>
-                  <StatusBadge code={`value.leave_request_status.${r.status}`} />
+                  <StatusBadge code={`value.leave_request_status.${displayStatus(r)}`} />
                 </td>
                 <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>
+                  {r.status === 'submitted' && r.approvalState === 'pending' && (
+                    <button className="btn btn-secondary" disabled={busyId === r.id} onClick={() => cancelRequest(r.id)}>
+                      {t('action.cancel_leave_request')}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

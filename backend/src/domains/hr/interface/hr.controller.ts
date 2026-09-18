@@ -46,6 +46,35 @@ class CreateEmployeeDto {
   employmentType?: EmploymentType;
 }
 
+class EditEmployeeDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  fullName?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  position?: string | null;
+
+  @IsOptional()
+  @IsISO8601()
+  hireDate?: string | null;
+
+  @IsOptional()
+  @IsIn(['full_time', 'part_time', 'contractor'])
+  employmentType?: EmploymentType | null;
+}
+
+class AssignManagerDto {
+  @IsOptional()
+  @IsUUID()
+  managerId?: string | null;
+}
+
 class SetEmployeeStatusDto {
   @IsIn(['active', 'on_leave'])
   status!: Exclude<EmployeeStatus, 'terminated'>;
@@ -161,6 +190,22 @@ export class HrController {
     return this.hr.listStatusHistory(id);
   }
 
+  /** General field edit (Stage 2/E2E-03) — distinct from status/terminate/link-user, each with its own narrower audit action. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr.employee.edit', 'editable')
+  @Post('employees/:id')
+  async editEmployee(@Param('id', ParseUUIDPipe) id: string, @Body() dto: EditEmployeeDto, @Req() req: AuthenticatedRequest) {
+    return this.hr.editEmployee(id, dto, req.user.id);
+  }
+
+  /** Stage 2/E2E-05 — the reporting line. Same permission node as any other routine employee edit. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr.employee.edit', 'editable')
+  @Post('employees/:id/manager')
+  async assignManager(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssignManagerDto, @Req() req: AuthenticatedRequest) {
+    return this.hr.assignManager(id, dto.managerId ?? null, req.user.id);
+  }
+
   /** Routine transitions only — `terminated` is refused here (service-enforced); use `.../terminate`. */
   @UseGuards(PermissionGuard)
   @RequirePermission('hr.employee.edit', 'editable')
@@ -192,11 +237,12 @@ export class HrController {
     return this.hr.submitLeaveRequest(dto, req.user.id);
   }
 
+  /** Enriched with the linked `ApprovalRequest`'s own `state` so "rejected"/"cancelled" are visible — see `HrService.listLeaveRequestsWithApprovalState`'s own doc comment. */
   @UseGuards(PermissionGuard)
   @RequirePermission('hr.leave_request.view', 'read-only')
   @Get('leave-requests')
   async listLeaveRequests(@Query('employeeId') employeeId?: string) {
-    return this.hr.listLeaveRequests(employeeId);
+    return this.hr.listLeaveRequestsWithApprovalState(employeeId);
   }
 
   /** Same shape as every other FA-01 consumer's own decide wrapper (e.g. `ArController.decide`) — gated by the domain-specific checker node, not the generic one. */
@@ -205,5 +251,13 @@ export class HrController {
   @Post('leave-requests/:id/decide')
   async decideLeaveRequest(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideLeaveRequestDto, @Req() req: AuthenticatedRequest) {
     return this.hr.decide(id, req.user.id, dto.decision, dto.note);
+  }
+
+  /** Stage 3 ("cancel where permitted") — gated by the same submit-side permission; `ApprovalEngineService.withdraw` itself enforces maker-only. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr.leave_request.create', 'editable')
+  @Post('leave-requests/:id/cancel')
+  async cancelLeaveRequest(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
+    return this.hr.cancelLeaveRequest(id, req.user.id);
   }
 }

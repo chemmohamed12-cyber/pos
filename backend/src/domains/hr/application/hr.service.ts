@@ -28,6 +28,14 @@ export interface CreateEmployeeInput {
   employmentType?: EmploymentType | null;
 }
 
+export interface EditEmployeeInput {
+  fullName?: string;
+  departmentId?: string | null;
+  position?: string | null;
+  hireDate?: string | null;
+  employmentType?: EmploymentType | null;
+}
+
 export interface SubmitLeaveRequestInput {
   employeeId: string;
   leaveType: string;
@@ -189,6 +197,65 @@ export class HrService implements OnModuleInit {
       await this.events.publish(manager, 'employee.created', { employeeId: saved.id, code: saved.code });
       return saved;
     });
+  }
+
+  /** General field edit (Stage 2/E2E-03) — distinct from `setStatus`/`terminate`/`linkUser`, each of which owns its own narrower audit action and (for terminate/linkUser) its own permission node. */
+  async editEmployee(id: string, input: EditEmployeeInput, actorUserId: string): Promise<Employee> {
+    const employee = await this.getEmployee(id);
+    if (input.departmentId) {
+      await this.getDepartmentOrThrow(input.departmentId);
+    }
+    const before = {
+      fullName: employee.fullName,
+      departmentId: employee.departmentId,
+      position: employee.position,
+      hireDate: employee.hireDate,
+      employmentType: employee.employmentType,
+    };
+    if (input.fullName !== undefined) employee.fullName = input.fullName;
+    if (input.departmentId !== undefined) employee.departmentId = input.departmentId;
+    if (input.position !== undefined) employee.position = input.position;
+    if (input.hireDate !== undefined) employee.hireDate = input.hireDate;
+    if (input.employmentType !== undefined) employee.employmentType = input.employmentType;
+    const saved = await this.employees.save(employee);
+    await this.audit.record({
+      actorUserId,
+      organizationId: null,
+      action: 'hr.employee.edited',
+      resource: 'hr_employee',
+      resourceId: id,
+      result: 'success',
+      correlationId: null,
+      before,
+      after: { fullName: saved.fullName, departmentId: saved.departmentId, position: saved.position, hireDate: saved.hireDate, employmentType: saved.employmentType },
+    });
+    return saved;
+  }
+
+  /** Stage 2/E2E-05 — the reporting line. `managerId` is a plain self-referential column (same convention as `OrgUnit.parentId`); `null` un-assigns. */
+  async assignManager(employeeId: string, managerId: string | null, actorUserId: string): Promise<Employee> {
+    const employee = await this.getEmployee(employeeId);
+    if (managerId) {
+      if (managerId === employeeId) {
+        throw new ConflictException('An employee cannot be their own manager.');
+      }
+      await this.getEmployee(managerId); // throws NotFoundException if the manager id does not resolve to a real employee
+    }
+    const before = employee.managerId;
+    employee.managerId = managerId;
+    const saved = await this.employees.save(employee);
+    await this.audit.record({
+      actorUserId,
+      organizationId: null,
+      action: 'hr.employee.manager_assigned',
+      resource: 'hr_employee',
+      resourceId: employeeId,
+      result: 'success',
+      correlationId: null,
+      before: { managerId: before },
+      after: { managerId },
+    });
+    return saved;
   }
 
   async listEmployees(): Promise<Employee[]> {
@@ -369,9 +436,50 @@ export class HrService implements OnModuleInit {
     return this.leaveRequests.find({ where: employeeId ? { employeeId } : {}, order: { createdAt: 'DESC' } });
   }
 
+  /**
+   * Frontend-facing list: enriches each row with its linked `ApprovalRequest`'s own `state`
+   * (`pending|approved|rejected|withdrawn|expired`) so "rejected"/"cancelled" — neither of which
+   * this table's own `status` column ever holds (see the entity's own doc comment) — are still
+   * visible, without duplicating the Approval Engine's state machine here.
+   */
+  async listLeaveRequestsWithApprovalState(employeeId?: string): Promise<Array<LeaveRequest & { approvalState: string | null }>> {
+    const requests = await this.listLeaveRequests(employeeId);
+    return Promise.all(
+      requests.map(async (r) => {
+        if (!r.approvalRequestId) return { ...r, approvalState: null };
+        try {
+          const approval = await this.approvals.getRequest(r.approvalRequestId);
+          return { ...r, approvalState: approval.state };
+        } catch {
+          return { ...r, approvalState: null };
+        }
+      }),
+    );
+  }
+
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide` (e.g. `ArAdjustmentService.decide`). */
   async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
     return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  }
+
+  /** Stage 3 ("cancel where permitted") — reuses `ApprovalEngineService.withdraw`, which already enforces maker-only (`ForbiddenException` otherwise); no new authorization mechanism. Only a still-`submitted` request has anything to withdraw. */
+  async cancelLeaveRequest(id: string, actorUserId: string): Promise<LeaveRequest> {
+    const leaveRequest = await this.leaveRequests.findOne({ where: { id } });
+    if (!leaveRequest) throw new NotFoundException(`Leave request "${id}" not found.`);
+    if (leaveRequest.status !== 'submitted' || !leaveRequest.approvalRequestId) {
+      throw new ConflictException(`Leave request "${id}" is "${leaveRequest.status}" — only a submitted, pending request can be cancelled.`);
+    }
+    await this.approvals.withdraw(leaveRequest.approvalRequestId, actorUserId);
+    await this.audit.record({
+      actorUserId,
+      organizationId: null,
+      action: 'hr.leave_request.cancelled',
+      resource: 'hr_leave_request',
+      resourceId: id,
+      result: 'success',
+      correlationId: leaveRequest.approvalRequestId,
+    });
+    return leaveRequest;
   }
 
   /** ADR-046 D7 subscriber pattern — check current state first (idempotent against duplicate delivery), ignore any requestTypeCode that is not ours. */

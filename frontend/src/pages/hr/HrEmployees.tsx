@@ -22,6 +22,7 @@ interface Employee {
   hireDate: string | null;
   status: 'active' | 'on_leave' | 'terminated';
   userId: string | null;
+  managerId: string | null;
   employmentType: 'full_time' | 'part_time' | 'contractor' | null;
   terminationDate: string | null;
   terminationReason: string | null;
@@ -55,6 +56,13 @@ export function HrEmployees() {
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linkUserId, setLinkUserId] = useState('');
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState('');
+  const [editEmploymentType, setEditEmploymentType] = useState<(typeof EMPLOYMENT_TYPES)[number] | ''>('');
+  const [editManagerId, setEditManagerId] = useState('');
+
   preload([
     'nav.hr_employees',
     'field.code',
@@ -68,10 +76,13 @@ export function HrEmployees() {
     'field.linked_user',
     'field.termination_reason',
     'field.termination_date',
+    'field.manager',
     'action.create_employee',
     'action.change_employee_status',
     'action.terminate_employee',
     'action.link_user',
+    'action.edit_employee',
+    'action.save',
     'action.confirm',
     'action.cancel',
     'panel.no_employees_yet',
@@ -176,8 +187,43 @@ export function HrEmployees() {
     }
   }
 
+  function startEdit(emp: Employee) {
+    setEditingId(emp.id);
+    setEditFullName(emp.fullName);
+    setEditPosition(emp.position ?? '');
+    setEditDepartmentId(emp.departmentId ?? '');
+    setEditEmploymentType(emp.employmentType ?? '');
+    setEditManagerId(emp.managerId ?? '');
+  }
+
+  async function saveEdit(emp: Employee) {
+    setBusyId(emp.id);
+    setError(null);
+    try {
+      await api.post(`/hr/employees/${emp.id}`, {
+        fullName: editFullName,
+        position: editPosition || null,
+        departmentId: editDepartmentId || null,
+        employmentType: editEmploymentType || null,
+      });
+      if (editManagerId !== (emp.managerId ?? '')) {
+        await api.post(`/hr/employees/${emp.id}/manager`, { managerId: editManagerId || null });
+      }
+      setEditingId(null);
+      await loadEmployees();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to edit employee.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
   const userLabel = (id: string | null) => (id ? (users.find((u) => u.id === id)?.fullName ?? id.slice(0, 8)) : '—');
+  const employeeLabel = (id: string | null) => {
+    const found = employees?.find((e) => e.id === id);
+    return found ? `${found.code} — ${found.fullName}` : '—';
+  };
 
   return (
     <div>
@@ -242,19 +288,76 @@ export function HrEmployees() {
               <th>{t('field.department')}</th>
               <th>{t('field.position')}</th>
               <th>{t('field.employment_type')}</th>
+              <th>{t('field.manager')}</th>
               <th>{t('field.linked_user')}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp) => (
+            {employees.map((emp) =>
+              editingId === emp.id ? (
+                <tr key={emp.id}>
+                  <td>{emp.code}</td>
+                  <td>
+                    <input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} style={{ width: 140 }} />
+                  </td>
+                  <td>
+                    <select value={editDepartmentId} onChange={(e) => setEditDepartmentId(e.target.value)}>
+                      <option value="">—</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.code ? `${d.code} — ${d.name}` : d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input value={editPosition} onChange={(e) => setEditPosition(e.target.value)} style={{ width: 100 }} />
+                  </td>
+                  <td>
+                    <select value={editEmploymentType} onChange={(e) => setEditEmploymentType(e.target.value as never)}>
+                      <option value="">—</option>
+                      {EMPLOYMENT_TYPES.map((et) => (
+                        <option key={et} value={et}>
+                          {t(`value.employment_type.${et}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select value={editManagerId} onChange={(e) => setEditManagerId(e.target.value)}>
+                      <option value="">—</option>
+                      {employees
+                        .filter((e) => e.id !== emp.id)
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.code} — {e.fullName}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
+                  <td>{userLabel(emp.userId)}</td>
+                  <td>
+                    <StatusBadge code={`value.employee_status.${emp.status}`} />
+                  </td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-primary" disabled={busyId === emp.id} onClick={() => saveEdit(emp)}>
+                      {t('action.save')}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setEditingId(null)}>
+                      {t('action.cancel')}
+                    </button>
+                  </td>
+                </tr>
+              ) : (
               <tr key={emp.id}>
                 <td>{emp.code}</td>
                 <td>{emp.fullName}</td>
                 <td>{departmentName(emp.departmentId)}</td>
                 <td>{emp.position ?? '—'}</td>
                 <td>{emp.employmentType ? t(`value.employment_type.${emp.employmentType}`) : '—'}</td>
+                <td>{employeeLabel(emp.managerId)}</td>
                 <td>{userLabel(emp.userId)}</td>
                 <td>
                   <StatusBadge code={`value.employee_status.${emp.status}`} />
@@ -263,6 +366,11 @@ export function HrEmployees() {
                   )}
                 </td>
                 <td style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220 }}>
+                  {emp.status !== 'terminated' && (
+                    <button className="btn btn-secondary" onClick={() => startEdit(emp)}>
+                      {t('action.edit_employee')}
+                    </button>
+                  )}
                   {emp.status !== 'terminated' && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {NEXT_STATUS[emp.status].map((next) => (
@@ -320,7 +428,8 @@ export function HrEmployees() {
                   )}
                 </td>
               </tr>
-            ))}
+              ),
+            )}
           </tbody>
         </table>
       )}
