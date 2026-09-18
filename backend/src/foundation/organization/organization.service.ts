@@ -25,12 +25,30 @@ export class OrganizationService {
     return this.units.find({ order: { createdAt: 'ASC' } });
   }
 
-  async createUnit(type: OrgUnitType, name: string, parentId: string | null = null): Promise<OrgUnit> {
+  /** ADR-059 (HR Phase 1) — `hr`'s `/hr/departments` view filters to `type = 'department'` through this, rather than a second table. */
+  async listUnitsByType(type: OrgUnitType): Promise<OrgUnit[]> {
+    return this.units.find({ where: { type }, order: { name: 'ASC' } });
+  }
+
+  async getUnitById(id: string): Promise<OrgUnit | null> {
+    return this.units.findOne({ where: { id } });
+  }
+
+  /** `code` (ADR-059 D4 — HR issues this via `NumberingService` for `type = 'department'`) is optional and unused by every other existing caller of this method. */
+  async createUnit(type: OrgUnitType, name: string, parentId: string | null = null, code: string | null = null): Promise<OrgUnit> {
     if (parentId) {
       const parent = await this.units.findOne({ where: { id: parentId } });
       if (!parent) throw new NotFoundException(`Parent org unit "${parentId}" not found.`);
     }
-    return this.units.save(this.units.create({ type, name, parentId }));
+    return this.units.save(this.units.create({ type, name, parentId, code }));
+  }
+
+  /** ADR-059 (HR Phase 1) — the missing "rename a department" capability the Phase 0 study flagged as a real gap (`hr.department.edit` was declared but unwired). Generic enough for any `OrgUnit`, not HR-specific. */
+  async renameUnit(id: string, name: string): Promise<OrgUnit> {
+    const unit = await this.units.findOne({ where: { id } });
+    if (!unit) throw new NotFoundException(`Org unit "${id}" not found.`);
+    unit.name = name;
+    return this.units.save(unit);
   }
 
   async assignMember(userId: string, orgUnitId: string): Promise<void> {

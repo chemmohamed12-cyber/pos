@@ -141,6 +141,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/hr/employees', code: 'nav.hr_employees', roles: ['admin'] },
       { to: '/hr/departments', code: 'nav.hr_departments', roles: ['admin'] },
+      { to: '/hr/leave-requests', code: 'nav.hr_leave_requests', roles: ['admin'] },
     ],
   },
   { code: '', items: [{ to: '/reports-overview', code: 'nav.reports' }] },

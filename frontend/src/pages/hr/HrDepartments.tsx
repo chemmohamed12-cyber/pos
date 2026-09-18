@@ -4,18 +4,20 @@ import { useLanguage } from '../../context/LanguageContext';
 
 interface Department {
   id: string;
-  code: string;
   name: string;
+  code: string | null;
   createdAt: string;
 }
 
-/** HR (ADR-029) — Departments screen: flat list + create form, same shape as `TreasuryAccounts.tsx`'s account-type panel. */
+/** ADR-059 (HR Phase 1) — Departments screen: now a thin view over `OrgUnit(type='department')` (D1); `hr_departments` is retired. Codes are `NumberingService`-issued (D4), never client-supplied. */
 export function HrDepartments() {
   const { t, preload } = useLanguage();
   const [departments, setDepartments] = useState<Department[] | null>(null);
-  const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   preload([
@@ -23,7 +25,11 @@ export function HrDepartments() {
     'field.code',
     'field.name',
     'field.created_at',
+    'field.actions',
     'action.create_department',
+    'action.edit_department',
+    'action.save',
+    'action.cancel',
     'panel.no_departments_yet',
   ]);
 
@@ -45,14 +51,32 @@ export function HrDepartments() {
     setCreating(true);
     setError(null);
     try {
-      await api.post('/hr/departments', { code, name });
-      setCode('');
+      await api.post('/hr/departments', { name });
       setName('');
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create department.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  function startEdit(d: Department) {
+    setEditingId(d.id);
+    setEditName(d.name);
+  }
+
+  async function saveEdit(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/hr/departments/${id}`, { name: editName });
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to edit department.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -64,10 +88,6 @@ export function HrDepartments() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.code')}</label>
-            <input value={code} onChange={(e) => setCode(e.target.value)} required />
-          </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>{t('field.name')}</label>
             <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -91,14 +111,37 @@ export function HrDepartments() {
               <th>{t('field.code')}</th>
               <th>{t('field.name')}</th>
               <th>{t('field.created_at')}</th>
+              <th>{t('field.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {departments.map((d) => (
               <tr key={d.id}>
-                <td>{d.code}</td>
-                <td>{d.name}</td>
+                <td>{d.code ?? '—'}</td>
+                <td>
+                  {editingId === d.id ? (
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: 200 }} />
+                  ) : (
+                    d.name
+                  )}
+                </td>
                 <td>{new Date(d.createdAt).toLocaleDateString()}</td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  {editingId === d.id ? (
+                    <>
+                      <button className="btn btn-primary" disabled={busy} onClick={() => saveEdit(d.id)}>
+                        {t('action.save')}
+                      </button>
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => setEditingId(null)}>
+                        {t('action.cancel')}
+                      </button>
+                    </>
+                  ) : (
+                    <button className="btn btn-secondary" onClick={() => startEdit(d)}>
+                      {t('action.edit_department')}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

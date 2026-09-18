@@ -31,6 +31,7 @@ import { TreasuryAccounts } from './pages/TreasuryAccounts';
 import { TreasuryLedger } from './pages/TreasuryLedger';
 import { HrEmployees } from './pages/hr/HrEmployees';
 import { HrDepartments } from './pages/hr/HrDepartments';
+import { HrLeaveRequests } from './pages/hr/HrLeaveRequests';
 import { HrCover } from './pages/covers/HrCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
 import { ChartOfAccounts } from './pages/accounting/ChartOfAccounts';
@@ -202,6 +203,7 @@ function AppRoutes() {
         <Route path="hr" element={<HrCover />} />
         <Route path="hr/employees" element={<HrEmployees />} />
         <Route path="hr/departments" element={<HrDepartments />} />
+        <Route path="hr/leave-requests" element={<HrLeaveRequests />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/journals" element={<Journals />} />

@@ -22,6 +22,11 @@ export class OrgUnit {
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  /** ADR-059 D4 (HR Phase 1) — nullable; only `type = 'department'` units created via HR are currently code-issued (`NumberingService`, document type `hr_department`). Other unit types leave this null. */
+  @Index({ unique: true, where: '"code" IS NOT NULL' })
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  code!: string | null;
+
   @Index()
   @Column({ type: 'uuid', nullable: true })
   parentId!: string | null;

@@ -5,8 +5,13 @@ import { StatusBadge } from '../../components/StatusBadge';
 
 interface Department {
   id: string;
-  code: string;
   name: string;
+  code: string | null;
+}
+interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
 }
 interface Employee {
   id: string;
@@ -16,27 +21,39 @@ interface Employee {
   position: string | null;
   hireDate: string | null;
   status: 'active' | 'on_leave' | 'terminated';
+  userId: string | null;
+  employmentType: 'full_time' | 'part_time' | 'contractor' | null;
+  terminationDate: string | null;
+  terminationReason: string | null;
 }
 
-const NEXT_STATUS: Record<Employee['status'], Employee['status'][]> = {
-  active: ['on_leave', 'terminated'],
-  on_leave: ['active', 'terminated'],
+const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contractor'] as const;
+const NEXT_STATUS: Record<Employee['status'], Array<'active' | 'on_leave'>> = {
+  active: ['on_leave'],
+  on_leave: ['active'],
   terminated: [],
 };
 
-/** HR (ADR-029) — Employees screen: list + create form + status transition, same shape as `TreasuryAccounts.tsx`. */
+/** ADR-059 (HR Phase 1) — Employees screen. Employee codes are `NumberingService`-issued (D4), never entered by hand. Termination (D3) and manual User linking (D2) are their own dedicated actions, each behind its own permission node. */
 export function HrEmployees() {
   const { t, preload } = useLanguage();
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [employees, setEmployees] = useState<Employee[] | null>(null);
-  const [code, setCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [position, setPosition] = useState('');
   const [hireDate, setHireDate] = useState('');
+  const [employmentType, setEmploymentType] = useState<(typeof EMPLOYMENT_TYPES)[number] | ''>('');
   const [creating, setCreating] = useState(false);
-  const [busyStatus, setBusyStatus] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [terminatingId, setTerminatingId] = useState<string | null>(null);
+  const [terminateReason, setTerminateReason] = useState('');
+
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [linkUserId, setLinkUserId] = useState('');
 
   preload([
     'nav.hr_employees',
@@ -47,16 +64,33 @@ export function HrEmployees() {
     'field.hire_date',
     'field.status',
     'field.actions',
+    'field.employment_type',
+    'field.linked_user',
+    'field.termination_reason',
+    'field.termination_date',
     'action.create_employee',
     'action.change_employee_status',
+    'action.terminate_employee',
+    'action.link_user',
+    'action.confirm',
+    'action.cancel',
     'panel.no_employees_yet',
     'value.employee_status.active',
     'value.employee_status.on_leave',
     'value.employee_status.terminated',
+    ...EMPLOYMENT_TYPES.map((et) => `value.employment_type.${et}`),
   ]);
 
   async function loadDepartments() {
     setDepartments(await api.get<Department[]>('/hr/departments'));
+  }
+
+  async function loadUsers() {
+    try {
+      setUsers(await api.get<AdminUser[]>('/admin/users'));
+    } catch {
+      // link-user picker degrades to empty — not fatal for the rest of the page
+    }
   }
 
   async function loadEmployees() {
@@ -69,6 +103,7 @@ export function HrEmployees() {
 
   useEffect(() => {
     loadDepartments();
+    loadUsers();
     loadEmployees();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -79,17 +114,17 @@ export function HrEmployees() {
     setError(null);
     try {
       await api.post('/hr/employees', {
-        code,
         fullName,
         departmentId: departmentId || undefined,
         position: position || undefined,
         hireDate: hireDate || undefined,
+        employmentType: employmentType || undefined,
       });
-      setCode('');
       setFullName('');
       setDepartmentId('');
       setPosition('');
       setHireDate('');
+      setEmploymentType('');
       await loadEmployees();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create employee.');
@@ -98,8 +133,8 @@ export function HrEmployees() {
     }
   }
 
-  async function setStatus(emp: Employee, status: Employee['status']) {
-    setBusyStatus(emp.id);
+  async function setStatus(emp: Employee, status: 'active' | 'on_leave') {
+    setBusyId(emp.id);
     setError(null);
     try {
       await api.post(`/hr/employees/${emp.id}/status`, { status });
@@ -107,11 +142,42 @@ export function HrEmployees() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to change employee status.');
     } finally {
-      setBusyStatus(null);
+      setBusyId(null);
+    }
+  }
+
+  async function confirmTerminate(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.post(`/hr/employees/${id}/terminate`, { reason: terminateReason });
+      setTerminatingId(null);
+      setTerminateReason('');
+      await loadEmployees();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to terminate employee.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmLinkUser(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.post(`/hr/employees/${id}/link-user`, { userId: linkUserId });
+      setLinkingId(null);
+      setLinkUserId('');
+      await loadEmployees();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to link user.');
+    } finally {
+      setBusyId(null);
     }
   }
 
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
+  const userLabel = (id: string | null) => (id ? (users.find((u) => u.id === id)?.fullName ?? id.slice(0, 8)) : '—');
 
   return (
     <div>
@@ -122,10 +188,6 @@ export function HrEmployees() {
       <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.code')}</label>
-            <input value={code} onChange={(e) => setCode(e.target.value)} required />
-          </div>
-          <div className="form-field" style={{ marginBottom: 0 }}>
             <label>{t('field.full_name')}</label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           </div>
@@ -135,7 +197,7 @@ export function HrEmployees() {
               <option value="">—</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.code} — {d.name}
+                  {d.code ? `${d.code} — ${d.name}` : d.name}
                 </option>
               ))}
             </select>
@@ -147,6 +209,17 @@ export function HrEmployees() {
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>{t('field.hire_date')}</label>
             <input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} />
+          </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label>{t('field.employment_type')}</label>
+            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value as never)}>
+              <option value="">—</option>
+              {EMPLOYMENT_TYPES.map((et) => (
+                <option key={et} value={et}>
+                  {t(`value.employment_type.${et}`)}
+                </option>
+              ))}
+            </select>
           </div>
           <button className="btn btn-primary" type="submit" disabled={creating}>
             {t('action.create_employee')}
@@ -168,7 +241,8 @@ export function HrEmployees() {
               <th>{t('field.full_name')}</th>
               <th>{t('field.department')}</th>
               <th>{t('field.position')}</th>
-              <th>{t('field.hire_date')}</th>
+              <th>{t('field.employment_type')}</th>
+              <th>{t('field.linked_user')}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.actions')}</th>
             </tr>
@@ -180,22 +254,70 @@ export function HrEmployees() {
                 <td>{emp.fullName}</td>
                 <td>{departmentName(emp.departmentId)}</td>
                 <td>{emp.position ?? '—'}</td>
-                <td>{emp.hireDate ?? '—'}</td>
+                <td>{emp.employmentType ? t(`value.employment_type.${emp.employmentType}`) : '—'}</td>
+                <td>{userLabel(emp.userId)}</td>
                 <td>
                   <StatusBadge code={`value.employee_status.${emp.status}`} />
+                  {emp.status === 'terminated' && emp.terminationReason && (
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>{emp.terminationReason}</div>
+                  )}
                 </td>
-                <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {NEXT_STATUS[emp.status].map((next) => (
-                    <button
-                      key={next}
-                      className="btn btn-secondary"
-                      disabled={busyStatus === emp.id}
-                      onClick={() => setStatus(emp, next)}
-                      title={t('action.change_employee_status')}
-                    >
-                      {t(`value.employee_status.${next}`)}
-                    </button>
-                  ))}
+                <td style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220 }}>
+                  {emp.status !== 'terminated' && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {NEXT_STATUS[emp.status].map((next) => (
+                        <button key={next} className="btn btn-secondary" disabled={busyId === emp.id} onClick={() => setStatus(emp, next)}>
+                          {t(`value.employee_status.${next}`)}
+                        </button>
+                      ))}
+                      {terminatingId === emp.id ? (
+                        <>
+                          <input
+                            placeholder={t('field.termination_reason')}
+                            value={terminateReason}
+                            onChange={(e) => setTerminateReason(e.target.value)}
+                            style={{ width: 140 }}
+                          />
+                          <button className="btn btn-danger" disabled={busyId === emp.id} onClick={() => confirmTerminate(emp.id)}>
+                            {t('action.confirm')}
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => setTerminatingId(null)}>
+                            {t('action.cancel')}
+                          </button>
+                        </>
+                      ) : (
+                        <button className="btn btn-danger" onClick={() => setTerminatingId(emp.id)}>
+                          {t('action.terminate_employee')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!emp.userId && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {linkingId === emp.id ? (
+                        <>
+                          <select value={linkUserId} onChange={(e) => setLinkUserId(e.target.value)} style={{ minWidth: 140 }}>
+                            <option value="">—</option>
+                            {users.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.fullName} ({u.email})
+                              </option>
+                            ))}
+                          </select>
+                          <button className="btn btn-primary" disabled={busyId === emp.id || !linkUserId} onClick={() => confirmLinkUser(emp.id)}>
+                            {t('action.confirm')}
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => setLinkingId(null)}>
+                            {t('action.cancel')}
+                          </button>
+                        </>
+                      ) : (
+                        <button className="btn btn-secondary" onClick={() => setLinkingId(emp.id)}>
+                          {t('action.link_user')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

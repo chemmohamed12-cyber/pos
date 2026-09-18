@@ -38,6 +38,7 @@ export function HrCover() {
       shortcuts={[
         { to: '/hr/employees', labelCode: 'nav.hr_employees' },
         { to: '/hr/departments', labelCode: 'nav.hr_departments' },
+        { to: '/hr/leave-requests', labelCode: 'nav.hr_leave_requests' },
       ]}
       kpis={
         kpis
