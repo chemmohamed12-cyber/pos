@@ -145,6 +145,11 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    code: 'module.manufacturing',
+    coverTo: '/manufacturing',
+    items: [{ to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', roles: ['admin'] }],
+  },
+  {
     code: 'module.attendance',
     coverTo: '/attendance',
     items: [

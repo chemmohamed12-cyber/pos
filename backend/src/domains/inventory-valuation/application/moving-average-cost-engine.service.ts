@@ -67,15 +67,23 @@ export class MovingAverageCostEngine implements CostEngine {
 
       if (quantity > state.onHandQuantity) return { rejected: 'negative_on_hand' as const }; // NO mutation
 
+      // Captured BEFORE mutation — this is the rate actually charged for THIS
+      // dispatch. Reading `state.averageCostBase` again after the mutation
+      // below is wrong: it becomes `null` whenever this issue exactly zeroes
+      // out on-hand quantity (a real, common case — e.g. using up the last
+      // units of a lot), which previously made this method incorrectly
+      // report `unitCostBase: null` for an otherwise perfectly valid issue.
+      const costCharged = state.averageCostBase;
+
       const beforeValue = state.totalValueBase;
       const [row]: Array<{ issue_value: string; after_value: string }> = await m.query(
         `SELECT
            ($1::numeric(20,4) * $2::int)::numeric(20,4) AS issue_value,
            ($3::numeric(20,4) - $1::numeric(20,4) * $2::int)::numeric(20,4) AS after_value`,
-        [state.averageCostBase, quantity, beforeValue],
+        [costCharged, quantity, beforeValue],
       );
       const afterQty = state.onHandQuantity - quantity;
-      const afterAvg = afterQty > 0 ? state.averageCostBase : null; // weighted average is UNCHANGED by an issue
+      const afterAvg = afterQty > 0 ? costCharged : null; // weighted average is UNCHANGED by an issue, but undefined once on-hand hits zero
 
       state.onHandQuantity = afterQty;
       state.totalValueBase = row.after_value;
@@ -97,7 +105,7 @@ export class MovingAverageCostEngine implements CostEngine {
         }),
       );
 
-      return { unitCostBase: state.averageCostBase!, totalCostBase: row.issue_value };
+      return { unitCostBase: costCharged, totalCostBase: row.issue_value };
     });
   }
 
