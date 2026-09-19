@@ -1,29 +1,408 @@
 # ADR-067 — Payroll: Policy Decision Package
 
-**Status: PROPOSED — CTO decision pending. Analysis only.** No code,
-migration, schema, API, frontend, permission, or calculation is authorized
-by this document. Produced strictly from `ADR-064` (Payroll: Phase 0
-Architecture Study, accepted baseline) plus the now-ratified `ADR-063`
-(Attendance Policy Decision Package, RATIFIED 2026-09-19) — no new
-repository investigation is made beyond what those two documents already
+**Status: RATIFIED (2026-09-19).** All ten original decisions below
+(§1–§10) plus six additional binding architectural points the CTO directed
+beyond the original scope (§J–§O) have been resolved via the "CTO
+DIRECTIVE — ADR-067 Payroll Policy Decision Package" message, issued after
+`ADR-068` (Commission & Target) was ratified (commit `1d57782`) and
+Attendance was formally closed as **COMPLETE / VERIFIED / HANDOFF-READY
+FOR PAYROLL**. This document's original options-analysis body (§1–§10) is
+kept intact, unmodified, below the fold, as the historical record of what
+was weighed and why — the same "supersede via new content, never rewrite
+the analysis" discipline `ADR-052`/`ADR-060`/`ADR-063`/`ADR-068` already
+used. **Every decision below is now closed and is not to be reopened or
+reinterpreted** except through the escalation categories `ADR-053 §16`
+already defines — and one item (the Holiday Calendar's actual data/rules,
+§C below) is itself explicitly recorded as such an escalation rather than
+invented. The resulting deliverable is the **Payroll Phase 1
+Implementation Contract**, not yet written — production remains HOLD; **no
+implementation, schema, or migration proceeds from this document alone.**
+
+## RATIFIED DECISIONS (2026-09-19)
+
+Each item is tagged with its governance status, per the CTO's own
+classification requirement: **Ratified** (a closed policy choice),
+**Deferred** (explicitly out of Phase 1, not rejected), **Extension
+Point** (Phase 1 architecture must accommodate it later without a
+rebuild, but does not implement it now), or **Escalation** (cannot be
+resolved from ratified architecture alone; recorded as open per `ADR-053
+§16`, not invented).
+
+| # | Topic | Status | Ratified Direction |
+|---|---|---|---|
+| **§1 → §A** | Pay Frequency | **Ratified** | Monthly in Phase 1 (closest to original Option A), via an explicit `Payroll Period` (Start/End/Status/Payroll Run) model designed to extend to other frequencies later without rebuilding the bounded context |
+| **§2 → §B** | Salary Structure | **Ratified** | Componentized (original Option B): explicit `Earnings → Gross Pay → Deductions → Net Pay` pipeline, never a single figure; effective-dated |
+| **§C** | Attendance Interpretation & Day-Type Determination | **Ratified** (architecture) / **Escalation** (Holiday Calendar data) | `AttendanceDay.status = absent` never auto-implies a deduction; Payroll independently determines Working Day / Weekend / Holiday / Approved Leave / Actual Absence before any financial treatment. The Holiday Calendar's actual source/rules remain unresolved — escalated, not invented |
+| **§3 → §D** | Overtime | **Ratified** (deferred) + **Extension Point** | No overtime rate, multiplier, or auto-approval invented in Phase 1 (original Option A); architecture must be able to consume a future Approved Overtime Result |
+| **§5/§6 → §E** | Tax / Social Insurance | **Extension Point** (boundary ratified) / **Escalation** (rates) | `Payroll Calculation → Tax/Social Insurance Rules → Calculated Deduction` boundary is ratified now, swappable without rebuilding Payroll Core; actual rates/brackets remain Policy Data / Future Configuration, not hardcoded, not invented |
+| **§8 → §F** | Leave & Leave Encashment | **Ratified** | `HR LeaveRequest → Approved Leave → Attendance → Payroll Treatment` is the sole authority; Payroll never reinterprets `LeaveRequest` from scratch; encashment, if it occurs, is only an explicit, separately-approved payroll input — never an automatic inference from a leave balance |
+| **§9 → §G** | Deductions | **Ratified** | Two-category taxonomy: **System-derived** (tax, social insurance, approved attendance-related deductions) vs. **Approved External/Business** (from an approved administrative source); no deduction may be created from a bare UI action without an authorization/audit/control boundary |
+| **§7 → §H** | Gratuity / End-of-Service | **Deferred** + **Extension Point** | No automatic legal calculation engine in Phase 1 unless an approved policy exists later; an architectural extension point must be preserved |
+| **§10 → §I** | Contractors / Population Scope | **Ratified** | Contractors are excluded from Employee Payroll Core in Phase 1 (original Option B); no mixing Contractor Settlement with Employee Payroll; a future separate integration/bounded context is possible, not built now |
+| **§J** | Commission → Payroll Boundary | **Ratified** | Payroll consumes only an Approved Commission Result/Statement (per ratified `ADR-068 §G`); it never reconstructs commission from Sales/Customer data |
+| **§K** | Payroll → GL / Accounting Integration | **Ratified** (boundary) | `Payroll Result → Accounting Event → Control Accounts → Journal`, via the existing Financial Event/`resolveControlAccount` architecture only; idempotency, balanced posting, audit trail, period control, and retry/reconciliation safety are all binding requirements; no new Chart of Accounts |
+| **§L** | Payroll Approval / SoD | **Ratified** | Lifecycle at minimum: `Draft → Calculated → Reviewed → Approved → Posted`; FA-01 (`ApprovalEngineService`) reused, not a new engine; SoD enforced wherever policy requires actor separation |
+| **§M** | Immutability & Corrections | **Ratified** | No overwrite of an approved/posted Payroll Result; corrections are an `Adjustment`, `Correction`, or `Recalculation Run` depending on state, each fully audited; historical payroll remains traceable |
+| **§N** | Payroll Period Control | **Ratified** | No duplicate Payroll Run for the same Employee + Period without explicit policy; no posting into a closed accounting period; no direct edit of an approved/posted run; must integrate with the existing Financial Period control |
+| **§O** | Payroll Phase 1 Non-Goals | **Ratified** (explicit exclusion list) | See §O below — sixteen named capabilities are explicitly out of Phase 1 scope, recorded as extension points, not rejections |
+
+**Original status line (superseded by the ratification above, kept for
+the record):** *"PROPOSED — CTO decision pending. Analysis only."* No
+code, migration, schema, API, frontend, permission, or calculation was
+authorized by this document at the time it was written, produced strictly
+from `ADR-064` plus the then-newly-ratified `ADR-063` — no new repository
+investigation was made beyond what those two documents already
 established. `ADR-059` (HR Phase 1, CLOSED/PASS) and `ADR-065` (Attendance
-Phase 1 Implementation Contract) are not reopened by this document.
+Phase 1 Implementation Contract) were not reopened by this document, and
+remain not reopened now.
 
-This document converts `ADR-064 §8`'s nine unresolved business-policy
-items — plus one item `ADR-064 §5` identified as a hard Attendance-boundary
-consequence that §8 did not itself enumerate as its own line (weekend/
-holiday pay treatment) — into named, bounded options with real
-consequences, the same discipline `ADR-052` (GRNI), `ADR-060`
-(Manufacturing Costing), and `ADR-063` (Attendance) already used for this
-codebase's prior CTO decision packages. **It does not choose an option in
-any section below and makes no recommendation.**
+**ملخص تنفيذي (ar):** تم اعتماد جميع القرارات (§1–§10 الأصلية بالإضافة
+إلى ستة نقاط معمارية ملزمة إضافية §J–§O) من قبل الـCTO. النص الأصلي
+(تحليل الخيارات دون توصية) محفوظ دون تعديل كسجل تاريخي. أبرز القرارات:
+Payroll شهريًا في Phase 1 مع نموذج Payroll Period قابل للتوسع؛ فصل
+Earnings/Gross/Deductions/Net بدل رقم واحد؛ Payroll يحدد بشكل مستقل نوع
+اليوم (عمل/عطلة أسبوعية/عطلة رسمية/إجازة معتمدة/غياب فعلي) قبل أي معالجة
+مالية — مع بقاء تفاصيل تقويم العطلات الرسمية كنقطة تصعيد غير محسومة؛
+Overtime وGratuity كـextension points بدون قواعد قانونية مخترعة؛ حدود
+واضحة لـTax/Social Insurance كـboundary فقط دون نسب؛ Contractors خارج
+الـPayroll Core؛ Commission يُستهلك كنتيجة معتمدة فقط؛ وربط Payroll
+بالـGL عبر البنية المحاسبية الموجودة فقط. **لا يوجد أي كود أو migration
+أو schema مصرّح به بموجب هذا المستند** — الخطوة التالية فقط هي عقد
+تنفيذ Payroll Phase 1، وهو لم يُكتب بعد.
 
-**ملخص تنفيذي (ar):** هذه حزمة قرار للـCTO فقط — بدون أي تنفيذ وبدون أي
-توصية ملزمة. تحوّل النقاط التسع في `ADR-064 §8` (بالإضافة إلى أثر مباشر
-لقرار الإجازات الأسبوعية/العطلات الرسمية من `ADR-063 §7`) إلى خيارات
-صريحة لكل نقطة مع نتائجها الحقيقية، دون اختيار أي خيار هنا. بمجرد صدور
-قرار الـCTO في كل نقطة، يُكتب عقد تنفيذ Payroll Phase 1 استنادًا إليها
-فقط — وليس قبل ذلك. لا يُعاد فتح `ADR-059` أو `ADR-065`.
+---
+
+## §A — Pay Frequency & Payroll Period Model (ratifies §1)
+
+Phase 1 is **Monthly Payroll**, company-wide (closest to the original §1
+Option A). Every Payroll Run is tied to an explicit period:
+
+```
+Payroll Period
+→ Start Date
+→ End Date
+→ Status
+→ Payroll Run
+```
+
+The design must remain extensible to other frequencies later **without
+rebuilding the Payroll bounded context** — this is a binding non-
+functional requirement on the eventual Implementation Contract's schema,
+not a Phase 1 feature to build now. How a Payroll Period aligns against
+Attendance's approval-batch periods (the open question §1's original
+analysis raised) is resolved by §C below: Payroll independently
+determines pay-impact per day, so it does not need the two period
+boundaries to be identical, only for Payroll to be able to correctly
+attribute each Attendance day within whatever Payroll Period it falls in.
+
+## §B — Salary Structure (ratifies §2)
+
+Compensation is **componentized**, never a single figure (closest to the
+original §2 Option B), structured as an explicit pipeline:
+
+```
+Earnings
+    ↓
+Gross Pay
+    ↓
+Deductions
+    ↓
+Net Pay
+```
+
+Salary structure is **effective-dated** — a salary change never rewrites
+the prior period's history, following the same effective-dating
+discipline already established for `CustomerAssignment` (`ADR-066 §0`)
+and required of Commission/Target policy (`ADR-068 §E`). The exact
+Earnings component list (basic, allowances, etc.) is Implementation
+Contract detail, not fixed here — this ratification fixes the *shape*
+(Earnings/Gross/Deductions/Net as distinct, addressable stages), not the
+component catalog.
+
+## §C — Attendance Interpretation & Day-Type Determination (ratifies §4; binding Payroll control, not UI behavior)
+
+Attendance hands Payroll approved facts/results only (per `ADR-064
+§0`/`ADR-067`'s preserved reuse direction) — Attendance's role stops
+there. **`AttendanceDay.status = absent` does not automatically mean
+deduction or unpaid absence.** Payroll is independently responsible for
+determining, before any financial treatment is decided:
+
+```
+Working Day?
+Weekend?
+Holiday?
+Approved Leave?
+Actual Absence?
+```
+
+only after which Payroll may decide the financial consequence, if any.
+This is a **binding Payroll control**, explicitly not a display/UI-layer
+concern — the determination must happen in Payroll's own calculation
+logic, not be inferred by a screen presenting Attendance's raw status as
+if it were already a pay decision.
+
+**Escalation, not invented:** the original §4 analysis offered "Payroll
+owns a minimal calendar" as Option A — that architectural shape is now
+ratified (Payroll must have day-type awareness), but the calendar's
+actual content — which dates are holidays, which weekday(s) constitute
+the weekend — is **not decided by this document** and is recorded here as
+an open item per `ADR-053 §16`'s escalation category, not defaulted or
+guessed. The Implementation Contract cannot fully specify this piece
+until that source/policy is supplied.
+
+## §D — Overtime (ratifies §3; deferred + extension point)
+
+Phase 1 does **not** invent an overtime rate, multiplier, or legal rule,
+and does **not** build an engine that assumes one — no statutory rate, no
+automatic overtime approval, matching the original §3 Option A's
+"deferred" consequence exactly. The Payroll architecture must nonetheless
+be **capable of consuming a future Approved Overtime Result** — the same
+"approved result only, never a raw recomputation" boundary shape this
+program has now used three times (Attendance → Payroll facts, Commission
+Result → Payroll, and this) — without assuming what produces that result
+or when. No overtime calculation exists anywhere in Phase 1's actual
+scope.
+
+## §E — Tax / Social Insurance Boundary (ratifies §5 and §6 together; boundary ratified, rates escalated)
+
+No tax bracket, social-insurance rate, or statutory rule is invented in
+this or any prior document in this program. What **is** ratified now is
+the architectural boundary itself:
+
+```
+Payroll Calculation
+        ↓
+Tax / Social Insurance Rules
+        ↓
+Calculated Deduction
+```
+
+These rules must be **changeable without rebuilding Payroll Core** — i.e.
+the Implementation Contract must design this as a pluggable rules
+boundary, not inline calculation logic baked into the core engine. Any
+rate or threshold not yet approved remains **Policy Data / Future
+Configuration**, never hardcoded logic — this is a binding constraint on
+how the eventual contract's schema must shape this boundary, even though
+the actual Egyptian tax/insurance figures themselves remain unsourced and
+unratified, exactly as `ADR-064 §8` already flagged.
+
+## §F — Leave & Leave Encashment (ratifies §8)
+
+Approved Leave is the sole official source for leave treatment inside
+Payroll, via the existing chain:
+
+```
+HR LeaveRequest
+      ↓
+Approved Leave
+      ↓
+Attendance
+      ↓
+Payroll Treatment
+```
+
+**Payroll must never reinterpret `LeaveRequest` from scratch** — it
+consumes the already-approved leave fact exactly as Attendance itself
+already does (`ADR-063 §3`, ratified). Leave Encashment, if it occurs in
+Phase 1 at all, must be an **explicit, separately-approved payroll
+input** — never an automatic system-computed inference from a leave
+balance. This resolves the original §8 analysis's Option A/B framing with
+a third, more constrained shape neither option fully named: encashment is
+not blanket in-scope with an automatic conversion rule (Option A), nor
+fully deferred (Option B) — it may occur, but only as a manually-
+initiated, individually-approved amount, never a formula Payroll derives
+on its own.
+
+## §G — Deductions Taxonomy (ratifies §9)
+
+Deductions/allowances are configurable (original §9 Option B), split into
+exactly two categories:
+
+- **System-derived** — tax, social insurance, and approved attendance-
+  related deductions (e.g. whatever §C's day-type determination and §D/§E
+  eventually produce as a pay-impacting fact).
+- **Approved External / Business deductions** — deductions originating
+  from an approved administrative source (e.g. a loan repayment, an
+  advance), not system-computed.
+
+**No deduction may be created from a bare UI action** without an
+authorization/audit/control boundary around it — this is a binding
+governance constraint on the eventual Implementation Contract's
+permission and audit design, not merely a data-modeling note.
+
+## §H — Gratuity / End-of-Service (ratifies §7; deferred + extension point)
+
+Phase 1 does **not** include an automatic legal gratuity/end-of-service
+calculation engine unless and until an approved policy exists for it
+(matches the original §7 Option B's deferred consequence). An appropriate
+**architectural extension point** must be preserved so this capability
+can be added later without a structural rebuild — no specific mechanism
+for that extension point is prescribed here.
+
+## §I — Contractors / Payroll Population Scope (ratifies §10)
+
+Contractors are excluded from the Employee Payroll Core in Phase 1
+(original §10 Option B, ratified as-is) — Contractor Settlement is never
+mixed with Employee Payroll. A separate integration or bounded context
+for contractor settlement may be built later if needed; nothing of that
+kind is built now.
+
+## §J — Commission → Payroll Boundary (new; ratifies and restates ADR-068 §G for Payroll's own document)
+
+Commission's architecture is Ratified in `ADR-068`. Payroll **never**
+recomputes a commission from Sales data. The mandatory path is:
+
+```
+Sales
+ ↓
+Invoice / Collection
+ ↓
+Commission Resolution
+ ↓
+Immutable Commission Result
+ ↓
+Commission Approval
+ ↓
+Payroll
+ ↓
+GL
+```
+
+Payroll consumes an **Approved Commission Result / Statement** only — it
+does not read Sales Orders or Customers to reconstruct a commission. This
+is not a new decision; it restates `ADR-068 §G`'s already-ratified
+boundary as binding on Payroll's own Implementation Contract as well, so
+that document does not need to re-derive it from `ADR-068` independently.
+
+## §K — Payroll → GL / Accounting Integration (new; ratified boundary)
+
+Payroll must produce an accounting result postable to GL strictly through
+the existing Financial Event / Posting architecture — it never mutates GL
+directly outside that mechanism. The required chain:
+
+```
+Payroll Result
+→ Accounting Event
+→ Control Accounts
+→ Journal
+```
+
+using the existing `resolveControlAccount` mechanism (`ADR-064 §0`/§4,
+confirmed live and reusable) — **no new Chart of Accounts is invented**;
+the dormant `5201 Salaries & Wages` template line, and whatever control-
+function-tagged accounts already exist or are added the same way, are the
+only accounts involved. The following are binding, non-negotiable
+properties of that posting, matching every prior Financial Event handler
+in this codebase:
+
+- **Idempotency** — reprocessing the same Payroll Result must never
+  double-post.
+- **Balanced posting** — every journal entry balances, no exception.
+- **Audit trail** — via the existing `AuditService`, no parallel log.
+- **Period control** — integrates with the existing Financial Period
+  mechanism (see §N below).
+- **Retry/reconciliation safety** — a failed post must be safely
+  retryable without corrupting state, the same discipline the currently-
+  committed `submitApprovalBatch` fix (commit `d76e22e`) already
+  established for Attendance's own approval-batch/GL-adjacent flow.
+
+## §L — Payroll Approval / SoD (new; ratified)
+
+A Payroll Run must **not** move directly to `Posted` merely upon
+calculation. The lifecycle is, at minimum:
+
+```
+Draft
+→ Calculated
+→ Reviewed
+→ Approved
+→ Posted
+```
+
+with permission separation such that the same actor cannot bypass an
+approval boundary where policy requires separation of duties. **FA-01
+(`ApprovalEngineService`) is reused** — no new approval engine is built,
+consistent with every prior phase of this program (HR leave requests,
+Attendance approval batches, and now Payroll Runs all share the one
+mechanism).
+
+## §M — Immutability & Corrections (new; ratified)
+
+After a Payroll Run is Approved/Posted, **its result may never be
+overwritten.** Any later correction must be one of:
+
+```
+Adjustment
+Correction
+Recalculation Run
+```
+
+depending on the situation, each with a complete audit trail. Historical
+Payroll data must remain fully traceable at all times — the same
+"evidence, not a working copy" discipline `ADR-062 §3` established for
+Attendance's raw records and `ADR-068 §F` established for Commission
+Results, applied here to Payroll Results as the third instance of the
+same pattern in this program.
+
+## §N — Payroll Period Control (new; ratified)
+
+Payroll must integrate with the **existing Financial Period control**
+mechanism, not a parallel one. Binding constraints:
+
+- No duplicate Payroll Run for the same Employee + Period without an
+  explicit, clearly-defined policy permitting it.
+- No posting into a **closed** accounting period.
+- No direct edit of an approved/posted run — only the §M correction paths
+  apply.
+
+## §O — Payroll Phase 1 — Explicit Non-Goals
+
+The following are explicitly **out of Phase 1 scope** — recorded as
+extension points or deferred capabilities, not rejected outright, exactly
+matching this program's existing convention for naming a boundary without
+foreclosing it permanently:
+
+- Contractor Payroll (§I)
+- Automatic legal gratuity engine (§H)
+- Automatic legal overtime calculation (§D)
+- Unapproved holiday policy assumptions (§C)
+- An advanced, unapproved tax-law engine (§E)
+- An advanced bonus engine
+- A workforce scheduling engine
+- Attendance device implementation
+- Rebuilding Attendance in any form
+- A Commission calculation engine (Payroll only ever consumes `ADR-068`'s
+  approved result, per §J)
+
+## Dependency & Conflict Review
+
+- **`ADR-059` (HR Phase 1, CLOSED/PASS):** not reopened. §B's effective-
+  dated compensation model and §F's `LeaveRequest` consumption both read
+  HR's existing aggregates without modification.
+- **Attendance closure (`ADR-062`/`ADR-063`/`ADR-065`, now COMPLETE /
+  VERIFIED / HANDOFF-READY FOR PAYROLL):** not reopened. §C's day-type
+  determination consumes Attendance's approved facts (`attendance.period.
+  approved`) exactly as `ADR-064 §0` already established — Payroll adds
+  its own financial interpretation on top, it does not ask Attendance to
+  change what it hands over.
+- **`ADR-064` (Payroll Phase 0 Study):** this document is `ADR-064 §11`'s
+  own Step 2 (Payroll Policy Decision Package), now complete. §K/§J both
+  directly implement mechanisms `ADR-064 §0`/§4 already identified as
+  reusable (`resolveControlAccount`, the Treasury/`SupplierPaymentService`
+  disbursement shape) — no conflict, no new mechanism invented.
+- **`ADR-068` (Commission & Target, RATIFIED, commit `1d57782`):** §J
+  restates, does not alter, `ADR-068 §G`'s Payroll-consumption boundary.
+  No conflict.
+- **Accounting / Financial Period:** §K/§N bind Payroll to the existing
+  Financial Event and Financial Period mechanisms without proposing any
+  change to either — Payroll is a new *poster* into that architecture,
+  not a modification of it.
+- **Treasury / GL:** §K's disbursement shape (referenced via `ADR-064
+  §0`'s already-cited `TreasuryAccount`/`SupplierPaymentService` pattern)
+  and control-account resolution are both reused unchanged — no new
+  disbursement or GL-write mechanism is proposed.
+- **No conflict found between any decision above and any other ADR in
+  this program.**
 
 ---
 
