@@ -17,6 +17,7 @@ import { readAppVersion } from '../../../foundation/release/app-version';
 import { FINANCE_CUSTOMER_LEDGER_CONTRACT, FinanceCustomerLedgerContract, FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { SUPPLIER_LEDGER_CONTRACT, SupplierLedgerContract } from '../../../foundation/module-registry/contracts/ap-events.contract';
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+import { MANUFACTURING_WIP_CONTRACT, ManufacturingWipContract } from '../../../foundation/module-registry/contracts/manufacturing-wip.contract';
 
 const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000'; // matches this codebase's existing convention (FiscalPeriodService et al.)
 
@@ -76,6 +77,10 @@ export class ClosingSnapshotService {
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
     @Optional() @Inject(SUPPLIER_LEDGER_CONTRACT) private readonly supplierLedger?: SupplierLedgerContract,
     @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly inventoryValuation?: InventoryValuationContract,
+    // Month-End dependency (independent review, Phase 1) — lets `assembleBody` below report WIP
+    // sub-warehouse value as its own labeled `wip` figure instead of leaving it silently mixed,
+    // unlabeled, into the plain `inventory` breakdown (Case G).
+    @Optional() @Inject(MANUFACTURING_WIP_CONTRACT) private readonly manufacturingWip?: ManufacturingWipContract,
   ) {}
 
   /** ADR-051 §12 — called INSIDE the same transaction that applies the approved close/reclose. Idempotent under a duplicate approval-event delivery (unique index on `approvalRequestId`). */
@@ -232,7 +237,13 @@ export class ClosingSnapshotService {
     const ar = await this.customerLedger.getAllCustomerBalances(asOfDate);
     const ap = this.supplierLedger ? await this.supplierLedger.getAllSupplierBalances(asOfDate) : null;
     const cashBank = await this.treasury.getAllTreasuryBalances(asOfDate);
-    const inventory = this.inventoryValuation ? await this.inventoryValuation.getValuedOnHandTotal(asOfDate) : null;
+    const rawInventory = this.inventoryValuation ? await this.inventoryValuation.getValuedOnHandTotal(asOfDate) : null;
+    // Month-End dependency (independent review, Phase 1) — split out every Manufacturing WIP
+    // sub-warehouse (ADR-061 §6) so it is reported as its own labeled `wip` figure, never silently
+    // mixed into the plain `inventory` breakdown as if it were ordinary on-hand stock (Case G).
+    const wip = this.manufacturingWip ? await this.manufacturingWip.getAllWipBalances(asOfDate) : null;
+    const wipWarehouseIds = new Set((wip?.balances ?? []).map((b) => b.wipWarehouseId));
+    const inventory = rawInventory ? rawInventory.filter((w) => !wipWarehouseIds.has(w.warehouseId)) : null;
 
     const exceptions = await this.dataSource.getRepository(ClosingException).find({ where: { fiscalPeriodId: run.fiscalPeriodId } });
     const rejectedEventsInPeriod = await this.dataSource
@@ -251,6 +262,7 @@ export class ClosingSnapshotService {
       financialPosition: { trialBalance },
       subledgers: { ar, ap, cashBank },
       inventory,
+      wip,
       closingEvidence: {
         approvalRequestId: run.approvalRequestId,
         closeSequence: run.closeSequence,

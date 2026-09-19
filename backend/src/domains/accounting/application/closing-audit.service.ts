@@ -14,6 +14,7 @@ import { CashBankReconciliationService } from './cash-bank-reconciliation.servic
 import { InventoryReconciliationService } from './inventory-reconciliation.service';
 import { FixedAssetReconciliationService } from './fixed-asset-reconciliation.service';
 import { GrniReconciliationService } from './grni-reconciliation.service';
+import { WipReconciliationService } from './wip-reconciliation.service';
 
 const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000'; // matches this codebase's existing convention (FiscalPeriodService et al.)
 
@@ -45,6 +46,7 @@ export class ClosingAuditService {
     private readonly inventoryReconciliation: InventoryReconciliationService,
     private readonly fixedAssetReconciliation: FixedAssetReconciliationService,
     private readonly grniReconciliation: GrniReconciliationService,
+    private readonly wipReconciliation: WipReconciliationService,
   ) {}
 
   async listRuns(fiscalPeriodId: string): Promise<ClosingAuditRun[]> {
@@ -185,6 +187,31 @@ export class ClosingAuditService {
             ? `Outstanding GRNI balances and GL differ by ${grni.driftBase} as of ${asOfDate}.`
             : 'No operational GRNI ledger source is registered — GRNI reconciliation could not confirm a match.',
         requiredAction: grniClass.requiredAction,
+      });
+    }
+
+    // ADR-061 (Manufacturing) Month-End dependency, resolved per the independent review's Phase 1
+    // finding — the seventh reconciliation type. Structurally IDENTICAL to the GRNI block above
+    // (same dormant/@Optional() contract shape): reports 'no_subledger_source' until the
+    // `manufacturing` module is installed and binds MANUFACTURING_WIP_CONTRACT.
+    const wip = await this.wipReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const wipClass = classifyReconciliationStatus(wip.status);
+    if (wipClass) {
+      findings.push({
+        module: 'wip',
+        documentType: null,
+        documentId: null,
+        transactionRef: null,
+        accountOrSubledgerRef: null,
+        amount: wip.driftBase,
+        source: 'wip_reconciliation',
+        category: wipClass.category,
+        severity: wipClass.severity,
+        problem:
+          wip.status === 'drift_found'
+            ? `Manufacturing WIP balances and GL differ by ${wip.driftBase} as of ${asOfDate}.`
+            : 'No operational Manufacturing WIP source is registered — WIP reconciliation could not confirm a match.',
+        requiredAction: wipClass.requiredAction,
       });
     }
 

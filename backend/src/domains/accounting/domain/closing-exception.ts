@@ -25,7 +25,7 @@ export type ClosingExceptionSeverity = (typeof CLOSING_EXCEPTION_SEVERITIES)[num
 export const CLOSING_EXCEPTION_STATUSES = ['open', 'acknowledged', 'resolved', 'waived'] as const;
 export type ClosingExceptionStatus = (typeof CLOSING_EXCEPTION_STATUSES)[number];
 
-export type ClosingExceptionModule = 'ap' | 'ar' | 'cash_bank' | 'inventory' | 'fixed_asset' | 'financial_events' | 'grni';
+export type ClosingExceptionModule = 'ap' | 'ar' | 'cash_bank' | 'inventory' | 'fixed_asset' | 'financial_events' | 'grni' | 'wip';
 
 export interface ClosingExceptionFinding {
   module: ClosingExceptionModule;

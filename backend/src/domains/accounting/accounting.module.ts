@@ -30,6 +30,7 @@ import { ClosingException } from './infrastructure/closing-exception.entity';
 import { ClosingWorkflowRun } from './infrastructure/closing-workflow-run.entity';
 import { ClosingSnapshotRun } from './infrastructure/closing-snapshot-run.entity';
 import { GrniReconciliationRun } from './infrastructure/grni-reconciliation-run.entity';
+import { WipReconciliationRun } from './infrastructure/wip-reconciliation-run.entity';
 import { CurrencyService } from './application/currency.service';
 import { FiscalPeriodService } from './application/fiscal-period.service';
 import { TaxCodeService } from './application/tax-code.service';
@@ -61,7 +62,9 @@ import { ClosingExceptionService } from './application/closing-exception.service
 import { ClosingSnapshotService } from './application/closing-snapshot.service';
 import { ClosingSnapshotRecoveryScheduler } from './application/closing-snapshot-recovery.scheduler';
 import { GrniReconciliationService } from './application/grni-reconciliation.service';
+import { WipReconciliationService } from './application/wip-reconciliation.service';
 import { GrniController } from './interface/grni.controller';
+import { WipController } from './interface/wip.controller';
 import { AccountingController } from './interface/accounting.controller';
 import { GeneralLedgerController } from './interface/general-ledger.controller';
 import { ArController } from './interface/ar.controller';
@@ -82,6 +85,7 @@ import { CustomerFinanceModule } from '../customer-finance/customer-finance.modu
 import { TreasuryModule } from '../treasury/treasury.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
 import { ProcurementModule } from '../procurement/procurement.module';
+import { ManufacturingModule } from '../manufacturing/manufacturing.module';
 
 /**
  * F01 — Financial Foundation (ADR-032). `accounting`'s composition root.
@@ -134,6 +138,7 @@ import { ProcurementModule } from '../procurement/procurement.module';
       ClosingWorkflowRun,
       ClosingSnapshotRun,
       GrniReconciliationRun,
+      WipReconciliationRun,
     ]),
     AuthenticationModule,
     PermissionModule,
@@ -162,6 +167,13 @@ import { ProcurementModule } from '../procurement/procurement.module';
     // ApAdjustmentService's @Optional() dormancy (ADR-037 D2), zero change to either service's
     // own code. No import from `domains/procurement`'s own classes anywhere — DI token only.
     ProcurementModule,
+    // ADR-061 (Manufacturing) Month-End dependency, resolved per the independent review's Phase 1
+    // finding — for MANUFACTURING_WIP_CONTRACT: lights up WipReconciliationService's/
+    // InventoryReconciliationService's/ClosingSnapshotService's @Optional() dormancy, zero change
+    // to any of their already-verified costing/GL/lifecycle code. No import from
+    // `domains/manufacturing`'s own classes anywhere except its module (DI token only, same
+    // ProcurementModule/InventoryValuationModule pattern immediately above).
+    ManufacturingModule,
   ],
   controllers: [
     AccountingController,
@@ -172,6 +184,7 @@ import { ProcurementModule } from '../procurement/procurement.module';
     InventoryAccountingController,
     FixedAssetController,
     GrniController,
+    WipController,
   ],
   providers: [
     CurrencyService,
@@ -205,6 +218,7 @@ import { ProcurementModule } from '../procurement/procurement.module';
     ClosingSnapshotService,
     ClosingSnapshotRecoveryScheduler,
     GrniReconciliationService,
+    WipReconciliationService,
   ],
   exports: [
     CurrencyService,

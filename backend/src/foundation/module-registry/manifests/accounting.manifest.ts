@@ -153,7 +153,19 @@ export const accountingManifest: ModuleManifest = {
   //          — GRNI_LEDGER_CONTRACT is unbound today (confirmed: no Procurement-side GRNI posting
   //          logic exists yet), so every run reports `no_subledger_source`, never a mock. Adds 1
   //          new table (`accounting_grni_reconciliation_runs`), no existing table altered.
-  manifest_version: '1.13.0',
+  // 1.14.0 — ADR-061 (Manufacturing) Month-End dependency, resolved per the independent
+  //          post-implementation review's Phase 1 finding: +2 permission nodes
+  //          (`accounting.wip.{view,create}`), +1 reconciliation type (WipReconciliationService,
+  //          the seventh Month-End Closing must verify). Same dormant/`@Optional()` shape as GRNI
+  //          — MANUFACTURING_WIP_CONTRACT is unbound unless the `manufacturing` module is
+  //          installed, so every run reports `no_subledger_source` until then, never a mock.
+  //          `InventoryReconciliationService` (existing, unchanged shape) now excludes every
+  //          Manufacturing WIP sub-warehouse from its own sum via the same contract — this is
+  //          the split that closes the false-drift gap ADR-061 §17 flagged and left open. Adds 1
+  //          new table (`accounting_wip_reconciliation_runs`), no existing table altered. `admin`'s
+  //          existing blanket `accounting: editable` grant already covers the 2 new nodes (same
+  //          precedent as 1.13.0 — no corrective admin-grant migration needed).
+  manifest_version: '1.14.0',
   title_code: 'module.accounting',
   business_domains: ['accounting'],
   depends_on: ['finance'],
@@ -293,6 +305,14 @@ export const accountingManifest: ModuleManifest = {
     { node: 'accounting.grni', title_code: 'perm.accounting.grni', parent: 'accounting' },
     { node: 'accounting.grni.view', title_code: 'perm.accounting.grni.view', parent: 'accounting.grni' },
     { node: 'accounting.grni.create', title_code: 'perm.accounting.grni.create', parent: 'accounting.grni' },
+
+    // ADR-061 (Manufacturing) Month-End dependency, resolved per the independent review's Phase 1
+    // finding — the seventh reconciliation type. Mirror of `accounting.grni.*`'s `.view`/`.create`
+    // shape; no `.adjust`/`.approve` — a WIP correction is a Manufacturing-side Material Return
+    // (ADR-061 §5), not an Accounting adjustment capability.
+    { node: 'accounting.wip', title_code: 'perm.accounting.wip', parent: 'accounting' },
+    { node: 'accounting.wip.view', title_code: 'perm.accounting.wip.view', parent: 'accounting.wip' },
+    { node: 'accounting.wip.create', title_code: 'perm.accounting.wip.create', parent: 'accounting.wip' },
 
     // F06 — Cash & Bank (ADR-038). Mirror of `accounting.ar.*`/`accounting.ap.*`.
     // `reconcile`/`close` ride `.create` (disclosed like F04/F05).

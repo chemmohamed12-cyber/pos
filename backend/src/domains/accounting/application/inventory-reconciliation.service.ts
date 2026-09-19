@@ -5,6 +5,7 @@ import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+import { MANUFACTURING_WIP_CONTRACT, ManufacturingWipContract } from '../../../foundation/module-registry/contracts/manufacturing-wip.contract';
 
 export interface InventoryReconcileInput {
   fiscalPeriodId?: string | null;
@@ -34,6 +35,14 @@ export class InventoryReconciliationService {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
     @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
+    // Month-End dependency (independent review, Phase 1) — when Manufacturing is installed, every
+    // Work Order's dedicated WIP sub-warehouse (ADR-061 §6) is EXCLUDED from this service's own
+    // subledger sum below: its value has already been reclassified out of the `inventory` GL
+    // control account into `wip` (Dr WIP / Cr Inventory), so it belongs to `WipReconciliationService`'s
+    // own comparison against the `wip` account, never this one's. `@Optional()` — when Manufacturing
+    // is not installed, `valued` is used exactly as before, unchanged (Case F: no behavior change for
+    // any non-Manufacturing installation).
+    @Optional() @Inject(MANUFACTURING_WIP_CONTRACT) private readonly manufacturingWip?: ManufacturingWipContract,
   ) {}
 
   async listRuns(filter?: { status?: string; from?: string; to?: string }): Promise<InventoryReconciliationRun[]> {
@@ -92,7 +101,17 @@ export class InventoryReconciliationService {
     }
 
     // --- Valuation source present (future F08) -------------------------------
-    const valued = await this.valuation.getValuedOnHandTotal(asOfDate);
+    const rawValued = await this.valuation.getValuedOnHandTotal(asOfDate);
+    // Month-End dependency (independent review, Phase 1) — exclude every Manufacturing WIP
+    // sub-warehouse from THIS reconciliation's own sum; `WipReconciliationService` covers that
+    // slice against the `wip` GL account separately. See the constructor's `manufacturingWip`
+    // doc comment for why this must be a split, never a combined/netted comparison.
+    let valued = rawValued;
+    if (this.manufacturingWip) {
+      const wip = await this.manufacturingWip.getAllWipBalances(asOfDate);
+      const wipWarehouseIds = new Set(wip.balances.map((b) => b.wipWarehouseId));
+      valued = rawValued.filter((w) => !wipWarehouseIds.has(w.warehouseId));
+    }
     const subledgerTotalBase = valued.reduce((sum, w) => sum + Number(w.totalValueBase), 0).toFixed(4);
     const [d] = (await this.dataSource.query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
       subledgerTotalBase,

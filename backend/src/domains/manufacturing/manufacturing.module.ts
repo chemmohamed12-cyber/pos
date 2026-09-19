@@ -3,7 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkOrder } from './infrastructure/work-order.entity';
 import { WorkOrderComponent } from './infrastructure/work-order-component.entity';
 import { WorkOrderService } from './application/work-order.service';
+import { ManufacturingWipLedgerService } from './application/manufacturing-wip-ledger.service';
 import { WorkOrderController } from './interface/work-order.controller';
+import { MANUFACTURING_WIP_CONTRACT } from '../../foundation/module-registry/contracts/manufacturing-wip.contract';
 import { AuditModule } from '../../foundation/audit/audit.module';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { AuthorizationModule } from '../../foundation/authorization/authorization.module';
@@ -38,7 +40,13 @@ import { InventoryValuationModule } from '../inventory-valuation/inventory-valua
     InventoryValuationModule,
   ],
   controllers: [WorkOrderController],
-  providers: [WorkOrderService],
-  exports: [WorkOrderService],
+  providers: [
+    WorkOrderService,
+    ManufacturingWipLedgerService,
+    // Month-End dependency (independent review, Phase 1) — MANUFACTURING_WIP_CONTRACT's real
+    // implementation, mirroring `GRNI_LEDGER_CONTRACT: useExisting: GrniLedgerService` exactly.
+    { provide: MANUFACTURING_WIP_CONTRACT, useExisting: ManufacturingWipLedgerService },
+  ],
+  exports: [WorkOrderService, MANUFACTURING_WIP_CONTRACT],
 })
 export class ManufacturingModule {}
