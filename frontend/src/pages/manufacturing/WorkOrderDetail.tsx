@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
@@ -22,6 +22,28 @@ interface WorkOrderComponent {
   quantityIssued: number;
   unitCostAtRelease: string | null;
 }
+interface FinancialTrailLine {
+  accountCode: string;
+  accountName: string;
+  debitBase: string;
+  creditBase: string;
+}
+interface FinancialTrailEvent {
+  id: string;
+  eventType: string;
+  status: string;
+  businessDate: string;
+  rejectionReason: string | null;
+  journalEntryId: string | null;
+  lines: FinancialTrailLine[];
+}
+interface AuditTrailEntry {
+  seq: number;
+  timestamp: string;
+  action: string;
+  actorUserId: string | null;
+  result: string;
+}
 interface WorkOrderDetail {
   id: string;
   workOrderNumber: string;
@@ -34,6 +56,8 @@ interface WorkOrderDetail {
   state: string;
   components: WorkOrderComponent[];
   wipValue: string;
+  financialTrail: FinancialTrailEvent[];
+  auditTrail: AuditTrailEntry[];
 }
 
 /** ADR-061 §3 — bare (no-quantity) lifecycle actions available per state; material issue/return and finished-goods output have their own quantity pickers below. */
@@ -99,8 +123,20 @@ export function WorkOrderDetail() {
     'action.material_return',
     'action.finished_goods_output',
     'action.confirm',
+    'field.financial_events',
+    'field.audit_trail',
+    'field.account',
+    'field.debit',
+    'field.credit',
+    'field.rejection_reason',
+    'field.business_date',
+    'field.actor',
+    'field.result',
+    'panel.no_financial_events_yet',
+    'panel.no_audit_trail_yet',
     ...availableActions.map((a) => `work_order_action.${a}`),
     ...(wo ? [`work_order_lifecycle.state.${wo.state}`] : []),
+    ...(wo ? wo.financialTrail.map((e) => `value.financial_event_status.${e.status.toLowerCase()}`) : []),
   ]);
 
   async function runAction(action: string) {
@@ -310,6 +346,90 @@ export function WorkOrderDetail() {
           </div>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>{t('field.financial_events')}</h3>
+        {wo.financialTrail.length === 0 ? (
+          <div className="empty-state">{t('panel.no_financial_events_yet')}</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t('field.business_date')}</th>
+                <th>{t('field.status')}</th>
+                <th>{t('field.account')}</th>
+                <th>{t('field.debit')}</th>
+                <th>{t('field.credit')}</th>
+                <th>{t('field.rejection_reason')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wo.financialTrail.map((ev) => (
+                <Fragment key={ev.id}>
+                  {ev.lines.length === 0 ? (
+                    <tr key={ev.id}>
+                      <td>{ev.businessDate}</td>
+                      <td>
+                        <StatusBadge code={`value.financial_event_status.${ev.status.toLowerCase()}`} />
+                      </td>
+                      <td colSpan={2}>—</td>
+                      <td>—</td>
+                      <td>{ev.rejectionReason ?? '—'}</td>
+                    </tr>
+                  ) : (
+                    ev.lines.map((line, i) => (
+                      <tr key={`${ev.id}:${i}`}>
+                        {i === 0 && (
+                          <>
+                            <td rowSpan={ev.lines.length}>{ev.businessDate}</td>
+                            <td rowSpan={ev.lines.length}>
+                              <StatusBadge code={`value.financial_event_status.${ev.status.toLowerCase()}`} />
+                            </td>
+                          </>
+                        )}
+                        <td>
+                          {line.accountCode} — {line.accountName}
+                        </td>
+                        <td>{Number(line.debitBase) > 0 ? line.debitBase : '—'}</td>
+                        <td>{Number(line.creditBase) > 0 ? line.creditBase : '—'}</td>
+                        {i === 0 && <td rowSpan={ev.lines.length}>{ev.rejectionReason ?? '—'}</td>}
+                      </tr>
+                    ))
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>{t('field.audit_trail')}</h3>
+        {wo.auditTrail.length === 0 ? (
+          <div className="empty-state">{t('panel.no_audit_trail_yet')}</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t('field.business_date')}</th>
+                <th>{t('field.actions')}</th>
+                <th>{t('field.actor')}</th>
+                <th>{t('field.result')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wo.auditTrail.map((entry) => (
+                <tr key={entry.seq}>
+                  <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                  <td>{entry.action}</td>
+                  <td>{entry.actorUserId ?? '—'}</td>
+                  <td>{entry.result}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

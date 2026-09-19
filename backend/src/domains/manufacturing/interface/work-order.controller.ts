@@ -57,7 +57,7 @@ export class WorkOrderController {
   @RequirePermission('manufacturing.work_order.view', 'read-only')
   @Get()
   async list() {
-    return this.workOrders.listWorkOrders();
+    return this.workOrders.listWorkOrdersWithSummary();
   }
 
   @UseGuards(RequireFeatureGuard, PermissionGuard)
@@ -65,13 +65,15 @@ export class WorkOrderController {
   @RequirePermission('manufacturing.work_order.view', 'read-only')
   @Get(':id')
   async get(@Param('id', ParseUUIDPipe) id: string) {
-    const [workOrder, state, components, wipValue] = await Promise.all([
+    const [workOrder, state, components, wipValue, financialTrail, auditTrail] = await Promise.all([
       this.workOrders.getWorkOrderOrThrow(id),
       this.workOrders.getWorkOrderState(id),
       this.workOrders.getWorkOrderComponents(id),
       this.workOrders.computeWipValue(id),
+      this.workOrders.getFinancialTrail(id),
+      this.workOrders.getAuditTrail(id),
     ]);
-    return { ...workOrder, state, components, wipValue: wipValue.toFixed(4) };
+    return { ...workOrder, state, components, wipValue: wipValue.toFixed(4), financialTrail, auditTrail };
   }
 
   @UseGuards(RequireFeatureGuard, PermissionGuard)

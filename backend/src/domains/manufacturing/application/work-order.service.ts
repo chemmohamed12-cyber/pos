@@ -52,6 +52,23 @@ export class WorkOrderService {
     return this.dataSource.getRepository(WorkOrder).find({ order: { createdAt: 'DESC' } });
   }
 
+  /**
+   * Phase 2 (Manufacturing UI completion, team directive UI-02) — the list
+   * view's own required columns (Status, WIP Value) are computed, not
+   * stored, exactly like the single-Work-Order `get()` endpoint already
+   * does (`getWorkOrderState`/`computeWipValue`) — this is the same
+   * composition, just mapped over every row. No new business logic.
+   */
+  async listWorkOrdersWithSummary(): Promise<Array<WorkOrder & { state: string; wipValue: string }>> {
+    const workOrders = await this.listWorkOrders();
+    return Promise.all(
+      workOrders.map(async (wo) => {
+        const [state, wipValue] = await Promise.all([this.getWorkOrderState(wo.id), this.computeWipValue(wo.id)]);
+        return { ...wo, state, wipValue: wipValue.toFixed(4) };
+      }),
+    );
+  }
+
   async getWorkOrderState(workOrderId: string): Promise<string> {
     return this.processEngine.getState(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId);
   }
@@ -82,6 +99,89 @@ export class WorkOrderService {
     const rows = await this.valuation.getValuedOnHandTotal(undefined, this.dataSource.manager);
     const row = rows.find((r) => r.warehouseId === wo.wipWarehouseId);
     return row ? Number(row.totalValueBase) : 0;
+  }
+
+  /**
+   * Phase 2 (Manufacturing UI completion, team directive UI-09 —
+   * "Accounting / Traceability: Financial Events, GL reference, movement
+   * references"). Read-only, keyed off the same deterministic
+   * `manufacturing:work_order:<id>:*` idempotency-key prefix every
+   * mutating method above already writes (§16) — never a second,
+   * independently-maintained trail. Deliberately implemented HERE, inside
+   * Manufacturing's own domain, reading the shared, cross-cutting
+   * `accounting_financial_events`/`accounting_journal_lines`/
+   * `accounting_gl_accounts` tables directly (the same class of shared
+   * platform table `AuditService`'s own `audit_records` already is, not
+   * another domain's PRIVATE schema) — so a viewer with only
+   * `manufacturing.work_order.view` can see this Work Order's own
+   * financial trail without also needing an `accounting.*` permission,
+   * which routing this through Accounting's own
+   * `/accounting/financial-events` endpoint would have required.
+   */
+  async getFinancialTrail(workOrderId: string): Promise<
+    Array<{
+      id: string;
+      eventType: string;
+      status: string;
+      businessDate: string;
+      rejectionReason: string | null;
+      journalEntryId: string | null;
+      lines: Array<{ accountCode: string; accountName: string; debitBase: string; creditBase: string }>;
+    }>
+  > {
+    const events: Array<{
+      id: string;
+      eventType: string;
+      status: string;
+      businessDate: string;
+      rejectionReason: string | null;
+      journalEntryId: string | null;
+    }> = await this.dataSource.query(
+      `SELECT "id", "eventType", "status", "businessDate", "rejectionReason", "journalEntryId"
+       FROM "accounting_financial_events"
+       WHERE "idempotencyKey" LIKE $1
+       ORDER BY "receivedAt" ASC`,
+      [`manufacturing:work_order:${workOrderId}:%`],
+    );
+    if (events.length === 0) return [];
+
+    const journalEntryIds = events.map((e) => e.journalEntryId).filter((id): id is string => id != null);
+    const lines: Array<{ journalEntryId: string; accountCode: string; accountName: string; debitBase: string; creditBase: string }> =
+      journalEntryIds.length === 0
+        ? []
+        : await this.dataSource.query(
+            `SELECT jl."journalEntryId", a."code" AS "accountCode", a."name" AS "accountName", jl."debitBase", jl."creditBase"
+             FROM "accounting_journal_lines" jl
+             JOIN "accounting_gl_accounts" a ON a.id = jl."accountId"
+             WHERE jl."journalEntryId" = ANY($1::uuid[])
+             ORDER BY jl."lineNumber" ASC`,
+            [journalEntryIds],
+          );
+
+    return events.map((e) => ({
+      ...e,
+      lines: lines.filter((l) => l.journalEntryId === e.journalEntryId).map(({ accountCode, accountName, debitBase, creditBase }) => ({ accountCode, accountName, debitBase, creditBase })),
+    }));
+  }
+
+  /**
+   * Phase 2 (Manufacturing UI completion, team directive UI-09 — "audit
+   * trail"). Reads the shared, append-only `audit_records` table
+   * (`AuditService`'s own table — every mutating method above already
+   * calls `AuditService.record({ resource: 'work_order', resourceId:
+   * wo.id, ... })`) filtered to this one Work Order. No new audit
+   * mechanism; this is a read view over the one that already exists.
+   */
+  async getAuditTrail(workOrderId: string): Promise<
+    Array<{ seq: number; timestamp: Date; action: string; actorUserId: string | null; result: string; after: Record<string, unknown> | null }>
+  > {
+    return this.dataSource.query(
+      `SELECT "seq", "timestamp", "action", "actorUserId", "result", "after"
+       FROM "audit_records"
+       WHERE "resource" = 'work_order' AND "resourceId" = $1
+       ORDER BY "seq" ASC`,
+      [workOrderId],
+    );
   }
 
   // ---------------------------------------------------------------------

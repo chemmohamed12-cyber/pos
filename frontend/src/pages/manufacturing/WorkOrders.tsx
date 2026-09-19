@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface Warehouse {
   id: string;
@@ -21,7 +22,11 @@ interface WorkOrder {
   quantityProduced: number;
   warehouseId: string;
   createdAt: string;
+  state: string;
+  wipValue: string;
 }
+
+const STATES = ['draft', 'released', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 
 /** ADR-061 §18 — Work Orders screen: list + create. Lifecycle actions live on WorkOrderDetail. */
 export function WorkOrders() {
@@ -34,6 +39,8 @@ export function WorkOrders() {
   const [warehouseId, setWarehouseId] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
 
   preload([
     'nav.manufacturing_work_orders',
@@ -42,11 +49,16 @@ export function WorkOrders() {
     'field.warehouse',
     'field.quantity_planned',
     'field.quantity_produced',
+    'field.quantity_remaining',
+    'field.status',
+    'field.wip_value',
     'field.created_at',
     'field.actions',
     'action.create_work_order',
     'action.view',
     'panel.no_work_orders_yet',
+    'field.all_document_types',
+    ...STATES.map((s) => `work_order_lifecycle.state.${s}`),
   ]);
 
   async function loadWorkOrders() {
@@ -91,6 +103,13 @@ export function WorkOrders() {
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id.slice(0, 8);
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id.slice(0, 8);
 
+  const filtered = workOrders?.filter((wo) => {
+    if (stateFilter && wo.state !== stateFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return wo.workOrderNumber.toLowerCase().includes(q) || productName(wo.finishedProductId).toLowerCase().includes(q);
+  });
+
   return (
     <div>
       <div className="page-header">
@@ -133,9 +152,21 @@ export function WorkOrders() {
 
       {error && <div className="error-text">{error}</div>}
 
+      <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <input placeholder={`${t('field.work_order_number')} / ${t('field.finished_product')}`} value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: 240 }} />
+        <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+          <option value="">{t('field.all_document_types')}</option>
+          {STATES.map((s) => (
+            <option key={s} value={s}>
+              {t(`work_order_lifecycle.state.${s}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {workOrders === null ? (
         <div className="empty-state">Loading…</div>
-      ) : workOrders.length === 0 ? (
+      ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('panel.no_work_orders_yet')}</div>
       ) : (
         <table className="data-table">
@@ -146,18 +177,26 @@ export function WorkOrders() {
               <th>{t('field.warehouse')}</th>
               <th>{t('field.quantity_planned')}</th>
               <th>{t('field.quantity_produced')}</th>
+              <th>{t('field.quantity_remaining')}</th>
+              <th>{t('field.status')}</th>
+              <th>{t('field.wip_value')}</th>
               <th>{t('field.created_at')}</th>
               <th>{t('field.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {workOrders.map((wo) => (
+            {filtered!.map((wo) => (
               <tr key={wo.id}>
                 <td>{wo.workOrderNumber}</td>
                 <td>{productName(wo.finishedProductId)}</td>
                 <td>{warehouseName(wo.warehouseId)}</td>
                 <td>{wo.quantityPlanned}</td>
                 <td>{wo.quantityProduced}</td>
+                <td>{wo.quantityPlanned - wo.quantityProduced}</td>
+                <td>
+                  <StatusBadge code={`work_order_lifecycle.state.${wo.state}`} />
+                </td>
+                <td>{wo.wipValue}</td>
                 <td>{new Date(wo.createdAt).toLocaleDateString()}</td>
                 <td>
                   <Link className="btn btn-secondary" to={`/manufacturing/work-orders/${wo.id}`}>
