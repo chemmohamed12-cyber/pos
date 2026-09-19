@@ -108,6 +108,29 @@ describe('AttendanceService (ADR-065, Attendance Phase 1)', () => {
     await expect(attendance.createMapping({ connectorId: connector.id, employeeId: emp2.id, deviceUserRef: deviceRef }, ADMIN_A)).rejects.toThrow(/already actively mapped/);
   });
 
+  it('createMapping rejects a non-existent employeeId (same guard recordManualPunch already had)', async () => {
+    const connector = await attendance.createConnector(shortName('GhostConn'), 'manual', ADMIN_A);
+    await expect(
+      attendance.createMapping({ connectorId: connector.id, employeeId: '00000000-0000-0000-0000-000000000099', deviceUserRef: shortName('GHOST') }, ADMIN_A),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it('submitApprovalBatch leaves no orphaned batchId when ApprovalEngineService.submit fails — the batch is deleted and days remain submittable', async () => {
+    const emp = await hr.createEmployee({ fullName: shortName('BatchFailEmp') }, ADMIN_A);
+    await attendance.recordManualPunch({ employeeId: emp.id, punchTimestamp: '2026-11-24T08:00:00.000Z', punchType: 'in' }, ADMIN_A);
+    await attendance.recordManualPunch({ employeeId: emp.id, punchTimestamp: '2026-11-24T16:00:00.000Z', punchType: 'out' }, ADMIN_A);
+
+    const submitSpy = jest.spyOn(approvals, 'submit').mockRejectedValueOnce(new Error('simulated approval-engine outage'));
+    await expect(attendance.submitApprovalBatch('2026-11-24', '2026-11-24', ADMIN_A)).rejects.toThrow(/simulated approval-engine outage/);
+    submitSpy.mockRestore();
+
+    const day = (await attendance.listDays(emp.id)).find((d) => d.calendarDate === '2026-11-24');
+    expect(day?.batchId).toBeNull(); // not stuck — eligible for a fresh submission
+
+    const batch = await attendance.submitApprovalBatch('2026-11-24', '2026-11-24', ADMIN_A);
+    expect(batch.status).toBe('submitted');
+  }, 30_000);
+
   it('device reassignment: closing a mapping and opening a new one preserves old punch attribution (ADR-062 §5)', async () => {
     const connector = await attendance.createConnector(shortName('ReassignConn'), 'manual', ADMIN_A);
     const empA = await hr.createEmployee({ fullName: shortName('OldOwner') }, ADMIN_A);

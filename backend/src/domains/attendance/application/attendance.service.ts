@@ -133,6 +133,7 @@ export class AttendanceService implements OnModuleInit {
   async createMapping(input: CreateMappingInput, actorUserId: string): Promise<AttendanceEmployeeMapping> {
     const connector = await this.connectors.findOne({ where: { id: input.connectorId } });
     if (!connector) throw new NotFoundException(`Attendance connector "${input.connectorId}" not found.`);
+    await this.hr.getEmployee(input.employeeId); // throws NotFoundException if the employee does not exist — same guard as recordManualPunch
 
     const existingActive = await this.mappings.findOne({
       where: { connectorId: input.connectorId, deviceUserRef: input.deviceUserRef, effectiveTo: IsNull() },
@@ -399,14 +400,26 @@ export class AttendanceService implements OnModuleInit {
     const batch = await this.approvalBatches.save(this.approvalBatches.create({ periodStart, periodEnd, status: 'draft', createdByUserId: actorUserId }));
     await this.days.update(inRange.map((d) => d.id), { batchId: batch.id });
 
-    const approvalRequest = await this.approvals.submit({
-      requestTypeCode: APPROVAL_BATCH_TYPE,
-      resourceType: 'attendance_approval_batch',
-      resourceId: batch.id,
-      requestedAction: 'approve',
-      payload: { periodStart, periodEnd, dayCount: inRange.length },
-      makerUserId: actorUserId,
-    });
+    let approvalRequest: { id: string };
+    try {
+      approvalRequest = await this.approvals.submit({
+        requestTypeCode: APPROVAL_BATCH_TYPE,
+        resourceType: 'attendance_approval_batch',
+        resourceId: batch.id,
+        requestedAction: 'approve',
+        payload: { periodStart, periodEnd, dayCount: inRange.length },
+        makerUserId: actorUserId,
+      });
+    } catch (err) {
+      // ApprovalEngineService.submit failed after the days were already stamped with this
+      // batch's id — unlike a rejected batch (onApprovalRejected), nothing would otherwise
+      // ever clear that batchId, permanently excluding these days from every future
+      // submission attempt (they'd never again match `batchId: IsNull()`). Reverse the
+      // stamp and drop the orphaned draft batch so the days remain submittable.
+      await this.days.update(inRange.map((d) => d.id), { batchId: null as unknown as string });
+      await this.approvalBatches.delete(batch.id);
+      throw err;
+    }
     batch.approvalRequestId = approvalRequest.id;
     batch.status = 'submitted';
     await this.approvalBatches.save(batch);
