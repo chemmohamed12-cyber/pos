@@ -1,16 +1,19 @@
 # ADR-067 — Attendance Phase 1: Completion Review & Payroll Handoff Contract
 
-**Status: COMPLETE / VERIFIED / HANDOFF-READY FOR PAYROLL (2026-09-19).**
-This document closes out Attendance Phase 1 (`ADR-065`) with a full
-domain review against its own ratified baseline (`ADR-062`, `ADR-063`,
-`ADR-065`), records the two correctness defects found and fixed, and
-resolves `ADR-064 §5`'s Attendance-dependency blockers now that `ADR-063`
-is ratified and `ADR-065` is shipped. `ADR-059` (HR Phase 1), `ADR-062`,
-`ADR-063`, and `ADR-065` are **not reopened** — this document supersedes
-nothing in them, per the same "supersede via new content, never rewrite
-the analysis" discipline they themselves establish. Production remains
+**Status: CLOSED — COMPLETE / VERIFIED / HANDOFF-READY FOR PAYROLL
+(2026-09-19). CTO-accepted closure, §10.** This document closes out
+Attendance Phase 1 (`ADR-065`) with a full domain review against its own
+ratified baseline (`ADR-062`, `ADR-063`, `ADR-065`), records the two
+correctness defects found and fixed, and resolves `ADR-064 §5`'s
+Attendance-dependency blockers now that `ADR-063` is ratified and
+`ADR-065` is shipped. `ADR-059` (HR Phase 1), `ADR-062`, `ADR-063`, and
+`ADR-065` are **not reopened** — this document supersedes nothing in
+them, per the same "supersede via new content, never rewrite the
+analysis" discipline they themselves establish. Production remains
 HOLD. This document does not authorize, begin, or scope any Payroll
-implementation.
+implementation. §10 records the CTO's closure directive and elevates the
+§5 holiday/weekend finding from a recommendation to a **binding Payroll
+design condition**.
 
 ## 0. Baseline reviewed
 
@@ -189,7 +192,14 @@ scope) remain fully open and are not addressed here.
 | Backend build (`nest build`) | **PASS** |
 | Frontend build (`tsc -b && vite build`) | **PASS**, zero type errors |
 
-## 7. Browser / E2E evidence — partial, disclosed limitation
+## 7. Browser / E2E evidence — disclosed Evidence Gap, not a functional failure
+
+**CTO classification (§10):** the absence of a manual browser
+click-through is an **Evidence Gap**, explicitly disclosed rather than
+discovered — not a defect, not a blocker to closure, and not grounds to
+reopen Attendance. The live-PostgreSQL functional proof (12/12 + 154/154,
+real approval/permission engines, real DB) stands as sufficient
+verification on its own.
 
 The dev servers (backend `:3500`, frontend `:5173`) were confirmed live
 and serving the real compiled application — the login screen rendered
@@ -230,3 +240,75 @@ Payroll's own Policy Decision Package and Implementation Contract
 is ready — this document removes the *Attendance-side* blockers named in
 `ADR-064 §5` but does not itself authorize, begin, or scope any Payroll
 work.
+
+## 10. CTO directive — closure and binding Payroll design condition (2026-09-19)
+
+The CTO reviewed §5 and §7 above and issued the following directive,
+recorded verbatim in substance (Arabic original preserved as the
+authoritative instruction; English restatement for the ADR record):
+
+> **الأصل (ar):** "هذه النقطة يجب أن تصبح شرطًا صريحًا في Payroll
+> Contract: `AttendanceDay.status = absent` لا يمكن استخدامه وحده لاتخاذ
+> قرار خصم من الراتب... ولا يجوز لفريق Payroll أن يفترض أن `absent =
+> unpaid absence`. هذه نقطة Accounting/Payroll control وليست مجرد UI
+> detail." Browser walkthrough absence is accepted as a disclosed
+> Evidence Gap, not a failure. Directive: **Attendance Team — CLOSE &
+> HAND OFF.**
+
+### 10.1 Binding Payroll design condition (elevated from recommendation to requirement)
+
+`ADR-067 §5`'s holiday/weekend finding is no longer advisory. It is now a
+**mandatory condition on the future Payroll Phase 1 Implementation
+Contract**, binding on whoever writes it:
+
+> **`AttendanceDay.status = 'absent'` MUST NOT be interpreted, alone, as
+> a payable/unpaid-absence decision.** Payroll MUST independently
+> determine calendar context before treating an `'absent'` day as a
+> deduction:
+
+```
+Attendance Result
+        ↓
+   status = 'absent'
+        ↓
+Payroll Calendar Awareness (Payroll's own, not Attendance's)
+        ├── Working Day      → potential absence (payroll may deduct)
+        ├── Weekend          → NOT an absence for payroll deduction
+        ├── Holiday          → NOT an absence for payroll deduction
+        └── Approved Leave   → leave treatment (already status = 'on_leave',
+                                never reaches this branch)
+```
+
+This is an **Accounting/Payroll control requirement, not a UI or
+formatting detail** — a `PayRun` that deducts pay for a day merely
+because `AttendanceDay.status = 'absent'`, without first classifying that
+calendar date as a genuine working day, is a control failure, not a
+cosmetic one. The Payroll Phase 1 Implementation Contract (`ADR-064 §8`/
+§11, whenever authorized) MUST name, explicitly, how Payroll determines
+"working day vs. weekend vs. holiday" before it may consume
+`AttendanceDay.status` for any deduction decision — `ADR-063 §7`'s
+deferral of the holiday/weekend calendar is **not** silently inherited as
+"assume every non-punch day is unpaid." Attendance will not resolve this
+gap; per `ADR-063 §7: B` it was deferred deliberately and remains
+deferred. Resolving it is Payroll's own scope, not Attendance's, and is
+not satisfied by anything in `ADR-065`.
+
+### 10.2 Closure
+
+Per the CTO's directive:
+
+- `ADR-067` (this document) and commits `d76e22e` / `a42fd0b` are
+  **accepted as the completion and handoff record.**
+- **Attendance Domain status: COMPLETE / VERIFIED / HANDOFF-READY FOR
+  PAYROLL — CLOSED.**
+- `ADR-059` (HR Phase 1) is **not** reopened. No new Attendance policy is
+  to be added.
+- The documented Payroll boundary (§10.1 above) is preserved as binding;
+  `ADR-063 §7`'s deferred holiday/weekend policy **remains deferred** and
+  is to be resolved, if and when needed, **inside the Payroll design**,
+  not inside Attendance.
+- **No further Attendance implementation work is authorized** unless a
+  concrete defect is discovered through a later Payroll integration test
+  — a hypothetical future finding, not a currently known one.
+- The Attendance team's ongoing role is limited to **Payroll integration
+  verification** if and when that work begins.
