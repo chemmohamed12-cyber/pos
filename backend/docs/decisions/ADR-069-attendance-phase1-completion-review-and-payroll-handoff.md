@@ -1,4 +1,13 @@
-# ADR-067 — Attendance Phase 1: Completion Review & Payroll Handoff Contract
+# ADR-069 — Attendance Phase 1: Completion Review & Payroll Handoff Contract
+
+**Renumbering note (2026-09-19):** This document was originally committed
+as `ADR-067` (commits `a42fd0b`, `40c957f`). It has been renumbered to
+`ADR-069` to resolve a numbering collision with a separately, concurrently
+ratified `ADR-067` — the Payroll Policy Decision Package (commits
+`a835458`, `b9d70e1`, `8bf3bf0`) — which the CTO confirmed keeps the
+`ADR-067` number. This is a numbering/reference correction only: no
+content, finding, fix, or directive recorded below is altered, reopened,
+or reinterpreted.
 
 **Status: CLOSED — COMPLETE / VERIFIED / HANDOFF-READY FOR PAYROLL
 (2026-09-19). CTO-accepted closure, §10.** This document closes out
@@ -224,8 +233,8 @@ approval to mint a dev-only token.
   the two fixes in §2.
 - `backend/src/domains/attendance/application/attendance-phase1.spec.ts`
   — two new regression tests.
-- `backend/docs/decisions/ADR-067-attendance-phase1-completion-review-and-payroll-handoff.md`
-  — this document.
+- `backend/docs/decisions/ADR-069-attendance-phase1-completion-review-and-payroll-handoff.md`
+  — this document (renumbered from `ADR-067`, see note at top).
 
 Commit `d76e22e` — `fix(attendance): validate mapping employeeId and
 recover from a failed batch submission`.
@@ -257,7 +266,7 @@ authoritative instruction; English restatement for the ADR record):
 
 ### 10.1 Binding Payroll design condition (elevated from recommendation to requirement)
 
-`ADR-067 §5`'s holiday/weekend finding is no longer advisory. It is now a
+`ADR-069 §5`'s holiday/weekend finding is no longer advisory. It is now a
 **mandatory condition on the future Payroll Phase 1 Implementation
 Contract**, binding on whoever writes it:
 
@@ -297,7 +306,8 @@ not satisfied by anything in `ADR-065`.
 
 Per the CTO's directive:
 
-- `ADR-067` (this document) and commits `d76e22e` / `a42fd0b` are
+- `ADR-069` (this document, renumbered from `ADR-067`) and commits
+  `d76e22e` / `a42fd0b` are
   **accepted as the completion and handoff record.**
 - **Attendance Domain status: COMPLETE / VERIFIED / HANDOFF-READY FOR
   PAYROLL — CLOSED.**
