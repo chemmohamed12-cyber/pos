@@ -1,29 +1,345 @@
 # ADR-068 — Sales Commission & Target Management: Policy Decision Package
 
-**Status: PROPOSED — CTO decision pending. Analysis only.** No code,
-migration, schema, API, frontend, or commission/target calculation is
-authorized by this document. Produced strictly from `ADR-066` (Sales
-Commission & Target Management: Future Architecture Requirements,
-RECORDED baseline) — no new repository investigation is made beyond what
-that document already established. `ADR-059` (HR Phase 1, CLOSED/PASS),
-`ADR-064`/`ADR-067` (Payroll study/policy), and the Attendance track
-(`ADR-062`/`ADR-063`/`ADR-065`) are not reopened by this document.
+**Status: RATIFIED (2026-09-19).** All five decisions below (§1–§5) have
+been resolved by the CTO, via the "CTO Directive — Payroll + Commission &
+Target Policy Resolution" message. This document's original
+options-analysis body is kept intact, unmodified, below the fold, as the
+historical record of what was weighed and why — the same "supersede via
+new content, never rewrite the analysis" discipline `ADR-052`/`ADR-060`/
+`ADR-063` already used. **These five decisions, plus the additional
+binding specifications in §§A–H below, are now closed and are not to be
+reopened or reinterpreted** except through the escalation categories
+`ADR-053 §16` already defines. The resulting deliverable is the
+**Commission & Target Phase 1 Implementation Contract**, not yet written —
+production remains HOLD; **no implementation proceeds from this document
+alone.**
 
-This document converts `ADR-066`'s **Business Policy Decision Required**
+## RATIFIED DECISIONS (2026-09-19)
+
+| # | Decision | Ratified |
+|---|---|---|
+| **§1** | Commission Policy Scope | **B** — Sales Rep, Customer, and Customer Group only in Phase 1. Team, Campaign/Segment, and Global scope are explicitly NOT added in Phase 1. |
+| **§2** | Precedence | **A** — Customer Override wins over Rep Policy. Full Phase 1 rank order: **Customer → Customer Group → Sales Rep**. If no active Customer policy, fall through to Customer Group, then Sales Rep. |
+| **§3** | Calculation Basis | **B** — Basis is a field on each individual Commission Policy, not a global fixed setting. Phase 1 supports Gross Sales, Net Sales, and Collected Amount. |
+| **§4** | Target Tier Rate Application | **B** — Marginal / per-tier calculation. Each tier's rate applies only to the portion of the eligible amount falling within that tier's band. |
+| **§5** | Target Architecture | **B** — Target Management is its own independent bounded context. Commission does not own Target data. |
+
+**Original status line (superseded by the ratification above, kept for
+the record):** *"PROPOSED — CTO decision pending. Analysis only."* No
+code, migration, schema, API, frontend, or commission/target calculation
+was authorized by this document at the time it was written. Produced
+strictly from `ADR-066` (Sales Commission & Target Management: Future
+Architecture Requirements, RECORDED baseline) — no new investigation, no
+new claim about the repository was made beyond what `ADR-066` already
+established. `ADR-059` / HR Phase 1 (CLOSED/PASS), `ADR-064`/`ADR-067`
+(Payroll study/policy), and the Attendance track (`ADR-062`/`ADR-063`/
+`ADR-065`) were not reopened by this document.
+
+This document converted `ADR-066`'s **Business Policy Decision Required**
 items (§3, §4, §5, §9) plus one item `ADR-066 §2` named as a recorded
-candidate list rather than an approved scope (which policy dimensions are
-actually built in Phase 1) into named, bounded options with real
-consequences — the same discipline `ADR-063` (Attendance) and `ADR-067`
-(Payroll) already used for this program's prior CTO decision packages.
-**It does not choose an option in any section below and makes no
-recommendation.**
+candidate list rather than an approved scope into named, bounded options
+with real consequences, the same discipline `ADR-063` (Attendance) and
+`ADR-067` (Payroll) already used for this program's prior CTO decision
+packages. It did not choose an option or make a recommendation — the
+table above is the CTO's own resolution, not an inference by this team.
 
-**ملخص تنفيذي (ar):** هذه حزمة قرار للـCTO فقط — بدون أي تنفيذ وبدون أي
-توصية ملزمة. تحوّل نقاط القرار غير المحسومة في `ADR-066` (تسلسل الأولوية
-بين سياسة المندوب وتجاوز العميل، أساس احتساب العمولة، طريقة تطبيق شرائح
-الهدف، ونطاق إدارة الأهداف) إلى خيارات صريحة مع نتائجها الحقيقية، دون
-اختيار أي خيار هنا. بمجرد صدور قرار الـCTO، يُكتب عقد تنفيذ Commission
-Phase 1 استنادًا إليها فقط. لا يُعاد فتح `ADR-059` أو `ADR-064`/`ADR-067`.
+**ملخص تنفيذي (ar):** تم اعتماد القرارات الخمسة (§1–§5) من قبل الـCTO.
+النص الأصلي (تحليل الخيارات دون توصية) محفوظ دون تعديل كسجل تاريخي. تم
+إضافة توصيف ملزم إضافي (§§A–H أدناه) يغطي: خوارزمية الـResolution
+والتتبع، تعريف أسس الاحتساب (Gross/Net/Collected)، حساب الشرائح
+الهامشية (Marginal Tier)، أبعاد الـTarget في Phase 1 (Employee + Period
+إلزاميًا)، نموذج فترة الـTarget، لقطة الـCommission غير القابلة للتغيير،
+حدود Payroll، الحوكمة، وتسلسل التنفيذ. **لا يوجد أي كود أو migration أو
+schema مصرّح به بموجب هذا المستند** — الخطوة التالية فقط هي عقد تنفيذ
+Commission & Target Phase 1، وهو لم يُكتب بعد.
+
+---
+
+## §A — Precedence & Resolution Algorithm (binding specification)
+
+Per §2's ratified decision, the Commission Rule Resolution Engine
+(preserved from `ADR-066`'s reuse direction — a dedicated resolver, never
+an inline `if customerRate else repRate` chain) must resolve a commission
+policy for a given transaction as follows:
+
+1. Look for an **active, effective-dated Customer-level policy** for the
+   transaction's customer. If found, it is the resolved policy — stop.
+2. Otherwise, look for an **active, effective-dated Customer-Group-level
+   policy** for the customer's group. If found, it is the resolved
+   policy — stop.
+3. Otherwise, fall through to the **Sales Rep's default policy**. This is
+   the terminal fallback — Phase 1 has no scope below Sales Rep (per §1,
+   Team/Campaign/Global do not exist in Phase 1, so there is no further
+   fallback beyond this step).
+
+The resolution's output must be traceable end-to-end and recorded exactly
+in this shape (this is not optional formatting — it is the minimum
+resolution record the Implementation Contract must specify a concrete
+schema for):
+
+```
+Resolved Policy → Scope → Effective Period → Basis → Tier/Rate
+```
+
+Ambiguity within a single scope level (e.g. two overlapping active
+Customer-level policies for the same customer) is not addressed by this
+ratification and must be closed as an explicit rule in the Implementation
+Contract — it is not inferable from the above and must not be left
+implicit.
+
+## §B — Calculation Basis Definitions (binding requirement, not yet fully specified)
+
+Per §3, each Commission Policy carries its own basis: **Gross Sales**,
+**Net Sales**, or **Collected Amount**. This ratification fixes that the
+basis is a per-policy field (not a company-wide constant) and fixes the
+three named bases as the Phase 1 set — it does **not** itself define the
+exact accounting composition of each basis. The Implementation Contract
+**must** define, explicitly and before any calculation logic is written:
+
+- The treatment of **Discounts** within Net Sales.
+- The treatment of **Returns** within Net Sales.
+- The treatment of **Taxes** within both Gross and Net Sales.
+- The treatment of **Credit Notes** against either basis.
+- The treatment of **partial Collections** within Collected Amount (e.g.
+  a partially-collected invoice's commission timing/amount).
+
+No team member may assume or invent an accounting definition for any of
+the above during implementation — each must be resolved as its own
+explicit line item in the Implementation Contract, sourced from
+Accounting's existing conventions where one already exists (e.g. however
+Returns/Credit Notes are already recognized elsewhere in this codebase's
+Accounting domain) rather than invented fresh for Commission.
+
+## §C — Marginal Tier Calculation (binding specification)
+
+Per §4, tier rates apply **marginally** — only to the portion of the
+eligible amount within each tier's band, never to the whole amount at the
+top tier reached. Worked illustration (rates and thresholds below remain
+**non-authoritative examples**, exactly as `ADR-066 §5` already stipulated
+— only the calculation *method* is ratified here, not any rate or
+threshold):
+
+```
+0–50     → Rate A
+50–70    → Rate B
+70–90    → Rate C
+90+      → Rate D
+```
+
+If a Sales Rep achieves 80 (using whatever achievement basis the eventual
+Target definition resolves to), the calculation is:
+
+```
+0–50   at Rate A
+50–70  at Rate B
+70–80  at Rate C
+```
+
+Rate C does **not** apply to the entire 80 — only to the 70–80 band. The
+actual tier thresholds and rates remain undecided business input, to be
+supplied when the Implementation Contract (or a subsequent policy
+configuration exercise) is written — this ratification fixes the
+*method*, not the *numbers*.
+
+## §D — Target Bounded Context & Phase 1 Dimensions (binding specification, closes ADR-066 §9)
+
+Per §5, Target Management is built as its own bounded context (`targets`
+or an equivalently named domain), never as Commission-owned data.
+Commission's Resolution Engine (§A) consumes an **Approved Target** from
+this context; it does not define, own, or mutate Target data itself. The
+chain is:
+
+```
+Target Context
+      ↓
+Approved Target
+      ↓
+Commission Resolution Engine
+      ↓
+Commission Result
+      ↓
+Approval
+      ↓
+Payroll
+      ↓
+GL
+```
+
+This boundary is deliberate and closed — not open for reinterpretation —
+specifically so Targets remain reusable later for sales performance
+tracking, incentive programs, management dashboards, campaigns,
+forecasting, or other performance programs, without redesigning
+Commission (`ADR-066 §9`'s own stated rationale, now ratified as binding,
+not just a named possibility).
+
+**Phase 1 dimensions are closed as follows** (this replaces `ADR-066 §9`'s
+open "final dimension list" question — it is no longer open):
+
+- **Mandatory:** `Employee` + `Target Period`. Every Phase 1 Target is,
+  at minimum, an Employee's target value for a defined period. No Target
+  exists without both.
+- **Supported organizational context (not a separate engine):** a Target
+  may additionally be linked to the Employee's Team/Department, when
+  available from the existing Organization structure (`OrgUnit`, per
+  `ADR-059` D1) — but this is contextual metadata on an Employee-level
+  Target, not a standalone Team-based target engine. Phase 1 does not
+  support setting one target value for an entire team and deriving
+  individual employee targets from it.
+- **Explicitly deferred (not rejected — named as future capability,
+  exactly as `ADR-066 §9` itself already framed the full candidate
+  list):** Region, Customer Group Target, Product Category Target,
+  Campaign Target, Territory Target, and any multi-dimensional target
+  matrix combining more than one of these. None of these are built,
+  stubbed, or partially modeled in Phase 1.
+
+## §E — Target Period Model (binding specification)
+
+Every Phase 1 Target carries, at minimum:
+
+```
+Target Period
+→ Start Date
+→ End Date
+→ Status
+→ Employee
+→ Target Value
+→ Approval State
+```
+
+Targets are effective-dated in the same discipline `CustomerAssignment`
+already established (`ADR-066 §0`/§7) — a new row per change, never a
+mutated single row. **No two Targets may overlap for the same Employee,
+in the same period, at the same dimension, without an explicit rule
+preventing that ambiguity.** This ratification fixes the requirement that
+such a rule must exist; the exact mechanism (a DB-level uniqueness/
+exclusion constraint, an application-level check, or both) is
+Implementation Contract detail, not decided here.
+
+## §F — Commission Snapshot (binding specification, closes ADR-066 §7 field list)
+
+Per the reuse direction already preserved from `ADR-066 §7` (immutable
+snapshot, never recalculated when policy changes later), every calculated
+Commission Result must retain, at minimum, all of the following fields —
+this is now the closed, binding field list, not just a category
+description:
+
+```
+Employee / Sales Rep
+Customer
+Customer Group
+Sale / Invoice / Collection references
+Resolved Policy
+Policy Scope
+Calculation Basis
+Target Period
+Target Snapshot
+Applicable Tier
+Rate
+Calculation Inputs
+Calculated Amount
+Calculation Timestamp
+```
+
+Once written, a Commission Result is immutable. If the underlying policy
+changes afterward, this snapshot — not the live policy — remains the
+permanent record of what was actually calculated and why.
+
+## §G — Payroll Boundary (binding, restates and closes ADR-066 §8 for this context)
+
+Payroll never recomputes a commission from Sales data. The boundary is:
+
+```
+Sales
+ ↓
+Invoice / Collection
+ ↓
+Commission Resolution
+ ↓
+Commission Result
+ ↓
+Commission Approval
+ ↓
+Payroll
+```
+
+Payroll consumes an **Approved Commission Result/Statement** only. It does
+not independently re-derive Sales, Customer, Rate, Target, or Commission
+Basis from source data — exactly as `ADR-064 §8`/`ADR-067` already
+established for Payroll's consumption of Attendance facts, applied here
+to Commission instead. This is the same boundary shape `ADR-066 §8`
+already proposed; it is now ratified as binding, not merely proposed.
+
+**Sales Rep identity remains unchanged and closed** — no new Sales Rep
+identity is created. The existing path is reaffirmed as the permanent
+model:
+
+```
+CustomerAssignment.salesRepUserId
+        ↓
+User
+        ↓
+Employee.userId
+```
+
+Sales Rep is a role an `Employee` plays, never a second, parallel
+identity record (`ADR-066 §1`, now ratified as closed, not merely
+carried-forward reuse direction).
+
+## §H — Governance, Corrections, and Implementation Sequence
+
+**Governance (binding):** Commission policy changes, Target approvals, and
+Commission approval remain subject to: the existing permission model;
+FA-01 (`ApprovalEngineService`) wherever an approval gate applies;
+`AuditService` for every mutation; effective-dating for every policy and
+Target; and the immutable calculation/result snapshot (§F). **A ratified
+Commission Result may never be directly mutated.** Any correction must be
+a controlled adjustment/recalculation flow that produces a new, separately
+traceable record — never an overwrite of an existing result.
+
+**Implementation sequence (CTO-directed roadmap, recorded here for
+traceability — steps beyond Step 1 are NOT authorized by this document):**
+
+1. Finalize this document (ADR-068) as RATIFIED — **this step**.
+2. Write the Commission & Target Phase 1 Implementation Contract.
+3. Review that contract against HR, Sales, `CustomerAssignment`, Sales
+   Orders, Invoices, Collections, Accounting, Attendance, and Payroll.
+4. Complete the Payroll Policy Decision Package (`ADR-067`) with the same
+   rigor as this document.
+5. Produce the Payroll Phase 1 Implementation Contract.
+6. Only once both Implementation Contracts (Commission & Target, and
+   Payroll) exist and are approved: Implementation → Testing →
+   Verification → Delivery, as one coordinated package.
+
+**Explicitly prohibited at this stage (documentation-only phase):** no
+Commission code; no Target code; no Payroll code; no database migration;
+no default/placeholder commission rates; no invented tax or social
+insurance rules; no unapproved overtime or holiday rules; no modification
+to HR or Sales to force-fit this design; no production deployment.
+
+## Dependency & Conflict Review
+
+- **`ADR-059` (HR Phase 1, CLOSED/PASS):** not reopened. §D/§G's Employee/
+  Sales Rep model reads `Employee.userId` exactly as already ratified
+  there (D2) — no change to HR's own aggregate.
+- **`ADR-062`/`ADR-063`/`ADR-065` (Attendance):** not reopened, not
+  referenced by any decision above except as a precedent for the
+  facts-only Payroll-boundary shape (§G), which does not alter
+  Attendance's own contract.
+- **`ADR-064`/`ADR-067` (Payroll study/policy):** unmodified. §G's Payroll
+  boundary is consistent with, not a change to, `ADR-064 §8`'s
+  already-established "Payroll consumes an approved result, never
+  reconstructs a calculation" principle — this ratification applies the
+  same principle to Commission, it does not alter Payroll's own open
+  policy items in `ADR-067`, which remain separately pending.
+  `ADR-067`'s own Step 4 (completing the Payroll Policy Decision Package)
+  is a distinct, not-yet-executed deliverable per §H above.
+- **`ADR-066` (Commission/Target backlog):** this document is the direct
+  ratification of `ADR-066`'s deferred Business Policy Decision Required
+  items (§3, §4, §5, §9) plus its §2 scope question and §7 snapshot field
+  list — fully consistent with, and closing, those open items. No
+  conflict found.
+- **No other ADR in this program references Commission, Target, or
+  Sales Rep identity** in a way that conflicts with §§A–H above.
 
 ---
 
