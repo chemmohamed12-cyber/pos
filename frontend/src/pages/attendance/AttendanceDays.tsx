@@ -28,6 +28,12 @@ interface ApprovalBatch {
 
 const ATTENDANCE_REQUEST_TYPE_CODES = ['attendance.approval_batch', 'attendance.correction'];
 
+/** A UTC ISO instant -> the "YYYY-MM-DDTHH:mm" a `datetime-local` input expects, in the VIEWER's own local time — the inverse of the browser-local -> UTC conversion `correctDay`'s submit does. */
+function toLocalDatetimeInput(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 /** ADR-065 §5/§8 — days table, split-authority correction, and the FA-01 approval batch workflow. `<ApprovalsPanel>` reused as-is for both request types this module registers. */
 export function AttendanceDays() {
   const { t, preload } = useLanguage();
@@ -103,9 +109,11 @@ export function AttendanceDays() {
     setBusyId(day.id);
     setError(null);
     try {
+      // Same browser-local -> real UTC instant conversion as the manual-entry form — a bare
+      // `datetime-local` string has no timezone of its own.
       await api.post(`/attendance/days/${day.id}/correct`, {
-        checkIn: correctCheckIn || undefined,
-        checkOut: correctCheckOut || undefined,
+        checkIn: correctCheckIn ? new Date(correctCheckIn).toISOString() : undefined,
+        checkOut: correctCheckOut ? new Date(correctCheckOut).toISOString() : undefined,
         reason: correctReason,
       });
       setCorrectingId(null);
@@ -251,8 +259,8 @@ export function AttendanceDays() {
                       className="btn btn-secondary"
                       onClick={() => {
                         setCorrectingId(d.id);
-                        setCorrectCheckIn(d.checkIn ? d.checkIn.slice(0, 16) : '');
-                        setCorrectCheckOut(d.checkOut ? d.checkOut.slice(0, 16) : '');
+                        setCorrectCheckIn(d.checkIn ? toLocalDatetimeInput(d.checkIn) : '');
+                        setCorrectCheckOut(d.checkOut ? toLocalDatetimeInput(d.checkOut) : '');
                         setCorrectReason('');
                       }}
                     >

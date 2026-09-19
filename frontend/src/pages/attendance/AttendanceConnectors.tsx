@@ -162,7 +162,10 @@ export function AttendanceConnectors() {
     setRecordingPunch(true);
     setError(null);
     try {
-      await api.post('/attendance/manual-entries', { employeeId: punchEmployeeId, punchTimestamp, punchType });
+      // `<input type="datetime-local">` has no timezone of its own — `new Date(...)` here
+      // reads it as the ADMIN'S OWN browser-local time, and `.toISOString()` converts it to
+      // a real UTC instant, so the server never has to guess (or assume its own timezone).
+      await api.post('/attendance/manual-entries', { employeeId: punchEmployeeId, punchTimestamp: new Date(punchTimestamp).toISOString(), punchType });
       setPunchTimestamp('');
       await loadUnmapped();
     } catch (err) {
