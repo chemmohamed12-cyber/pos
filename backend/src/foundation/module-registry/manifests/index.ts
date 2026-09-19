@@ -7,11 +7,12 @@ import { reportingManifest } from './reporting.manifest';
 import { hrManifest } from './hr.manifest';
 import { accountingManifest } from './accounting.manifest';
 import { procurementManifest } from './procurement.manifest';
+import { attendanceManifest } from './attendance.manifest';
 
 /**
  * ERP Foundation — P1 (5 V1 module manifests) + P9/ADR-029 (`hr`, the 6th)
  * + F01/ADR-032 (`accounting`, the 7th — Financial Core) + ADR-048
- * (`procurement`, the 8th).
+ * (`procurement`, the 8th) + ADR-065 (`attendance`, the 9th).
  * `core` has no authored manifest (always active, never gated — ADR-024 §2.1).
  */
 export const ALL_MODULE_MANIFESTS: readonly ModuleManifest[] = [
@@ -23,6 +24,17 @@ export const ALL_MODULE_MANIFESTS: readonly ModuleManifest[] = [
   hrManifest,
   accountingManifest,
   procurementManifest,
+  attendanceManifest,
 ];
 
-export { salesManifest, inventoryManifest, logisticsManifest, financeManifest, reportingManifest, hrManifest, accountingManifest, procurementManifest };
+export {
+  salesManifest,
+  inventoryManifest,
+  logisticsManifest,
+  financeManifest,
+  reportingManifest,
+  hrManifest,
+  accountingManifest,
+  procurementManifest,
+  attendanceManifest,
+};

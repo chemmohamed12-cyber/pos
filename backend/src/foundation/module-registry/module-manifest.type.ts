@@ -23,8 +23,12 @@
  * from reserved to built; see `ReservedModuleCode` below). `procurement`
  * added by ADR-048 (Purchasing/Supplier/Supplier-Finance, promoted from
  * reserved to built; see docs/decisions/ADR-048-procurement-promotion.md).
+ * `attendance` added by ADR-065 (HR Attendance & Biometric Integration
+ * Foundation, Phase 1) — a genuinely new module, never previously
+ * reserved (see `ADR-062 §0`), not a promotion out of
+ * `ReservedModuleCode`.
  */
-export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement';
+export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'attendance';
 
 /** A module_code a manifest may actually declare (`core` has no authored manifest — §3.2). */
 export type AuthoredModuleCode = Exclude<ModuleCode, 'core'>;
@@ -148,7 +152,7 @@ export interface ModuleManifest {
   readonly public_contract: ModulePublicContract;
 }
 
-/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048). */
+/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `attendance` per ADR-065). */
 export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'core',
   'sales',
@@ -159,6 +163,7 @@ export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'hr',
   'accounting',
   'procurement',
+  'attendance',
 ] as const;
 
 /** Reserved, not built, not designed (ADR-024 §2.1; 6 codes as of ADR-029/ADR-032/ADR-048 promoting `hr`/`accounting`/`procurement` out). */

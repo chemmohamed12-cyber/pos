@@ -144,6 +144,15 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/hr/leave-requests', code: 'nav.hr_leave_requests', roles: ['admin'] },
     ],
   },
+  {
+    code: 'module.attendance',
+    coverTo: '/attendance',
+    items: [
+      { to: '/attendance/connectors', code: 'nav.attendance_connectors', roles: ['admin'] },
+      { to: '/attendance/import', code: 'nav.attendance_import', roles: ['admin'] },
+      { to: '/attendance/days', code: 'nav.attendance_days', roles: ['admin'] },
+    ],
+  },
   { code: '', items: [{ to: '/reports-overview', code: 'nav.reports' }] },
   {
     code: 'nav_group.administration',

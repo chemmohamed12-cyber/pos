@@ -33,6 +33,10 @@ import { HrEmployees } from './pages/hr/HrEmployees';
 import { HrDepartments } from './pages/hr/HrDepartments';
 import { HrLeaveRequests } from './pages/hr/HrLeaveRequests';
 import { HrCover } from './pages/covers/HrCover';
+import { AttendanceConnectors } from './pages/attendance/AttendanceConnectors';
+import { AttendanceImport } from './pages/attendance/AttendanceImport';
+import { AttendanceDays } from './pages/attendance/AttendanceDays';
+import { AttendanceCover } from './pages/covers/AttendanceCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
 import { ChartOfAccounts } from './pages/accounting/ChartOfAccounts';
 import { Journals } from './pages/accounting/Journals';
@@ -204,6 +208,10 @@ function AppRoutes() {
         <Route path="hr/employees" element={<HrEmployees />} />
         <Route path="hr/departments" element={<HrDepartments />} />
         <Route path="hr/leave-requests" element={<HrLeaveRequests />} />
+        <Route path="attendance" element={<AttendanceCover />} />
+        <Route path="attendance/connectors" element={<AttendanceConnectors />} />
+        <Route path="attendance/import" element={<AttendanceImport />} />
+        <Route path="attendance/days" element={<AttendanceDays />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/journals" element={<Journals />} />

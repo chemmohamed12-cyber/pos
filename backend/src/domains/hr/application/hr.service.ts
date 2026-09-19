@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { Employee } from '../infrastructure/employee.entity';
 import { EmployeeStatusHistory } from '../infrastructure/employee-status-history.entity';
 import { LeaveRequest } from '../infrastructure/leave-request.entity';
@@ -434,6 +434,26 @@ export class HrService implements OnModuleInit {
 
   async listLeaveRequests(employeeId?: string): Promise<LeaveRequest[]> {
     return this.leaveRequests.find({ where: employeeId ? { employeeId } : {}, order: { createdAt: 'DESC' } });
+  }
+
+  /**
+   * ADR-065 (Attendance Phase 1) — the one additive, read-only method
+   * this ratified `ADR-063 §3: B` decision needs. Does not change any
+   * existing HR Phase 1 behavior, endpoint, or ratified D1-D4 decision;
+   * `LeaveRequest.status` only ever holds `'approved'` once the FA-01
+   * subscriber (`onApprovalApproved`, above) has actually applied it, so
+   * this is a plain, already-consistent field check — no new state.
+   */
+  async isApprovedLeaveDate(employeeId: string, calendarDate: string): Promise<boolean> {
+    const count = await this.leaveRequests.count({
+      where: {
+        employeeId,
+        status: 'approved',
+        startDate: LessThanOrEqual(calendarDate),
+        endDate: MoreThanOrEqual(calendarDate),
+      },
+    });
+    return count > 0;
   }
 
   /**
