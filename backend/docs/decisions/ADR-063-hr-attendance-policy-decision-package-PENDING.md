@@ -1,13 +1,38 @@
 # ADR-063 — HR Attendance & Biometric Integration: Policy Decision Package
 
-**Status: PROPOSED — CTO decision pending. Analysis only.** No code,
-migration, schema, API, frontend, permission, or calculation is authorized
-by this document, and none is proposed as imminent. Produced strictly from
-`ADR-062` (HR Attendance & Biometric Integration Foundation — Phase 0
+**Status: RATIFIED (2026-09-19).** All nine decisions below (D-ATT1,
+§1–§8) have been resolved by the CTO. This document's original
+options-analysis body is kept intact, unmodified, as the historical
+record of what was weighed and why — the same "supersede via new content,
+never rewrite the analysis" discipline `ADR-052`/`ADR-060` used. **These
+nine decisions are now closed and are not to be reopened or reinterpreted**
+except through the escalation categories `ADR-053 §16` already defines.
+The resulting Attendance Phase 1 Implementation Contract is
+`ADR-065-attendance-phase1-implementation-contract.md`. Production remains
+HOLD; implementation proceeds under `ADR-065`, not under this document.
+
+## RATIFIED DECISIONS (2026-09-19)
+
+| # | Decision | Ratified |
+|---|---|---|
+| **D-ATT1** | Module boundary | **A** — standalone `attendance` module |
+| **§1** | Lateness/early-departure | **C** — no late/early calculation in Phase 1 |
+| **§2** | Overtime | **B** — Attendance calculates hours worked as a factual result only; no wage/overtime-pay computation |
+| **§3** | Absence vs. leave | **B** — reconcile against approved `LeaveRequest` |
+| **§4** | Shift model | **A** — no Shift entity in Phase 1 |
+| **§5** | Multi-punch handling | **A** — first-in/last-out span |
+| **§6** | Rounding | **A** — exact timestamps, no rounding |
+| **§7** | Holiday/weekend calendar | **B** — deferred |
+| **§8** | Correction authority | **C** — split by approval-batch status |
+
+**Original status line (superseded by the ratification above, kept for
+the record):** *"PROPOSED — CTO decision pending. Analysis only."* No
+code, migration, schema, API, frontend, permission, or calculation was
+authorized by this document at the time it was written. Produced strictly
+from `ADR-062` (HR Attendance & Biometric Integration Foundation — Phase 0
 Study, accepted baseline, commit `0077d6d`) — no new investigation, no
-new claim about the repository is made here that `ADR-062` did not
-already establish. `ADR-059` / HR Phase 1 (CLOSED/PASS) is not reopened.
-Production remains HOLD.
+new claim about the repository was made beyond what `ADR-062` already
+established. `ADR-059` / HR Phase 1 (CLOSED/PASS) was not reopened.
 
 This document converts `ADR-062 §11`'s nine unresolved items — eight
 business-policy questions plus one architecture-boundary question
