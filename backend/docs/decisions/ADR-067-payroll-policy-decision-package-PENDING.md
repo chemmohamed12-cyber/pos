@@ -44,7 +44,7 @@ resolved from ratified architecture alone; recorded as open per `ADR-053
 | **§L** | Payroll Approval / SoD | **Ratified** | Lifecycle at minimum: `Draft → Calculated → Reviewed → Approved → Posted`; FA-01 (`ApprovalEngineService`) reused, not a new engine; SoD enforced wherever policy requires actor separation |
 | **§M** | Immutability & Corrections | **Ratified** | No overwrite of an approved/posted Payroll Result; corrections are an `Adjustment`, `Correction`, or `Recalculation Run` depending on state, each fully audited; historical payroll remains traceable |
 | **§N** | Payroll Period Control | **Ratified** | No duplicate Payroll Run for the same Employee + Period without explicit policy; no posting into a closed accounting period; no direct edit of an approved/posted run; must integrate with the existing Financial Period control |
-| **§O** | Payroll Phase 1 Non-Goals | **Ratified** (explicit exclusion list) | See §O below — sixteen named capabilities are explicitly out of Phase 1 scope, recorded as extension points, not rejections |
+| **§O** | Payroll Phase 1 Non-Goals | **Ratified** (explicit exclusion list) | See §O below — ten named capabilities are explicitly out of Phase 1 scope, recorded as extension points, not rejections |
 
 **Original status line (superseded by the ratification above, kept for
 the record):** *"PROPOSED — CTO decision pending. Analysis only."* No
