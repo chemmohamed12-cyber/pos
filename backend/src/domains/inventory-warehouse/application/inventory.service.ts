@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, EntityManager, Like } from 'typeorm';
 import { StockMovement } from '../infrastructure/stock-movement.entity';
-import { StockReservation, ReservationStatus } from '../infrastructure/stock-reservation.entity';
+import { StockReservation, ReservationStatus, ReservationReferenceType } from '../infrastructure/stock-reservation.entity';
 import { Warehouse } from '../infrastructure/warehouse.entity';
 import { MovementType } from '../domain/movement-type';
 import { canTransitionWarehouseStatus, WarehouseStatus } from '../domain/warehouse-status';
@@ -251,6 +251,24 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * `getAvailable` cannot: two simultaneous postings both reading the
    * same stale "available" snapshot and both proceeding.
    */
+  /**
+   * ADR-061 (Manufacturing) — raw physical on-hand quantity for a
+   * (warehouse, product) pair, with NO reservation subtracted (unlike
+   * `getAvailableInTransaction`). Needed because a Work Order's dedicated
+   * WIP sub-warehouse never itself carries reservations — "on hand" and
+   * "available" are the same number there, but Manufacturing's guards
+   * (ADR-061 §5/§7) are phrased in terms of physical on-hand quantity
+   * specifically, not availability net of a reservation concept that
+   * doesn't apply inside WIP.
+   */
+  async getOnHandQuantityInTransaction(manager: EntityManager, warehouseId: string, productId: string): Promise<number> {
+    const rows: Array<{ sum: string | null }> = await manager.query(
+      'SELECT SUM(quantity) as sum FROM stock_movements WHERE "warehouseId" = $1 AND "productId" = $2',
+      [warehouseId, productId],
+    );
+    return Number(rows[0]?.sum ?? 0);
+  }
+
   async getAvailableInTransaction(manager: EntityManager, warehouseId: string, productId: string): Promise<number> {
     const onHandRows: Array<{ sum: string | null }> = await manager.query(
       'SELECT SUM(quantity) as sum FROM stock_movements WHERE "warehouseId" = $1 AND "productId" = $2',
@@ -555,6 +573,61 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * ADR-061 (Manufacturing) — the generic-reference twin of
+   * `reserveStockInTransaction` above, for callers that are not a Sales
+   * Order (Work Order release, per ADR-061 §5). Same availability check,
+   * same advisory lock, same audit action — the only difference is which
+   * addressing column is populated (`referenceType`/`referenceId` instead
+   * of `salesOrderId`), enforced at the DB level by
+   * `CHK_stock_reservations_reference_xor`. Not a second reservation
+   * mechanism — the same `stock_reservations` table, the same
+   * `getAvailableInTransaction` availability calc (which already
+   * aggregates by `(warehouseId, productId, status)` regardless of which
+   * reference column is set).
+   */
+  async reserveStockForReferenceInTransaction(
+    manager: EntityManager,
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+    referenceType: ReservationReferenceType,
+    referenceId: string,
+    actorUserId: string | null,
+    status: ReservationStatus = 'active',
+  ): Promise<StockReservation> {
+    await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${warehouseId}:${productId}`]);
+
+    const available = await this.getAvailableInTransaction(manager, warehouseId, productId);
+
+    if (available < quantity) {
+      throw new ConflictException(
+        `Insufficient available stock for product "${productId}" in warehouse "${warehouseId}": requested ${quantity}, available ${available}.`,
+      );
+    }
+
+    const repo = manager.getRepository(StockReservation);
+    const reservation = await repo.save(
+      repo.create({ warehouseId, productId, quantity, referenceType, referenceId, status }),
+    );
+
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'inventory.stock.reserved',
+        resource: 'stock_reservation',
+        resourceId: reservation.id,
+        result: 'success',
+        correlationId: null,
+        after: { warehouseId, productId, quantity, referenceType, referenceId },
+      },
+      manager,
+    );
+
+    return reservation;
+  }
+
+  /**
    * The release half of `adjustReservationQuantityInTransaction` below,
    * without a replacement reservation — used when a line is REMOVED
    * entirely from an order (CTO directive — Order Edit at draft: "امكانية
@@ -774,6 +847,13 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return this.dataSource
       .getRepository(StockReservation)
       .find({ where: { salesOrderId, status: 'active' }, order: { createdAt: 'ASC' } });
+  }
+
+  /** ADR-061 (Manufacturing) — the generic-reference twin of `getActiveReservationsForOrder` above. */
+  async getActiveReservationsForReference(referenceType: ReservationReferenceType, referenceId: string): Promise<StockReservation[]> {
+    return this.dataSource
+      .getRepository(StockReservation)
+      .find({ where: { referenceType, referenceId, status: 'active' }, order: { createdAt: 'ASC' } });
   }
 
   /**
@@ -1077,6 +1157,70 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * ADR-061 (Manufacturing) — the generic-reference twin of
+   * `releaseReservedQuantity` above, for Work Order Material Issue: each
+   * issue decrements the Work Order's own reservation by the issued
+   * quantity, the same FIFO-drain-across-active-rows logic, so
+   * `getAvailableInTransaction` reflects the shrinking reservation
+   * immediately.
+   */
+  async releaseReservedQuantityForReference(
+    referenceType: ReservationReferenceType,
+    referenceId: string,
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new ConflictException('Release quantity must be a positive whole number.');
+    }
+
+    const run = async (m: EntityManager): Promise<void> => {
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${warehouseId}:${productId}`]);
+
+      const repo = m.getRepository(StockReservation);
+      const rows = await repo.find({
+        where: { referenceType, referenceId, productId, warehouseId, status: 'active' },
+        order: { createdAt: 'ASC' },
+      });
+      const totalActive = rows.reduce((sum, r) => sum + r.quantity, 0);
+      if (totalActive < quantity) {
+        throw new ConflictException(
+          `Cannot release ${quantity} of product "${productId}" for reference "${referenceType}:${referenceId}" — only ${totalActive} is actively reserved in warehouse "${warehouseId}".`,
+        );
+      }
+
+      let remaining = quantity;
+      for (const row of rows) {
+        if (remaining <= 0) break;
+        const take = Math.min(row.quantity, remaining);
+        row.quantity -= take;
+        remaining -= take;
+        if (row.quantity === 0) row.status = 'released';
+        await repo.save(row);
+      }
+
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'inventory.reservation.partially_released',
+          resource: 'stock_reservation',
+          resourceId: `${referenceType}:${referenceId}:${productId}:${warehouseId}`,
+          result: 'success',
+          correlationId: null,
+          after: { referenceType, referenceId, productId, warehouseId, quantity },
+        },
+        m,
+      );
+    };
+
+    return manager ? run(manager) : this.dataSource.transaction(run);
+  }
+
+  /**
    * Converts an active reservation into an actual outbound movement — the
    * physical stock reduction, at actual dispatch time. `warehouseIdOverride`
    * defaults to the reservation's own `warehouseId`, but a caller whose
@@ -1225,36 +1369,67 @@ export class InventoryService implements InventoryReservationContract, Inventory
         }
       }
 
-      const movementRepo = manager.getRepository(StockMovement);
+      // ADR-061 §14 (D5 retrofit) — every leg now goes through `recordMovement` (never a direct
+      // `movementRepo.save`), and F08/Financial-Event integration is wired exactly like a Work
+      // Order's Material Issue + Finished Goods Output, financially collapsed into ONE
+      // instantaneous transaction (assembly has no partial-production concept, so there is no
+      // "remaining planned quantity" to pool across — the Work-Order-pooled override is not
+      // needed here; each component is simply consumed at its own current average, same as a
+      // real dispatch, and the finished good receipts at the sum of what was actually consumed).
+      // Movement types are UNCHANGED (`assembly_consumption`/`assembly_output`) — no existing
+      // report/query that filters on them is disturbed.
       const componentMovements: StockMovement[] = [];
+      let totalConsumedValue = 0;
       for (const component of recipe) {
         const required = component.quantityPerUnit * quantity;
+        const naturalCost = this.valuation ? await this.valuation.getUnitCost(component.componentProductId, warehouseId, undefined, manager) : null;
+        if (this.valuation && naturalCost != null) {
+          const applied = await this.valuation.consumeIssueCost(
+            component.componentProductId,
+            warehouseId,
+            required,
+            `manufacturing:assembly:${assemblyReference}:consumption:${component.componentProductId}`,
+            manager,
+          );
+          if (applied && !('rejected' in applied)) totalConsumedValue += Number(applied.totalCostBase);
+        }
         componentMovements.push(
-          await movementRepo.save(
-            movementRepo.create({
-              warehouseId,
-              productId: component.componentProductId,
-              quantity: -required,
-              movementType: 'assembly_consumption',
-              referenceType: 'assembly',
-              referenceId: assemblyReference,
-              createdByUserId: actorUserId,
-            }),
-          ),
+          await this.recordMovement(warehouseId, component.componentProductId, -required, 'assembly_consumption', 'assembly', assemblyReference, actorUserId, manager),
         );
       }
 
-      const finishedGoodMovement = await movementRepo.save(
-        movementRepo.create({
+      const finishedGoodMovement = await this.recordMovement(warehouseId, finishedProductId, quantity, 'assembly_output', 'assembly', assemblyReference, actorUserId, manager);
+      if (this.valuation && totalConsumedValue > 0) {
+        await this.valuation.recordReceiptCost(
+          finishedProductId,
           warehouseId,
-          productId: finishedProductId,
           quantity,
-          movementType: 'assembly_output',
-          referenceType: 'assembly',
-          referenceId: assemblyReference,
-          createdByUserId: actorUserId,
-        }),
-      );
+          (totalConsumedValue / quantity).toFixed(4),
+          `manufacturing:assembly:${assemblyReference}:output`,
+          manager,
+        );
+
+        // ADR-061 §14 — "an instantaneous Work Order": Dr WIP / Cr Inventory on consumption, then
+        // Dr Inventory / Cr WIP on output, same transaction, WIP touched and immediately zeroed
+        // again — reuses the identical Manufacturing topics/handlers (§13), no new control
+        // function or mechanism introduced solely for legacy compatibility.
+        await this.events.publish(manager, 'manufacturing.work_order.material_issued', {
+          idempotencyKey: `manufacturing:assembly:${assemblyReference}:consumption`,
+          workOrderId: assemblyReference,
+          componentProductId: null,
+          quantity,
+          unitCostBase: null,
+          totalValueBase: totalConsumedValue.toFixed(4),
+        });
+        await this.events.publish(manager, 'manufacturing.work_order.finished_goods_received', {
+          idempotencyKey: `manufacturing:assembly:${assemblyReference}:output`,
+          workOrderId: assemblyReference,
+          finishedProductId,
+          quantity,
+          unitCostBase: (totalConsumedValue / quantity).toFixed(4),
+          totalValueBase: totalConsumedValue.toFixed(4),
+        });
+      }
 
       // Pass this transaction's own manager through — see the pool-
       // exhaustion deadlock note on AuditService.record() / reserveStock().
@@ -1272,6 +1447,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
             warehouseId,
             finishedProductId,
             quantity,
+            totalConsumedValue: totalConsumedValue.toFixed(4),
             components: recipe.map((r) => ({ componentProductId: r.componentProductId, consumed: r.quantityPerUnit * quantity })),
           },
         },
@@ -1279,6 +1455,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
       );
 
       return { assemblyReference, finishedGoodMovement, componentMovements };
+    }).then(async (result) => {
+      // Same precedent as `GoodsReceiptService.post` — without this, the outbox rows `events.publish`
+      // wrote above would sit `pending` until some unrelated later sweep, an accidental delay.
+      await this.events.dispatchPending();
+      return result;
     });
   }
 }

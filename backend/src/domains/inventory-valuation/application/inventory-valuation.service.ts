@@ -47,4 +47,15 @@ export class InventoryValuationService implements InventoryValuationContract {
   ): Promise<void> {
     return this.costEngine.applyReceipt(productId, warehouseId, quantity, unitCostBase, idempotencyKey, manager);
   }
+
+  async consumeManufacturingPooledCost(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    appliedValueBase: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+  ): Promise<{ appliedValueBase: string } | { rejected: 'negative_on_hand' | 'value_exceeds_on_hand' } | null> {
+    return this.costEngine.applyPolicyValuedIssue(productId, warehouseId, quantity, appliedValueBase, idempotencyKey, manager);
+  }
 }

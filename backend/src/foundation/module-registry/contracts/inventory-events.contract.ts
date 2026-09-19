@@ -121,6 +121,30 @@ export interface InventoryValuationContract {
     idempotencyKey: string,
     manager?: EntityManager,
   ): Promise<void>;
+  /**
+   * ADR-061 (Manufacturing) — NARROWLY SCOPED to Manufacturing Finished
+   * Goods Output. Every other consumer of this contract MUST keep using
+   * `consumeIssueCost`, which always resolves cost from the resource's
+   * own current average and cannot be overridden. This method exists
+   * ONLY because ADR-061 §7 (CTO-ratified) requires applying a
+   * Work-Order-POOLED cost (`WIP(WO).value_before ÷
+   * remainingPlannedQty_before`) instead of a single component's own
+   * natural average — a deliberate, explicitly-ratified exception, never
+   * a general-purpose valuation bypass. The caller must have already
+   * derived `appliedValueBase` from that ratified formula; this method
+   * performs no costing computation of its own. Fails closed (no
+   * mutation) with `{ rejected: 'negative_on_hand' }` if `quantity`
+   * exceeds on-hand, or `{ rejected: 'value_exceeds_on_hand' }` if
+   * `appliedValueBase` exceeds the resource's current total value.
+   */
+  consumeManufacturingPooledCost(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    appliedValueBase: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+  ): Promise<{ appliedValueBase: string } | { rejected: 'negative_on_hand' | 'value_exceeds_on_hand' } | null>;
 }
 
 export const INVENTORY_VALUATION_CONTRACT = Symbol('INVENTORY_VALUATION_CONTRACT');

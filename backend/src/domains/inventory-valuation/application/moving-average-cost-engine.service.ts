@@ -101,6 +101,74 @@ export class MovingAverageCostEngine implements CostEngine {
     });
   }
 
+  /**
+   * ADR-061 (Manufacturing) — see `CostEngine.applyPolicyValuedIssue`'s
+   * doc comment for the full scoping rationale. Mirrors `applyIssue`
+   * above exactly (same lock, same on-hand guard, same history-row
+   * shape) except the value removed is `appliedValueBase` (caller-
+   * supplied, ADR-061 §7-derived) instead of `quantity × averageCostBase`
+   * — and the remaining average is recomputed from the REMAINING value,
+   * not left at the old (now policy-overridden) rate.
+   */
+  async applyPolicyValuedIssue(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    appliedValueBase: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+  ): Promise<{ appliedValueBase: string } | { rejected: 'negative_on_hand' | 'value_exceeds_on_hand' } | null> {
+    return this.run(manager, async (m) => {
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
+
+      const stateRepo = m.getRepository(InventoryValuationState);
+      const state = await stateRepo.findOne({ where: { productId, warehouseId } });
+      if (!state || state.averageCostBase == null || state.onHandQuantity <= 0) return null; // no_valuation_source
+
+      if (quantity > state.onHandQuantity) return { rejected: 'negative_on_hand' as const }; // NO mutation
+
+      const beforeValue = state.totalValueBase;
+      const [check]: Array<{ exceeds: boolean }> = await m.query(
+        `SELECT ($1::numeric(20,4) > $2::numeric(20,4)) AS exceeds`,
+        [appliedValueBase, beforeValue],
+      );
+      if (check.exceeds) return { rejected: 'value_exceeds_on_hand' as const }; // NO mutation
+
+      const afterQty = state.onHandQuantity - quantity;
+      const [row]: Array<{ after_value: string; after_avg: string | null }> = await m.query(
+        `SELECT
+           ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS after_value,
+           CASE WHEN $3::int > 0
+             THEN (($1::numeric(20,4) - $2::numeric(20,4)) / $3::int)::numeric(20,4)
+             ELSE NULL
+           END AS after_avg`,
+        [beforeValue, appliedValueBase, afterQty],
+      );
+
+      state.onHandQuantity = afterQty;
+      state.totalValueBase = row.after_value;
+      state.averageCostBase = row.after_avg;
+      await stateRepo.save(state);
+
+      await m.getRepository(InventoryValuationMovement).save(
+        m.getRepository(InventoryValuationMovement).create({
+          productId,
+          warehouseId,
+          kind: 'issue',
+          stockMovementId: null,
+          quantity: -quantity,
+          quantityBeforeValueBase: beforeValue,
+          valueDeltaBase: `-${appliedValueBase}`,
+          quantityAfterValueBase: row.after_value,
+          averageCostAfterBase: row.after_avg,
+          idempotencyKey,
+        }),
+      );
+
+      return { appliedValueBase };
+    });
+  }
+
   async applyReceipt(
     productId: string,
     warehouseId: string,

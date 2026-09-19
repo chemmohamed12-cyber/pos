@@ -43,6 +43,33 @@ export interface CostEngine {
     manager?: EntityManager,
   ): Promise<void>;
 
+  /**
+   * ADR-061 (Manufacturing) — NARROWLY SCOPED, Manufacturing Finished
+   * Goods Output ONLY. Unlike `applyIssue`, the value removed is
+   * CALLER-SUPPLIED (`appliedValueBase`), not resolved from this
+   * resource's own current average — the one deliberate, explicitly
+   * CTO-ratified exception in this engine (ADR-061 §7's Work-Order-pooled
+   * costing formula). Every other flow in this codebase MUST keep using
+   * `applyIssue`. Guards: `quantity` must not exceed on-hand quantity,
+   * AND `appliedValueBase` must not exceed the resource's current total
+   * value — either failure returns `{ rejected }` with NO mutation. On
+   * success, the remaining on-hand quantity's average cost is
+   * recomputed from the REMAINING value (`totalValueBase −
+   * appliedValueBase`) ÷ the remaining quantity, so total book value
+   * always reconciles exactly even though the applied rate differs from
+   * this resource's own natural average — the same "never cache a
+   * derived number, always keep it consistent with what's on hand"
+   * discipline `applyIssue`/`applyReceipt` already follow.
+   */
+  applyPolicyValuedIssue(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    appliedValueBase: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+  ): Promise<{ appliedValueBase: string } | { rejected: 'negative_on_hand' | 'value_exceeds_on_hand' } | null>;
+
   /** MUTATING — internal value movement only (ADR-041 D9); publishes no GL event, moves value at the FROM warehouse's current average cost. */
   applyTransfer(
     productId: string,

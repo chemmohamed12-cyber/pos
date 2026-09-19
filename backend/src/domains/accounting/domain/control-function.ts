@@ -19,11 +19,16 @@ export type ControlFunction =
   // `isContra`, never by a second control-function value) — mirrors `bank` already spanning
   // multiple accounts under one function. NOT singleton: an installation may hold several
   // fixed-asset cost/contra pairs (one per category).
-  | 'grni'; // Goods Received Not Invoiced control — ADR-054/ADR-056. Marks the liability account
+  | 'grni' // Goods Received Not Invoiced control — ADR-054/ADR-056. Marks the liability account
   // that sits between a Goods Receipt (Dr Inventory / Cr GRNI) and its Supplier Invoice (Dr GRNI /
   // Cr AP) — a receipt-based-recognition control account, same "F02 only marks it, the owning
   // domain's reconciliation enforces it" discipline as every other control function here. Not
   // singleton — mirrors `ap`/`ar`.
+  | 'wip'; // Work-in-Process control — ADR-061 (Manufacturing). Marks the asset account every
+  // Manufacturing movement (Material Issue, Material Return, Finished Goods Output) reclassifies
+  // Inventory into/out of — same "F02 only marks it, the owning domain's reconciliation enforces
+  // it" discipline as `grni`. Not singleton — an installation may hold several WIP accounts (e.g.
+  // split by warehouse or product line), same as `bank`/`grni`.
 
 export const CONTROL_FUNCTIONS: readonly ControlFunction[] = [
   'ar',
@@ -37,6 +42,7 @@ export const CONTROL_FUNCTIONS: readonly ControlFunction[] = [
   'rounding',
   'fixed_asset',
   'grni',
+  'wip',
 ] as const;
 
 /**

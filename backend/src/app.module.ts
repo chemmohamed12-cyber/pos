@@ -46,6 +46,7 @@ import { HrModule } from './domains/hr/hr.module';
 import { AccountingModule } from './domains/accounting/accounting.module';
 import { ProcurementModule } from './domains/procurement/procurement.module';
 import { AttendanceModule } from './domains/attendance/attendance.module';
+import { ManufacturingModule } from './domains/manufacturing/manufacturing.module';
 
 /**
  * Composition root. Stage 2 build-order items 1-19 (Phase A, complete)
@@ -109,6 +110,7 @@ import { AttendanceModule } from './domains/attendance/attendance.module';
     AccountingModule,
     ProcurementModule,
     AttendanceModule,
+    ManufacturingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

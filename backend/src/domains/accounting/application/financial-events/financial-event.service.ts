@@ -32,6 +32,9 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   'collection.remitted': 'delivery',
   'return.completed': 'returns',
   'inventory.movement.recorded': 'inventory',
+  'manufacturing.work_order.material_issued': 'manufacturing',
+  'manufacturing.work_order.material_returned': 'manufacturing',
+  'manufacturing.work_order.finished_goods_received': 'manufacturing',
   'customer.refund.adjusted': 'deposit-control',
   // F04 — internal (F04 both emits and consumes; not an outbox subscription)
   'accounting.ar.adjustment.approved': 'accounting',

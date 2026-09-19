@@ -97,6 +97,10 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   'finance.supplier_payment.recorded',
   // ADR-054/ADR-057 — GRNI (Goods Received Not Invoiced): the Goods Receipt leg, Dr Inventory / Cr GRNI
   'procurement.goods_receipt.posted',
+  // ADR-061 — Manufacturing Work Order movements (§13's accounting table)
+  'manufacturing.work_order.material_issued',
+  'manufacturing.work_order.material_returned',
+  'manufacturing.work_order.finished_goods_received',
   'treasury.cash.recorded',
   'treasury.transfer.completed',
   // F07 (ADR-040) — real handler, fail-closed (`no_valuation_source`) until F08

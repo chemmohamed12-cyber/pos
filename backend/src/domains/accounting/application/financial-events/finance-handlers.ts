@@ -2,6 +2,7 @@ import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { HandlerContext, HandlerResult, JournalDraftLine } from './handler-registry';
 import { handleSupplierInvoicePosted, handleSupplierInvoiceVoided, handleSupplierPaymentRecorded } from './supplier-invoice.handler';
 import { handleGoodsReceiptPosted } from './goods-receipt.handler';
+import { handleWorkOrderMaterialIssued, handleWorkOrderMaterialReturned, handleWorkOrderFinishedGoodsReceived } from './manufacturing-events.handler';
 
 /**
  * F03 — V1 Financial Event handlers for the `finance` / `treasury` topics
@@ -278,6 +279,10 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   // ADR-054/ADR-057 — GRNI's own leg: Dr Inventory / Cr GRNI at receipt (the FIRST GL entry
   // Procurement's purchased value now hits, before the invoice clears GRNI above).
   'procurement.goods_receipt.posted': handleGoodsReceiptPosted,
+  // ADR-061 — Manufacturing Work Order movements (§13's accounting table).
+  'manufacturing.work_order.material_issued': handleWorkOrderMaterialIssued,
+  'manufacturing.work_order.material_returned': handleWorkOrderMaterialReturned,
+  'manufacturing.work_order.finished_goods_received': handleWorkOrderFinishedGoodsReceived,
   'treasury.cash.recorded': handleCashRecorded,
   'treasury.transfer.completed': handleTransferCompleted,
   // F09 (ADR-042 D1-D3) — 'deposit.verified' and 'collection.remitted' are both PURE (read

@@ -23,12 +23,13 @@
  * from reserved to built; see `ReservedModuleCode` below). `procurement`
  * added by ADR-048 (Purchasing/Supplier/Supplier-Finance, promoted from
  * reserved to built; see docs/decisions/ADR-048-procurement-promotion.md).
- * `attendance` added by ADR-065 (HR Attendance & Biometric Integration
- * Foundation, Phase 1) — a genuinely new module, never previously
- * reserved (see `ADR-062 §0`), not a promotion out of
- * `ReservedModuleCode`.
+ * `manufacturing` added by ADR-061 (Manufacturing Production & Costing
+ * Integration Contract, promoted from reserved to built). `attendance`
+ * added by ADR-065 (HR Attendance & Biometric Integration Foundation,
+ * Phase 1) — a genuinely new module, never previously reserved (see
+ * `ADR-062 §0`), not a promotion out of `ReservedModuleCode`.
  */
-export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'attendance';
+export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'manufacturing' | 'attendance';
 
 /** A module_code a manifest may actually declare (`core` has no authored manifest — §3.2). */
 export type AuthoredModuleCode = Exclude<ModuleCode, 'core'>;
@@ -37,10 +38,10 @@ export type AuthoredModuleCode = Exclude<ModuleCode, 'core'>;
  * Reserved-but-unbuilt, unbuilt-by-design codes (ADR-024 §2.1 + MODULE_REGISTRY.md §3).
  * Not usable in a manifest — here so the CI check can reject them with a clear message.
  * `hr` promoted out of this list by ADR-029 (P9). `accounting` promoted out
- * by ADR-032 (F01). `procurement` promoted out by ADR-048.
+ * by ADR-032 (F01). `procurement` promoted out by ADR-048. `manufacturing`
+ * promoted out by ADR-061.
  */
 export type ReservedModuleCode =
-  | 'manufacturing'
   | 'pos'
   | 'projects'
   | 'assets'
@@ -152,7 +153,7 @@ export interface ModuleManifest {
   readonly public_contract: ModulePublicContract;
 }
 
-/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `attendance` per ADR-065). */
+/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `manufacturing` per ADR-061, + `attendance` per ADR-065). */
 export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'core',
   'sales',
@@ -163,12 +164,12 @@ export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'hr',
   'accounting',
   'procurement',
+  'manufacturing',
   'attendance',
 ] as const;
 
-/** Reserved, not built, not designed (ADR-024 §2.1; 6 codes as of ADR-029/ADR-032/ADR-048 promoting `hr`/`accounting`/`procurement` out). */
+/** Reserved, not built, not designed (ADR-024 §2.1; 5 codes as of ADR-029/ADR-032/ADR-048/ADR-061 promoting `hr`/`accounting`/`procurement`/`manufacturing` out). */
 export const RESERVED_MODULE_CODES: readonly ReservedModuleCode[] = [
-  'manufacturing',
   'pos',
   'projects',
   'assets',

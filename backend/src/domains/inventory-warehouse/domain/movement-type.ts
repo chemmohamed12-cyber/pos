@@ -27,6 +27,15 @@
  * follows a disposition reuses the existing `transfer_in`/`transfer_out`
  * pair, no further new type needed.
  */
+/**
+ * `work_order_material_issue`/`work_order_material_return`/
+ * `work_order_finished_goods_output` — ADR-061 (Manufacturing). Each
+ * explicitly invokes F08 valuation itself (never relies on
+ * `recordMovement`'s `'receipt'`-only auto-hook) — see
+ * `ManufacturingWorkOrderService`. Deliberately NOT added to
+ * `INVENTORY_GL_MOVEMENT_TYPES` (ADR-061 §13): each publishes its own
+ * Financial Event topic instead of using that set's dispatch-only path.
+ */
 export type MovementType =
   | 'receipt'
   | 'dispatch'
@@ -36,4 +45,7 @@ export type MovementType =
   | 'return'
   | 'return_in'
   | 'assembly_consumption'
-  | 'assembly_output';
+  | 'assembly_output'
+  | 'work_order_material_issue'
+  | 'work_order_material_return'
+  | 'work_order_finished_goods_output';
