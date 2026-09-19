@@ -185,7 +185,13 @@ than `quantityRequired` in one call, issuing across multiple calls) is
 supported by construction — `WorkOrderComponent.quantityIssued` accumulates
 per issue, the same way `PurchaseOrderLine.quantityReceived` already
 accumulates across partial Goods Receipts (Phase 0 §12, INFERRED from the
-established Procurement pattern).
+established Procurement pattern). **Physically**, this is an ordinary F08
+receipt into the Work Order's dedicated WIP sub-warehouse (§6): the
+component's physical on-hand quantity there increases by the issued
+quantity, valued (per D1) at the issuing warehouse's own current
+moving-average cost — the "WIP balance" increase in dollar terms is a
+direct, mechanical consequence of that physical inflow, not a
+separately-computed figure.
 
 **Hard guard (no over-issue in Phase 1):** `work_order_material_issue` must
 reject any issue event where `quantityIssued_before + issueQuantity >
@@ -211,7 +217,10 @@ un-costed limbo state).
 **Return:** a new movement type `work_order_material_return` — the exact
 reversal of an issue: increases the component's on-hand stock back in the
 originating (real) warehouse, decreases the Work Order's WIP balance,
-decreases `WorkOrderComponent.quantityIssued`. **Corrected costing rule
+decreases `WorkOrderComponent.quantityIssued`. **Physically**, this
+decreases that component's on-hand physical quantity in the Work Order's
+dedicated WIP sub-warehouse by the returned quantity — symmetric with
+Issue's physical inflow above. **Corrected costing rule
 (supersedes an earlier, mathematically incomplete draft of this contract
 that specified "the original issue's cost"):** a return is costed at the
 **WIP sub-warehouse's own current moving-average cost for that component,
@@ -356,6 +365,118 @@ without it `remainingPlannedQty_before` (the formula's divisor) could
 reach zero or go negative before a legitimate final output — an undefined
 division, not merely an undesirable one.
 
+**Physical component consumption at FG output (RESOLVED — closes the
+physical/monetary reconciliation gap the CTO's final review identified).**
+Because §6 models WIP as a real, dedicated inventory sub-warehouse holding
+physical component stock — not merely a dollar figure — the formula above
+governs *only* the dollar amount leaving WIP as a whole; it does not by
+itself say how many physical units of any specific component are
+consumed. That is defined here.
+
+1/2. **Physical quantity consumed, tied to the BOM snapshot.** For output
+event *i*, producing finished-good quantity `q_i`, and for each
+`WorkOrderComponent` *c* on this Work Order:
+
+```
+componentQtyConsumed_i,c = (quantityRequired_c ÷ quantityPlanned) × q_i
+```
+
+`quantityRequired_c ÷ quantityPlanned` is exactly this Work Order's own
+snapshotted BOM ratio for component *c* (§2/§3 — `quantityRequired_c` was
+itself computed as `BOM.quantityPerUnit_c × quantityPlanned` at release
+time), so this is equivalent to "BOM quantity per finished unit × output
+quantity," using the Work Order's frozen snapshot rather than a live
+re-read of `BillOfMaterial`/`BomComponent` — the same snapshot-is-
+authoritative rule §2 already ratified for issue quantities, extended
+here to output quantities. No alternative consumption rule is introduced;
+nothing already ratified (D1–D5, §2's snapshot rule) suggests a different
+one.
+
+3. **Resulting stock movement inside the dedicated WIP warehouse.**
+`work_order_finished_goods_output` is a single all-or-nothing document
+(matching `recordMovement`'s existing multi-line, all-or-nothing document
+discipline, Phase 0 §6, VERIFIED) containing, for this one output event:
+one decrease line per `WorkOrderComponent` *c*, for
+`componentQtyConsumed_i,c` units, against that component's on-hand
+physical stock in the Work Order's dedicated WIP sub-warehouse (§6); and
+one increase line for `q_i` units of the finished product in the Work
+Order's real (non-WIP) warehouse. All lines post together or not at all —
+there is no intermediate state where finished goods have been received
+but WIP's physical component stock has not yet been drawn down, or vice
+versa.
+
+4. **Hard guard — physical availability.** Before applying any of the
+above, for every `WorkOrderComponent` *c*, the Work Order's dedicated WIP
+sub-warehouse's current on-hand physical quantity of *c* must be **≥**
+`componentQtyConsumed_i,c`; if any single component fails this check, the
+**entire** output event is rejected (all-or-nothing, matching the
+document boundary in point 3) — a Work Order cannot report finished
+output that its physically on-hand WIP stock cannot actually back, even
+though the output quantity itself may be within `quantityPlanned` (this
+section's other guard) and even though enough may eventually have been
+*issued* in total (§5's guard) — availability is checked against what is
+physically present in WIP **right now**, not against a cumulative
+entitlement. In practice, this guard is what forces a Work Order's
+net-issued quantity for each component to actually reach
+`quantityRequired_c` before that component's share of the plan can be
+fully produced — no additional, separate "has enough been issued" check
+is needed.
+
+5. **Reconciling physical quantity and monetary value at completion.**
+Two independent totals must each reach zero when a Work Order completes
+at `quantityProduced == quantityPlanned`: the physical on-hand quantity of
+every component in WIP, and `WIP(WO).value` (§3's existing completion
+guard). These reach zero **together**, not merely coincidentally:
+
+- **Physical quantity:** summing `componentQtyConsumed_i,c` over every
+  output event for a component *c* gives `(quantityRequired_c ÷
+  quantityPlanned) × Σ_i q_i`. When the Work Order completes at full
+  plan, `Σ_i q_i = quantityPlanned`, so total consumed = `quantityRequired_c`
+  exactly — regardless of how many partial events or in what order. Net
+  physical on-hand for *c* reaches exactly zero at that point **if and
+  only if** net-issued quantity for *c* also reached `quantityRequired_c`
+  — precisely what guard 4 above forces before the final output can be
+  accepted.
+- **Monetary value:** unchanged from the already-proven result below —
+  `WIP(WO).value` reaches exactly `$0.00` at the same moment, because
+  `remainingPlannedQty` and `quantityProduced`'s distance from
+  `quantityPlanned` are the same underlying quantity by construction.
+- **Attributing `valueOutput_i` across components (why there is no
+  double-accounting):** `valueOutput_i` (the one dollar figure the
+  formula above produces) is the *only* amount that leaves
+  `WIP(WO).value` at event *i* — this does not change. Because WIP is
+  physically tracked per component (§6, via F08's existing
+  per-(product, warehouse) mechanic), posting the physical decrease
+  lines in point 3 still requires *some* per-component cost for F08's
+  own bookkeeping. That cost is **not** each component's own
+  independently-tracked moving average (unlike an ordinary Issue or
+  Return, §5) — it is `valueOutput_i` allocated across the components
+  consumed in this event, in proportion to what each component's *own*
+  current moving average would naturally have valued its
+  `componentQtyConsumed_i,c` at:
+
+  ```
+  naturalValue_i,c           = componentQtyConsumed_i,c × currentAvgCost_c
+  naturalTotal_i              = Σ_c naturalValue_i,c
+  componentValueConsumed_i,c = valueOutput_i × (naturalValue_i,c ÷ naturalTotal_i)
+  ```
+
+  By construction, `Σ_c componentValueConsumed_i,c = valueOutput_i`
+  exactly — there is exactly one dollar total leaving WIP per output
+  event, split across components only for F08's own per-component
+  bookkeeping, never summed twice and never independently re-derived.
+  This is a deliberate, narrow exception to F08's default "dispatch at
+  the source's own current average" rule (§5 still uses that default
+  rule for Issue and Return): a Finished Goods Output is not an ordinary
+  dispatch of a single component, it is the point where D1's
+  "actual/moving average, applied one level up" policy (this section) —
+  which treats the whole Work Order as one pooled costed unit, not *N*
+  independently-costed component streams — is realized as a set of
+  component-level postings. For a Work Order with only one component (as
+  in §8's worked example), this collapses to
+  `componentValueConsumed_i,c = valueOutput_i` directly, since that one
+  component's natural-value share is trivially 100%.
+
 **Explicit costing-policy statement (clarifying the formula above):** at
 each FG output event, the *entire* current `WIP(WO).value` is allocated
 across the Work Order's *remaining planned* production quantity — never
@@ -389,15 +510,18 @@ Goods Receipt or Opening Stock import already supplies one for a
 opening-stock/receipt cost-input flow"*) — reusing that exact, existing
 mechanism rather than inventing a second one, per `ADR-055 §10`.
 
-**Proof this conserves value exactly across multiple partial outputs,
-partial issues, a partial return, a component cost change between issues,
-and a Material Issue occurring between two partial FG outputs** — see
-§8's fully worked numerical example, which traces a single
-Work Order end-to-end and shows total value in (issues, net of a return) =
-total value out (two partial FG outputs), to the cent, with the final
-output correctly driving `WIP(WO).value` to exactly zero (satisfying §3's
-new completion guard) precisely because `remainingPlannedQty` reaches zero
-at the same moment `quantityProduced` reaches `quantityPlanned`.
+**Proof this conserves both value and physical quantity exactly across
+multiple partial outputs, partial issues, a partial return, a component
+cost change between issues, and a Material Issue occurring between two
+partial FG outputs** — see §8's fully worked numerical example, which
+traces a single Work Order end-to-end and shows total value in (issues,
+net of a return) = total value out (two partial FG outputs), to the cent,
+*and* total physical component quantity issued (net of the return) =
+total physical component quantity consumed across both outputs, with the
+final output correctly driving both `WIP(WO).value` and every component's
+physical on-hand quantity to exactly zero (satisfying §3's new completion
+guard and point 5 above) precisely because `remainingPlannedQty` reaches
+zero at the same moment `quantityProduced` reaches `quantityPlanned`.
 
 **Partial output** (a Work Order producing less than `quantityPlanned` in
 one event, or across multiple events before completion) is supported by
@@ -407,41 +531,72 @@ case bolted on afterward.
 ## 8. Worked numerical example (required proof of conservation)
 
 One Work Order, finished good **F**, `quantityPlanned = 10`, one raw
-component **C**. All figures to the cent; no rounding error accumulates
-because every step is exact arithmetic on the figures given.
+component **C**, BOM ratio (this Work Order's own snapshot,
+`quantityRequired ÷ quantityPlanned`) = **2.1 units of C per unit of F**,
+so `quantityRequired` for C = **21 units**. All figures to the cent; no
+rounding error accumulates in the dollar totals because every dollar step
+is exact arithmetic on the figures given (the two *derived, informational*
+per-unit component rates in steps 5 and 7 are irrational-decimal and are
+shown rounded — see the note after the table).
 
-| Step | Event | Detail | WIP(WO).value after |
-|---|---|---|---|
-| 1 | Material Issue #1 | 12 units of C @ real warehouse's current avg **$5.00** → WIP receipt-costed @ $5.00; WIP's own avg for C = $5.00. Guard check: `quantityIssued_before(0) + 12 ≤ quantityRequired` — passes. | **$60.00** (12 × $5.00) |
-| 2 | *(real warehouse independently receives new stock of C @ $6.00 — unrelated to this Work Order)* | — | $60.00 (unchanged) |
-| 3 | Material Issue #2 | 8 units of C @ real warehouse's *new* current avg **$6.00** → WIP receipt-costed @ $6.00; WIP's own avg for C recomputes: (12×$5.00 + 8×$6.00) ÷ 20 = **$5.40**. Guard check: `quantityIssued_before(12) + 8 ≤ quantityRequired` — passes. | **$108.00** (20 × $5.40) |
-| 4 | Material Return | 2 units of C returned, costed at WIP's **current** avg for C = $5.40 (§5, corrected — not "the original issue cost," which is no longer a single well-defined number after step 3's blend) | **$97.20** (18 × $5.40 — self-consistent: $108.00 − $10.80) |
-| 5 | FG Output #1 | Produce 6 of 10 planned. `remainingPlannedQty_before = 10 − 0 = 10`. `unitCost = $97.20 ÷ 10 = $9.72`. `valueOutput = 6 × $9.72 = $58.32`. Guard check: `quantityProduced_before(0) + 6 ≤ 10` — passes. | **$38.88** ($97.20 − $58.32) |
-| 6 | **Material Issue #3** *(occurs after a partial FG output — the case §7's costing-policy clarification addresses)* | 3 more units of C, issued @ real warehouse's *now-current* avg **$7.00** (having moved again since step 3) → WIP receipt-costed @ $7.00. Guard check: `quantityIssued_before(20) + 3 ≤ quantityRequired` — passes for this example's snapshot. §7's formula works in Work-Order-level dollars, not per-component units, so this simply adds value to `WIP(WO).value`. | **$59.88** ($38.88 + 3 × $7.00) |
-| 7 | FG Output #2 (final) | Produce remaining 4 of 10. `remainingPlannedQty_before = 10 − 6 = 4` (**unchanged by the issue** — only `quantityProduced` moves this divisor). `unitCost = $59.88 ÷ 4 = $14.97` — **higher than step 5's $9.72**, exactly because step 6 raised `WIP(WO).value` without changing `remainingPlannedQty`, precisely the effect §7's clarification describes. `valueOutput = 4 × $14.97 = $59.88`. Guard check: `quantityProduced_before(6) + 4 = 10 ≤ 10` — passes, at the exact boundary. | **$0.00** ($59.88 − $59.88) |
+| Step | Event | Detail | Physical C on hand in WIP after | WIP(WO).value after |
+|---|---|---|---|---|
+| 1 | Material Issue #1 | 12 units of C @ real warehouse's current avg **$5.00** → WIP receipt-costed @ $5.00; WIP's own avg for C = $5.00. Guard check: `quantityIssued_before(0) + 12 ≤ 21` — passes. | **12** (0 + 12) | **$60.00** (12 × $5.00) |
+| 2 | *(real warehouse independently receives new stock of C @ $6.00 — unrelated to this Work Order)* | — | 12 (unchanged) | $60.00 (unchanged) |
+| 3 | Material Issue #2 | 8 units of C @ real warehouse's *new* current avg **$6.00** → WIP receipt-costed @ $6.00; WIP's own avg for C recomputes: (12×$5.00 + 8×$6.00) ÷ 20 = **$5.40**. Guard check: `quantityIssued_before(12) + 8 ≤ 21` — passes. | **20** (12 + 8) | **$108.00** (20 × $5.40) |
+| 4 | Material Return | 2 units of C returned, costed at WIP's **current** avg for C = $5.40 (§5, corrected — not "the original issue cost," which is no longer a single well-defined number after step 3's blend) | **18** (20 − 2) | **$97.20** (18 × $5.40 — self-consistent: $108.00 − $10.80) |
+| 5 | FG Output #1 | Produce 6 of 10 planned. **Physical:** `componentQtyConsumed = (21 ÷ 10) × 6 = 12.6` units of C. Availability guard: on-hand `18 ≥ 12.6` — passes. **Monetary:** `remainingPlannedQty_before = 10 − 0 = 10`. `unitCost = $97.20 ÷ 10 = $9.72`. `valueOutput = 6 × $9.72 = $58.32`. Over-production guard: `0 + 6 ≤ 10` — passes. (Derived, informational only: the effective rate this event applies to C's own physical units is `$58.32 ÷ 12.6 ≈ $4.63/unit` — not C's own $5.40 average; see the reconciliation note below.) | **5.4** (18 − 12.6) | **$38.88** ($97.20 − $58.32) |
+| 6 | **Material Issue #3** *(occurs after a partial FG output — the case the costing-policy clarification above addresses)* | 3 more units of C, issued @ real warehouse's *now-current* avg **$7.00** (having moved again since step 3) → WIP receipt-costed @ $7.00. Guard check: `quantityIssued_before(20) + 3 ≤ 21` — passes, at the exact boundary once combined with step 4's return (net issued reaches exactly 21). | **8.4** (5.4 + 3) | **$59.88** ($38.88 + 3 × $7.00) |
+| 7 | FG Output #2 (final) | Produce remaining 4 of 10. **Physical:** `componentQtyConsumed = (21 ÷ 10) × 4 = 8.4` units of C. Availability guard: on-hand `8.4 ≥ 8.4` — passes, at the exact boundary. **Monetary:** `remainingPlannedQty_before = 10 − 6 = 4` (**unchanged by the issue** — only `quantityProduced` moves this divisor). `unitCost = $59.88 ÷ 4 = $14.97` — **higher than step 5's $9.72**, exactly because step 6 raised `WIP(WO).value` without changing `remainingPlannedQty`. `valueOutput = 4 × $14.97 = $59.88`. Over-production guard: `6 + 4 = 10 ≤ 10` — passes, at the exact boundary. (Derived, informational rate: `$59.88 ÷ 8.4 ≈ $7.13/unit`.) | **0** (8.4 − 8.4) | **$0.00** ($59.88 − $59.88) |
 
-**Conservation check:**
+**Conservation check — value:**
 
 ```
 Total value IN  (issues, net of return) = $60.00 + $48.00 − $10.80 + $21.00 = $118.20
 Total value OUT (both FG outputs)       = $58.32 + $59.88                   = $118.20
 ```
 
-**Exactly balanced — total material value is neither created nor destroyed**,
-across two partial issues, a component cost change between them, a partial
-return valued at the post-blend average, a *third* Material Issue occurring
-**after** a partial FG output at yet another new cost, and two partial FG
-outputs whose combined quantity exactly reaches `quantityPlanned` at the
-§7 guard's exact boundary (`10 ≤ 10`). `WIP(WO).value` reaches exactly
-`$0.00` at the moment `quantityProduced` reaches `quantityPlanned` —
-satisfying §3's completion guard without any special "final output absorbs
-the remainder" rule, because the formula's denominator
-(`remainingPlannedQty`) and the Work Order's own completion condition are
-the same underlying quantity by construction. Crucially, the mid-stream
-Material Issue (step 6) **demonstrably changed the cost basis of the
-remaining planned units** — from `$9.72` to `$14.97` per unit — without
-breaking conservation, confirming §7's costing-policy clarification is not
-just descriptive text but a proven property of the formula.
+**Conservation check — physical quantity:**
+
+```
+Total C issued (net of return) = 12 + 8 − 2 + 3 = 21 units
+Total C consumed (both outputs) = 12.6 + 8.4    = 21 units
+```
+
+**Both exactly balanced — neither material value nor physical component
+quantity is created or destroyed**, across two partial issues, a component
+cost change between them, a partial return valued at the post-blend
+average, a *third* Material Issue occurring **after** a partial FG output
+at yet another new cost, and two partial FG outputs whose combined
+quantity exactly reaches `quantityPlanned` at the over-production guard's
+exact boundary (`10 ≤ 10`). Both `WIP(WO).value` **and** physical on-hand
+C reach exactly zero at the moment `quantityProduced` reaches
+`quantityPlanned` — satisfying §3's completion guard and the physical/
+monetary reconciliation above — without any special "final output absorbs
+the remainder" rule, because `remainingPlannedQty` (the value formula's
+denominator) and the *unconsumed fraction of `quantityRequired`* (the
+physical formula's residual) both reach zero at the same instant by
+construction. Crucially, the mid-stream Material Issue (step 6)
+**demonstrably changed the monetary cost basis of the remaining planned
+units** — from `$9.72` to `$14.97` per unit — while the *physical*
+consumption rate stayed fixed at the BOM's own 2.1-per-unit ratio
+throughout; this is the intended effect of allocating the WO-pooled dollar
+total (§7) independently from the BOM-fixed physical rate (§7, point 2) —
+the two are reconciled in total, not forced to move together at every
+step.
+
+**Note on the two derived per-unit component rates (steps 5 and 7):** the
+$58.32/12.6 ≈ $4.63 and $59.88/8.4 ≈ $7.13 figures are *not* new policy
+values and drive no posting on their own — they exist only because F08
+needs a per-unit cost to record the physical decrease line for component
+C (§7, point 5's `componentValueConsumed_i,c`), and here they simply equal
+`valueOutput_i` itself divided by the physical quantity consumed, since a
+single-component Work Order attributes 100% of `valueOutput_i` to that
+one component. The GL posting itself always uses the exact-to-the-cent
+`valueOutput_i` total, not a re-multiplication of a rounded per-unit rate
+— any rounding shown here is for this document's display only, using the
+same monetary-rounding convention already used elsewhere in this
+codebase, not a new one.
 
 **What happens if a Work Order completes with `quantityProduced <
 quantityPlanned` (a deliberate under-produced close, not shown in the table
@@ -510,7 +665,7 @@ specified in full below:
 |---|---|---|---|---|---|---|
 | `work_order_material_issue` | Component stock −qty in real warehouse; +qty in WIP sub-warehouse | Cost = live moving-average of component at issue time (D1) | **YES** — new topic `manufacturing.work_order.material_issued` | `Dr WIP (control function 'wip', NEW) / Cr Inventory (control function 'inventory', EXISTING — same account `handleSupplierInvoicePosted` already resolves, Phase 0 §13)` | `manufacturing:work_order:<workOrderId>:material_issue:<issueLineId>` | Same transaction as the stock movement + reservation decrement; all-or-nothing |
 | `work_order_material_return` | Component stock +qty in real warehouse; −qty in WIP sub-warehouse | Cost = the WIP sub-warehouse's own current moving-average cost for that component at return time (§5, corrected — never the specific prior issue's cost, which is not a well-defined quantity once multiple issues have blended; see §8) | **YES** — new topic `manufacturing.work_order.material_returned` | `Dr Inventory / Cr WIP` (exact reversal of the issue leg, at the return's own current-average cost, not the original issue's amount) | `manufacturing:work_order:<workOrderId>:material_return:<returnLineId>` | Same transaction as the stock movement; all-or-nothing |
-| `work_order_finished_goods_output` | Finished product stock +qty in real warehouse; −value in WIP sub-warehouse | Cost = `WIP(WO).value_before ÷ remainingPlannedQty_before`, evaluated fresh at each output event (§7, corrected — not a single cumulative-average figure; see §8's worked example), supplied as `recordMovement`'s existing `unitCostBase` receipt-cost-input parameter | **YES** — new topic `manufacturing.work_order.finished_goods_received` | `Dr Finished Goods Inventory (control function 'inventory') / Cr WIP (control function 'wip')` | `manufacturing:work_order:<workOrderId>:fg_output:<outputEventId>` | Same transaction as the stock movement + `WorkOrder.quantityProduced` increment; all-or-nothing |
+| `work_order_finished_goods_output` | **Multi-line (§7, points 1–3):** finished product stock `+q_i` in the real (non-WIP) warehouse; **and, for EACH `WorkOrderComponent` c, physical stock `−componentQtyConsumed_i,c = (quantityRequired_c ÷ quantityPlanned) × q_i`** in the Work Order's dedicated WIP sub-warehouse — not a single value-only entry | Cost = `WIP(WO).value_before ÷ remainingPlannedQty_before` for the finished-good receipt leg (§7, corrected — not a single cumulative-average figure; see §8's worked example); each component's physical decrease line is costed at `componentValueConsumed_i,c = valueOutput_i × (naturalValue_i,c ÷ naturalTotal_i)` (§7, point 5 — a pro-rata share of the one WO-pooled `valueOutput_i`, not that component's own current average), both supplied as `recordMovement`'s existing `unitCostBase` receipt/dispatch-cost-input parameter per line | **YES** — new topic `manufacturing.work_order.finished_goods_received` | `Dr Finished Goods Inventory (control function 'inventory') / Cr WIP (control function 'wip')` — one Financial Event per output event, for the total `valueOutput_i` (component-level attribution is an inventory/costing-layer detail, not separate GL lines) | `manufacturing:work_order:<workOrderId>:fg_output:<outputEventId>` | Same transaction as **all** the stock movement lines (finished-good receipt + every component's decrease line) + `WorkOrder.quantityProduced` increment; all-or-nothing across the whole multi-line document |
 
 **Explicitly, no movement type above is a `dispatch`, and none is added to
 `INVENTORY_GL_MOVEMENT_TYPES` as currently defined** (that set's existing,
@@ -726,7 +881,12 @@ change to any Wave 1 (Procurement/Accounting/Month-End) table.
    remainingPlannedQty_before` at that exact output event (§7, corrected),
    `Dr Inventory/Cr WIP` journal posted, balanced, and the resulting
    `WIP(WO).value_after` verified against the same formula's hand-computed
-   expectation.
+   expectation. **Also verify the physical leg (§7, points 1–3):** for
+   every `WorkOrderComponent`, the WIP sub-warehouse's on-hand physical
+   quantity decreases by exactly `(quantityRequired_c ÷ quantityPlanned) ×
+   outputQuantity`, verified by direct query against the stock-movement
+   rows the single multi-line document produced — not merely that the
+   dollar journal balances.
 5. Full chain: `Work Order → Material Issue(s) → WIP → Finished Goods
    Output(s) → WIP balance returns to zero when quantityProduced ==
    quantityPlanned and no further issues occur` — traced end to end.
@@ -747,11 +907,20 @@ change to any Wave 1 (Procurement/Accounting/Month-End) table.
    of both partial outputs (`$58.32 + $59.88 = $118.20`) verified equal to
    total value issued net of the return (`$60.00 + $48.00 + $21.00 −
    $10.80 = $118.20`) by direct query — not by trusting the application
-   layer's own arithmetic. Also verify as part of the same run: an issue
-   attempting `quantityIssued_before + issueQuantity > quantityRequired`
-   is rejected (§5's guard), and an output attempting
-   `quantityProduced_before + outputQuantity > quantityPlanned` is
-   rejected (§7's guard).
+   layer's own arithmetic. Also verify, using the same Work Order's BOM
+   ratio of 2.1 units of C per unit of F (`quantityRequired = 21`): the
+   WIP sub-warehouse's physical on-hand quantity of C after each step
+   matches §8's figures exactly (`12 → 12 → 20 → 18 → 5.4 → 8.4 → 0`), and
+   total physical C issued net of the return (`21`) equals total physical
+   C consumed across both outputs (`12.6 + 8.4 = 21`) by direct query.
+   Also verify as part of the same run: an issue attempting
+   `quantityIssued_before + issueQuantity > quantityRequired` is rejected
+   (§5's guard); an output attempting `quantityProduced_before +
+   outputQuantity > quantityPlanned` is rejected (§7's over-production
+   guard); and an output attempting to consume more of a component than
+   is physically on hand in that Work Order's WIP sub-warehouse is
+   rejected (§7's physical-availability guard, point 4), even when
+   neither of the other two guards would have blocked it.
 7. No duplicate posting on retried issue/return/output calls (idempotency
    key re-delivery test, per movement type in §13's table).
 8. Concurrent material issue against the same (warehouse, product) pair
