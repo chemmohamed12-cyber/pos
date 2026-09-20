@@ -201,6 +201,20 @@ export class AttendanceController {
   }
 
   @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.import.view', 'read-only')
+  @Get('biometric-import/history')
+  async listBiometricImportBatches() {
+    return this.attendance.listBiometricImportBatches();
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.day.view', 'read-only')
+  @Get('biometric-facts')
+  async listBiometricFacts(@Query('employeeId') employeeId?: string) {
+    return this.attendance.listBiometricFacts(employeeId);
+  }
+
+  @UseGuards(PermissionGuard)
   @RequirePermission('attendance.day.view', 'read-only')
   @Get('days')
   async listDays(@Query('employeeId') employeeId?: string) {

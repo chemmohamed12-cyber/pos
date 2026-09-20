@@ -82,7 +82,14 @@ export const attendanceManifest: ModuleManifest = {
       'DecideAttendanceApprovalBatch',
       'CorrectAttendanceDay',
     ],
-    queries: ['ListAttendanceDays', 'ListUnmappedAttendanceRecords', 'ListUnmappedBiometricAttendanceRows', 'ListAttendanceApprovalBatches'],
+    queries: [
+      'ListAttendanceDays',
+      'ListUnmappedAttendanceRecords',
+      'ListUnmappedBiometricAttendanceRows',
+      'ListBiometricAttendanceImportHistory',
+      'ListBiometricAttendanceFacts',
+      'ListAttendanceApprovalBatches',
+    ],
     events: ['attendance.period.approved'],
   },
 };

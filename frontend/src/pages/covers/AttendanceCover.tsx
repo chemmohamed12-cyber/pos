@@ -34,6 +34,8 @@ export function AttendanceCover() {
       shortcuts={[
         { to: '/attendance/connectors', labelCode: 'nav.attendance_connectors' },
         { to: '/attendance/import', labelCode: 'nav.attendance_import' },
+        { to: '/attendance/biometric-import', labelCode: 'nav.attendance_biometric_import' },
+        { to: '/attendance/facts', labelCode: 'nav.attendance_facts' },
         { to: '/attendance/days', labelCode: 'nav.attendance_days' },
       ]}
       kpis={

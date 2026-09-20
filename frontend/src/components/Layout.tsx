@@ -155,6 +155,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/attendance/connectors', code: 'nav.attendance_connectors', roles: ['admin'] },
       { to: '/attendance/import', code: 'nav.attendance_import', roles: ['admin'] },
+      { to: '/attendance/biometric-import', code: 'nav.attendance_biometric_import', roles: ['admin'] },
+      { to: '/attendance/facts', code: 'nav.attendance_facts', roles: ['admin'] },
       { to: '/attendance/days', code: 'nav.attendance_days', roles: ['admin'] },
     ],
   },

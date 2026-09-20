@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, IsNull, Repository } from 'typeorm';
+import { Between, DataSource, In, IsNull, Repository } from 'typeorm';
 import { createHash } from 'crypto';
 import { AttendanceConnector } from '../infrastructure/attendance-connector.entity';
 import { AttendanceEmployeeMapping } from '../infrastructure/attendance-employee-mapping.entity';
@@ -601,6 +601,18 @@ export class AttendanceService implements OnModuleInit {
 
   async listUnmappedBiometricRows(): Promise<AttendanceBiometricDailyFact[]> {
     return this.biometricFacts.find({ where: { resolvedEmployeeId: IsNull() }, order: { calendarDate: 'DESC' }, take: 500 });
+  }
+
+  async listBiometricFacts(employeeId?: string): Promise<AttendanceBiometricDailyFact[]> {
+    return this.biometricFacts.find({ where: employeeId ? { resolvedEmployeeId: employeeId } : {}, order: { calendarDate: 'DESC' }, take: 500 });
+  }
+
+  /** "Import history/status" — every `AttendanceImportBatch` that produced at least one biometric fact row. No new column on the shared batch table: derived from `AttendanceBiometricDailyFact.importBatchId`, which the punch-log Excel importer never populates. */
+  async listBiometricImportBatches(): Promise<AttendanceImportBatch[]> {
+    const rows = await this.biometricFacts.createQueryBuilder('f').select('DISTINCT f."importBatchId"', 'importBatchId').where('f."importBatchId" IS NOT NULL').getRawMany<{ importBatchId: string }>();
+    const ids = rows.map((r) => r.importBatchId);
+    if (ids.length === 0) return [];
+    return this.importBatches.find({ where: { id: In(ids) }, order: { importedAt: 'DESC' } });
   }
 
   // ---------------------------------------------------------------------------

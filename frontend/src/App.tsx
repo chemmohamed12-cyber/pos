@@ -38,6 +38,8 @@ import { WorkOrderDetail } from './pages/manufacturing/WorkOrderDetail';
 import { ManufacturingCover } from './pages/covers/ManufacturingCover';
 import { AttendanceConnectors } from './pages/attendance/AttendanceConnectors';
 import { AttendanceImport } from './pages/attendance/AttendanceImport';
+import { AttendanceBiometricImport } from './pages/attendance/AttendanceBiometricImport';
+import { AttendanceFacts } from './pages/attendance/AttendanceFacts';
 import { AttendanceDays } from './pages/attendance/AttendanceDays';
 import { AttendanceCover } from './pages/covers/AttendanceCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
@@ -217,6 +219,8 @@ function AppRoutes() {
         <Route path="attendance" element={<AttendanceCover />} />
         <Route path="attendance/connectors" element={<AttendanceConnectors />} />
         <Route path="attendance/import" element={<AttendanceImport />} />
+        <Route path="attendance/biometric-import" element={<AttendanceBiometricImport />} />
+        <Route path="attendance/facts" element={<AttendanceFacts />} />
         <Route path="attendance/days" element={<AttendanceDays />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
