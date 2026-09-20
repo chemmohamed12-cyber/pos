@@ -370,6 +370,11 @@ export class PayrollService implements OnModuleInit {
     return saved;
   }
 
+  /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide` (e.g. `AttendanceService.decide`). */
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  }
+
   async listRuns(): Promise<PayrollRun[]> {
     return this.runs.find({ order: { createdAt: 'DESC' } });
   }
@@ -379,6 +384,22 @@ export class PayrollService implements OnModuleInit {
     if (!run) throw new NotFoundException(`PayrollRun "${id}" not found.`);
     const lines = await this.runLines.find({ where: { payrollRunId: id } });
     return { run, lines };
+  }
+
+  /**
+   * The Frontend's own explicit three-state distinction requirement:
+   * `PayrollRun.status`, `FinancialEvent.status`, and Treasury
+   * disbursement are never the same state (`ADR-070 §6`). Returns `null`
+   * when no `FinancialEvent` has landed yet (the run hasn't reached
+   * `posted`, or the outbox hasn't dispatched it yet) — the UI must show
+   * this as its own distinct "not yet posted" state, never blank/error.
+   */
+  async getFinancialEventStatus(runId: string): Promise<{ status: string; rejectionReason: string | null; journalEntryId: string | null } | null> {
+    const [event]: Array<{ status: string; rejectionReason: string | null; journalEntryId: string | null }> = await this.dataSource.query(
+      `SELECT status, "rejectionReason", "journalEntryId" FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+      [runId],
+    );
+    return event ?? null;
   }
 
   async listDayClassifications(payrollRunLineId: string): Promise<PayrollAttendanceDayClassification[]> {

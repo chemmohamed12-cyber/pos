@@ -42,6 +42,11 @@ import { AttendanceBiometricImport } from './pages/attendance/AttendanceBiometri
 import { AttendanceFacts } from './pages/attendance/AttendanceFacts';
 import { AttendanceDays } from './pages/attendance/AttendanceDays';
 import { AttendanceCover } from './pages/covers/AttendanceCover';
+import { PayrollPeriods } from './pages/payroll/PayrollPeriods';
+import { PayrollCompensation } from './pages/payroll/PayrollCompensation';
+import { PayrollRuns } from './pages/payroll/PayrollRuns';
+import { PayrollRunDetail } from './pages/payroll/PayrollRunDetail';
+import { PayrollCover } from './pages/covers/PayrollCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
 import { ChartOfAccounts } from './pages/accounting/ChartOfAccounts';
 import { Journals } from './pages/accounting/Journals';
@@ -222,6 +227,11 @@ function AppRoutes() {
         <Route path="attendance/biometric-import" element={<AttendanceBiometricImport />} />
         <Route path="attendance/facts" element={<AttendanceFacts />} />
         <Route path="attendance/days" element={<AttendanceDays />} />
+        <Route path="payroll" element={<PayrollCover />} />
+        <Route path="payroll/periods" element={<PayrollPeriods />} />
+        <Route path="payroll/compensation" element={<PayrollCompensation />} />
+        <Route path="payroll/runs" element={<PayrollRuns />} />
+        <Route path="payroll/runs/:id" element={<PayrollRunDetail />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/journals" element={<Journals />} />

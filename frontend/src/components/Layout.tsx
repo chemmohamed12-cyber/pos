@@ -160,6 +160,15 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/attendance/days', code: 'nav.attendance_days', roles: ['admin'] },
     ],
   },
+  {
+    code: 'module.payroll',
+    coverTo: '/payroll',
+    items: [
+      { to: '/payroll/periods', code: 'nav.payroll_periods', roles: ['admin'] },
+      { to: '/payroll/compensation', code: 'nav.payroll_compensation', roles: ['admin'] },
+      { to: '/payroll/runs', code: 'nav.payroll_runs', roles: ['admin'] },
+    ],
+  },
   { code: '', items: [{ to: '/reports-overview', code: 'nav.reports' }] },
   {
     code: 'nav_group.administration',

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ArrayMinSize, IsArray, IsIn, IsISO8601, IsString, IsUUID, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsISO8601, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PayrollService } from '../application/payroll.service';
 import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
@@ -48,6 +48,16 @@ class CalculateDto {
 class DisburseDto {
   @IsUUID()
   treasuryAccountId!: string;
+}
+
+class DecideDto {
+  @IsIn(['approved', 'rejected'])
+  decision!: 'approved' | 'rejected';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  note?: string;
 }
 
 class CreateAdjustmentDto {
@@ -144,6 +154,13 @@ export class PayrollController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('payroll.run.view', 'read-only')
+  @Get('runs/:id/financial-event-status')
+  async getFinancialEventStatus(@Param('id', ParseUUIDPipe) id: string) {
+    return this.payroll.getFinancialEventStatus(id);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('payroll.run.view', 'read-only')
   @Get('run-lines/:id/day-classifications')
   async listDayClassifications(@Param('id', ParseUUIDPipe) id: string) {
     return this.payroll.listDayClassifications(id);
@@ -176,5 +193,13 @@ export class PayrollController {
   @Get('adjustments')
   async listAdjustments(@Query('payrollRunLineId') payrollRunLineId?: string) {
     return this.payroll.listAdjustments(payrollRunLineId);
+  }
+
+  /** Same generic decide route shape every other FA-01 consumer in this codebase uses (e.g. Attendance) — `ApprovalEngineService.decide` needs only the request id, never a type discriminator. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('payroll.run.approve', 'editable')
+  @Post('approvals/:requestId/decide')
+  async decide(@Param('requestId', ParseUUIDPipe) requestId: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
+    return this.payroll.decide(requestId, req.user.id, dto.decision, dto.note);
   }
 }
