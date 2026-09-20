@@ -43,7 +43,7 @@ const dataSourceOptions: DataSourceOptions = {
   // for a local subset test with DAII_MIGRATION_TAGS=core,sales.
   migrations: (process.env.DAII_MIGRATION_TAGS
     ? process.env.DAII_MIGRATION_TAGS.split(',').map((t) => t.trim()).filter(Boolean)
-    : ['core', 'sales', 'inventory', 'logistics', 'finance', 'hr', 'accounting', 'procurement', 'manufacturing', 'attendance', 'payroll']
+    : ['core', 'sales', 'inventory', 'logistics', 'finance', 'hr', 'accounting', 'procurement', 'manufacturing', 'attendance', 'payroll', 'targets', 'commission']
   ).map((tag) => `${__dirname}/migrations/${tag}/[0-9]*{.ts,.js}`),
   synchronize: false,
   logging: false,

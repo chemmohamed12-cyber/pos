@@ -268,6 +268,11 @@ export class HrService implements OnModuleInit {
     return employee;
   }
 
+  /** ADR-071 §9 — the one additive, read-only method Commission's own Sales Rep resolution requires: `CustomerAssignment.salesRepUserId` (a `User`) reverse-resolved to the authoritative `Employee`. Returns `null` (never throws) when no `Employee.userId` link exists yet — the caller decides how to treat an unresolvable Sales Rep, this method never guesses. */
+  async getEmployeeByUserId(userId: string): Promise<Employee | null> {
+    return this.employees.findOne({ where: { userId } });
+  }
+
   /** Routine transitions only — `terminated` must go through `terminate()` (ADR-059 D3: its own dedicated, evidenced action). */
   async setStatus(id: string, status: EmployeeStatus, actorUserId: string, reason?: string | null): Promise<Employee> {
     if (status === 'terminated') {

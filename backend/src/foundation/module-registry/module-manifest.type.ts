@@ -29,7 +29,7 @@
  * Phase 1) — a genuinely new module, never previously reserved (see
  * `ADR-062 §0`), not a promotion out of `ReservedModuleCode`.
  */
-export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'manufacturing' | 'attendance' | 'payroll';
+export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'manufacturing' | 'attendance' | 'payroll' | 'commission' | 'targets';
 
 /** A module_code a manifest may actually declare (`core` has no authored manifest — §3.2). */
 export type AuthoredModuleCode = Exclude<ModuleCode, 'core'>;
@@ -152,7 +152,7 @@ export interface ModuleManifest {
   readonly public_contract: ModulePublicContract;
 }
 
-/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `manufacturing` per ADR-061, + `attendance` per ADR-065, + `payroll` per ADR-070). */
+/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `manufacturing` per ADR-061, + `attendance` per ADR-065, + `payroll` per ADR-070, + `commission`/`targets` per ADR-071 — both genuinely new codes, never previously reserved, the same situation `attendance` was in per `ADR-065 §2`, not a promotion out of `ReservedModuleCode`). */
 export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'core',
   'sales',
@@ -166,6 +166,8 @@ export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'manufacturing',
   'attendance',
   'payroll',
+  'commission',
+  'targets',
 ] as const;
 
 /** Reserved, not built, not designed (ADR-024 §2.1; `hr`/`accounting`/`procurement`/`manufacturing` promoted out by ADR-029/ADR-032/ADR-048/ADR-061; `payroll` promoted out by ADR-070 — ADR-070 §2's own module-promotion mechanism). */

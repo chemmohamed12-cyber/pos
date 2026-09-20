@@ -48,6 +48,8 @@ import { ProcurementModule } from './domains/procurement/procurement.module';
 import { AttendanceModule } from './domains/attendance/attendance.module';
 import { ManufacturingModule } from './domains/manufacturing/manufacturing.module';
 import { PayrollModule } from './domains/payroll/payroll.module';
+import { TargetsModule } from './domains/targets/targets.module';
+import { CommissionModule } from './domains/commission/commission.module';
 
 /**
  * Composition root. Stage 2 build-order items 1-19 (Phase A, complete)
@@ -113,6 +115,8 @@ import { PayrollModule } from './domains/payroll/payroll.module';
     AttendanceModule,
     ManufacturingModule,
     PayrollModule,
+    TargetsModule,
+    CommissionModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
