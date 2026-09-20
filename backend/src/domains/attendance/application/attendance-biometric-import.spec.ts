@@ -120,6 +120,27 @@ describe('AttendanceService — Biometric Daily Attendance Summary import (CTO d
     expect(day?.checkOut).toBeNull();
   });
 
+  it('2b. CTO Final Verification invariant: Absent=True + blank Clock In/Out produces ZERO punch records, yet AttendanceDay is still explicitly created and resolved — status derivation does not depend on a punch record existing', async () => {
+    const emp = await hr.createEmployee({ fullName: shortName('BioAbsentZero') }, ADMIN_A);
+    const connector = await attendance.createConnector(shortName('BioConn'), 'manual', ADMIN_A);
+    const acNo = shortName('AC');
+    await attendance.createMapping({ connectorId: connector.id, employeeId: emp.id, deviceUserRef: acNo }, ADMIN_A);
+
+    const buffer = await buildWorkbook([{ acNo, date: '11/08/2026', onDuty: '09:00', offDuty: '17:00', absent: 'True' }]);
+    await attendance.importBiometricDailySummary(buffer, 'daily-2b.xlsx', ADMIN_A);
+
+    // ZERO punch records — asserted directly against the table, not inferred from the derived status.
+    const punchCount = await dataSource.getRepository('attendance_raw_records').count({ where: { resolvedEmployeeId: emp.id } });
+    expect(punchCount).toBe(0);
+
+    // AttendanceDay is nonetheless an explicitly persisted, queryable row — not merely a
+    // transient/default value returned when no row exists.
+    const persistedDay = await dataSource.getRepository('attendance_days').findOne({ where: { employeeId: emp.id, calendarDate: '2026-08-11' } });
+    expect(persistedDay).not.toBeNull();
+    expect(persistedDay?.id).toBeTruthy();
+    expect(persistedDay?.status).toBe('absent');
+  });
+
   it('3. Late populated is preserved as an opaque fact, never affecting derived status', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('BioLate') }, ADMIN_A);
     const connector = await attendance.createConnector(shortName('BioConn'), 'manual', ADMIN_A);
@@ -178,6 +199,42 @@ describe('AttendanceService — Biometric Daily Attendance Summary import (CTO d
 
     const day = (await attendance.listDays(emp.id)).find((d) => d.calendarDate === '2026-08-03');
     expect(day?.status).toBe('on_leave');
+  }, 30_000);
+
+  it('6b. CTO Final Verification invariant: Absent=True + Approved LeaveRequest -> on_leave, HR LeaveRequest is byte-unmodified, and no payroll deduction is generated (structurally impossible — AttendanceDay carries no financial field)', async () => {
+    const emp = await hr.createEmployee({ fullName: shortName('BioLeaveInvariant') }, ADMIN_A);
+    const connector = await attendance.createConnector(shortName('BioConn'), 'manual', ADMIN_A);
+    const acNo = shortName('AC');
+    await attendance.createMapping({ connectorId: connector.id, employeeId: emp.id, deviceUserRef: acNo }, ADMIN_A);
+
+    const leaveRequest = await hr.submitLeaveRequest({ employeeId: emp.id, leaveType: 'annual', startDate: '2026-08-12', endDate: '2026-08-12' }, ADMIN_A);
+    await approvals.decide(leaveRequest.approvalRequestId!, SECOND_APPROVER, 'approved', null);
+
+    // Snapshot the HR LeaveRequest BEFORE the biometric import.
+    const beforeSnapshot = (await hr.listLeaveRequests(emp.id)).find((lr) => lr.id === leaveRequest.id);
+    expect(beforeSnapshot).toBeTruthy();
+
+    const buffer = await buildWorkbook([{ acNo, date: '12/08/2026', onDuty: '09:00', offDuty: '17:00', absent: 'True' }]);
+    await attendance.importBiometricDailySummary(buffer, 'daily-6b.xlsx', ADMIN_A);
+
+    const day = (await attendance.listDays(emp.id)).find((d) => d.calendarDate === '2026-08-12');
+    expect(day?.status).toBe('on_leave');
+
+    // HR LeaveRequest is byte-unmodified — the biometric importer never writes to it (directive §6:
+    // "Do not modify or invent HR leave records during biometric import").
+    const afterSnapshot = (await hr.listLeaveRequests(emp.id)).find((lr) => lr.id === leaveRequest.id);
+    expect(afterSnapshot).toEqual(beforeSnapshot);
+
+    // No payroll deduction is generated — not merely unobserved, but structurally impossible:
+    // AttendanceDay carries no wage/rate/amount/deduction field of any kind (ADR-063 §2: B,
+    // unchanged), and no Payroll module/table exists anywhere in this repository to write one to.
+    const dayColumns = Object.keys(day ?? {});
+    expect(dayColumns).not.toContain('deductionAmount');
+    expect(dayColumns).not.toContain('payImpact');
+    expect(dayColumns).not.toContain('wageAmount');
+    expect(dayColumns.sort()).toEqual(
+      ['batchId', 'calendarDate', 'checkIn', 'checkOut', 'correctedAt', 'correctedByUserId', 'createdAt', 'employeeId', 'hoursWorked', 'id', 'status', 'updatedAt'].sort(),
+    );
   }, 30_000);
 
   it('7. Unmapped AC-No. is preserved unmapped, never auto-assigned, never auto-creates an Employee — and resolves retroactively once mapped', async () => {
