@@ -161,6 +161,45 @@ export class AttendanceController {
     return this.attendance.importExcel(file.buffer, file.originalname, req.user.id);
   }
 
+  // ---------------------------------------------------------------------------
+  // Biometric Daily Attendance Summary — CTO directive (2026-09-20). Same
+  // `attendance.import.*` permission nodes as the punch-log importer above
+  // — this is the same capability (importing attendance), a different
+  // confirmed source format, not a new scope.
+  // ---------------------------------------------------------------------------
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.import.view', 'read-only')
+  @Get('biometric-import-template')
+  async biometricImportTemplate(@Res() res: Response) {
+    const buffer = await this.attendance.buildBiometricDailyImportTemplate();
+    res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="biometric-daily-attendance-template.xlsx"' });
+    res.send(buffer);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.import.create', 'editable')
+  @Post('biometric-import/preview')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async previewBiometricImport(@UploadedFile() file: Express.Multer.File) {
+    return this.attendance.previewBiometricDailyImport(file.buffer);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.import.create', 'editable')
+  @Post('biometric-import')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async importBiometric(@UploadedFile() file: Express.Multer.File, @Req() req: AuthenticatedRequest) {
+    return this.attendance.importBiometricDailySummary(file.buffer, file.originalname, req.user.id);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('attendance.raw_record.view', 'read-only')
+  @Get('biometric-import/unmapped')
+  async listUnmappedBiometricRows() {
+    return this.attendance.listUnmappedBiometricRows();
+  }
+
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.day.view', 'read-only')
   @Get('days')

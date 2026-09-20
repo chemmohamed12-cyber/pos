@@ -77,11 +77,12 @@ export const attendanceManifest: ModuleManifest = {
       'CreateAttendanceMapping',
       'RecordManualAttendancePunch',
       'ImportAttendanceExcel',
+      'ImportAttendanceBiometricDailySummary',
       'SubmitAttendanceApprovalBatch',
       'DecideAttendanceApprovalBatch',
       'CorrectAttendanceDay',
     ],
-    queries: ['ListAttendanceDays', 'ListUnmappedAttendanceRecords', 'ListAttendanceApprovalBatches'],
+    queries: ['ListAttendanceDays', 'ListUnmappedAttendanceRecords', 'ListUnmappedBiometricAttendanceRows', 'ListAttendanceApprovalBatches'],
     events: ['attendance.period.approved'],
   },
 };

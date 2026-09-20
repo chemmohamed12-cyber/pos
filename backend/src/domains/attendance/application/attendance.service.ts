@@ -6,6 +6,7 @@ import { AttendanceConnector } from '../infrastructure/attendance-connector.enti
 import { AttendanceEmployeeMapping } from '../infrastructure/attendance-employee-mapping.entity';
 import { AttendanceImportBatch } from '../infrastructure/attendance-import-batch.entity';
 import { AttendanceRawRecord } from '../infrastructure/attendance-raw-record.entity';
+import { AttendanceBiometricDailyFact } from '../infrastructure/attendance-biometric-daily-fact.entity';
 import { AttendanceDay } from '../infrastructure/attendance-day.entity';
 import { AttendanceApprovalBatch } from '../infrastructure/attendance-approval-batch.entity';
 import { AttendanceCorrectionRequest } from '../infrastructure/attendance-correction-request.entity';
@@ -52,6 +53,75 @@ function toDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// ---------------------------------------------------------------------------
+// Biometric Daily Attendance Summary — CTO directive (2026-09-20). The
+// confirmed real device export: one row per employee per day, AC-No. as
+// the authoritative identity (never Name), scheduled duty window + actual
+// Clock In/Out kept strictly separate, Late/Early/Absent/OT Time carried
+// as opaque source facts only.
+// ---------------------------------------------------------------------------
+
+export interface BiometricDailyImportRow {
+  acNo: string;
+  name: string;
+  date: string;
+  onDuty: string;
+  offDuty: string;
+  clockIn: string;
+  clockOut: string;
+  late: string;
+  early: string;
+  absent: string;
+  otTime: string;
+}
+
+const BIOMETRIC_DAILY_COLUMNS: ColumnSpec[] = [
+  { key: 'acNo', header: 'AC-No.', width: 14, example: '2024' },
+  { key: 'name', header: 'Name', width: 28, example: 'mohammed elady' },
+  { key: 'date', header: 'Date', width: 14, example: '26/07/2026' },
+  { key: 'onDuty', header: 'On duty', width: 10, example: '09:00' },
+  { key: 'offDuty', header: 'Off duty', width: 10, example: '17:00' },
+  { key: 'clockIn', header: 'Clock In', width: 10, example: '' },
+  { key: 'clockOut', header: 'Clock Out', width: 10, example: '' },
+  { key: 'late', header: 'Late', width: 10, example: '' },
+  { key: 'early', header: 'Early', width: 10, example: '' },
+  { key: 'absent', header: 'Absent', width: 10, example: 'True' },
+  { key: 'otTime', header: 'OT Time', width: 10, example: '' },
+];
+
+/** Strict `DD/MM/YYYY` parse, rejecting anything `Date.parse` would otherwise silently misread (locale ambiguity) or roll over (e.g. 30/02). Returns an ISO `YYYY-MM-DD` or `null`. */
+function parseDdMmYyyy(value: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null; // rejects e.g. 30/02/2026
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Strict `HH:mm` (24h) validation — returns the trimmed value unchanged, or `null` if invalid. Blank is valid (optional field) and returns `''`. */
+function parseHHmm(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(trimmed) ? trimmed : null;
+}
+
+/** Combines this row's `calendarDate` with an `HH:mm` string into the same "wall-clock digits as literal UTC" convention every other timestamp in this service already uses (e.g. `deriveDay`'s own day-boundary construction). */
+function combineDateAndTime(calendarDate: string, hhmm: string): Date {
+  return new Date(`${calendarDate}T${hhmm}:00.000Z`);
+}
+
+/** Normalizes the source "Absent" column: 'true'/'false' (any case) to a boolean; blank to `null`; anything else is a validation error the caller surfaces. */
+function parseAbsentFlag(value: string): { ok: true; value: boolean | null } | { ok: false } {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return { ok: true, value: null };
+  if (trimmed === 'true') return { ok: true, value: true };
+  if (trimmed === 'false') return { ok: true, value: false };
+  return { ok: false };
+}
+
 /**
  * ADR-065 — `attendance`'s application service, Phase 1. Implements the
  * ratified `ADR-063` decisions exactly (see `ADR-065 §0` for the full
@@ -66,6 +136,7 @@ export class AttendanceService implements OnModuleInit {
     @InjectRepository(AttendanceEmployeeMapping) private readonly mappings: Repository<AttendanceEmployeeMapping>,
     @InjectRepository(AttendanceImportBatch) private readonly importBatches: Repository<AttendanceImportBatch>,
     @InjectRepository(AttendanceRawRecord) private readonly rawRecords: Repository<AttendanceRawRecord>,
+    @InjectRepository(AttendanceBiometricDailyFact) private readonly biometricFacts: Repository<AttendanceBiometricDailyFact>,
     @InjectRepository(AttendanceDay) private readonly days: Repository<AttendanceDay>,
     @InjectRepository(AttendanceApprovalBatch) private readonly approvalBatches: Repository<AttendanceApprovalBatch>,
     @InjectRepository(AttendanceCorrectionRequest) private readonly correctionRequests: Repository<AttendanceCorrectionRequest>,
@@ -158,6 +229,17 @@ export class AttendanceService implements OnModuleInit {
     const affectedDates = new Set(affected.map((r) => toDateOnly(r.punchTimestamp)));
     for (const date of affectedDates) {
       await this.deriveDay(input.employeeId, date);
+    }
+
+    // Biometric daily-summary facts (CTO directive, 2026-09-20) resolve retroactively the same
+    // way — matched by deviceUserRef alone, since these rows are connector-agnostic at import
+    // time exactly like Excel-sourced raw records already are.
+    const unresolvedFacts = await this.biometricFacts.find({ where: { deviceUserRef: input.deviceUserRef, resolvedEmployeeId: IsNull() } });
+    for (const fact of unresolvedFacts) {
+      fact.resolvedEmployeeId = input.employeeId;
+      fact.sourceConnectorId = input.connectorId;
+      const savedFact = await this.biometricFacts.save(fact);
+      await this.applyBiometricFactToDay(savedFact);
     }
 
     await this.audit.record({
@@ -330,6 +412,195 @@ export class AttendanceService implements OnModuleInit {
 
   async listUnmappedRecords(): Promise<AttendanceRawRecord[]> {
     return this.rawRecords.find({ where: { resolvedEmployeeId: IsNull() }, order: { punchTimestamp: 'DESC' }, take: 500 });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Biometric Daily Attendance Summary import — CTO directive (2026-09-20).
+  // The confirmed real device export format: one row per employee per day.
+  // AC-No. is the authoritative identity (never Name). On duty/Off duty are
+  // scheduled-window facts only, never actual timestamps. Clock In/Clock Out
+  // are converted into 0/1/2 punch records so the existing, ratified
+  // `deriveDay` first-in/last-out rule (ADR-063 §5/§6) derives the day
+  // exactly as it already does for every other source — unchanged, not
+  // reopened. Late/Early/Absent/OT Time are preserved as opaque source
+  // facts on `AttendanceBiometricDailyFact` for audit/display only; none of
+  // them feed `deriveDay`, and `Absent = True` never directly produces a
+  // payroll deduction (that boundary is Payroll's own, per ADR-067 §C).
+  // ---------------------------------------------------------------------------
+
+  buildBiometricDailyImportTemplate(): Promise<Buffer> {
+    return this.excel.buildTemplate('Biometric Daily Attendance', BIOMETRIC_DAILY_COLUMNS);
+  }
+
+  /** Parses + validates only — no write. Same `ImportSummary<T>` shape every import in this service returns. */
+  async previewBiometricDailyImport(buffer: Buffer): Promise<ImportSummary<BiometricDailyImportRow>> {
+    const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, BIOMETRIC_DAILY_COLUMNS);
+    if (headerErrors.length > 0) return { totalRows: 0, succeeded: [], rejected: [], warnings: headerErrors };
+    return this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[]);
+  }
+
+  private validateBiometricDailyRows(rows: BiometricDailyImportRow[]): ImportSummary<BiometricDailyImportRow> {
+    const succeeded: BiometricDailyImportRow[] = [];
+    const rejected: Array<{ row: number; errors: string[] }> = [];
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 2;
+      const raw = rows[i];
+      const errors: string[] = [];
+
+      const acNo = raw.acNo?.trim();
+      if (!acNo) errors.push('AC-No. is required.');
+
+      const isoDate = raw.date?.trim() ? parseDdMmYyyy(raw.date.trim()) : null;
+      if (!raw.date?.trim() || !isoDate) errors.push('Date must be a valid date in DD/MM/YYYY format.');
+
+      const onDuty = parseHHmm(raw.onDuty ?? '');
+      if (onDuty === null) errors.push('On duty must be a valid time in HH:mm format, or left blank.');
+      const offDuty = parseHHmm(raw.offDuty ?? '');
+      if (offDuty === null) errors.push('Off duty must be a valid time in HH:mm format, or left blank.');
+      const clockIn = parseHHmm(raw.clockIn ?? '');
+      if (clockIn === null) errors.push('Clock In must be a valid time in HH:mm format, or left blank.');
+      const clockOut = parseHHmm(raw.clockOut ?? '');
+      if (clockOut === null) errors.push('Clock Out must be a valid time in HH:mm format, or left blank.');
+
+      const absentParsed = parseAbsentFlag(raw.absent ?? '');
+      if (!absentParsed.ok) errors.push('Absent must be "True", "False", or left blank.');
+
+      if (errors.length > 0) {
+        rejected.push({ row: rowNumber, errors });
+        continue;
+      }
+
+      succeeded.push({
+        acNo: acNo!,
+        name: raw.name?.trim() ?? '',
+        date: isoDate!,
+        onDuty: onDuty!,
+        offDuty: offDuty!,
+        clockIn: clockIn!,
+        clockOut: clockOut!,
+        late: raw.late?.trim() ?? '',
+        early: raw.early?.trim() ?? '',
+        absent: raw.absent?.trim() ?? '',
+        otTime: raw.otTime?.trim() ?? '',
+      });
+    }
+    return { totalRows: rows.length, succeeded, rejected, warnings: [] };
+  }
+
+  /** `fileHash` idempotency — same shape as `importExcel` (ADR-065 §6): a byte-identical re-upload is rejected before any row is touched. A different file that re-reports an already-imported (AC-No., Date) row upserts that one fact row in place (§9's row-level idempotency) rather than duplicating it. */
+  async importBiometricDailySummary(buffer: Buffer, fileName: string, actorUserId: string): Promise<AttendanceImportBatch> {
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    const existing = await this.importBatches.findOne({ where: { fileHash } });
+    if (existing) {
+      throw new ConflictException(`This exact file was already imported as batch "${existing.id}" on ${existing.importedAt.toISOString()} — re-upload refused.`);
+    }
+
+    const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, BIOMETRIC_DAILY_COLUMNS);
+    if (headerErrors.length > 0) throw new ConflictException(`Import template headers are invalid: ${headerErrors.join('; ')}`);
+    const summary = this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[]);
+
+    const batch = await this.importBatches.save(
+      this.importBatches.create({
+        fileHash,
+        fileName,
+        totalRows: summary.totalRows,
+        succeededCount: summary.succeeded.length,
+        rejectedCount: summary.rejected.length,
+        importedByUserId: actorUserId,
+      }),
+    );
+
+    for (const row of summary.succeeded) {
+      await this.upsertBiometricDailyFact(row, batch.id, actorUserId);
+    }
+
+    await this.audit.record({
+      actorUserId,
+      organizationId: null,
+      action: 'attendance.biometric_import.completed',
+      resource: 'attendance_import_batch',
+      resourceId: batch.id,
+      result: 'success',
+      correlationId: null,
+      after: { fileName, totalRows: summary.totalRows, succeededCount: summary.succeeded.length, rejectedCount: summary.rejected.length },
+    });
+    return batch;
+  }
+
+  private async upsertBiometricDailyFact(row: BiometricDailyImportRow, importBatchId: string, actorUserId: string): Promise<void> {
+    const absentParsed = parseAbsentFlag(row.absent);
+    const sourceAbsent = absentParsed.ok ? absentParsed.value : null;
+
+    // AC-No. is the authoritative identity — resolved connector-agnostically against any active
+    // mapping, mirroring how Excel-sourced raw records already resolve (no device connector is
+    // seeded for a file-based import). Never resolved by Name.
+    const mapping = await this.mappings.findOne({ where: { deviceUserRef: row.acNo, effectiveTo: IsNull() } });
+
+    let fact = await this.biometricFacts.findOne({ where: { deviceUserRef: row.acNo, calendarDate: row.date } });
+    fact = fact ?? this.biometricFacts.create({ deviceUserRef: row.acNo, calendarDate: row.date });
+    fact.importBatchId = importBatchId;
+    fact.sourceName = row.name || null;
+    fact.resolvedEmployeeId = mapping?.employeeId ?? null;
+    fact.sourceConnectorId = mapping?.connectorId ?? null;
+    fact.onDuty = row.onDuty || null;
+    fact.offDuty = row.offDuty || null;
+    fact.clockIn = row.clockIn || null;
+    fact.clockOut = row.clockOut || null;
+    fact.lateValue = row.late || null;
+    fact.earlyValue = row.early || null;
+    fact.otTimeValue = row.otTime || null;
+    fact.sourceAbsent = sourceAbsent;
+    fact.rawPayload = row as unknown as Record<string, unknown>;
+    fact.ingestedByUserId = actorUserId;
+    fact.updatedAt = new Date();
+    const saved = await this.biometricFacts.save(fact);
+
+    // Unmapped AC-No.: preserved (the fact row above), never auto-assigned to another employee,
+    // never auto-creates an Employee. No punch records are produced until a mapping resolves it.
+    if (saved.resolvedEmployeeId) {
+      await this.applyBiometricFactToDay(saved);
+    }
+  }
+
+  /** Converts one resolved biometric fact row into 0/1/2 punch records and re-derives that day — reused at import time and at retroactive-mapping time (createMapping). Idempotent: only THIS fact's own biometric-sourced punches for this employee/day are replaced, never another source's. */
+  private async applyBiometricFactToDay(fact: AttendanceBiometricDailyFact): Promise<void> {
+    const employeeId = fact.resolvedEmployeeId;
+    if (!employeeId) return;
+
+    const dayStart = new Date(`${fact.calendarDate}T00:00:00.000Z`);
+    const dayEnd = new Date(`${fact.calendarDate}T23:59:59.999Z`);
+    await this.rawRecords.delete({ sourceType: 'biometric', resolvedEmployeeId: employeeId, punchTimestamp: Between(dayStart, dayEnd) });
+
+    const punches: Array<{ punchTimestamp: Date; punchType: AttendancePunchType }> = [];
+    // Clock In/Clock Out are the ONLY source of actual attendance timestamps (directive §3) —
+    // On duty/Off duty (the scheduled window) never contribute a punch. A blank Clock In/Out
+    // remains blank: no punch time is ever inferred or manufactured.
+    if (fact.clockIn) punches.push({ punchTimestamp: combineDateAndTime(fact.calendarDate, fact.clockIn), punchType: 'in' });
+    if (fact.clockOut) punches.push({ punchTimestamp: combineDateAndTime(fact.calendarDate, fact.clockOut), punchType: 'out' });
+
+    for (const p of punches) {
+      await this.rawRecords.save(
+        this.rawRecords.create({
+          sourceType: 'biometric',
+          sourceConnectorId: fact.sourceConnectorId,
+          importBatchId: fact.importBatchId,
+          deviceEmployeeRef: fact.deviceUserRef,
+          resolvedEmployeeId: employeeId,
+          punchTimestamp: p.punchTimestamp,
+          punchType: p.punchType,
+          rawPayload: fact.rawPayload,
+          ingestedByUserId: fact.ingestedByUserId,
+        }),
+      );
+    }
+
+    // Zero punches (e.g. Absent = True with blank Clock In/Out) is a deliberate, expected case —
+    // `deriveDay` already derives `status = 'absent'` from zero same-day punches, unchanged.
+    await this.deriveDay(employeeId, fact.calendarDate);
+  }
+
+  async listUnmappedBiometricRows(): Promise<AttendanceBiometricDailyFact[]> {
+    return this.biometricFacts.find({ where: { resolvedEmployeeId: IsNull() }, order: { calendarDate: 'DESC' }, take: 500 });
   }
 
   // ---------------------------------------------------------------------------

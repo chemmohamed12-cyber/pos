@@ -4,6 +4,7 @@ import { AttendanceConnector } from './infrastructure/attendance-connector.entit
 import { AttendanceEmployeeMapping } from './infrastructure/attendance-employee-mapping.entity';
 import { AttendanceImportBatch } from './infrastructure/attendance-import-batch.entity';
 import { AttendanceRawRecord } from './infrastructure/attendance-raw-record.entity';
+import { AttendanceBiometricDailyFact } from './infrastructure/attendance-biometric-daily-fact.entity';
 import { AttendanceDay } from './infrastructure/attendance-day.entity';
 import { AttendanceApprovalBatch } from './infrastructure/attendance-approval-batch.entity';
 import { AttendanceCorrectionRequest } from './infrastructure/attendance-correction-request.entity';
@@ -30,6 +31,7 @@ import { HrModule } from '../hr/hr.module';
       AttendanceEmployeeMapping,
       AttendanceImportBatch,
       AttendanceRawRecord,
+      AttendanceBiometricDailyFact,
       AttendanceDay,
       AttendanceApprovalBatch,
       AttendanceCorrectionRequest,

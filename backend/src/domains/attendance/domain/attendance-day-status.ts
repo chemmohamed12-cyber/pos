@@ -8,4 +8,15 @@ export type AttendanceDayStatus = 'present' | 'absent' | 'on_leave' | 'missing_p
 
 export type AttendancePunchType = 'in' | 'out' | 'unknown';
 
-export type AttendanceSourceType = 'manual' | 'excel_import' | 'api';
+/**
+ * `'biometric'` — added for the confirmed real device Daily Attendance
+ * Summary format (CTO directive, 2026-09-20). Purely a new *source*
+ * label for `AttendanceRawRecord`/`AttendanceImportBatch` provenance —
+ * it carries no new derivation behavior and does not touch
+ * `AttendanceDayStatus` above. A biometric-sourced raw record still only
+ * ever contributes an 'in'/'out' punch exactly like any other source; the
+ * device's own Late/Early/Absent/OT facts are preserved separately on
+ * `AttendanceBiometricDailyFact` for audit/display only, never fed into
+ * this derivation.
+ */
+export type AttendanceSourceType = 'manual' | 'excel_import' | 'api' | 'biometric';
