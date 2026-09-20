@@ -1,11 +1,17 @@
 # ADR-070 — Payroll Phase 1: Implementation Contract
 
-**Status:** Contract Design — awaiting CTO review/approval as one package
-with `ADR-071`/`ADR-072`, per the "CTO DIRECTIVE — Begin Implementation
-Contracts" instruction (2026-09-20). Built strictly from `ADR-064`
-(Payroll Phase 0 Study), `ADR-067` (Payroll Policy, RATIFIED), and
-`ADR-069` (Attendance Completion & Payroll Handoff, CLOSED). **No policy
-is introduced, reopened, or reinterpreted here.** No code, schema,
+**Status:** Contract Design — CONDITIONAL / HOLD IMPLEMENTATION per CTO
+Final Review (2026-09-20), pending resolution of a financial-integrity
+semantic gap the corrected §13 transaction boundary exposed. **Resolved
+in this revision (§5, §6, §9, §13-§15, §19 below) as Option A**, per the
+CTO's own framing: `PayrollRun.status = 'posted'` means *posting intent
+durably committed*, explicitly **not** *GL journal confirmed posted* —
+made binding via a new, explicit reconciliation invariant (§6) built
+entirely on the already-existing `FinancialEvent` entity
+(`financial-event.entity.ts`), not a new mechanism. Built strictly from
+`ADR-064` (Payroll Phase 0 Study), `ADR-067` (Payroll Policy, RATIFIED),
+and `ADR-069` (Attendance Completion & Payroll Handoff, CLOSED). **No
+policy is introduced, reopened, or reinterpreted here.** No code, schema,
 migration, API, frontend, or seed change is authorized by this document.
 Production remains HOLD.
 
@@ -65,7 +71,7 @@ you actually import" discipline (`ADR-065 §2`).
 - **PayrollPeriod** — `id, code, startDate, endDate, status ('open'|'closed'), createdAt`. Monthly in Phase 1 (`ADR-067 §A`), designed so a future frequency just adds a value to how periods are generated, not a schema change.
 - **PayrollCompensation** — the effective-dated compensation record (`ADR-067 §B`): `id, employeeId, effectiveFrom, effectiveTo (nullable), status ('active'|'superseded'), createdByUserId, createdAt`. New row per change, never mutated in place — the same discipline `CustomerAssignment` and `ADR-068 §E`'s Commission Policy already use. Unique partial index `(employeeId)` where `effectiveTo IS NULL`, mirroring `AttendanceEmployeeMapping`'s own `(connectorId, deviceUserRef)` pattern.
 - **PayrollEarningLine** — one or more rows per `PayrollCompensation`: `id, compensationId, componentCode ('basic' | other, catalog is Implementation detail per §21), amount`. Together these sum to Gross Pay (`ADR-067 §B`'s Earnings stage) — no single-figure salary column exists anywhere.
-- **PayrollRun** — one per `(PayrollPeriod, populationScope)`: `id, payrollPeriodId, status (driven by `ProcessEngineService`, §5), approvalRequestId (nullable, FA-01), createdByUserId, calculatedAt, reviewedByUserId, reviewedAt, approvedAt, postedAt, financialEventId (nullable, set once posted).`
+- **PayrollRun** — one per `(PayrollPeriod, populationScope)`: `id, payrollPeriodId, status (driven by `ProcessEngineService`, §5), approvalRequestId (nullable, FA-01), createdByUserId, calculatedAt, reviewedByUserId, reviewedAt, approvedAt, postedAt, disbursedAt (nullable, §9/§13).` **No `financialEventId` field** — corrected per CTO Final Review: no other domain entity in this codebase stores a forward reference to its own `FinancialEvent` (confirmed by inspection — `SalesInvoice`, `GoodsReceipt`, and every other Financial-Event-publishing entity holds none). The existing, already-proven join is the **reverse** direction: `FinancialEvent.sourceDomain='payroll'`, `sourceEntityType='PayrollRun'`, `sourceEntityId=<this row's id>` (`financial-event.entity.ts:26-33`) — reconciliation queries `FinancialEvent`, `PayrollRun` does not cache a pointer to it. This removes a field this contract had invented beyond precedent in its first draft.
 - **PayrollRunLine** — one per employee per `PayrollRun`: `id, payrollRunId, employeeId, compensationSnapshot (jsonb — a copy of the `PayrollCompensation`/`PayrollEarningLine` values used, per the immutable-snapshot discipline `ADR-068 §F` already established for Commission), grossPay, totalDeductions, netPay, commissionAmount (nullable, from an Approved Commission Result reference, `ADR-067 §J`), overtimeAmount (always `0`/`null` in Phase 1, column reserved per `ADR-067 §D`'s extension point), calculationTimestamp.`
 - **PayrollAttendanceDayClassification** — one row per employee per calendar day inside the run's period, per `ADR-067 §C`'s binding day-type control: `id, payrollRunLineId, calendarDate, attendanceStatus (Attendance's own status, copied — never re-derived later), dayType ('working'|'weekend'|'holiday'|'approved_leave'|'unclassified'), payImpact ('none'|'deduction'|'leave').` This is the concrete, auditable, per-day evidence that a deduction decision was never taken from `AttendanceDay.status` alone (§6, §9 below detail the determination rule and its fail-safe).
 - **PayrollDeductionLine** — `id, payrollRunLineId, category ('system_derived'|'approved_external', `ADR-067 §G`'s closed taxonomy), type (coded, catalog is Implementation detail per §21), amount, sourceReference (nullable — an approval/request id for an `approved_external` deduction; never populated for a bare UI action per §G's own governance constraint).`
@@ -88,8 +94,26 @@ initialState   = 'draft'
 draft      --calculate-->  calculated
 calculated --review-->     reviewed
 reviewed   --approve-->    approved   (FA-01 gate, §10)
-approved   --post-->       posted     (terminal — §18 governs everything after)
+approved   --post-->       posted     (terminal for PayrollRun — §18 governs
+                                        everything after; NOT terminal for the
+                                        GL side of this event — see below and §6)
 ```
+
+**Binding semantic, per CTO Final Review (2026-09-20) — Option A:**
+`PayrollRun.status = 'posted'` means **posting intent durably committed**
+— the run has been finalized on the Payroll side and will never be
+recalculated or reopened (§18). It does **not** mean, by itself, that the
+GL journal exists or is balanced. That is a distinct, independently
+tracked fact, owned entirely by `FinancialEvent.status` (§6). This is
+Option A from the CTO's review, chosen because it is not a new pattern —
+it is the exact shape every other domain in this codebase that crosses
+into Accounting already uses (Sales, Manufacturing, Procurement none of
+them wait for GL confirmation before finalizing their own document), so
+choosing Option B (making `posted` wait for GL confirmation) would have
+made Payroll the only domain in this codebase with that stronger,
+inconsistent guarantee, at the cost of reintroducing exactly the kind of
+cross-domain synchronous coupling the Transactional Outbox pattern exists
+to avoid.
 
 `transition()`'s own row lock (`FOR UPDATE` on the process instance,
 `process-engine.service.ts:104`) is the concurrency guard preventing two
@@ -147,6 +171,28 @@ and does not do inside that automatic transition.
 - Every GL-posting Financial Event Payroll publishes carries a
   deterministic `idempotencyKey` derived from `(payrollRunId, 'posted')` —
   a redelivered event can never double-post (§12).
+- **New, binding — the reconciliation invariant CTO Final Review requires,
+  built entirely on the existing `FinancialEvent` entity, no new
+  mechanism:**
+
+  ```
+  Every PayrollRun that reaches `posted`
+  must have exactly one corresponding FinancialEvent row
+  (sourceDomain='payroll', sourceEntityType='PayrollRun', sourceEntityId=<run id>),
+  and that FinancialEvent must eventually resolve to
+  POSTED, or to an explicitly remediable terminal state
+  (REJECTED, IGNORED, or its underlying EventOutbox row reaching 'failed'
+   without ever producing a FinancialEvent row at all) —
+  never left indefinitely RECEIVED/MAPPED or the outbox row indefinitely 'pending'.
+  ```
+
+  "Exactly one" is guaranteed for free by `idempotencyKey`'s own
+  `UNIQUE` constraint (`financial-event.entity.ts:35-37`) — a redelivery
+  of the same outbox event can never create a second row. **A
+  `PayrollRun.status = 'posted'` is never, by itself, evidence that GL
+  posting succeeded — only `FinancialEvent.status = 'POSTED'` is.**
+  §15 specifies the reconciliation query this invariant makes possible;
+  §9/§13 specify disbursement's own dependency on it.
 
 ## 7. Service Boundaries
 
@@ -220,25 +266,62 @@ consumed here only as "an approved, immutable result," per §6/§8.
 registration shape as every existing handler in `finance-handlers.ts`) —
 payload carries `payrollRunId`, `payrollPeriodId`, and the aggregate
 Dr/Cr amounts; the handler resolves `wages_payable` via
-`resolveControlAccount` (§16) and posts one balanced journal.
+`resolveControlAccount` (§16) and posts one balanced journal, landing a
+`FinancialEvent` row keyed `sourceDomain='payroll'`,
+`sourceEntityType='PayrollRun'`, `sourceEntityId=payrollRunId` — the
+reconciliation join §6's invariant and §15 rely on (no `financialEventId`
+cached on `PayrollRun` itself, §4).
 
-**Outbound — Treasury:** the extended `cashOutForEmployee` contract call
-(§3), invoked only after the Financial Event's journal has posted
-successfully — mirrors `SupplierPaymentService`'s own sequencing (ledger
-effect before/with the cash leg, one transaction).
+**Outbound — Treasury (disbursement) — trigger, ownership, and gate made
+explicit per CTO Final Review (2026-09-20):** disbursement is **not**
+automatically cascaded from the Financial Event handler's success —
+matching this codebase's own existing, proven precedent exactly:
+`SupplierPaymentService.recordPayment` is never auto-triggered by a
+Supplier Invoice's own GL posting; it is a **distinct, separately-invoked
+action**, exposed through its own controller endpoint
+(`supplier-payment.controller.ts:56`), invoked by a human at a time of
+their choosing, referencing an already-posted invoice. Payroll disbursement
+follows the identical shape, not a new one:
+
+- **Trigger:** an explicit `PayrollService.disburse(payrollRunId)` action
+  (own permission node, §10), invoked by an authorized user — never
+  automatic.
+- **Ownership:** Payroll *initiates* (owns the decision of when/whether to
+  disburse a given run); Treasury *executes* (via the extended
+  `cashOutForEmployee` contract method, §3) — the identical split
+  `SupplierPaymentService`/Treasury already have; Payroll does not import
+  `TreasuryService` directly, exactly as Procurement does not.
+- **Gate:** `disburse()` must first query `FinancialEvent` by this run's
+  `sourceEntityId` and refuse (fail-closed) unless `status = 'POSTED'` —
+  a run whose Financial Event is still `RECEIVED`/`MAPPED`, or has
+  resolved `REJECTED`/`IGNORED`, cannot be disbursed. This is the
+  concrete mechanism that prevents "PayrollRun posted + GL never posted"
+  from ever silently reaching an employee's bank account.
+- **Idempotency/retry:** mirrors `SupplierPaymentService.recordPayment`'s
+  own proven shape (`supplier-payment.service.ts:61-75`) — an advisory
+  lock plus a remaining-balance/already-disbursed check, rejecting a
+  second disbursement attempt for the same run with a `ConflictException`,
+  not a new mechanism.
 
 ## 10. Authorization / SoD
 
 Candidate `payroll.*` permission nodes (naming only, final list is
 Implementation detail): `payroll`, `payroll.compensation.{view,create,edit}`,
 `payroll.period.{view,create}`, `payroll.run.{view,create,calculate}`,
-`payroll.run.approve` (FA-01 checker side), `payroll.adjustment.create`,
-`payroll.deduction.create` (governs the `approved_external` category's own
-authorization boundary per `ADR-067 §G`). **No `payroll.run.post` node
-exists** — consistent with §5's correction, `post` is not a separately
-human-invoked action, so there is nothing for a distinct permission to
-gate; the FA-01 approval decision (`payroll.run.approve`) is the one
-control point for the entire `approved → posted` outcome. FA-01's own SoD
+`payroll.run.approve` (FA-01 checker side), `payroll.run.disburse` (§9's
+explicit, separately-invoked disbursement trigger — distinct from
+approval, mirroring `supplier_payment.record`-shaped nodes elsewhere),
+`payroll.adjustment.create`, `payroll.deduction.create` (governs the
+`approved_external` category's own authorization boundary per `ADR-067
+§G`). **No `payroll.run.post` node exists** — consistent with §5's
+correction, `post` is not a separately human-invoked action, so there is
+nothing for a distinct permission to gate; the FA-01 approval decision
+(`payroll.run.approve`) is the one control point for the entire
+`approved → posted` outcome. `payroll.run.disburse` is deliberately a
+*different* node from `payroll.run.approve` — SoD may require the two to
+be held by different actors, the same separation `ADR-064 §6` already
+anticipated ("compensation data... likely needs its OWN narrower
+visibility node"), now extended to disbursement. FA-01's own SoD
 enforcement (`approval-engine.service.ts:231-234` — "the maker of an
 approval request cannot approve or reject it") covers the `approve` step
 automatically, zero new mechanism, exactly as `ADR-067 §L` requires.
@@ -289,7 +372,9 @@ other consumer — no gap, no duplication.
       • EventOutbox row created: topic='payroll.run.posted', status='pending'
         (EventBusService.publish(manager, …) — writes using THIS SAME manager,
          event-bus.service.ts:40-48 — no handler is invoked synchronously here)
-      • PayrollRun.financialEventId = <the outbox row's id>
+      • (no financialEventId write-back — PayrollRun caches nothing;
+         reconciliation joins FinancialEvent.sourceEntityId → PayrollRun.id
+         instead, §4/§6)
   COMMIT
       ↓ (separate, later — EventBusService.dispatchPending(), event-bus.service.ts:57-87)
   Financial Event Handler (registered in finance-handlers.ts, §16)
@@ -316,13 +401,17 @@ other consumer — no gap, no duplication.
   §12, makes redelivery a no-op); rejection/retry is handled entirely by
   the existing outbox/handler mechanism, not a new one.
 
-  **Disbursement is a third, separate, later transaction** —
-  `cashOutForEmployee` (§3) is only invoked once the Financial Event is
-  independently confirmed posted (e.g. `FinancialEventService.getEvent
-  (financialEventId)`'s status, `financial-event.service.ts:100`) — never
-  triggered from inside the `approved → posted` transaction itself, and
-  never assumed to have succeeded just because `PayrollRun.postedAt` is
-  set. Mirrors `SupplierPaymentService`'s own sequencing (§9).
+  **Disbursement is a third, separate, later transaction, and a
+  separate, explicitly human-invoked action (§9) — never automatic.**
+  `PayrollService.disburse(payrollRunId)` first queries `FinancialEvent`
+  (`sourceEntityType='PayrollRun'`, `sourceEntityId=payrollRunId`,
+  `financial-event.service.ts:100`'s `getEvent`-shaped lookup) and refuses
+  unless `status = 'POSTED'`, only then calling `cashOutForEmployee` (§3)
+  — never triggered from inside the `approved → posted` transaction
+  itself, and never assumed to have succeeded just because
+  `PayrollRun.postedAt` is set (§6's invariant is precisely why this check
+  is mandatory, not optional). Mirrors `SupplierPaymentService`'s own
+  sequencing and its own separate-action shape (§9).
 
 ## 14. Failure Modes
 
@@ -344,11 +433,13 @@ other consumer — no gap, no duplication.
   re-publish, no second event, no partial GL state, matching F03's own
   fail-closed discipline (`resolveControlAccount` returning `null` is
   handled as rejection everywhere else in this codebase, e.g.
-  `ap-adjustment.handler.ts:37-40`). Disbursement (§13) never proceeds
+  `ap-adjustment.handler.ts:37-40`). Disbursement (§9, §13) never proceeds
   while the underlying event is not yet confirmed posted, regardless of
-  `PayrollRun`'s own already-`posted` status — this is precisely why §13
-  makes disbursement wait on the Financial Event's own status, not on
-  `PayrollRun.postedAt`.
+  `PayrollRun`'s own already-`posted` status — this is precisely why §9's
+  `disburse()` gate checks the Financial Event's own status, not
+  `PayrollRun.postedAt`. Until remediated, this run is exactly the state
+  §6's invariant and §15's reconciliation query exist to surface: `posted`
+  on the Payroll side, unresolved on the GL side — flagged, not hidden.
 - **Treasury disbursement fails after posting:** `PayrollRun.postedAt` is
   already set (GL is correct — the liability is real regardless of
   disbursement timing); disbursement is retried independently, the same
@@ -360,10 +451,34 @@ other consumer — no gap, no duplication.
 
 Redelivery safety is inherited entirely from the existing Transactional
 Outbox (`EventBusService`) and F03's `idempotencyKey` — no new retry
-mechanism. A reconciliation report (`PayrollRun` totals vs. the posted
-Journal Entry's Dr/Cr lines) is Implementation detail, not specified
-further here, following the same shape `ADR-064 §0` already cited as
-proven for other subledger-to-GL reconciliations in this codebase.
+mechanism.
+
+**Reconciliation, made concrete per CTO Final Review (2026-09-20)
+(exact query shape is Implementation detail; the invariant it enforces is
+not):** the query §6's invariant requires is a straightforward join, no
+new table:
+
+```
+SELECT pr.id FROM payroll_runs pr
+LEFT JOIN accounting_financial_events fe
+  ON fe."sourceEntityType" = 'PayrollRun' AND fe."sourceEntityId" = pr.id
+WHERE pr.status = 'posted'
+  AND (fe.id IS NULL OR fe.status NOT IN ('POSTED'));
+```
+
+A non-empty result is, by definition, a `PayrollRun` that is `posted` on
+the Payroll side with **no confirmed GL counterpart** — exactly the gap
+CTO Final Review flagged, now a detectable, queryable, named condition
+rather than an implicit possibility. `fe.id IS NULL` additionally catches
+the case where the underlying `EventOutbox` row itself exhausted retries
+and reached `'failed'` before a `FinancialEvent` row was ever created —
+distinct from a `FinancialEvent` that was created and then `REJECTED`, but
+caught by the same query. This report is Implementation detail to build
+(a scheduled job, an admin dashboard query, or both), following the same
+shape `ADR-064 §0` already cited as proven for other subledger-to-GL
+reconciliations in this codebase — what is binding here is that the query
+is possible and correct with zero new fields beyond what `FinancialEvent`
+already has, not the exact delivery mechanism.
 
 ## 16. Financial Integration
 
@@ -445,6 +560,18 @@ remain permanently queryable exactly as posted, matching `ADR-067 §M`.
     each behind its own permission node.
 12. Full regression, clean build, live-database verification — same bar
     every prior phase in this program has met.
+13. **New, per CTO Final Review:** a `PayrollRun` whose Financial Event is
+    forced to `REJECTED` (e.g. by deactivating `wages_payable` mid-test)
+    still reaches `posted` on the Payroll side (§5) — proving the two are
+    genuinely decoupled, not just documented as such.
+14. **New:** §15's reconciliation query correctly identifies that same run
+    as a gap (`posted` + no `POSTED` `FinancialEvent`), and returns empty
+    once the control account is reactivated and the outbox row's retry
+    succeeds — proving detection and self-healing both work.
+15. **New:** `PayrollService.disburse()` is rejected for a `PayrollRun`
+    whose `FinancialEvent` is not `POSTED` (whether still pending or
+    definitively rejected), and succeeds once it is — proving §9's gate is
+    real, not documentation-only.
 
 ## 20. Non-Goals
 
@@ -510,9 +637,12 @@ implementation itself:
    determination and its fail-safe.
 4. FA-01 lifecycle wiring (§5, §10).
 5. Financial Event handler + `wages_payable` control function (§16).
-6. Treasury disbursement extension (§3, §9).
-7. Correction/adjustment flow (§18).
-8. Frontend.
+6. §15's reconciliation query (report/job) — built alongside the handler,
+   not deferred, since it is what makes §6's invariant observable.
+7. `PayrollService.disburse()` + the extended Treasury contract (§3, §9),
+   including its `FinancialEvent`-status gate.
+8. Correction/adjustment flow (§18).
+9. Frontend.
 
 Each stage tested before the next begins, same discipline as every prior
 phase. Production remains HOLD.
