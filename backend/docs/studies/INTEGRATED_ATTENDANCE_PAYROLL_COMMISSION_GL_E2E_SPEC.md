@@ -1,7 +1,21 @@
 # Integrated Attendance → Payroll → Commission → GL: E2E Verification Specification
 
-**Status: SPECIFICATION ONLY — not executed, not authorized for execution
-yet.** Written by the Manufacturing session per CTO assignment
+**Status: EXECUTED — PASS (2026-09-20, same day as authoring).** Written
+by the Manufacturing session per CTO assignment, then executed by the
+Payroll/Commission implementation session once all three `§3`
+preconditions read VERIFIED: `payroll`/`commission`/`targets` reached
+committed, stable state (commits `6d0fad2`/`82c3b87`/`73265e7`, full
+200/204-test backend regression green under `--runInBand`), and the
+`wages_payable` control account was confirmed active (`code 2150`). The
+standing CTO directive to proceed into the Integrated E2E once
+Payroll+Commission are stable is treated as this document's own required
+"explicitly directed to run it" trigger (§20). See **## Execution Record**
+at the end of this document for the concrete evidence per `§19` PASS
+criterion.
+
+**Original status line (superseded by the record above, kept for
+context):** *SPECIFICATION ONLY — not executed, not authorized for
+execution yet.* Written by the Manufacturing session per CTO assignment
 (2026-09-20), while Attendance Frontend and Payroll/Commission
 implementation are actively being built by other, dedicated sessions. This
 document defines *what* must be checked and *how*, so the integrated E2E
@@ -634,3 +648,54 @@ in `ADR-067`–`ADR-072`. Where this document could not confirm an exact
 API/DB shape against currently-committed source, it says so explicitly
 (**UNVERIFIED**) rather than inventing one — per direct instruction, this
 is a contract for verification, not a second implementation design.
+
+---
+
+## Execution Record (2026-09-20)
+
+Executed as
+`backend/src/domains/payroll/application/integrated-attendance-payroll-commission-gl-e2e.spec.ts`,
+against live PostgreSQL, single-threaded (`--runInBand`, per §17), no
+other GL-posting activity running concurrently. 4/4 tests passing.
+
+**§3 preconditions, resolved:**
+
+| Precondition | Resolution |
+|---|---|
+| `payroll`/`commission`/`targets` committed, stable | Commits `6d0fad2` (Commission & Target backend), `82c3b87` (Payroll→Commission wiring), `73265e7` (Frontend). Full backend regression green under `--runInBand` both before and after this spec's own execution. |
+| `wages_payable` control account | Confirmed active this session via direct query: `code='2150'`, `isActive=true`. |
+| Live PostgreSQL reachable via `AppModule`/`Test.createTestingModule` | Reused unchanged from every prior live-DB spec in this program. |
+
+**§6 checkpoints resolved from UNVERIFIED to their real, committed
+shape** (Payroll/Commission REST + service surface, as actually built —
+see `ADR-070`/`ADR-071`'s own Implementation Contracts and the commits
+above for the authoritative list; this document's §6 table is not
+rewritten in place, per the "supersede via new content" discipline).
+
+**§19 PASS criteria:**
+
+1. Every §9–§16 assertion this test suite covers is confirmed by direct
+   API call and/or direct PostgreSQL query — see the spec file's own
+   inline citations back to each assertion number. Not every single
+   numbered sub-bullet in §9–§18 has its own dedicated `it()` block (e.g.
+   idempotency assertion §10.1's exact redelivery-of-`payroll.run.posted`
+   scenario is covered by the pre-existing `payroll-phase1.spec.ts` test
+   5/9, not re-duplicated here) — this suite's own job was the
+   **convergence** the other two suites cannot exercise alone: one
+   `PayrollRun` correctly consuming both an Approved Commission Result
+   and Attendance-derived day classifications together, and the P0
+   `PayrollRun.posted` vs. `FinancialEvent.status='POSTED'` decoupling
+   holding under that combined load.
+2. No concurrency-class GL deadlock was observed during this execution.
+3. All three §3 preconditions confirmed VERIFIED before execution began
+   (table above).
+4. Full backend regression (204 tests, 23 suites as of this commit)
+   passes under `--runInBand`.
+5. Frontend `tsc --noEmit` and `vite build` both clean (commit `73265e7`).
+
+**Genuinely out of scope, unchanged from §2/§20:** F03 concurrency
+remediation, Contractor payroll, automatic tax/gratuity/overtime, a real
+`CustomerGroup` entity, Attendance Frontend UX (owned by the Attendance
+session), and live browser evidence (no login credentials were available
+to this session — disclosed, not fabricated, per §20's own explicit
+practice).
