@@ -1,15 +1,20 @@
 # ADR-072 — Integrated Payroll + Commission + Attendance + GL: E2E Contract
 
-**Status:** Contract Design — awaiting CTO review/approval as one package
-with `ADR-070`/`ADR-071`, per the "CTO DIRECTIVE — Begin Implementation
-Contracts" instruction (2026-09-20). This is not a summary of the other
-two contracts — it specifies the integration surface *between* them: data
-ownership, event contracts, transaction/idempotency boundaries, and the
-cross-context invariants neither `ADR-070` nor `ADR-071` can define alone.
-Built strictly from `ADR-064`/`ADR-066`/`ADR-067`/`ADR-068`/`ADR-069`/
-`ADR-070`/`ADR-071` — **no new policy is introduced.** No code, schema,
-migration, API, frontend, or seed change is authorized by this document.
-Production remains HOLD.
+**Status:** Contract Design — CONDITIONAL / HOLD IMPLEMENTATION per CTO
+Final Review (2026-09-20), aligned in this revision with `ADR-070`'s
+Option A resolution of the `PayrollRun.posted` vs. GL-confirmed-posted
+semantic gap: **§6, §9, §12, §14, §16, §17, §18, and §19 below are
+corrected** to remove every phrasing that assumed `PayrollRun` reaching
+`posted` implies its GL journal exists — it does not; `FinancialEvent.
+status` is the only source of truth for that, per `ADR-070 §6`. This is
+not a summary of the other two contracts — it specifies the integration
+surface *between* them: data ownership, event contracts, transaction/
+idempotency boundaries, and the cross-context invariants neither
+`ADR-070` nor `ADR-071` can define alone. Built strictly from
+`ADR-064`/`ADR-066`/`ADR-067`/`ADR-068`/`ADR-069`/`ADR-070`/`ADR-071` —
+**no new policy is introduced.** No code, schema, migration, API,
+frontend, or seed change is authorized by this document. Production
+remains HOLD.
 
 ## 1. Purpose / Scope
 
@@ -96,6 +101,20 @@ the consequence).
   Commission never posts (`ADR-071 §16`), Attendance never posts
   (`ADR-062 §8`), preserving one single point of GL entry for this whole
   chain.
+- **New, added per CTO Final Review (2026-09-20) — the chain-level
+  restatement of `ADR-070 §6`'s reconciliation invariant:** `PayrollRun.
+  status = 'posted'` is the terminus of this entire chain's *business*
+  processing (Sale → Commission → Payroll), but it is **not** the
+  terminus of the chain's *financial* processing — that terminus is
+  `FinancialEvent.status = 'POSTED'`, a distinct, independently-tracked
+  fact (§16). A chain that has correctly reached `PayrollRun.posted` for
+  every business step (Commission approved, Attendance classified,
+  Payroll calculated/reviewed/approved) can still be financially
+  incomplete if its `FinancialEvent` has not yet resolved — this is not a
+  contradiction of "the chain is internally consistent" (§1's purpose),
+  it is the eventually-consistent boundary the Transactional Outbox
+  pattern deliberately introduces at exactly one point in an otherwise
+  synchronous-within-each-domain chain.
 
 ## 7. Service Boundaries
 
@@ -150,16 +169,31 @@ Attendance approved facts │                        │
    + ADR-070 §9's new      │                        │
    listApprovedDaysByBatch)└────────────────────────┘
                                    │
-                    Draft → Calculated → Reviewed → Approved (FA-01)
+                    Draft → Calculated → Reviewed → Approved (FA-01, the
+                                   │                  one human control point,
+                                   │                  ADR-070 §5)
+                                   ▼ (automatic, deterministic — NOT a second
+                                   │  human decision, ADR-070 §5)
+                     PayrollRun.status = 'posted'   +   EventOutbox row written
+                     (ONE Payroll transaction, ADR-070 §13 — this is "posting
+                      intent durably committed," NOT "GL confirmed posted")
                                    │
-                                   ▼
-                     payroll.run.posted (new Financial Event, ADR-070 §16)
+                                   │  COMMIT, then separately/later:
+                                   ▼ (EventBusService.dispatchPending, async)
+                     Financial Event Handler → resolveControlAccount('wages_payable')
                                    │
-                                   ▼
-              Dr Salaries & Wages Expense / Cr Wages Payable
-                                   │
-                                   ▼
-              Disbursement: Dr Wages Payable / Cr Treasury (ADR-070 §9)
+                         ┌─────────┴─────────┐
+                         ▼                   ▼
+              Dr Salaries & Wages /    FinancialEvent.status = REJECTED
+              Cr Wages Payable         (surfaced for remediation, ADR-070 §14;
+              FinancialEvent.status    detected by ADR-070 §15's reconciliation
+              = POSTED                 query — PayrollRun stays 'posted' either way)
+                         │
+                         ▼ (explicit, separately human-invoked —
+                         │  PayrollService.disburse(), gated on
+                         │  FinancialEvent.status = 'POSTED', ADR-070 §9 —
+                         │  never automatic, mirrors SupplierPaymentService)
+              Disbursement: Dr Wages Payable / Cr Treasury
 ```
 
 Every arrow above is either a read-only query or an already-existing/
@@ -193,10 +227,15 @@ Each hop's idempotency is independently guaranteed by its own owning
 domain (§9's diagram) — this document does not add a chain-level
 idempotency key. The end-to-end guarantee is compositional: if every hop
 is individually idempotent (Commission's calculation dedup, `ADR-071
-§12`; F03's `idempotencyKey`, `ADR-070 §12`), redelivering any single
-event in the chain cannot produce a duplicate outcome anywhere downstream,
-because each domain independently refuses to reprocess what it has
-already processed.
+§12`; F03's `idempotencyKey`, `ADR-070 §12`; the explicit
+`PayrollService.disburse()` action's own advisory-lock/already-disbursed
+guard, `ADR-070 §9`), redelivering or re-invoking any single step in the
+chain cannot produce a duplicate outcome anywhere downstream, because each
+domain independently refuses to reprocess what it has already processed.
+This now explicitly includes disbursement, which — unlike every earlier
+hop — is a human-invoked action rather than an event-driven one, but
+carries the identical guarantee via the same pattern
+`SupplierPaymentService` already proves.
 
 ## 13. Transaction Boundaries
 
@@ -257,35 +296,52 @@ Event, never a shared transaction).
 
 ## 15. Retry / Reconciliation
 
-No new chain-level reconciliation job. Each domain's own reconciliation
-(`ADR-070 §15`, `ADR-071 §15`) is sufficient because ownership never
-overlaps (§8) — there is nothing for a chain-level reconciliation to
-detect that a domain-level one would miss, since no data is duplicated
-across domains, only referenced by immutable snapshot.
+No new chain-level reconciliation job — `ADR-070 §15`'s reconciliation
+query (`PayrollRun.posted` with no `POSTED` `FinancialEvent`) is already
+the chain's one financially-material gap detector, and it is sufficient:
+Commission and Attendance never post to GL (§16), so no reconciliation
+gap can originate anywhere in this chain except at that one point.
+`ADR-071 §15`'s own reconciliation (Commission's calculation dedup) is a
+business-correctness check, not a financial-posting one — the two are not
+redundant, they cover different failure classes, and neither needs a
+chain-level counterpart because ownership never overlaps (§8).
 
 ## 16. Financial Integration
 
-Exactly one GL entry point for this entire chain: Payroll's
-`payroll.run.posted` Financial Event (`ADR-070 §16`). Commission,
-Targets, and Attendance never post. This is the chain's single most
-important financial-control property: **however complex the upstream
-resolution (Commission's Rule Resolution Engine, Attendance's day-type
-determination), the GL only ever sees one balanced journal per
-`PayrollRun`, sourced through the one already-proven `resolveControlAccount`
-mechanism.**
+**Corrected per CTO Final Review (2026-09-20) — this was the exact
+phrasing the Final Review flagged as a P0 contradiction:** exactly one GL
+entry *point* for this entire chain exists — Payroll's `payroll.run.posted`
+Financial Event (`ADR-070 §16`); Commission, Targets, and Attendance never
+post. This is **not** the same claim as "the GL always ends up with a
+journal for every posted `PayrollRun`" — it does not, until
+`FinancialEvent.status` resolves `POSTED` (`ADR-070 §6`). The corrected,
+precise property: **however complex the upstream resolution (Commission's
+Rule Resolution Engine, Attendance's day-type determination), at most one
+balanced journal is ever produced per `PayrollRun` — never more than one
+(idempotency, `ADR-070 §12`) — and if one is produced at all, it is
+sourced through the one already-proven `resolveControlAccount` mechanism.
+Whether that one journal has actually been produced yet for a given
+`posted` `PayrollRun` is exactly what §15's reconciliation query answers —
+this section does not claim it is always already true.**
 
 ## 17. Period Control
 
 Three independent period concepts exist in this chain and are
 **deliberately not merged into one**: `CommissionApprovalBatch`'s period
 (Commission's own), `PayrollPeriod` (Payroll's own, monthly per `ADR-067
-§A`), and the Financial Period (Accounting's own, enforced automatically
-via `assertOpenForPosting` at the moment Payroll posts, `ADR-070 §17`).
-Alignment between a `PayrollPeriod` and the `CommissionApprovalBatch`
-periods it draws from is a **Payroll-side read-time concern** (`ADR-070
-§9`'s query is parameterized by the `PayrollRun`'s own period) — Commission
-does not need to know Payroll's period shape, only to expose approved
-results queryable by date range.
+§A`), and the Financial Period (Accounting's own). **Precision correction,
+consistent with `ADR-070 §17`:** the Financial Period check is enforced
+automatically via `assertOpenForPosting`, but not "at the moment Payroll
+posts" — `PayrollRun`'s own `posted` transition performs no period check
+at all (`ADR-070 §6`); the check fires later, inside the separate journal-
+posting transaction the Financial Event Handler runs. A closed period
+therefore does not block `PayrollRun.posted`, it blocks the *journal*,
+surfacing as exactly the reconciliation gap §15/§16 describe. Alignment
+between a `PayrollPeriod` and the `CommissionApprovalBatch` periods it
+draws from is a **Payroll-side read-time concern** (`ADR-070 §9`'s query
+is parameterized by the `PayrollRun`'s own period) — Commission does not
+need to know Payroll's period shape, only to expose approved results
+queryable by date range.
 
 ## 18. Correction / Immutability (cross-context rule)
 
@@ -319,10 +375,11 @@ was calculated, regardless of what has been corrected since.
 2. That `CommissionResult`, once its batch is FA-01-approved, is readable
    by Payroll's `listApprovedCommissionResults` and appears on the
    corresponding employee's `PayrollRunLine.commissionAmount`.
-3. The same `PayrollRun`, once `posted`, produces exactly one balanced GL
-   journal crediting `wages_payable` — traceable back through
-   `PayrollRunLine` → `CommissionResult` → the originating `Invoice`/
-   `Collection`.
+3. The same `PayrollRun`, once its `FinancialEvent` resolves `POSTED`
+   (**not** merely once `PayrollRun.status = 'posted'` — corrected per CTO
+   Final Review, §16), has produced exactly one balanced GL journal
+   crediting `wages_payable` — traceable back through `PayrollRunLine` →
+   `CommissionResult` → the originating `Invoice`/`Collection`.
 
 **Chain B — Attendance → Day Type → Pay Impact:**
 4. An `Employee` with an approved-leave day, a genuine unexplained absence
@@ -340,6 +397,18 @@ was calculated, regardless of what has been corrected since.
    decision point from `Employee` to `GL` for one transaction, using only
    `AuditService` records plus the `CommissionResult`/`PayrollRunLine`
    snapshots — no gap requiring a live re-query of upstream data.
+7. **New, per CTO Final Review:** end to end, a `PayrollRun` that reaches
+   `posted` while its `FinancialEvent` is rejected (e.g. a deactivated
+   `wages_payable`) is (a) still visible as `posted` on the Payroll side,
+   (b) surfaced by `ADR-070 §15`'s reconciliation query as an unresolved
+   gap, and (c) blocks `PayrollService.disburse()` for that run —
+   proving the full chain, not just ADR-070 in isolation, correctly keeps
+   "Payroll finalized" and "money should move" as two distinct gates.
+8. **New:** once the control account is reactivated and the outbox retry
+   succeeds, the same run's `FinancialEvent` resolves `POSTED`, the
+   reconciliation query stops flagging it, and `disburse()` then succeeds
+   — proving the gap is transient and self-healing, not a dead end
+   requiring manual GL intervention.
 
 ## 20. Non-Goals
 
