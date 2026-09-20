@@ -114,6 +114,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   // V1 subscribed-but-IGNORED (no publisher exists yet / out of Financial Core's scope)
   'return.completed',
   'customer.refund.adjusted',
+  // ADR-070 — Payroll's own GL entry point (real handler, see finance-handlers.ts)
+  'payroll.run.posted',
 ] as const;
 
 @Injectable()

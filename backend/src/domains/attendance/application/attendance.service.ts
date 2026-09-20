@@ -667,6 +667,11 @@ export class AttendanceService implements OnModuleInit {
     return this.days.find({ where: employeeId ? { employeeId } : {}, order: { calendarDate: 'DESC' } });
   }
 
+  /** ADR-070 §9 — the one additive, read-only method Payroll's own contract requires: `attendance.period.approved`'s payload carries no per-employee facts, so Payroll resolves the approved days for a batch through this instead of reading raw attendance data directly. */
+  async listApprovedDaysByBatch(batchId: string): Promise<AttendanceDay[]> {
+    return this.days.find({ where: { batchId }, order: { calendarDate: 'ASC' } });
+  }
+
   // ---------------------------------------------------------------------------
   // Approval batches — ADR-065 §5, FA-01, zero new mechanism.
   // ---------------------------------------------------------------------------

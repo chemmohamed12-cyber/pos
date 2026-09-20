@@ -42,6 +42,8 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   'accounting.ap.adjustment.approved': 'accounting',
   // F06 — internal (ADR-038; same pattern as F04/F05 above)
   'accounting.cash.adjustment.approved': 'accounting',
+  // ADR-070 — Payroll's own GL entry point
+  'payroll.run.posted': 'payroll',
 };
 
 export interface IngestResult {

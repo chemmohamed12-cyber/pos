@@ -24,11 +24,16 @@ export type ControlFunction =
   // Cr AP) — a receipt-based-recognition control account, same "F02 only marks it, the owning
   // domain's reconciliation enforces it" discipline as every other control function here. Not
   // singleton — mirrors `ap`/`ar`.
-  | 'wip'; // Work-in-Process control — ADR-061 (Manufacturing). Marks the asset account every
+  | 'wip' // Work-in-Process control — ADR-061 (Manufacturing). Marks the asset account every
   // Manufacturing movement (Material Issue, Material Return, Finished Goods Output) reclassifies
   // Inventory into/out of — same "F02 only marks it, the owning domain's reconciliation enforces
   // it" discipline as `grni`. Not singleton — an installation may hold several WIP accounts (e.g.
   // split by warehouse or product line), same as `bank`/`grni`.
+  | 'wages_payable'; // Payroll liability control — ADR-070 §16. Marks the account a
+  // `payroll.run.posted` Financial Event credits (Dr Salaries & Wages Expense / Cr this account).
+  // Same "F02 only marks it" discipline as `grni`/`wip`. Not singleton. Tax/social-insurance
+  // control functions are deliberately NOT added here — ADR-067 §E ratified the boundary only,
+  // not the rates; nothing exists to post yet.
 
 export const CONTROL_FUNCTIONS: readonly ControlFunction[] = [
   'ar',
@@ -43,6 +48,7 @@ export const CONTROL_FUNCTIONS: readonly ControlFunction[] = [
   'fixed_asset',
   'grni',
   'wip',
+  'wages_payable',
 ] as const;
 
 /**

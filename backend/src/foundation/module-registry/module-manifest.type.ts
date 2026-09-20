@@ -29,7 +29,7 @@
  * Phase 1) — a genuinely new module, never previously reserved (see
  * `ADR-062 §0`), not a promotion out of `ReservedModuleCode`.
  */
-export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'manufacturing' | 'attendance';
+export type ModuleCode = 'core' | 'sales' | 'inventory' | 'logistics' | 'finance' | 'reporting' | 'hr' | 'accounting' | 'procurement' | 'manufacturing' | 'attendance' | 'payroll';
 
 /** A module_code a manifest may actually declare (`core` has no authored manifest — §3.2). */
 export type AuthoredModuleCode = Exclude<ModuleCode, 'core'>;
@@ -45,8 +45,7 @@ export type ReservedModuleCode =
   | 'pos'
   | 'projects'
   | 'assets'
-  | 'operations'
-  | 'payroll';
+  | 'operations';
 
 /** The curated, closed list of permission-node action verbs (ADR-024 §3.1, D-P1-3). */
 export type PermissionActionVerb =
@@ -153,7 +152,7 @@ export interface ModuleManifest {
   readonly public_contract: ModulePublicContract;
 }
 
-/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `manufacturing` per ADR-061, + `attendance` per ADR-065). */
+/** The frozen V1 list (ADR-024 §2, + `hr` per ADR-029, + `accounting` per ADR-032, + `procurement` per ADR-048, + `manufacturing` per ADR-061, + `attendance` per ADR-065, + `payroll` per ADR-070). */
 export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'core',
   'sales',
@@ -166,16 +165,11 @@ export const V1_MODULE_CODES: readonly ModuleCode[] = [
   'procurement',
   'manufacturing',
   'attendance',
-] as const;
-
-/** Reserved, not built, not designed (ADR-024 §2.1; 5 codes as of ADR-029/ADR-032/ADR-048/ADR-061 promoting `hr`/`accounting`/`procurement`/`manufacturing` out). */
-export const RESERVED_MODULE_CODES: readonly ReservedModuleCode[] = [
-  'pos',
-  'projects',
-  'assets',
-  'operations',
   'payroll',
 ] as const;
+
+/** Reserved, not built, not designed (ADR-024 §2.1; `hr`/`accounting`/`procurement`/`manufacturing` promoted out by ADR-029/ADR-032/ADR-048/ADR-061; `payroll` promoted out by ADR-070 — ADR-070 §2's own module-promotion mechanism). */
+export const RESERVED_MODULE_CODES: readonly ReservedModuleCode[] = ['pos', 'projects', 'assets', 'operations'] as const;
 
 /** The closed action-verb list (D-P1-3). */
 export const PERMISSION_ACTION_VERBS: readonly PermissionActionVerb[] = [
