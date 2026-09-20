@@ -77,10 +77,16 @@ the consequence).
   `PayrollRun`'s `calculate` step ran (§5). A `CommissionResult` approved
   *after* a `PayrollRun` already calculated is **not** retroactively
   pulled into that run (§18).
-- No `PayrollRun` may reach `posted` while any `CommissionResult` it
-  consumed has since been reversed by a `CommissionAdjustment` dated
-  before the `PayrollRun`'s own `approved` transition — this is a
-  point-in-time consistency check, not a live re-validation (§14).
+- **Corrected per §13's automatic-posting review (2026-09-20):** a
+  `CommissionResult` being reversed by a `CommissionAdjustment` after a
+  `PayrollRun` has already consumed it is **not** a condition that blocks
+  or delays that `PayrollRun`'s own `approved → posted` transition — per
+  `ADR-070 §5`, that transition is automatic and unconditional on FA-01
+  approval, with no secondary Commission-side gate. This scenario is
+  handled entirely by §14's fail-forward rule instead: the reversal's
+  financial consequence flows into the first eligible *future* run, and
+  the original `PayrollRun`/journal is never reopened, blocked, or
+  retroactively altered because of it.
 - `AttendanceDay` facts consumed by a `PayrollRun` are always read via
   `ADR-070 §9`'s `listApprovedDaysByBatch` — never raw `AttendanceRawRecord`
   data, preserving `ADR-062 §8`'s facts-only boundary across this entire
@@ -205,14 +211,37 @@ Event, never a shared transaction).
 ## 14. Failure Modes (cross-context)
 
 - **A `CommissionResult` is adjusted (`CommissionAdjustment`) after the
-  `PayrollRun` that consumed its original value has already posted:** the
-  posted `PayrollRun` is **not** reopened or retroactively corrected by
-  this event. The adjustment amount flows into a **future** `PayrollRun`
-  as its own `PayrollAdjustment`/earning line — the same "corrections are
-  new records, never retroactive overwrites" discipline both `ADR-070
-  §18` and `ADR-071 §18` already independently established, now stated as
-  a cross-context rule: **a downstream domain's immutability is never
-  broken by an upstream domain's later correction.**
+  `PayrollRun` that consumed its original value has already posted —
+  corrected per CTO review (2026-09-20):** the posted `PayrollRun` is
+  **not** reopened, retroactively rewritten, or retroactively re-posted to
+  GL by this event — that rule is unchanged and absolute. What is
+  corrected here is *where the adjustment lands*: not necessarily "the
+  next calendar-period run" — it is the **first Payroll Run still
+  eligible to consume it** (a run that has not yet reached `posted`,
+  whichever period that turns out to be — ordinarily the next one, but
+  not defined as "next" by calendar position). That run picks up the
+  `CommissionAdjustment` as its own explicit `PayrollAdjustment`/earning
+  line (`ADR-070 §18`'s own correction shape) — a deliberate, visible
+  treatment, never silently blended into a recalculated total. The
+  binding cross-context rule, stated precisely:
+  ```
+  Commission Correction
+          ↓
+  New immutable correction/result (CommissionAdjustment, never mutates the original)
+          ↓
+  First eligible Payroll Run (not-yet-posted; not assumed to be "next period")
+          ↓
+  Explicit adjustment/earning treatment on that run
+  ```
+  and, unconditionally, never any of: reopening a posted `PayrollRun`,
+  retroactively rewriting a posted `PayrollRun`, or retroactively
+  rewriting a posted GL journal. This is the same "corrections are new
+  records, never retroactive overwrites" discipline both `ADR-070 §18`
+  and `ADR-071 §18` already independently established, now stated as one
+  cross-context rule: **a downstream domain's immutability is never
+  broken by an upstream domain's later correction — the correction always
+  moves forward to the next thing that can still consume it, never
+  backward into something already closed.**
 - **A `CommissionApprovalBatch` approves after a `PayrollRun` already
   calculated (but before it posted):** the newly-approved results are
   **not** pulled into the already-calculating run — `ADR-070 §12`'s
@@ -261,17 +290,23 @@ results queryable by date range.
 ## 18. Correction / Immutability (cross-context rule)
 
 **The chain-wide rule, stated once here because both `ADR-070 §18` and
-`ADR-071 §18` independently need it stated consistently:** every domain
-in this chain produces immutable, snapshot-based results
-(`AttendanceDay` via its approval batch, `CommissionResult`, `PayrollRunLine`)
-that are never retroactively altered by an upstream correction. A
-correction always creates a **new** record in the domain where the
-correction originates, and — if it has downstream financial consequence —
-flows forward into the **next** period's processing in the consuming
-domain, never backward into an already-approved/posted one. This is what
-makes the chain auditable end to end: at any point in the past, replaying
-what each domain knew *at that time* reproduces exactly what was
-calculated, regardless of what has been corrected since.
+`ADR-071 §18` independently need it stated consistently — precision
+corrected per CTO review (2026-09-20):** every domain in this chain
+produces immutable, snapshot-based results (`AttendanceDay` via its
+approval batch, `CommissionResult`, `PayrollRunLine`) that are never
+retroactively altered by an upstream correction. A correction always
+creates a **new** record in the domain where the correction originates,
+and — if it has downstream financial consequence — flows forward into the
+**first eligible** (not-yet-posted) unit of processing in the consuming
+domain — not defined as "the next calendar period," which would wrongly
+suggest a fixed time offset rather than "whichever unit of work can still
+accept it." It never flows backward into an already-approved/posted one:
+**reopening a posted `PayrollRun`, retroactively rewriting a posted
+`PayrollRun`, and retroactively rewriting a posted GL journal are each,
+independently, permanently prohibited — not merely discouraged.** This is
+what makes the chain auditable end to end: at any point in the past,
+replaying what each domain knew *at that time* reproduces exactly what
+was calculated, regardless of what has been corrected since.
 
 ## 19. E2E Acceptance Criteria
 
