@@ -227,12 +227,31 @@ the same "evidence, not a working copy" discipline `ADR-062 §3` and
 
 ## 12. Idempotency
 
-- `CommissionResult` calculation from a given source event is idempotent
-  by construction: a redelivered `finance.invoice.posted`/`collection.
-  recorded` event for an already-processed transaction must not produce a
-  second `CommissionResult` — enforced by a unique constraint on
-  `(sourceTransactionRefs, resolvedPolicyId)` or an equivalent dedup key,
-  Implementation detail per §21.
+- **Invariant, corrected per CTO review (2026-09-20) — not a schema:**
+  every Commission-triggering source event must carry a deterministic
+  identity that guarantees idempotent processing across event redelivery.
+  This identity must at minimum distinguish between the four kinds of
+  event that can trigger Commission processing, since each has a
+  different natural source-of-truth for what "the same event" means:
+  - an **Invoice** event (identity keyed to the invoice),
+  - a **Collection** event (identity keyed to the collection/receipt, not
+    the invoice it applies to — a single invoice can have several
+    collections, each its own distinct trigger),
+  - a **Correction/Adjustment** (identity keyed to the `CommissionAdjustment`
+    itself, never conflated with the original `CommissionResult`'s own
+    identity — §18's immutability already requires these to be separate
+    records, so their idempotency keys must be separate too), and
+  - a **Recalculation** (identity keyed to the specific recalculation run,
+    never silently reusing the original calculation's key — a
+    recalculation is a deliberate, distinct, auditable event, not a retry
+    of the original).
+  A redelivery of any one of these four must be a safe no-op; two
+  *different* ones sharing a transaction reference (e.g. an Invoice and a
+  later Collection against it) must **not** collide as if they were the
+  same trigger. The exact key/constraint shape that satisfies this
+  invariant (a composite unique index, a generated hash, or another
+  mechanism) is Implementation detail, not fixed by this contract — only
+  the invariant itself is binding, per instruction.
 - `Target`/`CommissionApprovalBatch` numbering via `NumberingService`,
   same pattern as every other numbered document.
 - FA-01 submission failure recovery follows the exact pattern `commit
