@@ -47,6 +47,12 @@ import { PayrollCompensation } from './pages/payroll/PayrollCompensation';
 import { PayrollRuns } from './pages/payroll/PayrollRuns';
 import { PayrollRunDetail } from './pages/payroll/PayrollRunDetail';
 import { PayrollCover } from './pages/covers/PayrollCover';
+import { Targets } from './pages/targets/Targets';
+import { TargetsCover } from './pages/covers/TargetsCover';
+import { CommissionPolicies } from './pages/commission/CommissionPolicies';
+import { CommissionResults } from './pages/commission/CommissionResults';
+import { CommissionBatches } from './pages/commission/CommissionBatches';
+import { CommissionCover } from './pages/covers/CommissionCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
 import { ChartOfAccounts } from './pages/accounting/ChartOfAccounts';
 import { Journals } from './pages/accounting/Journals';
@@ -232,6 +238,12 @@ function AppRoutes() {
         <Route path="payroll/compensation" element={<PayrollCompensation />} />
         <Route path="payroll/runs" element={<PayrollRuns />} />
         <Route path="payroll/runs/:id" element={<PayrollRunDetail />} />
+        <Route path="targets" element={<TargetsCover />} />
+        <Route path="targets/targets" element={<Targets />} />
+        <Route path="commission" element={<CommissionCover />} />
+        <Route path="commission/policies" element={<CommissionPolicies />} />
+        <Route path="commission/results" element={<CommissionResults />} />
+        <Route path="commission/batches" element={<CommissionBatches />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="accounting/journals" element={<Journals />} />

@@ -169,6 +169,20 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/payroll/runs', code: 'nav.payroll_runs', roles: ['admin'] },
     ],
   },
+  {
+    code: 'module.targets',
+    coverTo: '/targets',
+    items: [{ to: '/targets/targets', code: 'nav.targets', roles: ['admin'] }],
+  },
+  {
+    code: 'module.commission',
+    coverTo: '/commission',
+    items: [
+      { to: '/commission/policies', code: 'nav.commission_policies', roles: ['admin'] },
+      { to: '/commission/results', code: 'nav.commission_results', roles: ['admin'] },
+      { to: '/commission/batches', code: 'nav.commission_batches', roles: ['admin'] },
+    ],
+  },
   { code: '', items: [{ to: '/reports-overview', code: 'nav.reports' }] },
   {
     code: 'nav_group.administration',
