@@ -5,6 +5,8 @@ import { PayrollService } from './payroll.service';
 import { HrService } from '../../hr/application/hr.service';
 import { AttendanceService } from '../../attendance/application/attendance.service';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
+import { TreasuryService } from '../../treasury/application/treasury.service';
+import { FinancialEventService } from '../../accounting/application/financial-events/financial-event.service';
 
 /**
  * ADR-070 (Payroll Phase 1) — proves the ratified `ADR-067` decisions
@@ -24,6 +26,8 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
   let hr: HrService;
   let attendance: AttendanceService;
   let approvals: ApprovalEngineService;
+  let treasury: TreasuryService;
+  let financialEvents: FinancialEventService;
   let dataSource: DataSource;
 
   const ADMIN_A = 'e1d5fd90-6e1c-4f52-aac7-60dd6265aa80';
@@ -37,6 +41,8 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
     hr = moduleRef.get(HrService);
     attendance = moduleRef.get(AttendanceService);
     approvals = moduleRef.get(ApprovalEngineService);
+    treasury = moduleRef.get(TreasuryService);
+    financialEvents = moduleRef.get(FinancialEventService);
     dataSource = moduleRef.get(DataSource);
 
     // ADR-070 §16 — a `wages_payable` control account must exist for the Financial Event to post
@@ -59,10 +65,20 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
   });
 
   async function makePeriod(label: string): Promise<{ id: string; startDate: string; endDate: string }> {
-    const startDate = `2027-0${label}-01`;
-    const endDate = `2027-0${label}-28`;
+    const month = label.padStart(2, '0');
+    const startDate = `2027-${month}-01`;
+    const endDate = `2027-${month}-28`;
     const period = await payroll.createPeriod({ code: shortName('PP'), startDate, endDate }, ADMIN_A);
     return { id: period.id, startDate, endDate };
+  }
+
+  /** A fresh, dedicated, funded Treasury account — never a shared fixture, matching this program's own established discipline. */
+  async function makeFundedTreasuryAccount(amount: string): Promise<string> {
+    const suffix = shortName('');
+    const accountType = await treasury.createAccountType(`PTYPE-${suffix}`, `Payroll Test Type ${suffix}`, ADMIN_A);
+    const account = await treasury.createAccount(`PACC-${suffix}`, `Payroll Test Account ${suffix}`, accountType.id, ADMIN_A);
+    await treasury.cashIn(account.id, amount, null, null, 'test funding', 'payroll test fixture', ADMIN_A);
+    return account.id;
   }
 
   it('1. calculate() computes Gross Pay from componentized Earnings (never a single figure) for an eligible employee', async () => {
@@ -233,5 +249,95 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
     const { lines: linesAfter } = await payroll.getRun(run.id);
     expect(linesAfter.find((l) => l.employeeId === emp.id)!.grossPay).toBe(originalGross); // untouched
+  }, 30_000);
+
+  it('9. Disbursement (ADR-070 §9/§13): succeeds only once FinancialEvent.status = POSTED, moves Treasury funds, reduces Wages Payable balance, and is idempotent against a second call', async () => {
+    const emp = await hr.createEmployee({ fullName: shortName('PayDisburse'), employmentType: 'full_time' }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '3000.00' }] }, ADMIN_A);
+    const period = await makePeriod('9');
+    // calculate() is company-wide (ADR-070's own Phase 1 scope) — this dev DB accumulates every
+    // employee/compensation this whole suite has ever created across every run, so this run's
+    // total is NOT just this one employee's 3000. Funded generously; every assertion below is
+    // scoped to THIS employee's own treasury row, never an aggregate, so it stays correct
+    // regardless of how many other employees the run also swept in.
+    const treasuryAccountId = await makeFundedTreasuryAccount('100000000.00');
+
+    const run = await payroll.calculate(period.id, ADMIN_A);
+    await payroll.review(run.id, ADMIN_A);
+    const submitted = await payroll.submitForApproval(run.id, ADMIN_A);
+    await approvals.decide(submitted.approvalRequestId!, SECOND_APPROVER, 'approved', null);
+
+    const [event]: Array<{ status: string }> = await dataSource.query(
+      `SELECT status FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+      [run.id],
+    );
+    expect(event.status.toUpperCase()).toBe('POSTED'); // the gate disburse() itself checks
+
+    const disbursed = await payroll.disburse(run.id, treasuryAccountId, ADMIN_A);
+    expect(disbursed.disbursedAt).toBeTruthy();
+
+    const treasuryRows: Array<{ employeeId: string; payrollRunId: string; amount: string; type: string }> = await dataSource.query(
+      `SELECT "employeeId", "payrollRunId", amount, type FROM treasury_transactions WHERE "payrollRunId" = $1 AND "employeeId" = $2`,
+      [run.id, emp.id],
+    );
+    expect(treasuryRows).toHaveLength(1); // exactly one leg for THIS employee
+    expect(treasuryRows[0].type).toBe('cash_out');
+    expect(Number(treasuryRows[0].amount)).toBeCloseTo(3000, 2); // real Treasury movement, this employee's own net pay
+
+    // Idempotency / duplicate-disbursement prevention.
+    await expect(payroll.disburse(run.id, treasuryAccountId, ADMIN_A)).rejects.toThrow(/already been disbursed/);
+    const treasuryRowsAfterRetry = await dataSource.query(`SELECT id FROM treasury_transactions WHERE "payrollRunId" = $1 AND "employeeId" = $2`, [run.id, emp.id]);
+    expect(treasuryRowsAfterRetry).toHaveLength(1); // no duplicate leg created for this employee
+  }, 30_000);
+
+  it('10. Disbursement gate: refused while FinancialEvent has not resolved POSTED — never based on PayrollRun.posted alone (ADR-070 §9)', async () => {
+    const emp = await hr.createEmployee({ fullName: shortName('PayGate'), employmentType: 'full_time' }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '1800.00' }] }, ADMIN_A);
+    const period = await makePeriod('10');
+    const treasuryAccountId = await makeFundedTreasuryAccount('100000000.00');
+
+    // Deactivate the wages_payable account to force the Financial Event into REJECTED.
+    await dataSource.query(`UPDATE accounting_gl_accounts SET "isActive" = false WHERE "controlFunction" = 'wages_payable'`);
+    try {
+      const run = await payroll.calculate(period.id, ADMIN_A);
+      await payroll.review(run.id, ADMIN_A);
+      const submitted = await payroll.submitForApproval(run.id, ADMIN_A);
+      await approvals.decide(submitted.approvalRequestId!, SECOND_APPROVER, 'approved', null);
+
+      const { run: postedRun } = await payroll.getRun(run.id);
+      expect(postedRun.status).toBe('posted'); // Payroll-side, unconditional (ADR-070 §5)
+
+      const gaps = await payroll.listReconciliationGaps();
+      expect(gaps.some((g) => g.payrollRunId === run.id)).toBe(true); // flagged, not hidden
+
+      const [eventRejected]: Array<{ id: string; status: string }> = await dataSource.query(
+        `SELECT id, status FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+        [run.id],
+      );
+      expect(eventRejected.status.toUpperCase()).toBe('REJECTED');
+
+      await expect(payroll.disburse(run.id, treasuryAccountId, ADMIN_A)).rejects.toThrow(/has not resolved POSTED/);
+
+      // Reactivate, then explicitly re-drive the REJECTED event (F03's own recovery mechanism,
+      // financial-event.service.ts:174 — a REJECTED result is a terminal outbox outcome, NOT
+      // auto-retried by dispatchPending(); redrive() re-runs the same handler against the same
+      // FinancialEvent row) — the self-healing proof (ADR-072 §19 items 7-8).
+      await dataSource.query(`UPDATE accounting_gl_accounts SET "isActive" = true WHERE "controlFunction" = 'wages_payable'`);
+      await financialEvents.redrive(eventRejected.id);
+
+      const [eventAfterRetry]: Array<{ status: string }> = await dataSource.query(
+        `SELECT status FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+        [run.id],
+      );
+      expect(eventAfterRetry.status.toUpperCase()).toBe('POSTED'); // self-healed
+
+      const gapsAfterRetry = await payroll.listReconciliationGaps();
+      expect(gapsAfterRetry.some((g) => g.payrollRunId === run.id)).toBe(false); // no longer flagged
+
+      const disbursedAfterRetry = await payroll.disburse(run.id, treasuryAccountId, ADMIN_A);
+      expect(disbursedAfterRetry.disbursedAt).toBeTruthy(); // now succeeds
+    } finally {
+      await dataSource.query(`UPDATE accounting_gl_accounts SET "isActive" = true WHERE "controlFunction" = 'wages_payable'`);
+    }
   }, 30_000);
 });

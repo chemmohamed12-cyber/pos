@@ -103,6 +103,23 @@ export interface FinanceTreasuryContract {
     manager?: EntityManager,
   ): Promise<{ id: string }>;
 
+  /**
+   * ADR-070 §9 — the payroll-side counterpart to `cashOutForSupplier`,
+   * for `payroll`'s `PayrollService.disburse()` to reach Treasury through
+   * this contract instead of importing the concrete `TreasuryService`.
+   * Only `.id` of the created transaction is ever read by callers.
+   */
+  cashOutForEmployee(
+    accountId: string,
+    amount: string,
+    employeeId: string | null,
+    payrollRunId: string | null,
+    reference: string | null,
+    reason: string | null,
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<{ id: string }>;
+
   /** P4 Tranche-2 (delivery domain) — only `out.id` of the pair is ever read. F09-H3 (ADR-042 D3c) — see `cashIn`'s own doc comment for the additive `manager?` parameter. */
   transfer(
     sourceAccountId: string,

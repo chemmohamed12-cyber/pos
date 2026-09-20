@@ -50,6 +50,15 @@ export class TreasuryTransaction {
   @Column({ type: 'uuid', nullable: true })
   supplierInvoiceId!: string | null;
 
+  /** ADR-070 §9 — the payroll-side counterpart to `supplierId`/`supplierInvoiceId`, for `cashOutForEmployee`. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  employeeId!: string | null;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  payrollRunId!: string | null;
+
   @Index()
   @Column({ type: 'uuid', nullable: true })
   depositId!: string | null;

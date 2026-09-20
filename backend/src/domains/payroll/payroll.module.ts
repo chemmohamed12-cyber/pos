@@ -19,6 +19,7 @@ import { ProcessEngineModule } from '../../foundation/process-engine/process-eng
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { HrModule } from '../hr/hr.module';
 import { AttendanceModule } from '../attendance/attendance.module';
+import { TreasuryModule } from '../treasury/treasury.module';
 
 /**
  * ADR-070 — `payroll`'s composition root, Phase 1. `HrModule` (Employee
@@ -50,6 +51,7 @@ import { AttendanceModule } from '../attendance/attendance.module';
     NumberingModule,
     HrModule,
     AttendanceModule,
+    TreasuryModule,
   ],
   controllers: [PayrollController],
   providers: [PayrollService],

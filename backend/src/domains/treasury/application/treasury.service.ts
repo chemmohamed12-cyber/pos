@@ -322,6 +322,9 @@ export class TreasuryService implements FinanceTreasuryContract {
       /** OP-Procurement/AP Blueprint, Decision 1 (Option A) — optional; omitted by every pre-existing caller. */
       supplierId?: string | null;
       supplierInvoiceId?: string | null;
+      /** ADR-070 §9 — optional; omitted by every pre-existing caller. */
+      employeeId?: string | null;
+      payrollRunId?: string | null;
       depositId: string | null;
       transferGroupId: string | null;
       reference: string | null;
@@ -494,6 +497,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     opts: GlEmitOpts,
     manager?: EntityManager,
     supplierRef?: { supplierId: string | null; supplierInvoiceId: string | null },
+    payrollRef?: { employeeId: string | null; payrollRunId: string | null },
   ): Promise<TreasuryTransaction> {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
     const account = await this.getAccount(accountId);
@@ -510,6 +514,8 @@ export class TreasuryService implements FinanceTreasuryContract {
         salesOrderId,
         supplierId: supplierRef?.supplierId ?? null,
         supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null,
+        employeeId: payrollRef?.employeeId ?? null,
+        payrollRunId: payrollRef?.payrollRunId ?? null,
         depositId: null,
         transferGroupId: null,
         reference,
@@ -531,7 +537,16 @@ export class TreasuryService implements FinanceTreasuryContract {
       resourceId: txn.id,
       result: 'success',
       correlationId: null,
-      after: { accountId, amount, customerId, salesOrderId, supplierId: supplierRef?.supplierId ?? null, supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null },
+      after: {
+        accountId,
+        amount,
+        customerId,
+        salesOrderId,
+        supplierId: supplierRef?.supplierId ?? null,
+        supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null,
+        employeeId: payrollRef?.employeeId ?? null,
+        payrollRunId: payrollRef?.payrollRunId ?? null,
+      },
     });
     return txn;
   }
@@ -676,6 +691,28 @@ export class TreasuryService implements FinanceTreasuryContract {
     manager?: EntityManager,
   ): Promise<TreasuryTransaction> {
     return this.cashOutCore(accountId, amount, null, null, reference, reason, actorUserId, NO_EMIT, manager, { supplierId, supplierInvoiceId });
+  }
+
+  /**
+   * ADR-070 §9 — the payroll-side counterpart to `cashOutForSupplier`,
+   * for `PayrollService.disburse()` to reach Treasury through this
+   * contract instead of importing the concrete `TreasuryService`. Only
+   * `.id` of the created transaction is ever read by callers. Non-emitting
+   * (`NO_EMIT`) — the GL effect (Dr Wages Payable) was already posted by
+   * `payroll.run.posted`'s own Financial Event; this leg is the cash
+   * movement only, matching `cashOutForSupplier`'s identical shape.
+   */
+  async cashOutForEmployee(
+    accountId: string,
+    amount: string,
+    employeeId: string | null,
+    payrollRunId: string | null,
+    reference: string | null,
+    reason: string | null,
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<{ id: string }> {
+    return this.cashOutCore(accountId, amount, null, null, reference, reason, actorUserId, NO_EMIT, manager, undefined, { employeeId, payrollRunId });
   }
 
   /**

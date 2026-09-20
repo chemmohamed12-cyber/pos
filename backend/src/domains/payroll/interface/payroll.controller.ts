@@ -45,6 +45,11 @@ class CalculateDto {
   payrollPeriodId!: string;
 }
 
+class DisburseDto {
+  @IsUUID()
+  treasuryAccountId!: string;
+}
+
 class CreateAdjustmentDto {
   @IsUUID()
   originalPayrollRunLineId!: string;
@@ -149,6 +154,14 @@ export class PayrollController {
   @Get('reconciliation-gaps')
   async listReconciliationGaps() {
     return this.payroll.listReconciliationGaps();
+  }
+
+  /** ADR-070 §9 — a distinct permission node from `payroll.run.approve`; SoD may require different actors to hold the two. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('payroll.run.disburse', 'editable')
+  @Post('runs/:id/disburse')
+  async disburse(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DisburseDto, @Req() req: AuthenticatedRequest) {
+    return this.payroll.disburse(id, dto.treasuryAccountId, req.user.id);
   }
 
   @UseGuards(PermissionGuard)

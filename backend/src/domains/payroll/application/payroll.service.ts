@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
+import { FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { PayrollPeriod } from '../infrastructure/payroll-period.entity';
 import { PayrollCompensation } from '../infrastructure/payroll-compensation.entity';
 import { PayrollEarningLine } from '../infrastructure/payroll-earning-line.entity';
@@ -88,6 +89,7 @@ export class PayrollService implements OnModuleInit {
     private readonly numbering: NumberingService,
     private readonly hr: HrService,
     private readonly attendance: AttendanceService,
+    @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -459,6 +461,62 @@ export class PayrollService implements OnModuleInit {
         AND (fe.id IS NULL OR fe.status NOT IN ('POSTED'))
     `);
     return rows.map((r) => ({ payrollRunId: r.id, code: r.code }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Disbursement — ADR-070 §9/§13. A separate, explicitly human-invoked
+  // action, never automatic — mirrors the existing, already-proven
+  // `SupplierPaymentService.recordPayment` precedent exactly (its own
+  // dedicated controller endpoint, never auto-cascaded from GL posting).
+  // Gated on `FinancialEvent.status = 'POSTED'`, never on
+  // `PayrollRun.postedAt` alone (ADR-070 §6's invariant is precisely why
+  // this check is mandatory).
+  // ---------------------------------------------------------------------------
+
+  async disburse(runId: string, treasuryAccountId: string, actorUserId: string): Promise<PayrollRun> {
+    const run = await this.runs.findOne({ where: { id: runId } });
+    if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
+    if (run.status !== 'posted') throw new ConflictException(`PayrollRun "${runId}" must be "posted" before disbursement (current: "${run.status}").`);
+    if (run.disbursedAt) throw new ConflictException(`PayrollRun "${runId}" has already been disbursed.`);
+
+    const [event]: Array<{ status: string }> = await this.dataSource.query(
+      `SELECT status FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+      [runId],
+    );
+    if (!event || event.status.toUpperCase() !== 'POSTED') {
+      throw new ConflictException(
+        `PayrollRun "${runId}" cannot be disbursed — its Financial Event has not resolved POSTED (current: "${event?.status ?? 'none — not yet dispatched'}"). ADR-070 §9: disbursement never proceeds on PayrollRun.posted alone.`,
+      );
+    }
+
+    const lines = await this.runLines.find({ where: { payrollRunId: runId } });
+
+    await this.dataSource.transaction(async (manager) => {
+      // Advisory lock + a fresh re-check inside the transaction — the same idempotency/
+      // duplicate-disbursement guard shape SupplierPaymentService.recordPayment already proves.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:disburse:${runId}`]);
+      const fresh = await manager.getRepository(PayrollRun).findOne({ where: { id: runId } });
+      if (fresh?.disbursedAt) throw new ConflictException(`PayrollRun "${runId}" has already been disbursed.`);
+
+      for (const line of lines) {
+        await this.treasury.cashOutForEmployee(treasuryAccountId, line.netPay, line.employeeId, runId, `Payroll ${run.code}`, 'payroll_disbursement', actorUserId, manager);
+      }
+
+      run.disbursedAt = new Date();
+      await manager.getRepository(PayrollRun).save(run);
+    });
+
+    await this.audit.record({
+      actorUserId,
+      organizationId: null,
+      action: 'payroll.run.disbursed',
+      resource: 'payroll_run',
+      resourceId: runId,
+      result: 'success',
+      correlationId: null,
+      after: { treasuryAccountId, employeeCount: lines.length, totalNet: lines.reduce((s, l) => s + Number(l.netPay), 0).toFixed(2) },
+    });
+    return run;
   }
 
   // ---------------------------------------------------------------------------
