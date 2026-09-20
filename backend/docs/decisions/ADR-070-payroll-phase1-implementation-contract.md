@@ -94,11 +94,24 @@ approved   --post-->       posted     (terminal — §18 governs everything afte
 `transition()`'s own row lock (`FOR UPDATE` on the process instance,
 `process-engine.service.ts:104`) is the concurrency guard preventing two
 simultaneous `calculate`/`approve`/`post` calls on the same run — no new
-locking mechanism is introduced. `approved → posted` fires from the same
-`onApprovalApproved`-shaped event handler `FiscalPeriodService` and
-Attendance's own approval-batch flow already use — FA-01's
-`approval.request.approved` event is the trigger, not a direct caller
-transition, exactly mirroring `ADR-069 §1`'s approval-batch pattern.
+locking mechanism is introduced.
+
+**Explicit statement, per CTO review (2026-09-20): Approval is not
+Posting.** `reviewed → approved` is the one and only human control point
+— the FA-01 maker/checker decision (§10). `approved → posted` is **not**
+a second human decision; it is the deterministic, automatic system
+consequence of that decision, fired by the same `approval.request.
+approved` event handler shape `FiscalPeriodService.onApprovalApproved` →
+`applyApprovedPeriodTransition` (`fiscal-period.service.ts:461-467`) and
+Attendance's own `onApprovalApproved` (`attendance.service.ts:531-545`,
+`ADR-069 §1`) already use for every other FA-01-gated state transition in
+this codebase. This is now stated explicitly, not left implicit: the
+checker's approval decision *is* the control; `post` firing immediately
+and automatically afterward is a reused, already-precedented pattern, not
+a new one, and does not create a second, unreviewed path to a financial
+posting — nothing can reach `posted` without first passing through the
+one FA-01 gate at `approved`. §13 specifies exactly what "posting" does
+and does not do inside that automatic transition.
 
 ## 6. Invariants
 
@@ -120,9 +133,17 @@ transition, exactly mirroring `ADR-069 §1`'s approval-batch pattern.
 - Once a `PayrollRun` reaches `posted`, no `PayrollRunLine` or
   `PayrollDeductionLine` row may be updated — only a new `PayrollAdjustment`
   row may reference it (`ADR-067 §M`).
-- A `PayrollRun` may not transition to `posted` if its `PayrollPeriod`'s
-  underlying Financial Period is not open for posting — enforced for free
-  by `assertOpenForPosting` (§3, §17), not a second, Payroll-owned check.
+- **Corrected per §13's transaction-boundary review:** the Financial
+  Period open-check (`assertOpenForPosting`) does **not** gate
+  `PayrollRun`'s own `approved → posted` transition — that transition is
+  Payroll's own, synchronous, and completes before the journal is
+  attempted (§13). The check instead gates the **journal**, inside the
+  later, separate Financial Event Handler transaction
+  (`journal-entry.service.ts:334`). The correct invariant is therefore: a
+  `PayrollRun` **may reach `posted`** for a run whose period has since
+  closed, but its GL journal will then be rejected at posting time (§14),
+  surfaced for remediation — not silently blocked, not silently allowed
+  through to a wrongly-open period.
 - Every GL-posting Financial Event Payroll publishes carries a
   deterministic `idempotencyKey` derived from `(payrollRunId, 'posted')` —
   a redelivered event can never double-post (§12).
@@ -211,13 +232,16 @@ effect before/with the cash leg, one transaction).
 Candidate `payroll.*` permission nodes (naming only, final list is
 Implementation detail): `payroll`, `payroll.compensation.{view,create,edit}`,
 `payroll.period.{view,create}`, `payroll.run.{view,create,calculate}`,
-`payroll.run.approve` (FA-01 checker side), `payroll.run.post`,
-`payroll.adjustment.create`, `payroll.deduction.create` (governs the
-`approved_external` category's own authorization boundary per `ADR-067
-§G`). FA-01's own SoD enforcement (`approval-engine.service.ts:231-234` —
-"the maker of an approval request cannot approve or reject it") covers the
-`approve` step automatically, zero new mechanism, exactly as `ADR-067 §L`
-requires.
+`payroll.run.approve` (FA-01 checker side), `payroll.adjustment.create`,
+`payroll.deduction.create` (governs the `approved_external` category's own
+authorization boundary per `ADR-067 §G`). **No `payroll.run.post` node
+exists** — consistent with §5's correction, `post` is not a separately
+human-invoked action, so there is nothing for a distinct permission to
+gate; the FA-01 approval decision (`payroll.run.approve`) is the one
+control point for the entire `approved → posted` outcome. FA-01's own SoD
+enforcement (`approval-engine.service.ts:231-234` — "the maker of an
+approval request cannot approve or reject it") covers the `approve` step
+automatically, zero new mechanism, exactly as `ADR-067 §L` requires.
 
 ## 11. Audit
 
@@ -254,11 +278,51 @@ other consumer — no gap, no duplication.
   optional trailing `manager?` parameter to join the same transaction
   (`process-engine.service.ts:20-30`'s documented additive pattern), not a
   second nested transaction.
-- `approved → posted` is one transaction spanning: the process transition,
-  the Financial Event publish, and the `financialEventId` write-back onto
-  `PayrollRun` — disbursement (`cashOutForEmployee`) happens as its own,
-  separate transaction afterward, only once the journal is confirmed
-  posted (mirrors `SupplierPaymentService`'s sequencing, §9).
+- **`approved → posted` — corrected per CTO review (2026-09-20): GL
+  Journal Posting is NOT inside Payroll's own transaction.** The
+  Transactional Outbox pattern (`EventBusService`, `ADR-012`) is, by
+  design, exactly two separate transactions, never a distributed one:
+
+  ```
+  Payroll DB Transaction (one, atomic)
+      • PayrollRun.status: approved → posted   (ProcessEngineService.transition)
+      • EventOutbox row created: topic='payroll.run.posted', status='pending'
+        (EventBusService.publish(manager, …) — writes using THIS SAME manager,
+         event-bus.service.ts:40-48 — no handler is invoked synchronously here)
+      • PayrollRun.financialEventId = <the outbox row's id>
+  COMMIT
+      ↓ (separate, later — EventBusService.dispatchPending(), event-bus.service.ts:57-87)
+  Financial Event Handler (registered in finance-handlers.ts, §16)
+      • resolveControlAccount('wages_payable')
+      • Journal Posting (its own transaction, JournalEntryService)
+      • on success: outbox row → 'dispatched'
+      • on failure: outbox row stays 'pending' for retry (up to MAX_ATTEMPTS,
+        then 'failed' — event-bus.service.ts:76-84), and/or the handler itself
+        publishes `accounting.financial_event.rejected`
+        (financial-event.service.ts:346) for a definitive rejection
+  ```
+
+  **`PayrollRun` reaches its terminal `posted` state at COMMIT, before the
+  journal has necessarily posted.** This is intentional and is the
+  Transactional Outbox pattern working exactly as designed — the same
+  eventually-consistent boundary every other domain (Sales, Manufacturing,
+  Procurement) already crosses into Accounting through, not a new or
+  weaker guarantee invented for Payroll. `PayrollRun.posted` means "the
+  posting intent is durably recorded and cannot be lost or double-sent,"
+  not "the journal is confirmed balanced in the ledger" — those are
+  different, correctly separated guarantees. No partial Payroll mutation
+  is possible (the three bullet points above are one atomic transaction);
+  no duplicate journal is possible (the deterministic `idempotencyKey`,
+  §12, makes redelivery a no-op); rejection/retry is handled entirely by
+  the existing outbox/handler mechanism, not a new one.
+
+  **Disbursement is a third, separate, later transaction** —
+  `cashOutForEmployee` (§3) is only invoked once the Financial Event is
+  independently confirmed posted (e.g. `FinancialEventService.getEvent
+  (financialEventId)`'s status, `financial-event.service.ts:100`) — never
+  triggered from inside the `approved → posted` transaction itself, and
+  never assumed to have succeeded just because `PayrollRun.postedAt` is
+  set. Mirrors `SupplierPaymentService`'s own sequencing (§9).
 
 ## 14. Failure Modes
 
@@ -268,12 +332,23 @@ other consumer — no gap, no duplication.
   other row is stamped before the submit call succeeds. `PayrollRun`
   remains re-submittable.
 - **Financial Event handler rejects the posting** (e.g. `wages_payable`
-  unresolvable): the event lands `REJECTED`, `PayrollRun` stays `approved`
-  (not `posted`), surfaced for admin remediation (add/activate the control
-  account) and re-publish — no partial GL state, matching F03's own
+  unresolvable): per §13's corrected mechanism, `PayrollRun` has **already**
+  reached its terminal `posted` state at commit time — this failure mode
+  does **not** revert it, and does not need to. What fails is the
+  *journal*, tracked independently via the outbox row's own status
+  (`pending`/`failed`, `event-bus.service.ts:76-84`) and, on a definitive
+  rejection, `accounting.financial_event.rejected`
+  (`financial-event.service.ts:346`) — surfaced for admin remediation
+  (add/activate the control account). The **same** outbox row is retried
+  by the existing dispatch mechanism, up to `MAX_ATTEMPTS` — no
+  re-publish, no second event, no partial GL state, matching F03's own
   fail-closed discipline (`resolveControlAccount` returning `null` is
   handled as rejection everywhere else in this codebase, e.g.
-  `ap-adjustment.handler.ts:37-40`).
+  `ap-adjustment.handler.ts:37-40`). Disbursement (§13) never proceeds
+  while the underlying event is not yet confirmed posted, regardless of
+  `PayrollRun`'s own already-`posted` status — this is precisely why §13
+  makes disbursement wait on the Financial Event's own status, not on
+  `PayrollRun.postedAt`.
 - **Treasury disbursement fails after posting:** `PayrollRun.postedAt` is
   already set (GL is correct — the liability is real regardless of
   disbursement timing); disbursement is retried independently, the same
@@ -311,13 +386,18 @@ the boundary, not the rates; there is nothing to post yet (§21).
 ## 17. Period Control
 
 `PayrollPeriod` is Payroll's own concept (§4) — it is not the same row as
-a Financial Period, but posting through F03 automatically calls
-`FiscalPeriodService.assertOpenForPosting(orgUnitId, businessDate)`
-(`journal-entry.service.ts:334`) using the `PayrollRun`'s own posting
-date. A `PayrollRun` cannot post into a closed Financial Period —
-enforced for free, not reimplemented. Duplicate-run prevention (§6) and
-no-direct-edit-of-a-posted-run (§18) are Payroll's own, separate
-invariants layered on top, per `ADR-067 §N`.
+a Financial Period. **Precisely which layer enforces the closed-period
+check (corrected per §6/§13): not `PayrollRun`'s own `approved → posted`
+transition** (which does not check period status at all) **— the
+journal**, when `JournalEntryService.postJournal` calls `FiscalPeriodService.
+assertOpenForPosting(orgUnitId, businessDate)` (`journal-entry.service.ts:334`)
+inside the later, separate Financial Event Handler transaction. A
+`PayrollRun`'s GL journal cannot post into a closed Financial Period —
+enforced for free, not reimplemented — but the `PayrollRun` record itself
+can still reach `posted` first; §14 names the resulting failure mode
+explicitly rather than assuming the two are gated together. Duplicate-run
+prevention (§6) and no-direct-edit-of-a-posted-run (§18) are Payroll's own,
+separate invariants layered on top, per `ADR-067 §N`.
 
 ## 18. Correction / Immutability
 
