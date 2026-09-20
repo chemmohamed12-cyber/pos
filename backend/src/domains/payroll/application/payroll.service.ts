@@ -19,6 +19,7 @@ import { ProcessDefinition } from '../../../foundation/process-engine/process-de
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { HrService } from '../../hr/application/hr.service';
 import { AttendanceService } from '../../attendance/application/attendance.service';
+import { CommissionService } from '../../commission/application/commission.service';
 
 const APPROVAL_TYPE = 'payroll.run_approval';
 const APPROVER_NODE = 'payroll.run.approve';
@@ -89,6 +90,7 @@ export class PayrollService implements OnModuleInit {
     private readonly numbering: NumberingService,
     private readonly hr: HrService,
     private readonly attendance: AttendanceService,
+    private readonly commission: CommissionService,
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
   ) {}
 
@@ -275,7 +277,15 @@ export class PayrollService implements OnModuleInit {
       // classification fail-safe above guarantees payImpact is never 'deduction' until a Holiday
       // Calendar policy exists, so there is no rate/formula to invent here.
       const totalDeductions = 0;
-      const netPay = grossPay - totalDeductions;
+
+      // ADR-070 §J/ADR-067 §J/ADR-068 §G — Payroll consumes only an APPROVED Commission Result;
+      // it never recomputes commission from Sales/Customer data. An unapproved/draft/rejected
+      // result is not readable through this contract at all (CommissionService.
+      // listApprovedCommissionResults only ever returns batch-approved rows).
+      const approvedCommissionResults = await this.commission.listApprovedCommissionResults(emp.id, period.startDate, period.endDate);
+      const commissionAmount = approvedCommissionResults.reduce((sum, r) => sum + Number(r.calculatedAmount), 0);
+
+      const netPay = grossPay + commissionAmount - totalDeductions;
 
       const line = await this.runLines.save(
         this.runLines.create({
@@ -285,7 +295,7 @@ export class PayrollService implements OnModuleInit {
           grossPay: grossPay.toFixed(2),
           totalDeductions: totalDeductions.toFixed(2),
           netPay: netPay.toFixed(2),
-          commissionAmount: null, // ADR-070 §J — reserved; Commission's read contract is not wired in this slice
+          commissionAmount: approvedCommissionResults.length > 0 ? commissionAmount.toFixed(2) : null,
           overtimeAmount: null, // ADR-067 §D — reserved extension point, not computed
           calculationTimestamp: now,
         }),

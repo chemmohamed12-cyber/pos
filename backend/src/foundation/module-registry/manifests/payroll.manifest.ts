@@ -5,26 +5,23 @@ import { ModuleManifest } from '../module-manifest.type';
  * (ADR-070 §2, the same mechanism `hr`/`accounting`/`procurement`/
  * `manufacturing` already went through).
  *
- * `depends_on: ['hr', 'attendance', 'finance']` — `hr` for `Employee`
- * identity (read-only); `attendance` for `listApprovedDaysByBatch`
- * (read-only, `ADR-070 §9`); `finance` for the Treasury contract token
- * disbursement will use (`FINANCE_TREASURY_CONTRACT`, same
- * dependency-inversion pattern `procurement`'s own manifest already
- * documents). `accounting` is deliberately NOT listed — Payroll reaches
- * Accounting only via the Transactional Outbox event bus
- * (`payroll.run.posted`), never a code import, the same precedent
- * `manufacturing`'s own manifest already established. `commission` is
- * not yet listed — Commission's own read contract (`ADR-071 §9`) is not
- * wired into this Phase 1 slice yet; it will be added when that
- * consumption is actually implemented, per this codebase's "declare what
- * you actually import" discipline.
+ * `depends_on: ['hr', 'attendance', 'finance', 'commission']` — `hr` for
+ * `Employee` identity (read-only); `attendance` for
+ * `listApprovedDaysByBatch` (read-only, `ADR-070 §9`); `finance` for the
+ * Treasury contract token disbursement uses (`FINANCE_TREASURY_CONTRACT`,
+ * same dependency-inversion pattern `procurement`'s own manifest already
+ * documents); `commission` for `listApprovedCommissionResults`
+ * (read-only, `ADR-070 §J`/`ADR-071 §9`). `accounting` is deliberately NOT
+ * listed — Payroll reaches Accounting only via the Transactional Outbox
+ * event bus (`payroll.run.posted`), never a code import, the same
+ * precedent `manufacturing`'s own manifest already established.
  */
 export const payrollManifest: ModuleManifest = {
   module_code: 'payroll',
   manifest_version: '1.0.0',
   title_code: 'module.payroll',
   business_domains: ['payroll'],
-  depends_on: ['hr', 'attendance', 'finance'],
+  depends_on: ['hr', 'attendance', 'finance', 'commission'],
 
   permission_nodes: [
     { node: 'payroll', title_code: 'perm.payroll' },

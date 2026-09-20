@@ -20,15 +20,18 @@ import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { HrModule } from '../hr/hr.module';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { TreasuryModule } from '../treasury/treasury.module';
+import { CommissionModule } from '../commission/commission.module';
 
 /**
  * ADR-070 — `payroll`'s composition root, Phase 1. `HrModule` (Employee
- * identity, read-only) and `AttendanceModule` (`listApprovedDaysByBatch`,
- * `ADR-070 §9`, read-only) are this module's real cross-domain imports —
- * declared in the manifest's `depends_on` too. `AccountingModule` is
- * deliberately NOT imported — Payroll reaches Accounting only through the
- * Transactional Outbox (`payroll.run.posted`), never a code import
- * (`ADR-070 §3`, mirrors `manufacturing`'s own precedent).
+ * identity, read-only), `AttendanceModule` (`listApprovedDaysByBatch`,
+ * `ADR-070 §9`, read-only), and `CommissionModule`
+ * (`listApprovedCommissionResults`, `ADR-070 §J`, read-only) are this
+ * module's real cross-domain imports — declared in the manifest's
+ * `depends_on` too. `AccountingModule` is deliberately NOT imported —
+ * Payroll reaches Accounting only through the Transactional Outbox
+ * (`payroll.run.posted`), never a code import (`ADR-070 §3`, mirrors
+ * `manufacturing`'s own precedent).
  */
 @Module({
   imports: [
@@ -52,6 +55,7 @@ import { TreasuryModule } from '../treasury/treasury.module';
     HrModule,
     AttendanceModule,
     TreasuryModule,
+    CommissionModule,
   ],
   controllers: [PayrollController],
   providers: [PayrollService],
