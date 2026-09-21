@@ -367,10 +367,11 @@ export class CommissionService implements OnModuleInit {
 
   async submitApprovalBatch(periodStart: string, periodEnd: string, actorUserId: string): Promise<CommissionApprovalBatch> {
     if (periodStart > periodEnd) throw new ConflictException('periodStart must be on or before periodEnd.');
+    const { start, end } = this.utcDayRange(periodStart, periodEnd);
     const inRange = await this.results
       .createQueryBuilder('r')
-      .where('r."calculationTimestamp" >= :start', { start: periodStart })
-      .andWhere('r."calculationTimestamp" <= :end', { end: `${periodEnd} 23:59:59` })
+      .where('r."calculationTimestamp" >= :start', { start })
+      .andWhere('r."calculationTimestamp" <= :end', { end })
       .andWhere('r."batchId" IS NULL')
       .getMany();
     if (inRange.length === 0) throw new ConflictException('No un-batched commission results exist in this period.');
@@ -428,14 +429,36 @@ export class CommissionService implements OnModuleInit {
 
   /** ADR-071 §9 — Payroll's own read contract into Commission. Returns only APPROVED results, never pending/rejected (ADR-072 §19 item 8). */
   async listApprovedCommissionResults(employeeId: string, periodStart: string, periodEnd: string): Promise<CommissionResult[]> {
+    const { start, end } = this.utcDayRange(periodStart, periodEnd);
     return this.results
       .createQueryBuilder('r')
       .innerJoin(CommissionApprovalBatch, 'b', 'b.id = r."batchId"')
       .where('r."employeeId" = :employeeId', { employeeId })
       .andWhere("b.status = 'approved'")
-      .andWhere('r."calculationTimestamp" >= :start', { start: periodStart })
-      .andWhere('r."calculationTimestamp" <= :end', { end: `${periodEnd} 23:59:59` })
+      .andWhere('r."calculationTimestamp" >= :start', { start })
+      .andWhere('r."calculationTimestamp" <= :end', { end })
       .getMany();
+  }
+
+  /**
+   * Independent re-verification finding (2026-09-21): comparing a
+   * `timestamptz` column against a naive `'YYYY-MM-DD'`/`'YYYY-MM-DD
+   * 23:59:59'` string lets Postgres cast it using the SESSION's
+   * configured timezone (e.g. `Africa/Cairo`, UTC+3), not UTC — silently
+   * shifting the intended "today, UTC" window and wrongly excluding a
+   * `CommissionResult` calculated in the last few hours of a UTC calendar
+   * day. Same defect class as `54d8818`'s Attendance fix (a
+   * timezone-aware instant compared against a timezone-naive boundary),
+   * fixed here at its own call sites: build explicit UTC instants
+   * (`Date` objects with an unambiguous `Z` offset) once, in application
+   * code, so the comparison is timezone-safe regardless of the DB
+   * session's own configured timezone.
+   */
+  private utcDayRange(periodStart: string, periodEnd: string): { start: Date; end: Date } {
+    return {
+      start: new Date(`${periodStart}T00:00:00.000Z`),
+      end: new Date(`${periodEnd}T23:59:59.999Z`),
+    };
   }
 
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide`. */

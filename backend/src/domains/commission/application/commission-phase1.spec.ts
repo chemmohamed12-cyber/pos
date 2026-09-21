@@ -297,4 +297,33 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
     const t2After = (await targets.listTargets(rep.employeeId)).find((t) => t.id === t2.id)!;
     expect(t2After.status).not.toBe('approved'); // the exclusion constraint blocked it, never silently double-approved
   }, 30_000);
+
+  it('10. UTC day-boundary correctness (independent re-verification finding, 2026-09-21): a CommissionResult calculated in the final hours of the UTC calendar day is still included in that same UTC day\'s own batch, regardless of the DB session\'s configured timezone', async () => {
+    const rep = await makeSalesRep();
+    const customerId = await makeAssignedCustomer(rep.userId);
+    const policy = await commission.createPolicy({ scope: 'sales_rep', scopeRefId: rep.employeeId, basis: 'gross_sales', rateModel: 'flat', flatRate: '0.07' }, ADMIN_A);
+
+    // The exact previously-broken window: the DB session's configured timezone
+    // (confirmed Africa/Cairo, UTC+3, by the independent re-verification) casts a naive
+    // 'YYYY-MM-DD 23:59:59' upper bound to 20:59:59 UTC — 3 hours short of the real UTC day end.
+    // A calculationTimestamp of 22:30 UTC today falls squarely inside that previously-excluded gap.
+    const todayUtc = today();
+    const lateUtcTimestamp = `${todayUtc}T22:30:00.000Z`;
+    const triggerEventKey = `invoice:${randomUUID()}`;
+    await dataSource.query(
+      `INSERT INTO commission_results
+         (id, "employeeId", "customerId", "sourceTransactionRefs", "resolvedPolicyId", "policyScope", "calculationBasis", "rate", "calculationInputs", "calculatedAmount", "calculationTimestamp", "triggerEventKey")
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [rep.employeeId, customerId, JSON.stringify({ invoice: triggerEventKey }), policy.id, 'sales_rep', 'gross_sales', '0.07', JSON.stringify({}), '70.00', lateUtcTimestamp, triggerEventKey],
+    );
+
+    const batch = await commission.submitApprovalBatch(todayUtc, todayUtc, ADMIN_A);
+    const batchedIds = (await dataSource.query(`SELECT id FROM commission_results WHERE "batchId" = $1`, [batch.id])).map((r: { id: string }) => r.id);
+    const [lateResult] = await dataSource.query(`SELECT id FROM commission_results WHERE "triggerEventKey" = $1`, [triggerEventKey]);
+    expect(batchedIds).toContain(lateResult.id); // previously wrongly excluded — now correctly swept in
+
+    await approvals.decide(batch.approvalRequestId!, SECOND_APPROVER, 'approved', null);
+    const approved = await commission.listApprovedCommissionResults(rep.employeeId, todayUtc, todayUtc);
+    expect(approved.some((r) => r.id === lateResult.id)).toBe(true); // Payroll's own read contract also sees it correctly
+  }, 30_000);
 });
