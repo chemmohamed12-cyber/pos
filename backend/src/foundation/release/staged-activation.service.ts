@@ -85,15 +85,39 @@ export class StagedActivationService {
       await cp(src, dest, { force: true });
     }
 
-    // FU-1 (ERP Foundation P6 T3): `buildCandidate` copies ACTIVE's
-    // `package.json` verbatim and only overlays the manifest's explicit
-    // delta files — so unless a release deliberately shipped `package.json`
-    // as a delta, the CANDIDATE (and, after the swap, the live install)
-    // keeps the OLD version string, which is what "Current Version display
-    // stuck at 1.0.3" was. The LKG registry stays the authoritative record;
-    // this just makes the on-disk `version` reflect what actually deployed.
-    // Absorbed into the Release Engine's own build step, per the CTO
-    // directive — not a patch outside the pipeline.
+    // Root-cause fix (2026-09-21 incident): `generate_manifest()`
+    // (`build-release.sh`) only ever scans `src/ dist/ public/` for
+    // `manifest.files[]` — `package.json`/`package-lock.json` at the
+    // package ROOT are never listed as delta files, for a `full`
+    // package or a `delta` one. The loop above therefore never touches
+    // them, and the CANDIDATE silently kept ACTIVE's own OLD
+    // `package.json` (`dependencies`, `devDependencies`, everything but
+    // the `version` string `stampVersion` below already patched) no
+    // matter what the uploaded package's own `package.json` actually
+    // declared. A dependency-classification fix (`@types/yauzl` moved
+    // to `devDependencies`, v1.1.1) could never take effect through
+    // this path: every re-upload kept re-checking whatever
+    // `dependencies` ACTIVE happened to have at that moment, not the
+    // candidate's own. `build-release.sh`'s own `assemble_staged()`
+    // unconditionally copies both files into `stagingDir` for EVERY
+    // package type (confirmed by direct reading), so copying them here
+    // — unconditionally, always overwriting whatever the ACTIVE-tree
+    // copy above put in their place — is correct for both `full` and
+    // `delta` candidates, not just this specific fix.
+    for (const rootFile of ['package.json', 'package-lock.json']) {
+      const src = join(stagingDir, rootFile);
+      if (await exists(src)) {
+        await cp(src, join(candidate, rootFile), { force: true });
+      }
+    }
+
+    // FU-1 (ERP Foundation P6 T3): defensive fallback only now — the copy
+    // above already gives the candidate its own real `package.json`
+    // (version included), so this is a no-op in the normal case. Kept for
+    // the frontend/public trees, whose own package.json (if any) is a
+    // different file the copy above does not touch, and as a safety net
+    // if `stagingDir` ever lacks a root `package.json` (a malformed or
+    // hand-built package, not one `build-release.sh` itself produced).
     await this.stampVersion(candidate, manifest.version);
     for (const dir of [join(candidate, '..', 'frontend'), join(candidate, 'frontend'), join(candidate, 'public')]) {
       await this.stampVersion(dir, manifest.version, true);
