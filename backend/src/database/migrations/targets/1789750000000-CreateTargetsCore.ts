@@ -6,24 +6,42 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * previously reserved (confirmed `module-manifest.type.ts`), the same
  * situation `attendance` was in — not a promotion.
  *
- * Non-overlap (ADR-068 §E's ratified requirement) is enforced with a real
- * Postgres EXCLUDE constraint — no two `approved` Targets for the same
- * employee may have overlapping date ranges. This is a genuinely new
- * pattern for this codebase (no prior EXCLUDE-constraint use found), the
- * correct native mechanism for this specific invariant — stronger than
- * the partial-unique-index pattern `attendance_employee_mappings`/
- * `payroll_compensations` use (which only prevents more than one
- * *currently active* row, not overlapping *date ranges*).
+ * Non-overlap (ADR-068 §E's ratified requirement) — no two `approved`
+ * Targets for the same employee may have overlapping date ranges — is
+ * enforced at the DB level via a `BEFORE INSERT OR UPDATE` trigger, not
+ * a Postgres EXCLUDE constraint. An EXCLUDE constraint mixing an
+ * equality column with a range-overlap column needs the `btree_gist`
+ * extension (GiST core alone has no equality operator class), and
+ * `PRODUCTION_DEPLOYMENT_GUIDE.md`'s own "UUID generation strategy" /
+ * "Rule for future migrations" section — written after the 2026-08-27
+ * production incident — is explicit: **no migration may ever run
+ * `CREATE EXTENSION` for anything**, because this codebase's actual
+ * Hosting target (Namecheap Shared Stellar Plus) has zero contrib
+ * extensions available (confirmed live: `pgcrypto`/`uuid-ossp` both
+ * missing `.control` files, not a permissions restriction — `btree_gist`
+ * is the same class of contrib module and was never independently
+ * re-confirmed). Found and corrected during this release's own
+ * candidate review, before this migration ever reached a real Hosting
+ * target (caught by design — see the restored
+ * `extension-dependencies.spec.ts` regression guard).
+ *
+ * The trigger function reproduces the EXACT same invariant an EXCLUDE
+ * constraint would (atomic, race-safe, DB-level, `status='approved'`
+ * rows only) using only core SQL: `daterange`/`&&` are core Postgres
+ * types/operators (no extension needed for the comparison itself — only
+ * the *indexed* EXCLUDE-constraint mechanism needed GiST+btree_gist), and
+ * `pg_advisory_xact_lock` (also core) serializes concurrent approval
+ * attempts for the same employee so two concurrent transactions can
+ * never both pass the overlap check before either commits — the same
+ * "read-then-decide, but race-safe" pattern `NumberingService.
+ * getNextNumber`'s own `SELECT ... FOR UPDATE` and `PayrollService.
+ * disburse`'s own `pg_advisory_xact_lock` already use elsewhere in this
+ * codebase.
  */
 export class CreateTargetsCore1789750000000 implements MigrationInterface {
   name = 'CreateTargetsCore1789750000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // btree_gist is required for a GiST exclusion constraint mixing an equality
-    // column (employeeId) with a range-overlap column (the daterange) — Postgres
-    // core only ships gist range-overlap operators, not gist equality, without it.
-    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
-
     await queryRunner.query(`
       CREATE TABLE "targets" (
         "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,20 +62,38 @@ export class CreateTargetsCore1789750000000 implements MigrationInterface {
     await queryRunner.query(`CREATE INDEX "IDX_targets_employeeId" ON "targets" ("employeeId")`);
 
     // ADR-068 §E — no two APPROVED targets for the same employee may overlap in period.
-    // Draft/pending/rejected rows are excluded from this constraint by design (only an
+    // Draft/pending/rejected rows are excluded from this check by design (only an
     // approved target is a binding commitment two ranges could genuinely conflict over).
+    // The error text/ERRCODE mirror what an EXCLUDE constraint itself would have raised
+    // (23P01, exclusion_violation) — no caller-visible behavior change from the original design.
     await queryRunner.query(`
-      ALTER TABLE "targets"
-      ADD CONSTRAINT "EXCL_targets_employee_period_when_approved"
-      EXCLUDE USING gist (
-        "employeeId" WITH =,
-        daterange("periodStart", "periodEnd", '[]') WITH &&
-      )
-      WHERE ("status" = 'approved')
+      CREATE OR REPLACE FUNCTION targets_check_non_overlap() RETURNS TRIGGER AS $BODY$
+      BEGIN
+        IF NEW."status" = 'approved' THEN
+          PERFORM pg_advisory_xact_lock(hashtext('targets:employee:' || NEW."employeeId"::text));
+          IF EXISTS (
+            SELECT 1 FROM "targets"
+            WHERE "employeeId" = NEW."employeeId"
+              AND "status" = 'approved'
+              AND "id" <> NEW."id"
+              AND daterange("periodStart", "periodEnd", '[]') && daterange(NEW."periodStart", NEW."periodEnd", '[]')
+          ) THEN
+            RAISE EXCEPTION 'conflicting key value violates exclusion constraint "EXCL_targets_employee_period_when_approved"' USING ERRCODE = '23P01';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $BODY$ LANGUAGE plpgsql
+    `);
+    await queryRunner.query(`
+      CREATE TRIGGER "TRG_targets_check_non_overlap"
+      BEFORE INSERT OR UPDATE ON "targets"
+      FOR EACH ROW EXECUTE FUNCTION targets_check_non_overlap()
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE "targets"`);
+    await queryRunner.query(`DROP FUNCTION IF EXISTS targets_check_non_overlap()`);
   }
 }
