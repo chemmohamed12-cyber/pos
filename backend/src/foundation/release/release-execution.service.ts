@@ -366,22 +366,47 @@ export class ReleaseExecutionService {
 
       // 2. Invariant I-8 — expand/contract migrations only. Scan the NEW
       //    migration files in this delta (from the verified CANDIDATE tree)
-      //    for contraction DDL BEFORE running anything. A violation aborts
-      //    pre-swap (I-2 preserved).
+      //    for contraction DDL BEFORE running anything. A violation ALWAYS
+      //    aborts pre-swap (I-2 preserved) — this is a correctness gate, not
+      //    an advisory one. Production Incident 2026-09-22: this gate used
+      //    to be skippable via `RELEASE_EXPAND_CONTRACT_ENFORCE=false`,
+      //    which let a DENIED violation fall through to swap/restart/
+      //    succeeded — a config value silently downgraded a safety
+      //    invariant to a log line. There is no longer an escape hatch:
+      //    a detected violation always throws, regardless of any config.
       const contraction = await this.scanDeltaMigrations(release, candidatePath, migrationTags);
       if (contraction.length > 0) {
         const detail = contraction.map((v) => `${v.file}: ${v.rule} [${v.statement}]`).join(' | ');
         await audit('release.deploy.expand_contract_violation', 'denied', { violations: contraction });
-        if (this.config.releaseDeploy.expandContractEnforce) {
-          throw new PreSwapAbort(`Migration(s) are not expand/contract-safe (RELEASE_EXPAND_CONTRACT_ENFORCE=true): ${detail}`);
-        }
-        this.logger.warn(`Expand/contract violation(s) NOT blocked (RELEASE_EXPAND_CONTRACT_ENFORCE=false): ${detail}`);
+        throw new PreSwapAbort(`Migration(s) are not expand/contract-safe: ${detail}`);
       }
 
       // 3. migrations — LATE, against the CANDIDATE's compiled migration set, immediately before the swap
       release.status = 'migrating';
       await releaseRepo.save(release);
       await this.runReleaseMigrations(release, candidatePath, migrationTags);
+
+      // 3b. Production Incident 2026-09-22 — migration EXECUTION completing
+      //     without error was previously trusted as proof the release's own
+      //     migrations actually ran. It isn't: a narrower-than-expected tag
+      //     scope reaching `runReleaseMigrations` (whatever its cause) can
+      //     make `runMigrations()` succeed having genuinely run zero of the
+      //     migrations THIS release actually needs, with no error raised —
+      //     the four `SeedAdminPermissionsFor*` migrations shipped in
+      //     v1.1.1 and never executed on production are the proven case.
+      //     Re-derive "is every migration this candidate's manifest ships
+      //     now actually recorded as executed" from the SAME source of
+      //     truth (`MigrationExecutor`, never a hand-rolled diff) as an
+      //     independent post-condition — never inferred from "the call
+      //     didn't throw". A non-empty result here means migration state is
+      //     missing/inconsistent/uncertain: swap must not proceed.
+      const stillPending = await this.verifyMigrationsComplete(release, candidatePath, migrationTags);
+      if (stillPending.length > 0) {
+        await audit('release.deploy.migration_verification_failed', 'denied', { stillPending });
+        throw new PreSwapAbort(
+          `Migration phase reported success but ${stillPending.length} migration(s) this release ships are still pending: ${stillPending.join(', ')}. Refusing to swap.`,
+        );
+      }
 
       // 4. ATOMIC SWAP
       const res = await this.stagedActivation.activate(release.id, candidatePath);
@@ -995,6 +1020,51 @@ export class ReleaseExecutionService {
         );
       }
       throw err;
+    } finally {
+      await migrationDataSource.destroy();
+    }
+  }
+
+  /**
+   * Post-condition for Invariant I-8b (Production Incident 2026-09-22):
+   * `runReleaseMigrations()` completing without throwing is NOT sufficient
+   * proof that this release's own migrations actually ran — it only proves
+   * `runMigrations()` didn't throw against whatever `pendingNames` it
+   * computed at that moment. If the migration DataSource's scope excludes
+   * a tag this release's manifest ships migrations under (the proven cause
+   * of the four `SeedAdminPermissionsFor*` migrations from v1.1.1 never
+   * reaching the `migrations` table), `runMigrations()` succeeds having
+   * done nothing for those files, silently.
+   *
+   * This re-opens a FRESH `MigrationExecutor` (same delegation discipline
+   * as `scanDeltaMigrations`/`runReleaseMigrations` — never a hand-rolled
+   * diff) against the exact same candidatePath + tags, and cross-checks
+   * every migration file THIS RELEASE'S OWN MANIFEST declares against
+   * what is now still pending. Returns the migration names that are still
+   * pending — non-empty means the migration phase did not actually
+   * complete for this release, regardless of what `runMigrations()`
+   * reported.
+   */
+  private async verifyMigrationsComplete(release: Release, candidatePath: string, tags?: readonly string[]): Promise<string[]> {
+    // Same manifest-path -> TypeORM-name derivation `scanDeltaMigrations` and
+    // `migration-preflight.ts`'s `migrationNameFromFilePath` already use:
+    // "<timestamp>-<ClassName>.(ts|js)" -> "<ClassName><timestamp>".
+    const shippedMigrationNames = new Set<string>();
+    for (const f of release.manifest.files) {
+      if (f.action === 'delete' || !isMigrationPath(f.path) || f.path.endsWith('.d.ts')) continue;
+      const base = f.path.replace(/\.(ts|js)$/, '').split('/').pop() ?? '';
+      const i = base.indexOf('-');
+      if (i < 0) continue;
+      shippedMigrationNames.add(base.slice(i + 1) + base.slice(0, i));
+    }
+    if (shippedMigrationNames.size === 0) return [];
+
+    const migrationDataSource = createMigrationDataSource(candidatePath, this.config.database, tags);
+    await migrationDataSource.initialize();
+    try {
+      const pending = await new MigrationExecutor(migrationDataSource).getPendingMigrations();
+      const pendingNames = new Set(pending.map((m) => m.name));
+      return [...shippedMigrationNames].filter((name) => pendingNames.has(name));
     } finally {
       await migrationDataSource.destroy();
     }
