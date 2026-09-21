@@ -1,4 +1,10 @@
-# Release Notes — v1.1.0
+# Release Notes — v1.1.1
+
+**v1.1.0 superseded** — it failed real Hosting candidate verification
+(`@types/yauzl` misdeclared as a runtime dependency) and was never
+activated. v1.1.1 fixes only that dependency-classification defect; see
+`CHANGELOG.md`. Everything below still describes what's functionally
+new in this release.
 
 **Release date:** 2026-09-21
 **Type:** Minor feature release — Hosting test candidate (not a

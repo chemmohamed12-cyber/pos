@@ -1,4 +1,6 @@
-# Deploy Instructions — v1.1.0 Hosting-Test Candidate
+# Deploy Instructions — v1.1.1 Hosting-Test Candidate
+
+**v1.1.0 superseded** — failed real Hosting candidate verification, never activated. Use v1.1.1.
 
 **This package is a Hosting-test release candidate — built and verified
 for testing purposes only. It is NOT a production deployment
@@ -19,7 +21,7 @@ Built by the project's own approved release engine
 (`tools/build/build-release.sh`) — never a manually-assembled ZIP:
 
 ```
-Daii-Release-v1.1.0-<date>.zip
+Daii-Release-v1.1.1-<date>.zip
 ├── MANIFEST.json          (machine-readable: version, file checksums,
 │                            migration list, runtimeDependencies)
 ├── dist/                  (compiled backend)
@@ -42,7 +44,7 @@ The build engine already ran this verification as its own last step
 `.zip` at any time:
 
 ```bash
-bash tools/build/build-release.sh --verify <path-to>/Daii-Release-v1.1.0-<date>.zip
+bash tools/build/build-release.sh --verify <path-to>/Daii-Release-v1.1.1-<date>.zip
 ```
 
 Checks: every `MANIFEST.json` file entry exists with a matching
@@ -121,6 +123,6 @@ BUILD    = PASS
 TEST     = PASS
 VERIFY   = PASS
 PACKAGE  = PASS
-RELEASE VERSION = 1.1.0 — ISSUED
+RELEASE VERSION = 1.1.1 — ISSUED
 HOSTING DEPLOYMENT = WAITING FOR AUTHORIZATION
 ```

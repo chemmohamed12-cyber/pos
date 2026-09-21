@@ -1,4 +1,4 @@
-# Test Report — v1.1.0
+# Test Report — v1.1.1
 
 **Date:** 2026-09-21
 **Mode:** `npx jest --runInBand` — this project's canonical, deterministic
@@ -6,14 +6,25 @@ mode for live-Postgres-heavy suites (per `F03_GL_POSTING_CONCURRENCY_
 DEADLOCK_RCA.md §3`'s own precedent; parallel Jest workers against the
 same shared dev database are what originally surfaced the F03
 concurrency defect this release fixes).
-**Result: 211/211 tests passing, 25/25 suites passing, 0 failed, 0
+**Result: 213/213 tests passing, 26/26 suites passing, 0 failed, 0
 timeout. Exit code 0.**
 
-This is the definitive run — executed after every fix in this release
-(the Commission UTC boundary fix, the F03 Option B+C remediation, and
-the `CreateTargetsCore` hosting-compatibility fix) and after both new
-regression suites (`f03-deadlock-retry-verification.spec.ts`,
-`extension-dependencies.spec.ts`) were in place.
+This is the definitive run for v1.1.1 — executed after every fix in
+this release (the Commission UTC boundary fix, the F03 Option B+C
+remediation, the `CreateTargetsCore` hosting-compatibility fix, the
+Commission test-isolation fix, and the `@types/yauzl` dependency-
+classification fix that corrects the real candidate-verification
+failure `v1.1.0` hit on Hosting) and after all four new regression
+suites (`f03-deadlock-retry-verification.spec.ts`,
+`extension-dependencies.spec.ts`, `dependency-classification.spec.ts`,
+and the `commission-phase1.spec.ts` self-cleanup addition) were in
+place.
+
+**v1.1.0 superseded:** uploaded to the real Hosting Release Center and
+**failed** its own `dependencies_resolve` candidate-verification check
+(`@types/yauzl` missing from `node_modules` — a misclassified
+type-definitions-only package). Fixed in `v1.1.1`; see `CHANGELOG.md`
+and `MANIFEST.md`. `v1.1.0` was never activated on Hosting.
 
 ## Suite-by-suite
 
@@ -21,6 +32,7 @@ regression suites (`f03-deadlock-retry-verification.spec.ts`,
 |---|---|
 | `f03-deadlock-retry-verification.spec.ts` | PASS |
 | `extension-dependencies.spec.ts` | PASS |
+| `dependency-classification.spec.ts` | PASS (2/2) |
 | `payroll-phase1.spec.ts` | PASS (10/10) |
 | `integrated-attendance-payroll-commission-gl-e2e.spec.ts` | PASS (4/4) |
 | `build-release.spec.ts` | PASS |

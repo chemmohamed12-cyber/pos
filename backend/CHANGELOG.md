@@ -3,6 +3,26 @@
 All notable changes to the DAII platform. Dates are UTC. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] — 2026-09-21
+
+### Fixed
+- **Release candidate-verification blocker.** `v1.1.0` was uploaded to
+  the real Hosting Release Center and **failed** its own
+  `dependencies_resolve` candidate-verification check:
+  `@types/yauzl` — a TypeScript type-definitions-only package, no
+  runtime code — was misdeclared under `package.json`'s `dependencies`
+  instead of `devDependencies` (every other `@types/*` package in this
+  same file was already correctly classified; this was the one
+  outlier). A production-only install correctly never installs
+  `devDependencies`, so the real `yauzl` package (genuinely needed at
+  runtime by the Release Engine's own package validator) resolved fine,
+  while the misclassified `@types/yauzl` did not. Moved to
+  `devDependencies`; no application/business logic touched. Added a
+  permanent regression guard (`dependency-classification.spec.ts`) so
+  an `@types/*` package can never again be declared as a runtime
+  dependency. `v1.1.0` is superseded and was never activated on
+  Hosting — see `MANIFEST.md`.
+
 ## [1.1.0] — 2026-09-21
 
 ### Added
