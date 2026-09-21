@@ -61,7 +61,33 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
     dataSource = moduleRef.get(DataSource);
   }, 60_000);
 
+  // Test-isolation fix (2026-09-21 incident): this suite has no isolated test
+  // database (confirmed — no test in this codebase's history has ever had one;
+  // every *.spec.ts boots the real AppModule against the same DB_NAME as the
+  // dev server). Every OTHER domain's fixtures (Employees, Customers, Work
+  // Orders, ...) are created through their own real service layer and are
+  // functionally inert if left behind. `makeShipmentForCustomer` below is
+  // the one exception in this file: it inserts directly into `sales_orders`/
+  // `shipments` via raw SQL (Commission has no reason to own a create-path
+  // for Sales Order fixtures), which deliberately bypasses
+  // `SalesOrdersService.createOrder()` — including its own
+  // `processEngine.start()` call. A row created this way is a valid,
+  // complete `Shipment`/`SalesOrder` row for Commission's own purposes (a
+  // shipment→sales_order→customer join), but an INCOMPLETE one for the real
+  // Sales Orders UI, which lists every `sales_orders` row and expects each
+  // to have a `process_instances` row. Left behind, these rows broke the
+  // live Sales Orders page for a real user (2026-09-21). Tracked and
+  // deleted here so a test re-run can never reproduce that again.
+  const createdFixtureShipmentIds: string[] = [];
+  const createdFixtureSalesOrderIds: string[] = [];
+
   afterAll(async () => {
+    if (createdFixtureShipmentIds.length > 0) {
+      await dataSource.query(`DELETE FROM shipments WHERE id = ANY($1)`, [createdFixtureShipmentIds]);
+    }
+    if (createdFixtureSalesOrderIds.length > 0) {
+      await dataSource.query(`DELETE FROM sales_orders WHERE id = ANY($1)`, [createdFixtureSalesOrderIds]);
+    }
     await moduleRef.close();
   });
 
@@ -107,11 +133,13 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
       `INSERT INTO sales_orders (id, "orderNumber", "customerId", "salesRepUserId", "totalAmount") VALUES ($1,$2,$3,$4,$5)`,
       [salesOrderId, shortName('SO'), customerId, salesRepUserId, '1000.00'],
     );
+    createdFixtureSalesOrderIds.push(salesOrderId);
     const shipmentId = randomUUID();
     await dataSource.query(
       `INSERT INTO shipments (id, "fulfillmentOrderId", "waybillNumber", "salesOrderId") VALUES ($1,$2,$3,$4)`,
       [shipmentId, shortName('FO'), shortName('WB'), salesOrderId],
     );
+    createdFixtureShipmentIds.push(shipmentId);
     return shipmentId;
   }
 
