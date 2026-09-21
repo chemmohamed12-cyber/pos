@@ -20,6 +20,30 @@ import { V1_FINANCE_HANDLERS } from './finance-handlers';
 /** The nil UUID stands in for "the accounting engine itself" on system-posted entries. */
 export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
+/**
+ * F03 GL Posting Concurrency RCA (`docs/studies/
+ * F03_GL_POSTING_CONCURRENCY_DEADLOCK_RCA.md`), Option B — CTO-approved
+ * 2026-09-21. A Postgres deadlock (`40P01`) between `postEntry`'s own
+ * `numbering_sequences`/`audit_records` locks is, by Postgres's own
+ * documented guarantee, always safe to retry: the aborted transaction
+ * made no persistent changes. This is domain-agnostic (the RCA reproduced
+ * it with no Manufacturing-specific setup) — the retry lives here, in
+ * F03's own generic posting gate, not in any calling domain.
+ */
+const DEADLOCK_ERROR_CODE = '40P01';
+const MAX_POSTING_ATTEMPTS = 3;
+const DEADLOCK_RETRY_BASE_DELAY_MS = 50;
+const DEADLOCK_RETRY_JITTER_MS = 150;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Walks the (possibly wrapped) error for the Postgres error code `runHandlerThroughPosting`'s own wrap sites attach as `.pgCode` — never string-matches the rejection message, which is free text. */
+function isDeadlockError(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { pgCode?: unknown }).pgCode === DEADLOCK_ERROR_CODE;
+}
+
 const DOMAIN_OF_TOPIC: Record<string, string> = {
   'finance.invoice.posted': 'finance',
   'finance.invoice.voided': 'finance',
@@ -204,68 +228,97 @@ export class FinancialEventService implements OnModuleInit {
    * TRANSACTIONAL SHAPE only, not to any observable message or to the posting gate's own checks.
    */
   private async runHandlerThroughPosting(event: FinancialEvent, handler: FinancialEventHandler): Promise<IngestResult> {
-    let outcome:
+    type Outcome =
       | { status: 'IGNORED'; reason: string | null }
       | { status: 'REJECTED'; reason: string }
       | { status: 'POSTED'; journalEntryId: string };
-    try {
-      outcome = await this.dataSource.transaction(async (manager) => {
-        const ctx = await this.buildContext(manager);
-        let result: HandlerResult;
-        try {
-          result = await handler(event, ctx);
-        } catch (e) {
-          throw new Error(`handler threw: ${(e as Error).message}`);
-        }
-        if (result.kind === 'ignored') return { status: 'IGNORED' as const, reason: result.reason };
-        if (result.kind === 'rejected') return { status: 'REJECTED' as const, reason: result.reason };
 
-        let entryId: string;
-        try {
-          const created = await this.journals.createEntry(
-            {
-              sourceType: 'FINANCIAL_EVENT',
-              financialEventId: event.id,
-              businessDate: result.draft.businessDate,
-              description: result.draft.description,
-              transactionCurrencyCode: result.draft.transactionCurrencyCode,
-              orgUnitId: result.draft.orgUnitId,
-              lines: result.draft.lines,
-            },
-            SYSTEM_ACTOR_ID,
-            manager,
-          );
-          entryId = created.id;
-        } catch (e) {
-          throw new Error(`draft build failed: ${(e as Error).message}`);
+    let outcome: Outcome | null = null;
+    let finalError: Error | null = null;
+
+    // RCA Option B — a deadlock (`40P01`) aborts the WHOLE transaction with no persistent
+    // change (Postgres's own guarantee for a deadlock loser), so retrying from scratch is safe.
+    // Any other error (a real posting-gate rejection, a handler error) exits after one attempt —
+    // this loop only ever retries the specific, transient failure class the RCA reproduced.
+    for (let attempt = 1; attempt <= MAX_POSTING_ATTEMPTS; attempt++) {
+      try {
+        outcome = await this.dataSource.transaction(async (manager) => {
+          const ctx = await this.buildContext(manager);
+          let result: HandlerResult;
+          try {
+            result = await handler(event, ctx);
+          } catch (e) {
+            const wrapped = new Error(`handler threw: ${(e as Error).message}`) as Error & { pgCode?: unknown };
+            wrapped.pgCode = (e as { code?: unknown })?.code;
+            throw wrapped;
+          }
+          if (result.kind === 'ignored') return { status: 'IGNORED' as const, reason: result.reason };
+          if (result.kind === 'rejected') return { status: 'REJECTED' as const, reason: result.reason };
+
+          let entryId: string;
+          try {
+            const created = await this.journals.createEntry(
+              {
+                sourceType: 'FINANCIAL_EVENT',
+                financialEventId: event.id,
+                businessDate: result.draft.businessDate,
+                description: result.draft.description,
+                transactionCurrencyCode: result.draft.transactionCurrencyCode,
+                orgUnitId: result.draft.orgUnitId,
+                lines: result.draft.lines,
+              },
+              SYSTEM_ACTOR_ID,
+              manager,
+            );
+            entryId = created.id;
+          } catch (e) {
+            const wrapped = new Error(`draft build failed: ${(e as Error).message}`) as Error & { pgCode?: unknown };
+            wrapped.pgCode = (e as { code?: unknown })?.code;
+            throw wrapped;
+          }
+          try {
+            await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, manager);
+          } catch (e) {
+            const wrapped = new Error(`posting gate rejected: ${(e as Error).message}`) as Error & { pgCode?: unknown };
+            wrapped.pgCode = (e as { code?: unknown })?.code;
+            throw wrapped;
+          }
+          return { status: 'POSTED' as const, journalEntryId: entryId };
+        });
+        finalError = null;
+        break;
+      } catch (e) {
+        finalError = e as Error;
+        if (isDeadlockError(e) && attempt < MAX_POSTING_ATTEMPTS) {
+          await sleep(DEADLOCK_RETRY_BASE_DELAY_MS + Math.random() * DEADLOCK_RETRY_JITTER_MS);
+          continue;
         }
-        try {
-          await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, manager);
-        } catch (e) {
-          throw new Error(`posting gate rejected: ${(e as Error).message}`);
-        }
-        return { status: 'POSTED' as const, journalEntryId: entryId };
-      });
-    } catch (e) {
-      // the transaction rolled back in full — no draft, no journal, no handler-side mutation
-      // survives; `discardDraft` is therefore unreachable on this path (nothing left to discard).
-      const message = (e as Error).message;
+        break;
+      }
+    }
+
+    if (finalError) {
+      // the transaction rolled back in full (on the FINAL attempt) — no draft, no journal, no
+      // handler-side mutation survives; `discardDraft` is therefore unreachable on this path
+      // (nothing left to discard).
+      const message = finalError.message;
       await this.mark(event.id, 'REJECTED', null, message);
       await this.publishRejected(event, message);
       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
     }
+    const result = outcome as Outcome;
 
-    if (outcome.status === 'IGNORED') {
-      await this.mark(event.id, 'IGNORED', null, outcome.reason);
+    if (result.status === 'IGNORED') {
+      await this.mark(event.id, 'IGNORED', null, result.reason);
       return { financialEventId: event.id, status: 'IGNORED', journalEntryId: null, deduped: false };
     }
-    if (outcome.status === 'REJECTED') {
-      await this.mark(event.id, 'REJECTED', null, outcome.reason);
-      await this.publishRejected(event, outcome.reason);
+    if (result.status === 'REJECTED') {
+      await this.mark(event.id, 'REJECTED', null, result.reason);
+      await this.publishRejected(event, result.reason);
       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
     }
 
-    await this.mark(event.id, 'POSTED', outcome.journalEntryId, null);
+    await this.mark(event.id, 'POSTED', result.journalEntryId, null);
     await this.dataSource.transaction(async (manager) => {
       await this.audit.record(
         {
@@ -276,12 +329,12 @@ export class FinancialEventService implements OnModuleInit {
           resourceId: event.id,
           result: 'success',
           correlationId: event.id,
-          after: { eventType: event.eventType, journalEntryId: outcome.journalEntryId },
+          after: { eventType: event.eventType, journalEntryId: result.journalEntryId },
         },
         manager,
       );
     });
-    return { financialEventId: event.id, status: 'POSTED', journalEntryId: outcome.journalEntryId, deduped: false };
+    return { financialEventId: event.id, status: 'POSTED', journalEntryId: result.journalEntryId, deduped: false };
   }
 
   private async buildContext(manager: EntityManager): Promise<HandlerContext> {

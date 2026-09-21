@@ -52,6 +52,19 @@ describe('classifyRejectedFinancialEvent (ADR-051 §3 — replaces the ADR-050 b
     expect(result.severity).toBe('blocking');
   });
 
+  it('a deadlock rejection → TRANSIENT_DATABASE_ERROR, blocking (F03 RCA Option C)', () => {
+    const result = classifyRejectedFinancialEvent('posting gate rejected: deadlock detected');
+    expect(result.category).toBe('TRANSIENT_DATABASE_ERROR');
+    expect(result.severity).toBe('blocking');
+    expect(result.requiredAction).toMatch(/redrive/i);
+  });
+
+  it('a serialization-failure rejection → TRANSIENT_DATABASE_ERROR, blocking', () => {
+    const result = classifyRejectedFinancialEvent('posting gate rejected: could not serialize access due to concurrent update');
+    expect(result.category).toBe('TRANSIENT_DATABASE_ERROR');
+    expect(result.severity).toBe('blocking');
+  });
+
   it('an orphaned master-data reference → UNCLASSIFIED_REJECTION, blocking (fail-safe, never auto-waved)', () => {
     const result = classifyRejectedFinancialEvent('draft build failed: Currency "F14" not found.');
     expect(result.category).toBe('UNCLASSIFIED_REJECTION');

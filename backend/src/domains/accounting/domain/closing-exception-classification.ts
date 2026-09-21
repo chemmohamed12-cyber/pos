@@ -53,7 +53,7 @@ export function classifyReconciliationStatus(
 export interface FinancialEventRejectionClassification {
   category: Extract<
     ClosingExceptionCategory,
-    'EXPECTED_BUSINESS_REJECTION' | 'CONFIGURATION_EXCEPTION' | 'UNCLASSIFIED_REJECTION'
+    'EXPECTED_BUSINESS_REJECTION' | 'CONFIGURATION_EXCEPTION' | 'TRANSIENT_DATABASE_ERROR' | 'UNCLASSIFIED_REJECTION'
   >;
   severity: ClosingExceptionSeverity;
   requiredAction: string;
@@ -79,6 +79,23 @@ const CONFIGURATION_EXCEPTION_PATTERNS: RegExp[] = [
   /account.*unresolved \(unset\)/i,
 ];
 
+/**
+ * F03 GL Posting Concurrency RCA, Option C (CTO-approved 2026-09-21,
+ * alongside Option B's automatic in-process deadlock retry —
+ * `financial-event.service.ts`'s `runHandlerThroughPosting`). A rejection
+ * matching one of these signatures reached this classifier only after
+ * Option B's own bounded retry (`MAX_POSTING_ATTEMPTS`) was already
+ * exhausted, or predates that fix — Postgres's own documented guarantee is
+ * that the aborted transaction made no persistent change, so a plain
+ * `redrive()` is safe and is very likely all that is needed, distinct from
+ * `UNCLASSIFIED_REJECTION`'s "investigate from scratch" guidance.
+ */
+const TRANSIENT_DATABASE_ERROR_PATTERNS: RegExp[] = [
+  /deadlock detected/i,
+  /could not serialize access/i,
+  /concurrent update/i,
+];
+
 export function classifyRejectedFinancialEvent(rejectionReason: string | null): FinancialEventRejectionClassification {
   const reason = rejectionReason ?? '';
 
@@ -95,6 +112,14 @@ export function classifyRejectedFinancialEvent(rejectionReason: string | null): 
       category: 'CONFIGURATION_EXCEPTION',
       severity: 'blocking',
       requiredAction: 'Fix the configuration via its legitimate mechanism, then explicitly redrive this specific event, then re-run the Closing Audit.',
+    };
+  }
+
+  if (TRANSIENT_DATABASE_ERROR_PATTERNS.some((p) => p.test(reason))) {
+    return {
+      category: 'TRANSIENT_DATABASE_ERROR',
+      severity: 'blocking',
+      requiredAction: 'Almost certainly a transient Postgres concurrency error (deadlock/serialization failure), not a genuine data or configuration defect — redrive() this specific event first; escalate as UNCLASSIFIED only if it fails again after redrive.',
     };
   }
 
