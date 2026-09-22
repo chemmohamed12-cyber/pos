@@ -36,17 +36,30 @@ cross-checked against the full transitive `require()` graph of
 
 | # | File | What changed | Source commit |
 |---|------|---------------|----------------|
-| 1 | `staged-activation.service.js` | `buildCandidate()` copies the candidate's OWN `package.json`/`package-lock.json` instead of silently keeping ACTIVE's | `a2f8001` |
+| 1 | `staged-activation.service.js` | `buildCandidate()` copies the candidate's OWN `package.json`/`package-lock.json`/`MANIFEST.json` instead of silently keeping ACTIVE's | `a2f8001`, `415b84e` |
 | 2 | `release-execution.service.js` | (a) expand/contract violation always aborts, no config escape hatch; (b) `verifyMigrationsComplete()` — migration phase reporting success is independently re-verified before swap; (c) `verifyArtifactIntegrity()` — candidate bytes vs. manifest checksums, checked before migrations run | `1876ede`, `35d2181` |
 | 3 | `expand-contract-guard.js` | `DROP CONSTRAINT "X"` is no longer flagged if the same migration re-adds `ADD CONSTRAINT "X"` under the identical name (the safe CHECK-widening idiom) | `55a321c` |
 | 4 | `artifact-integrity.js` | **NEW FILE.** Candidate-vs-manifest checksum verification, `require()`d by #2 | `35d2181` |
 | 5 | `release.controller.js` | `GET /releases/:id/migrations` now returns only the LATEST migration attempt (`MAX(startedAt)`), not every historical attempt ever recorded for a reused release id | `506de24` |
 
 All five were rebuilt from a clean `dist/` (`rm -rf dist
-tsconfig.build.tsbuildinfo && npm run build`) against current `HEAD`.
-`staged-activation.service.js`'s hash is byte-identical to the original
-`a2f8001` bootstrap's own hash — independent confirmation this build is
-deterministic and that file hasn't drifted.
+tsconfig.build.tsbuildinfo && npm run build`) against current `HEAD`
+(`415b84e`).
+
+**Update (2026-09-22, same day, second build):** the previous version of
+this package's `staged-activation.service.js` (hash `7fb1e3d8...`, then
+byte-identical to the original `a2f8001` build) did **not** yet include
+the `MANIFEST.json` fix — it was caught live, in Production, by this
+same Artifact Integrity Gate on its very first real exercise: `Artifact
+integrity check failed for release b73a154a-...: manifest identity:
+expected 39b276a1..., actual 00bffdda...`. Root cause: `MANIFEST.json`
+is a package-ROOT file exactly like `package.json`/`package-lock.json` —
+never listed in `manifest.files[]` either (`generate_manifest()` only
+scans `src/dist/public`) — so `buildCandidate()` never overlaid it, and
+every candidate silently kept ACTIVE's own old `MANIFEST.json`. Fixed in
+`415b84e`; `staged-activation.service.js`'s hash in this package (below)
+reflects that fix and is **no longer** identical to the original
+`a2f8001` hash — that's expected, not a regression.
 
 ## Package contents
 
@@ -67,8 +80,8 @@ BOOTSTRAP_HOTFIX_INSTRUCTIONS.md     this document
 
 `SHA256SUMS.txt`:
 ```
-7fb1e3d86fc33a7e2f2408c2ef35a762c85fef97c1313ef065bf2aec23f2c373  staged-activation.service.js
-6414695e038b546dd6ba0d725f72f53078bbc1d61702d7a725b9b2993ab90735  staged-activation.service.js.map
+38ac0f393002b43c3836dadea753601cae51bcd5f82c4b5492db17b48935b5c7  staged-activation.service.js
+639dc19f92033ae48072bef269dee908eaf772fa39b5ab49da82dfa6cad8025b  staged-activation.service.js.map
 c15508334f324688219f9eee11fe2dfb24e9966fe369e55d1482a5ba0a27b826  release-execution.service.js
 693e14a6a6b07edf3b26f5ffa4a8bc39149cb3570ec2a7511dddaff033afa90e  release-execution.service.js.map
 b824fb230d41bae3da04aa19ee8776a7915a3d8337c67232b0f328ab074dec26  expand-contract-guard.js
@@ -242,7 +255,7 @@ Only once all five pass is the Bootstrap Hotfix considered live.
    ```
    Must read exactly:
    ```
-   de7c92ee9e23764c18b2a66c1484de86ca78a5b7ec46b4a0bc361f32c7919c8b
+   1e78d371851ca913b402f42fbe27603c5b5c57e34d55d4bc94e4375ad09130ef
    ```
    Do not alter the ZIP if it doesn't match — re-obtain it instead. Any
    ZIP with a different filename or an older date is superseded; do not
@@ -304,7 +317,7 @@ Before SHA-256 (release-execution.service.js):   ____________________
 Before SHA-256 (expand-contract-guard.js):       ____________________
 Before SHA-256 (release.controller.js):          ____________________
 
-After SHA-256 (staged-activation.service.js):    7fb1e3d86fc33a7e2f2408c2ef35a762c85fef97c1313ef065bf2aec23f2c373  (must match)
+After SHA-256 (staged-activation.service.js):    38ac0f393002b43c3836dadea753601cae51bcd5f82c4b5492db17b48935b5c7  (must match)
 After SHA-256 (release-execution.service.js):    c15508334f324688219f9eee11fe2dfb24e9966fe369e55d1482a5ba0a27b826  (must match)
 After SHA-256 (expand-contract-guard.js):        b824fb230d41bae3da04aa19ee8776a7915a3d8337c67232b0f328ab074dec26  (must match)
 After SHA-256 (artifact-integrity.js):           24ce2efe3136afd10b155de52311e4a3278c507bcee76a2cb7c80566d6dd4854  (must match)

@@ -62,7 +62,7 @@ let StagedActivationService = StagedActivationService_1 = class StagedActivation
             await (0, promises_1.mkdir)((0, path_1.dirname)(dest), { recursive: true });
             await (0, promises_1.cp)(src, dest, { force: true });
         }
-        for (const rootFile of ['package.json', 'package-lock.json']) {
+        for (const rootFile of ['package.json', 'package-lock.json', 'MANIFEST.json']) {
             const src = (0, path_1.join)(stagingDir, rootFile);
             if (await exists(src)) {
                 await (0, promises_1.cp)(src, (0, path_1.join)(candidate, rootFile), { force: true });
