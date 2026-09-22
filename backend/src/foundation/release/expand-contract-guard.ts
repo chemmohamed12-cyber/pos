@@ -44,9 +44,54 @@ const CONTRACTION_PATTERNS: Array<{ re: RegExp; rule: string }> = [
   { re: /\bALTER\s+COLUMN\s+.+\s+SET\s+NOT\s+NULL\b/i, rule: 'SET NOT NULL on an existing column — outgoing-release writes may violate it mid-swap' },
   // ADD COLUMN ... NOT NULL with no DEFAULT in the same statement
   { re: /\bADD\s+(?:COLUMN\s+)?(?!.*\bDEFAULT\b)[^;()]*\bNOT\s+NULL\b/i, rule: 'ADD COLUMN NOT NULL without DEFAULT — outgoing-release inserts omit it and fail' },
-  { re: /\bDROP\s+CONSTRAINT\b/i, rule: 'DROP CONSTRAINT — may be relied on by the outgoing release; stage it' },
   { re: /\bDROP\s+(?:NOT\s+NULL\s+)?DEFAULT\b/i, rule: 'DROP DEFAULT — outgoing-release inserts that omit the column will fail' },
 ];
+
+/**
+ * `DROP CONSTRAINT "X"` is handled separately from `CONTRACTION_PATTERNS`
+ * (2026-09-22, false-positive found while validating v1.1.2): Postgres has
+ * no `ALTER CHECK CONSTRAINT`, so the ONLY mechanism to widen a CHECK
+ * constraint's allowed-value list (a purely additive change — the outgoing
+ * release's existing reads/writes are unaffected, nothing it relies on is
+ * removed) is DROP the old constraint and ADD a new one under the SAME
+ * name. Textually that is indistinguishable from a genuine, unsafe
+ * contraction (drop with no same-name replacement, or a rename) to a
+ * per-statement scan — exactly the shape `1789760000000-
+ * AddTransientDatabaseErrorClosingExceptionCategory.ts` and `1789730300000-
+ * AddBiometricDailySummaryImport.ts` both use, purely to widen an enum-like
+ * CHECK. Both were incorrectly blocked.
+ *
+ * The fix scans the WHOLE `up()` body (not one statement in isolation) for
+ * a `DROP CONSTRAINT "X"` that is NOT followed, anywhere later in the same
+ * body, by an `ADD CONSTRAINT "X"` under that identical name — i.e. "was
+ * this constraint dropped and never brought back under the same name" (a
+ * real removal/rename, still flagged) vs. "redefined in place" (safe by
+ * construction: whatever the outgoing release's queries validated against
+ * the old CHECK, the new CHECK permits at least the same set of values —
+ * the migration only ever ADDS values here, never removes any; a
+ * same-name redefinition that genuinely narrowed the constraint would
+ * still be a real bug, but that is a data-correctness question outside a
+ * text scanner's reach, not something this guard was ever positioned to
+ * catch even before this fix — see the file's own disclosed KNOWN
+ * LIMITATION doc comment).
+ */
+const DROP_CONSTRAINT_NAME_RE = /\bDROP\s+CONSTRAINT\s+"([^"]+)"/i;
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findUnstagedConstraintDrops(upBody: string): string[] {
+  const flagged: string[] = [];
+  for (const stmt of splitStatements(upBody)) {
+    const m = DROP_CONSTRAINT_NAME_RE.exec(stmt);
+    if (!m) continue;
+    const name = m[1];
+    const redefined = new RegExp(`\\bADD\\s+CONSTRAINT\\s+"${escapeRegExp(name)}"`, 'i').test(upBody);
+    if (!redefined) flagged.push(stmt);
+  }
+  return flagged;
+}
 
 /** Everything between `up(` and the following `down(` / `private ` / end. Best-effort. */
 function extractUpBody(source: string): string {
@@ -88,6 +133,13 @@ export function scanForContraction(files: Array<{ path: string; source: string }
           break; // one violation per statement is enough to flag it
         }
       }
+    }
+    for (const stmt of findUnstagedConstraintDrops(up)) {
+      out.push({
+        file: f.path,
+        statement: stmt.replace(/\s+/g, ' ').trim().slice(0, 240),
+        rule: 'DROP CONSTRAINT — may be relied on by the outgoing release; stage it',
+      });
     }
   }
   return out;
