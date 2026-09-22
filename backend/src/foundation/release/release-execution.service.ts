@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, MigrationExecutor } from 'typeorm';
+import { DataSource, In, MigrationExecutor } from 'typeorm';
 import { copyFile, cp, mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname, join, resolve, sep } from 'path';
@@ -157,6 +157,90 @@ export class ReleaseExecutionService {
     } catch {
       await cp(from, to, { recursive: true });
       await rm(from, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Boot-time self-reconciliation (Production Incident 2026-09-22).
+   * `deployReleaseStaged()`'s post-swap sequence is: ATOMIC SWAP ->
+   * `triggerPassengerRestart()` -> health check -> smoke check -> LKG
+   * commit -> `release.status = 'succeeded'`. That restart trigger can
+   * cause Passenger to recycle the CURRENT worker process — the same
+   * process still executing the rest of that sequence — at any point
+   * after it fires. When that happens, the deploy is functionally
+   * complete (the swap already happened, the new code is what's now
+   * running) but the function's own tail never gets to run: the release
+   * row is permanently stuck at `health_checking` (or `migrating`/
+   * `deploying`), even though nothing is actually wrong.
+   *
+   * This runs once at application boot (called from `main.ts`, after
+   * `app.listen()`, fire-and-forget). A freshly-booted process is in the
+   * exact right position to answer "did the deploy that produced ME
+   * succeed?" — if a release row is stuck in an interrupted-deploy status
+   * AND its version matches what THIS running process actually is AND a
+   * real health check right now says healthy, that is direct, current
+   * proof the deploy succeeded. It then finishes exactly the steps the
+   * interrupted run never reached: LKG commit (skipped if the LKG's
+   * current entry already names this release — never double-committed),
+   * slot pruning, and the final status write — each one audited under
+   * `release.deploy.reconciled`, never silent.
+   *
+   * Deliberately conservative: a version mismatch or a failed health
+   * check leaves the row untouched — this never guesses, and never
+   * fabricates a "succeeded" state the process itself can't verify right
+   * now. Every failure here is caught and logged; it must never prevent
+   * the application from finishing its own boot.
+   */
+  async reconcileInterruptedDeploys(actorUserId = 'system'): Promise<void> {
+    const releaseRepo = this.dataSource.getRepository(Release);
+    const stuck = await releaseRepo.find({ where: { status: In(['health_checking', 'migrating', 'deploying']) } });
+    if (stuck.length === 0) return;
+
+    const currentVersion = readAppVersion();
+    for (const release of stuck) {
+      if (release.version !== currentVersion) {
+        this.logger.warn(
+          `reconcileInterruptedDeploys: release "${release.id}" (v${release.version}) is stuck at "${release.status}" but this process is running v${currentVersion} — not reconciling (version mismatch, needs manual review).`,
+        );
+        continue;
+      }
+      try {
+        const health = await this.healthCheck.check();
+        if (!health.ok) {
+          this.logger.warn(`reconcileInterruptedDeploys: release "${release.id}" matches this process's version but health check failed right now — leaving status as-is for manual review.`);
+          continue;
+        }
+
+        const lkg = await this.lkg.read();
+        if (!lkg || lkg.current.release_id !== release.id) {
+          await this.commitLkg(release, '(unknown — reconciled after an interrupted deploy)', null);
+          await this.stagedActivation.pruneSlots([release.id]);
+        }
+
+        const previousStatus = release.status;
+        release.status = 'succeeded';
+        release.completedAt = new Date();
+        await releaseRepo.save(release);
+        await this.audit.record({
+          actorUserId,
+          organizationId: null,
+          action: 'release.deploy.reconciled',
+          resource: 'release',
+          resourceId: release.id,
+          result: 'success',
+          correlationId: null,
+          after: {
+            previousStatus,
+            reason: 'boot-time self-check: this process is running the release version this row names, and reports healthy right now',
+          },
+        });
+        this.logger.log(`reconcileInterruptedDeploys: release "${release.id}" (v${release.version}) reconciled from "${previousStatus}" to "succeeded".`);
+      } catch (err) {
+        this.logger.error(
+          `reconcileInterruptedDeploys: failed for release "${release.id}" — left untouched for manual review.`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
     }
   }
 

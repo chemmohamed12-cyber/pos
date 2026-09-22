@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './foundation/error-contract/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from './foundation/error-contract/response-envelope.interceptor';
 import { securityHeadersMiddleware } from './security-headers.middleware';
+import { ReleaseExecutionService } from './foundation/release/release-execution.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -81,6 +82,17 @@ async function bootstrap(): Promise<void> {
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port);
   console.log(`Daii backend listening on port ${port} (API at /api, UI at /)`);
+
+  // Production Incident 2026-09-22 — Passenger's post-swap restart can
+  // recycle the deploying process before its own health-check/commit tail
+  // runs, stranding an otherwise-successful release at "health_checking".
+  // Fire-and-forget, after listen() so it never delays the app coming up;
+  // errors are caught and logged inside the service itself and must never
+  // crash this process.
+  app
+    .get(ReleaseExecutionService)
+    .reconcileInterruptedDeploys()
+    .catch((err) => console.error('reconcileInterruptedDeploys failed at boot:', err));
 }
 
 bootstrap();
