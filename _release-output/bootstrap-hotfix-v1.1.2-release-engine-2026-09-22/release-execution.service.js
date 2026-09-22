@@ -66,6 +66,7 @@ const build_info_1 = require("./build-info");
 const expand_contract_guard_1 = require("./expand-contract-guard");
 const migration_datasource_1 = require("./migration-datasource");
 const migration_preflight_1 = require("./migration-preflight");
+const artifact_integrity_1 = require("./artifact-integrity");
 const app_version_1 = require("./app-version");
 const app_config_service_1 = require("../configuration/app-config.service");
 const audit_service_1 = require("../audit/audit.service");
@@ -281,6 +282,11 @@ let ReleaseExecutionService = ReleaseExecutionService_1 = class ReleaseExecution
             await audit('release.deploy.candidate_verified', verification.ok ? 'success' : 'denied', { checks: verification.checks });
             if (!verification.ok) {
                 throw new PreSwapAbort(`CANDIDATE verification failed: ${verification.checks.filter((c) => c.status === 'fail').map((c) => `${c.name} (${c.detail})`).join('; ')}`);
+            }
+            const integrity = await (0, artifact_integrity_1.verifyArtifactIntegrity)(release, candidatePath);
+            await audit('release.deploy.artifact_integrity', integrity.ok ? 'success' : 'denied', { violations: integrity.violations });
+            if (!integrity.ok) {
+                throw new PreSwapAbort((0, artifact_integrity_1.formatArtifactIntegrityViolations)(release.id, integrity.violations));
             }
             entitlementApplied = await this.applyEntitlementManifestPreSwap(release, candidatePath, actorUserId);
             const migrationTags = entitlementApplied
