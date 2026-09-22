@@ -315,11 +315,31 @@ export class ReleaseController {
     return (await this.releaseExecution.readRollbackReason(id)) ?? { rollback_reason: null };
   }
 
+  /**
+   * Production Incident 2026-09-22 — `registerRelease()`'s own REPLACEABLE
+   * re-upload policy (see its doc comment) deliberately reuses the SAME
+   * release id across every re-upload of a given version, and never
+   * deletes prior `release_migration_runs` rows — both correct, intentional
+   * design for audit-trail preservation. But this endpoint used to return
+   * ALL of them, unfiltered, for the id: after a corrected artifact was
+   * re-uploaded for the same version, an operator viewing "migrations"
+   * would still see the PRIOR (superseded) attempt's failures with no way
+   * to tell they were stale. Every row written by one `runReleaseMigrations()`
+   * call shares the exact same `startedAt` (set once, reused for the whole
+   * batch — success and failure paths alike, see release-execution.service.ts)
+   * — that shared timestamp IS the attempt boundary, with no schema change
+   * needed to express it. Scope to `MAX(startedAt)` for this release id:
+   * older attempts stay in the table (nothing deleted), this endpoint just
+   * stops conflating them with the latest one.
+   */
   @UseGuards(PermissionGuard)
   @RequirePermission('system.release.view', 'read-only')
   @Get('releases/:id/migrations')
   async getReleaseMigrations(@Param('id') id: string) {
-    return this.dataSource.getRepository(ReleaseMigrationRun).find({ where: { releaseId: id }, order: { startedAt: 'ASC' } });
+    const repo = this.dataSource.getRepository(ReleaseMigrationRun);
+    const latest = await repo.createQueryBuilder('r').where('r.releaseId = :id', { id }).select('MAX(r.startedAt)', 'max').getRawOne<{ max: Date | null }>();
+    if (!latest?.max) return [];
+    return repo.find({ where: { releaseId: id, startedAt: latest.max }, order: { migrationName: 'ASC' } });
   }
 
   // --- Controlled Data Repair: audit -> plan mapping -> link verified
