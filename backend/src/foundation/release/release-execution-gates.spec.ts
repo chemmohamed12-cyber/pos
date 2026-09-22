@@ -6,10 +6,16 @@ import { ReleaseExecutionService } from './release-execution.service';
 import { Release } from './release.entity';
 import { ReleaseManifest } from './release-manifest';
 import { buildMigrationPreflight } from './migration-preflight';
+import { verifyArtifactIntegrity } from './artifact-integrity';
 
 jest.mock('./migration-preflight', () => ({
   buildMigrationPreflight: jest.fn(),
   formatMigrationPreflight: jest.fn(() => ''),
+}));
+
+jest.mock('./artifact-integrity', () => ({
+  verifyArtifactIntegrity: jest.fn(),
+  formatArtifactIntegrityViolations: jest.requireActual('./artifact-integrity').formatArtifactIntegrityViolations,
 }));
 
 jest.mock('./migration-datasource', () => ({
@@ -192,6 +198,7 @@ describe('ReleaseExecutionService — pre-swap gate integrity (I-2)', () => {
     (MigrationExecutor as unknown as jest.Mock).mockImplementation(() => ({
       getPendingMigrations: jest.fn(async () => []),
     }));
+    (verifyArtifactIntegrity as jest.Mock).mockResolvedValue({ releaseId: 'release-under-test', ok: true, violations: [] });
   });
 
   afterEach(() => {
@@ -318,5 +325,78 @@ describe('ReleaseExecutionService — pre-swap gate integrity (I-2)', () => {
     expect(actions).not.toContain('release.deploy.migration_verification_failed');
     expect(actions).toContain('release.deploy.swapped');
     expect(actions).toContain('release.deploy.succeeded');
+  });
+
+  it('ARTIFACT INTEGRITY GATE: a violation (candidate bytes disagree with the manifest) => NO SWAP, NO RESTART, NO SUCCEEDED, and migration preflight/scan/execution are never reached', async () => {
+    service = buildService(/* expandContractEnforce */ true);
+    seedRelease();
+    (verifyArtifactIntegrity as jest.Mock).mockResolvedValue({
+      releaseId: 'release-under-test',
+      ok: false,
+      violations: [
+        {
+          kind: 'file_checksum_mismatch',
+          path: 'dist/database/migrations/targets/1789750000000-CreateTargetsCore.js',
+          expected: 'expected-checksum-abc',
+          actual: 'actual-checksum-xyz',
+        },
+      ],
+    });
+
+    const result = await service.deployRelease('release-under-test', 'admin-1');
+
+    expect(result.status).toBe('failed');
+    expect(stagedActivationMock.activate).not.toHaveBeenCalled();
+    expect(triggerPassengerRestartSpy).not.toHaveBeenCalled();
+    // Gate fires BEFORE migration preflight, the expand/contract scan, and
+    // migration execution — none of them ever run, so no NEW
+    // release_migration_runs row could possibly be written: existing
+    // migration history (from any prior attempt) is provably untouched.
+    expect(buildMigrationPreflight).not.toHaveBeenCalled();
+    expect(scanDeltaMigrationsSpy).not.toHaveBeenCalled();
+    expect(runReleaseMigrationsSpy).not.toHaveBeenCalled();
+    const actions = auditCalls.map((c) => c.action);
+    expect(actions).toContain('release.deploy.artifact_integrity');
+    expect(actions).not.toContain('release.deploy.swapped');
+    expect(actions).not.toContain('release.deploy.succeeded');
+    const integrityRecord = auditCalls.find((c) => c.action === 'release.deploy.artifact_integrity');
+    expect(integrityRecord?.result).toBe('denied');
+    expect(integrityRecord?.after?.violations).toEqual([
+      {
+        kind: 'file_checksum_mismatch',
+        path: 'dist/database/migrations/targets/1789750000000-CreateTargetsCore.js',
+        expected: 'expected-checksum-abc',
+        actual: 'actual-checksum-xyz',
+      },
+    ]);
+    // The release's own errorMessage names the exact release id, the
+    // expected/actual checksums, and the affected file — never surfaces
+    // as an opaque downstream error.
+    expect(result.errorMessage).toContain('release-under-test');
+    expect(result.errorMessage).toContain('expected-checksum-abc');
+    expect(result.errorMessage).toContain('actual-checksum-xyz');
+    expect(result.errorMessage).toContain('dist/database/migrations/targets/1789750000000-CreateTargetsCore.js');
+  });
+
+  it('ARTIFACT INTEGRITY GATE (control): a clean artifact passes the gate and deploy proceeds normally to swap', async () => {
+    service = buildService(/* expandContractEnforce */ true);
+    seedRelease();
+    // Default beforeEach mock already returns { ok: true, violations: [] }.
+
+    const result = await service.deployRelease('release-under-test', 'admin-1');
+
+    expect(result.status).toBe('succeeded');
+    expect(stagedActivationMock.activate).toHaveBeenCalledTimes(1);
+    const actions = auditCalls.map((c) => c.action);
+    expect(actions).toContain('release.deploy.artifact_integrity');
+    const integrityRecord = auditCalls.find((c) => c.action === 'release.deploy.artifact_integrity');
+    expect(integrityRecord?.result).toBe('success');
+    expect(actions).toContain('release.deploy.swapped');
+    expect(actions).toContain('release.deploy.succeeded');
+    // Proves gate ORDERING: the integrity check ran before preflight/scan/migrate.
+    const integrityIdx = actions.indexOf('release.deploy.artifact_integrity');
+    const preflightIdx = actions.indexOf('release.deploy.migration_preflight');
+    expect(integrityIdx).toBeGreaterThanOrEqual(0);
+    expect(preflightIdx).toBeGreaterThan(integrityIdx);
   });
 });

@@ -17,6 +17,7 @@ import { readBuildInfo } from './build-info';
 import { scanForContraction, isMigrationPath } from './expand-contract-guard';
 import { createMigrationDataSource } from './migration-datasource';
 import { buildMigrationPreflight, formatMigrationPreflight } from './migration-preflight';
+import { verifyArtifactIntegrity, formatArtifactIntegrityViolations } from './artifact-integrity';
 import { readAppVersion } from './app-version';
 import { ReleasePackageType } from './release-status';
 import { AppConfigService } from '../configuration/app-config.service';
@@ -318,6 +319,23 @@ export class ReleaseExecutionService {
       await audit('release.deploy.candidate_verified', verification.ok ? 'success' : 'denied', { checks: verification.checks });
       if (!verification.ok) {
         throw new PreSwapAbort(`CANDIDATE verification failed: ${verification.checks.filter((c) => c.status === 'fail').map((c) => `${c.name} (${c.detail})`).join('; ')}`);
+      }
+
+      // 1a2. Production Incident 2026-09-22 — Artifact Integrity Gate.
+      //      `verification` above proves the candidate is STRUCTURALLY
+      //      sound (dist/main.js exists, JS parses, deps resolve) — it
+      //      never proved the candidate's actual bytes are the ones the
+      //      manifest (and therefore the operator's own upload) declares.
+      //      A re-upload that registered correctly (manifestChecksum
+      //      provably matched) still produced a candidate running old
+      //      migration content — every build step traced clean from
+      //      source, so this closes the gap by checking the one thing
+      //      nothing else did: candidate bytes vs. manifest checksums,
+      //      unconditionally, before migrations ever see this candidate.
+      const integrity = await verifyArtifactIntegrity(release, candidatePath);
+      await audit('release.deploy.artifact_integrity', integrity.ok ? 'success' : 'denied', { violations: integrity.violations });
+      if (!integrity.ok) {
+        throw new PreSwapAbort(formatArtifactIntegrityViolations(release.id, integrity.violations));
       }
 
       // 1b. ERP Foundation P6 — apply the Edition entitlement manifest
