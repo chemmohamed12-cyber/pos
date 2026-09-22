@@ -220,7 +220,16 @@ export class CreateTargetsCore1789750000000 {
     rmSync(stagingDir, { recursive: true, force: true });
   });
 
-  /** Simulates exactly what `uploadPackage()` does to `stagingDir` for a given upload's content: wipe, write fresh. */
+  /**
+   * Simulates exactly what `uploadPackage()` does to `stagingDir` for a
+   * given upload's content: wipe, write fresh — including `MANIFEST.json`
+   * at the root, exactly as `PackageValidatorService.validateAndStage()`
+   * always does for a real upload (it's the file that proves the ZIP is a
+   * real release package at all). This is deliberately real staging
+   * content, not a shortcut, so `buildCandidate()`'s own root-file copy
+   * loop (package.json/package-lock.json/MANIFEST.json) is exercised for
+   * real, not bypassed.
+   */
   function stageContent(migrationContent: string): { manifest: ReleaseManifest; checksum: string } {
     rmSync(stagingDir, { recursive: true, force: true });
     mkdirSync(join(stagingDir, 'dist', 'database', 'migrations', 'targets'), { recursive: true });
@@ -232,6 +241,7 @@ export class CreateTargetsCore1789750000000 {
       files: [{ path: MIGRATION_REL_PATH, action: 'modify', checksum }],
       migrations: [],
     };
+    writeFileSync(join(stagingDir, 'MANIFEST.json'), JSON.stringify(manifest));
     return { manifest, checksum };
   }
 
@@ -244,11 +254,13 @@ export class CreateTargetsCore1789750000000 {
     expect(onDisk).toContain('EXECUTE FUNCTION');
 
     // The gate itself doesn't know old vs. new — it only knows "does the
-    // candidate match ITS OWN manifest". At this point it correctly does.
-    // (MANIFEST.json isn't written by buildCandidate() itself in this
-    // minimal harness, so we check per-file integrity only here.)
-    const actualChecksum = await computeFileChecksum(join(candidatePath, MIGRATION_REL_PATH));
-    expect(actualChecksum).toBe(manifest.files[0].checksum);
+    // candidate match ITS OWN manifest". At this point it correctly does,
+    // for both parts: the per-file checksum AND candidate identity
+    // (buildCandidate() now correctly overlays the staged MANIFEST.json —
+    // Production Incident 2026-09-22, staged-activation.service.ts).
+    const report = await verifyArtifactIntegrity(release, candidatePath);
+    expect(report.ok).toBe(true);
+    expect(report.violations).toEqual([]);
   });
 
   it('5. SAME release id re-uploaded with NEW content -> candidate 2 genuinely has the NEW bytes, no trace of the old FUNCTION content, and integrity passes for the NEW manifest', async () => {
@@ -268,7 +280,11 @@ export class CreateTargetsCore1789750000000 {
     expect(onDisk).toContain('EXECUTE PROCEDURE');
     expect(onDisk).not.toContain('EXECUTE FUNCTION');
 
-    writeFileSync(join(candidatePath, 'MANIFEST.json'), JSON.stringify(newManifest));
+    // MANIFEST.json is now overlaid by buildCandidate() itself — no manual
+    // write needed; this proves the real end-to-end pipeline, not a
+    // workaround for the fixed bug.
+    const candidateManifest = JSON.parse(readFileSync(join(candidatePath, 'MANIFEST.json'), 'utf8'));
+    expect(candidateManifest.version).toBe(newManifest.version);
     const report = await verifyArtifactIntegrity(release, candidatePath);
     expect(report.ok).toBe(true);
     expect(report.violations).toEqual([]);
@@ -286,7 +302,9 @@ export class CreateTargetsCore1789750000000 {
     // in the traced build path itself — the point of this gate is to
     // catch the SYMPTOM regardless of cause).
     writeFileSync(join(candidatePath, MIGRATION_REL_PATH), OLD_MIGRATION);
-    writeFileSync(join(candidatePath, 'MANIFEST.json'), JSON.stringify(newManifest));
+    // MANIFEST.json itself is correctly overlaid by buildCandidate() —
+    // this test only tampers with the migration file, matching "the
+    // migration content specifically reverted" incident shape.
 
     const release = makeRelease({ id: RELEASE_ID, manifest: newManifest, manifestChecksum: computeStringChecksum(JSON.stringify(newManifest)) });
     const report = await verifyArtifactIntegrity(release, candidatePath);

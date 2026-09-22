@@ -104,7 +104,16 @@ export class StagedActivationService {
     // — unconditionally, always overwriting whatever the ACTIVE-tree
     // copy above put in their place — is correct for both `full` and
     // `delta` candidates, not just this specific fix.
-    for (const rootFile of ['package.json', 'package-lock.json']) {
+    // Same gap, third instance (Production Incident 2026-09-22, found by
+    // the new Artifact Integrity Gate): `MANIFEST.json` is a package-ROOT
+    // file exactly like `package.json`/`package-lock.json` above —
+    // `generate_manifest()` only scans `src/ dist/ public/`, so it's never
+    // one of `manifest.files[]`'s own entries either. The loop above
+    // therefore never touched it, and the CANDIDATE silently kept
+    // ACTIVE's own OLD `MANIFEST.json` — invisible until something
+    // actually read the candidate's own manifest, which nothing did
+    // before `verifyArtifactIntegrity()`'s candidate-identity check.
+    for (const rootFile of ['package.json', 'package-lock.json', 'MANIFEST.json']) {
       const src = join(stagingDir, rootFile);
       if (await exists(src)) {
         await cp(src, join(candidate, rootFile), { force: true });

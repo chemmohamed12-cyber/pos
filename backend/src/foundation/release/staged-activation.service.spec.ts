@@ -100,4 +100,26 @@ describe('StagedActivationService.buildCandidate — package.json/package-lock.j
     expect(candidatePkg.version).toBe('1.1.2'); // stampVersion's own fallback still fires
     expect(candidatePkg.dependencies).toEqual(ACTIVE_PKG.dependencies); // no better source existed — inherited, not invented
   });
+
+  it('copies the CANDIDATE\'s own MANIFEST.json from stagingDir — third instance of the same package-ROOT-file gap (Production Incident 2026-09-22, found by the Artifact Integrity Gate)', async () => {
+    // ACTIVE carries a stale/old MANIFEST.json (from whatever release is
+    // currently live) — this must never leak into the new candidate.
+    writeFileSync(join(deployRoot, 'active', 'MANIFEST.json'), JSON.stringify({ version: '1.1.1', packageType: 'full', files: [], migrations: [] }));
+    const manifest: ReleaseManifest = {
+      version: CANDIDATE_PKG.version,
+      packageType: 'full',
+      files: [{ path: 'dist/main.js', action: 'modify', checksum: 'x' }],
+      migrations: [],
+    };
+    // generate_manifest() never lists MANIFEST.json in manifest.files[]
+    // either (same shape as package.json/package-lock.json) — but a real
+    // uploaded package DOES stage its own MANIFEST.json at the root, same
+    // as build-release.sh's assemble_staged() does for package.json.
+    writeFileSync(join(stagingDir, 'MANIFEST.json'), JSON.stringify(manifest));
+
+    const candidatePath = await service.buildCandidate('rel-3', manifest, stagingDir);
+
+    const candidateManifest = JSON.parse(readFileSync(join(candidatePath, 'MANIFEST.json'), 'utf8'));
+    expect(candidateManifest.version).toBe(CANDIDATE_PKG.version); // the CANDIDATE's own, not ACTIVE's stale 1.1.1
+  });
 });
