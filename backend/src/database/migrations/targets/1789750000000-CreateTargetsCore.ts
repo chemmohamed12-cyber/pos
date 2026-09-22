@@ -85,10 +85,17 @@ export class CreateTargetsCore1789750000000 implements MigrationInterface {
       END;
       $BODY$ LANGUAGE plpgsql
     `);
+    // `EXECUTE PROCEDURE`, not the newer `EXECUTE FUNCTION` spelling
+    // (PG11+ only) — this project's target hosting Postgres version is
+    // older than 11, where `EXECUTE FUNCTION` is a syntax error.
+    // `EXECUTE PROCEDURE` invokes a trigger function identically on every
+    // Postgres version back to trigger support itself, and remains valid
+    // (kept for backward compatibility) on every version up to current —
+    // there is no version where this spelling doesn't work.
     await queryRunner.query(`
       CREATE TRIGGER "TRG_targets_check_non_overlap"
       BEFORE INSERT OR UPDATE ON "targets"
-      FOR EACH ROW EXECUTE FUNCTION targets_check_non_overlap()
+      FOR EACH ROW EXECUTE PROCEDURE targets_check_non_overlap()
     `);
   }
 
