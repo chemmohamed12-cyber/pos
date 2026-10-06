@@ -5,8 +5,8 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 | Gap | Status |
 |---|---|
 | NAV-02 Accounting policy configuration | IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY (open escalations ESC-1, ESC-2) |
-| NAV-03 Approval visibility | pending |
-| NAV-04 Approval governance (PR maker/checker, payments, treasury) | pending — escalate if policy unsettled |
+| NAV-03 Approval visibility | IMPLEMENTED / INTEGRATED — **browser verification pending (needs the bv test login)** |
+| NAV-04 Approval governance (PR maker/checker, payments, treasury) | ESCALATED (ESC-3) — no ratified policy; not decided here |
 | NAV-01 / NAV-09 Setup & process guidance | pending |
 | NAV-05 Entry points to buried transactions | pending |
 | NAV-07 Accounting traceability on documents | pending |
@@ -33,3 +33,14 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 **Escalated (not blocking, no decision taken):**
 - **ESC-1 (architecture):** the Configuration Engine has no Company scope level — a saved value is installation-wide while the chart is per Company. Validation here is against the CALLER's Company chart and the screen says so. *Option A (current, adequate while every Company uses the same chart template):* keep installation scope; the same code must exist in every Company. *Option B:* add a Company scope level to the engine so each Company stores its own policy accounts (touches the engine and every reader). **Recommendation: A now, B before onboarding Companies with different charts.**
 - **ESC-2 (accounting):** the five unconsumed AR/AP hint keys and the hard-coded 5299 default in the AP adjustment handler (see above).
+
+## NAV-03 — Approval visibility (IMPLEMENTED / INTEGRATED; browser verification pending)
+
+**Verify (source).** Two mechanisms, confirmed: (1) Approval Engine — `GET /approvals/requests` (node `core.approval.view`), pending = `decidedAt === null`, central screen `/approvals` (last item of Administration) plus inline `ApprovalsPanel` on accounting screens; (2) Process-Engine transitions with their own list endpoints and a `state`/`status` field: purchase requests and purchase orders (`submitted`), warehouse transactions (`overview.pendingApprovalsCount`), sales orders (`supervisor_review` / `manager_approval` / `deposit_verification`), returns (`requested`), new-item requests (`pending`). Nothing was found that lists them together; the Dashboard had no approvals widget.
+
+**Implement (frontend only, no backend/authorization change, engines NOT merged).** `frontend/src/lib/pendingWork.ts` reads the existing list endpoints and counts what waits; each source is fetched through its own existing permission — a 403/404 hides that source for that user. New page `/pending-work` ("بانتظار القرار / Pending work", second item of the top-level Dashboard group, no sidebar reorder) shows count, oldest waiting item and an Open link to the screen where the decision is actually taken; a Dashboard card shows the total and links to it. Terminology migration `1789996000000` (15 texts, ≤ 255 chars).
+
+**Test so far.** Frontend and backend (build config) typecheck clean; navigation spec 20/20 and the policy real-PG spec 8/8 (which applies all migrations incl. the new one) on the isolated PG 5656; `dist` rebuilt and the bv backend restarted on 3601.
+**Not yet done:** browser verification (login to the bv environment is needed; the credentials of the throw-away users were not at hand and were not guessed).
+
+**ESC-3 (governance — NAV-04, escalated, not decided).** No ratified maker/checker policy exists for PR, payments or treasury. Process-Engine PR/PO approval has no requester≠approver rule (D7 spec shows a requester approving their own PR); payment/treasury services have no approval step. *Option A:* keep permission-only approval for PR/PO and no approval on payments/treasury (current behaviour). *Option B:* enforce requester≠approver on PR/PO now; payments/treasury approval only after the CTO sets thresholds. **Recommendation: B for PR/PO; payments/treasury stay as is until thresholds are decided.** Work on the other gaps is not blocked.

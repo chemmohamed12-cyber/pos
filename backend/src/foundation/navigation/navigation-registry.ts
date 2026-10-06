@@ -61,7 +61,14 @@ export interface NavGroup {
 }
 
 export const NAVIGATION_REGISTRY: NavGroup[] = [
-  { code: '', items: [{ to: '/', code: 'nav.dashboard' }] },
+  {
+    code: '',
+    items: [
+      { to: '/', code: 'nav.dashboard' },
+      // NAV-03 — every authenticated user; each source inside the page keeps its own permission (an unreadable source is simply hidden).
+      { to: '/pending-work', code: 'nav.pending_work' },
+    ],
+  },
   {
     code: 'nav_group.sales',
     coverTo: '/sales',

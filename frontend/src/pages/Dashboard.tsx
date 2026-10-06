@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../lib/api';
+import { usePendingSources } from '../lib/pendingWork';
 
 interface SalesOrder {
   id: string;
@@ -50,10 +51,13 @@ interface Summary {
 export function Dashboard() {
   const { user } = useAuth();
   const { t, preload } = useLanguage();
+  const pendingSources = usePendingSources();
+  const pendingTotal = pendingSources ? pendingSources.reduce((sum, p) => sum + p.count, 0) : null;
   const [summary, setSummary] = useState<Summary | null>(null);
   const [topReps, setTopReps] = useState<SalesByRepRow[]>([]);
 
   preload([
+    'nav.pending_work',
     'nav.customers',
     'nav.sales_orders',
     'nav.returns',
@@ -110,6 +114,12 @@ export function Dashboard() {
           {user ? `${user.fullName} — ${user.roles.map((r) => t(`role.${r}`)).join(', ')}` : ''}
         </p>
       </div>
+
+      {pendingTotal !== null && (
+        <Link to="/pending-work" className="card" style={{ display: 'block', marginBottom: 20, textDecoration: 'none', color: 'inherit' }} data-testid="dashboard-pending-work">
+          <strong>{t('nav.pending_work')}</strong>: <span style={{ fontSize: '1.4rem' }}>{pendingTotal}</span>
+        </Link>
+      )}
 
       {summary && (
         <>
