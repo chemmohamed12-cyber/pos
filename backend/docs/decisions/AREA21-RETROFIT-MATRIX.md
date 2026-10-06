@@ -3662,7 +3662,7 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Regression**: one serial run, 17 suites, 133 passed + 1 skipped (T0 baseline, by design), 0 failed; `AppModule` boot (grni-reconciliation 3/3).
 
-**Status**: FA-02 VERIFIED / CLOSED. **CUS-01** is at a one-question accounting gate (`CUS-01-ON-ACCOUNT-CUSTOMER-PAYMENT-2026-10-06.md`).
+**Status**: FA-02 VERIFIED — UAT READY (Production = HOLD; not DONE). Reconciliation proof (NBV / gain / loss with real depreciation) added: 5/5 in `fixed-asset-disposal-reconciliation`; focused regression 40/60 first run, 3 infra-contention suites individually re-run 20/20 (see the FA-02 record, section 6).
 
 ## §65 — CUS-01 CLOSED: on-account / advance customer payment — blast radius (2026-10-06)
 
