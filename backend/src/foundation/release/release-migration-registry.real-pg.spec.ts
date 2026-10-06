@@ -21,15 +21,15 @@ import { assertIsolatedInstance, createDisposableDatabase, dbConfig, dropDisposa
  * ISOLATED instance (127.0.0.1:5544 — `assertIsolatedInstance()` refuses anything else), over
  * COPIES of the compiled `dist/database/migrations` tree (`npm run build` first).
  *
- * The two D3 migrations (1789860000000 / 1789870000000) are unapproved: they are never copied
- * into any test tree, so this spec can never apply them. Remove `HELD_MIGRATION_IDS` once D3 is approved.
+ * D3 is CLOSED (2026-10-06): its two migrations (1789860000000 / 1789870000000) are part of the normal tree and are
+ * copied like any other. `HELD_MIGRATION_IDS` stays as an empty hook for any future held migration.
  *
  * Not covered here (cannot run without a hosting host): the atomic slot swap, Passenger restart,
  * live health/smoke endpoints — those remain covered only by the mocked staged-activation /
  * release-execution-gates specs and the code trace in
  * `docs/acceptance/H3_DEPLOYMENT_SAFETY_GATE_2026-10-06.md`.
  */
-const HELD_MIGRATION_IDS = ['1789860000000', '1789870000000'];
+const HELD_MIGRATION_IDS: string[] = [];
 const DIST_MIGRATIONS = join(process.cwd(), 'dist', 'database', 'migrations');
 const PREFIX = `daii_test_h3reg_${Date.now() % 100000}`;
 
