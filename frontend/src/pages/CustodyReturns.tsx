@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { ReturnsTabs } from '../components/ReturnsTabs';
 import { StatusBadge } from '../components/StatusBadge';
 
 interface CustodyShipmentSearchResult {
@@ -157,6 +158,7 @@ export function CustodyReturns() {
       <div className="page-header">
         <h1>{t('panel.custody_returns')}</h1>
       </div>
+      <ReturnsTabs />
 
       {error && <div className="error-text">{error}</div>}
       {notice && <div style={{ color: 'var(--success, #2e7d32)', marginBottom: 12 }}>{notice}</div>}

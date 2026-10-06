@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { FinancialTrace } from '../components/FinancialTrace';
 
 interface InvoiceLine {
   id: string;
@@ -175,6 +176,10 @@ export function InvoiceDetail() {
           })}
         </tbody>
       </table>
+
+      <div style={{ marginTop: 16 }}>
+        <FinancialTrace ids={[invoice.id]} />
+      </div>
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
         <button className="btn btn-secondary" onClick={() => window.open(`/print/invoice/${invoice.id}`, '_blank')}>

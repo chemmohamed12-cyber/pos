@@ -67,6 +67,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/', code: 'nav.dashboard' },
       // NAV-03 — every authenticated user; each source inside the page keeps its own permission (an unreadable source is simply hidden).
       { to: '/pending-work', code: 'nav.pending_work' },
+      // NAV-01 / NAV-09 — guidance only (links + done/to-do hints from existing list endpoints); every authenticated user.
+      { to: '/guide', code: 'nav.guide' },
     ],
   },
   {
@@ -130,7 +132,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     code: 'nav_group.customers_accounts',
     coverTo: '/customers-accounts',
     items: [
-      { to: '/customers', code: 'nav.customers', module: 'sales' },
+      // NAV-06 — `/customers` is listed once, in the Sales group (its owner); the Customers & Accounts cover still links to it.
       { to: '/customer-accounts', code: 'nav.customer_accounts', module: 'finance' },
       { to: '/customer-statement', code: 'nav.customer_statement', module: 'finance' },
       { to: '/invoices', code: 'nav.invoices', module: 'finance' },
@@ -307,6 +309,20 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
         module: 'accounting',
         permissionNode: 'accounting.fiscal_year',
       },
+      // NAV-10 — Dimensions and Accounting Settings (currencies / tax codes / tax periods) were reachable only from the Accounting cover. Each is gated on the
+      // node its own list route enforces (`accounting.dimension.view`, `accounting.currency.view`), so navigation never shows what the API would refuse.
+      {
+        to: '/accounting/dimensions',
+        code: 'nav.dimensions',
+        module: 'accounting',
+        permissionNode: 'accounting.dimension',
+      },
+      {
+        to: '/accounting/settings',
+        code: 'nav.accounting_settings',
+        module: 'accounting',
+        permissionNode: 'accounting.currency',
+      },
       // F14 — Financial Reporting (ADR-047 D7/D8). `feature: 'accounting.general_ledger'` matches
       // Trial Balance's own gate — reporting is built on the same GL data, no new feature flag (D7).
       {
@@ -342,9 +358,10 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     coverTo: '/procurement',
     items: [
       { to: '/suppliers', code: 'nav.suppliers', module: 'procurement', permissionNode: 'procurement.supplier' },
-      { to: '/purchase-orders', code: 'nav.purchase_orders', module: 'procurement', permissionNode: 'procurement.purchase_order' },
+      // NAV-01 — the same items, in process order (request -> RFQ -> order); no item added, removed or re-gated.
       { to: '/purchase-requests', code: 'nav.purchase_requests', module: 'procurement', permissionNode: 'procurement.purchase_request' },
       { to: '/rfqs', code: 'nav.rfqs', module: 'procurement', permissionNode: 'procurement.rfq' },
+      { to: '/purchase-orders', code: 'nav.purchase_orders', module: 'procurement', permissionNode: 'procurement.purchase_order' },
       { to: '/supplier-invoices', code: 'nav.supplier_invoices', module: 'procurement', permissionNode: 'procurement.supplier_invoice' },
       // `GET :id/ledger` on `supplier.controller.ts` — same node as the supplier list/detail routes.
       { to: '/supplier-statement', code: 'nav.supplier_statement', module: 'procurement', permissionNode: 'procurement.supplier' },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { FinancialStatusCell } from '../components/FinancialTrace';
 
 interface PaymentRow {
   id: string;
@@ -92,6 +93,7 @@ export function Payments() {
               <th>{t('field.total_amount')}</th>
               <th>{t('field.payment_method')}</th>
               <th>{t('field.date')}</th>
+              <th>{t('field.financial_status')}</th>
               <th>{t('field.actions')}</th>
             </tr>
           </thead>
@@ -108,6 +110,9 @@ export function Payments() {
                 <td>{r.amount}</td>
                 <td>{r.method}</td>
                 <td>{new Date(r.occurredAt).toLocaleString()}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <FinancialStatusCell id={r.id} />
+                </td>
                 <td>
                   <button className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); window.open(`/print/payment/${r.id}`, '_blank'); }}>
                     {t('action.print')}

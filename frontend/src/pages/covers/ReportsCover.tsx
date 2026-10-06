@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { SectionCover } from '../../components/SectionCover';
+import { ReportsHub } from '../../components/ReportsHub';
 
 interface SalesOrder {
   id: string;
@@ -85,6 +86,8 @@ export function ReportsCover() {
             ]
           : undefined
       }
-    />
+    >
+      <ReportsHub />
+    </SectionCover>
   );
 }

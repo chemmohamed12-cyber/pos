@@ -3711,6 +3711,10 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 **Scope**: `ERP-AUDIT-CLOSURE-REPORT-2026-10-06.md`. Records only — no code, no controller, no schema change. **Area 21 count unchanged: 27/43.**
 INV-03 → VERIFIED / CLOSED (evidence: the operator screenshot of the Warehouse screen — Code, Name, Location, Responsible only, no Account Code / GL mapping — stored under ~evidence/INV-03-warehouse-screen-operator-screenshot-2026-10-06.png`; no warehouse GL account; central Inventory Control 1120 stays). Final record: D1/D6/D7/D8 (acquisition / link workflow)/D9/PRC-01/CUS-01/COA-01/SHR-01/D10/T0/INV-03/Journal Company Numbering → VERIFIED / CLOSED; **D8 Acquisition-Journal Helper → DEFERRED / POLICY REQUIRED**; FA-02 → VERIFIED / UAT READY; Browser Verification #1 → PERFORMED / VERIFIED (found and fixed the D1 label and D6 terminology defects, and surfaced the journal-numbering defect, fixed and re-verified). **UAT = READY / PENDING EXECUTION. Production = HOLD.**
 
+## §69 — Navigation & Operational Workflow Gap Closure (2026-10-06)
+
+**Scope**: `NAV-GAP-CLOSURE-REPORT-2026-10-06.md` (+ running record `NAV-GAP-CLOSURE-2026-10-06.md`). Frontend-led, read-only/link layers and registry/terminology seeds; **no accounting rule, authorization semantic, company-isolation or approval-policy change; Area 21 count unchanged: 27/43.** NAV-02 → VERIFIED / UAT READY. NAV-03/01/09/05/07/06/08/10/12/13/14 → IMPLEMENTED / INTEGRATED — BROWSER VERIFICATION PENDING (no credentials for the 5173 environment; none guessed). NAV-11 → verified finding, no change (ESC-4). **NAV-04 → BLOCKED — POLICY DECISION REQUIRED (ESC-3).** Tests: navigation 20/20, nav-closure 9/9, policy real-PG 8/8 (37/37 first run; not a full-repository regression). Production = HOLD.
+
 ## §15 — What This Document Is Not
 
 Not an implementation. Not a decision on the 5 Mixed/Special. Not a

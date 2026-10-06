@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { FinancialTrace } from '../../components/FinancialTrace';
 
 interface Supplier {
   id: string;
@@ -73,6 +74,8 @@ export function SupplierInvoices() {
   const [invoices, setInvoices] = useState<SupplierInvoiceRow[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<(SupplierInvoiceRow & { lines: SupplierInvoiceLine[] }) | null>(null);
+  // NAV-07 — ids of this invoice's supplier payments (their financial events are keyed by payment id)
+  const [paymentIds, setPaymentIds] = useState<string[]>([]);
 
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [supplierReference, setSupplierReference] = useState('');
@@ -179,6 +182,10 @@ export function SupplierInvoices() {
       const d = await api.get<SupplierInvoiceRow & { lines: SupplierInvoiceLine[] }>(`/procurement/supplier-invoices/${id}`);
       setDetail(d);
       setPaymentAmount(d.remaining);
+      api
+        .get<Array<{ id: string; supplierInvoiceId: string }>>(`/procurement/supplier-payments/by-supplier/${d.supplierId}`)
+        .then((rows) => setPaymentIds((Array.isArray(rows) ? rows : []).filter((p) => p.supplierInvoiceId === id).map((p) => p.id)))
+        .catch(() => setPaymentIds([])); // not permitted to view supplier payments: the invoice's own trace still shows
     } catch (err) {
       // Foundation fix: called directly from a row onClick with no error handling.
       setError(err instanceof ApiError ? err.message : 'Failed to load supplier invoice detail.');
@@ -424,6 +431,8 @@ export function SupplierInvoices() {
                 ))}
               </tbody>
             </table>
+
+            <FinancialTrace ids={[detail.id, ...paymentIds]} />
 
             {(detail.state === 'posted' || detail.state === 'partially_paid') && hasRole('admin') && Number(detail.remaining) > 0 && (
               <form onSubmit={onRecordPayment} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { FinancialStatusCell } from '../components/FinancialTrace';
 
 interface TreasuryAccount {
   id: string;
@@ -253,6 +254,7 @@ export function TreasuryLedger() {
                 <th>{t('field.reason')}</th>
                 <th>{t('field.movement_date')}</th>
                 <th>{t('field.status')}</th>
+                <th>{t('field.financial_status')}</th>
                 <th>{t('field.actions')}</th>
               </tr>
             </thead>
@@ -270,6 +272,9 @@ export function TreasuryLedger() {
                   <td>{new Date(txn.movementDate).toLocaleString()}</td>
                   <td>
                     <StatusBadge code={`warehouse_txn_state.${txn.status}`} />
+                  </td>
+                  <td>
+                    <FinancialStatusCell id={txn.id} />
                   </td>
                   <td>
                     {txn.status === 'posted' && (

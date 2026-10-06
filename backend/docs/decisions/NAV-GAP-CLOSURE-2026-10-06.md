@@ -7,16 +7,16 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 | NAV-02 Accounting policy configuration | IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY (open escalations ESC-1, ESC-2) |
 | NAV-03 Approval visibility | IMPLEMENTED / INTEGRATED — **browser verification pending (needs the bv test login)** |
 | NAV-04 Approval governance (PR maker/checker, payments, treasury) | ESCALATED (ESC-3) — no ratified policy; not decided here |
-| NAV-01 / NAV-09 Setup & process guidance | pending |
-| NAV-05 Entry points to buried transactions | pending |
-| NAV-07 Accounting traceability on documents | pending |
-| NAV-06 Canonical Customers / BOM / returns grouping | pending |
-| NAV-08 Reports hub | pending |
-| NAV-10 Settings / Dimensions discoverable | pending |
-| NAV-11 Navigation gating consolidation | pending |
-| NAV-12 Fulfilment vs Manufacturing naming | pending |
-| NAV-13 Dashboard discovery | pending |
-| NAV-14 Missing terminology keys | pending |
+| NAV-01 / NAV-09 Setup & process guidance | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-05 Entry points to buried transactions | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-07 Accounting traceability on documents | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-06 Canonical Customers / BOM / returns grouping | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-08 Reports hub | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-10 Settings / Dimensions discoverable | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-11 Navigation gating consolidation | verified finding, no change (ESC-4) |
+| NAV-12 Fulfilment vs Manufacturing naming | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-13 Dashboard discovery | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-14 Missing terminology keys | IMPLEMENTED / INTEGRATED — browser verification pending |
 
 ## NAV-02 — Accounting Policy configuration (IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY)
 
@@ -44,3 +44,5 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 **Not yet done:** browser verification (login to the bv environment is needed; the credentials of the throw-away users were not at hand and were not guessed).
 
 **ESC-3 (governance — NAV-04, escalated, not decided).** No ratified maker/checker policy exists for PR, payments or treasury. Process-Engine PR/PO approval has no requester≠approver rule (D7 spec shows a requester approving their own PR); payment/treasury services have no approval step. *Option A:* keep permission-only approval for PR/PO and no approval on payments/treasury (current behaviour). *Option B:* enforce requester≠approver on PR/PO now; payments/treasury approval only after the CTO sets thresholds. **Recommendation: B for PR/PO; payments/treasury stay as is until thresholds are decided.** Work on the other gaps is not blocked.
+
+## NAV-01 … NAV-14 (remaining) — see `NAV-GAP-CLOSURE-REPORT-2026-10-06.md` (the single Closure Report): what changed, tests, limitations, escalations ESC-1…ESC-4, UAT readiness.

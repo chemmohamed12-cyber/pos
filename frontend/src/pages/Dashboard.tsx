@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../lib/api';
+import { CommonTasks } from '../components/CommonTasks';
+import { DashboardSections } from '../components/DashboardSections';
 import { usePendingSources } from '../lib/pendingWork';
 
 interface SalesOrder {
@@ -120,6 +122,10 @@ export function Dashboard() {
           <strong>{t('nav.pending_work')}</strong>: <span style={{ fontSize: '1.4rem' }}>{pendingTotal}</span>
         </Link>
       )}
+
+      <DashboardSections />
+
+      <CommonTasks />
 
       {summary && (
         <>

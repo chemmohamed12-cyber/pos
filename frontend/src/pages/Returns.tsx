@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { ReturnsTabs } from '../components/ReturnsTabs';
 import { StatusBadge } from '../components/StatusBadge';
 
 interface ReturnRequest {
@@ -187,6 +188,7 @@ export function Returns() {
       <div className="page-header">
         <h1>{t('nav.returns')}</h1>
       </div>
+      <ReturnsTabs />
 
       {error && <div className="error-text">{error}</div>}
 

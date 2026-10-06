@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { FinancialStatusCell } from '../../components/FinancialTrace';
 import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
 
@@ -457,7 +458,7 @@ export function PurchaseOrders() {
               <ul style={{ paddingInlineStart: 18 }}>
                 {receipts.map((r) => (
                   <li key={r.id}>
-                    {r.grNumber} — {new Date(r.createdAt).toLocaleString()}
+                    {r.grNumber} — {new Date(r.createdAt).toLocaleString()} <FinancialStatusCell id={r.id} />
                   </li>
                 ))}
               </ul>

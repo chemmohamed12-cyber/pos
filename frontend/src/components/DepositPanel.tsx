@@ -3,6 +3,7 @@ import { api, ApiError, downloadBlob } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from './StatusBadge';
+import { FinancialTrace } from './FinancialTrace';
 
 interface Deposit {
   id: string;
@@ -226,6 +227,7 @@ export function DepositPanel({ salesOrderId, orderStatus, onChanged }: { salesOr
 
       {deposit && (
         <div style={{ marginBottom: needsSubmission ? 16 : 0 }}>
+          <FinancialTrace ids={[deposit.id]} />
           <div className="detail-grid">
             <div className="detail-field">
               <div className="label">{t('field.total_amount')}</div>

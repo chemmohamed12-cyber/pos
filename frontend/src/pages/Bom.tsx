@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useVisibleRoutes } from '../lib/navVisibility';
 
 interface BomListEntry {
   finishedProductId: string;
@@ -32,6 +34,7 @@ interface DraftLine {
 
 export function Bom() {
   const { t, preload } = useLanguage();
+  const visibleRoutes = useVisibleRoutes();
   const [boms, setBoms] = useState<BomListEntry[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +145,13 @@ export function Bom() {
       <div className="page-header">
         <h1>{t('nav.bom')}</h1>
       </div>
+
+      {/* NAV-06 — when Manufacturing is available to this user, its BOM screen is the canonical one; this screen stays for Sales-only Companies. */}
+      {visibleRoutes?.has('/manufacturing/boms') && (
+        <div className="card" style={{ marginBottom: 20 }} data-testid="bom-canonical-notice">
+          {t('panel.bom_canonical_notice')} <Link to="/manufacturing/boms">{t('nav.manufacturing_boms')}</Link>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>

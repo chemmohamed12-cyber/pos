@@ -93,6 +93,7 @@ import { CustodianDetail } from './pages/CustodianDetail';
 import { Admin } from './pages/Admin';
 import { Approvals } from './pages/Approvals';
 import { PendingWork } from './pages/PendingWork';
+import { Guide } from './pages/Guide';
 import { ReleaseCenter } from './pages/ReleaseCenter';
 import { Organization } from './pages/Organization';
 import { Reports } from './pages/Reports';
@@ -220,6 +221,7 @@ function AppRoutes() {
         <Route path="admin" element={<Admin />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="pending-work" element={<PendingWork />} />
+        <Route path="guide" element={<Guide />} />
         <Route path="release-center" element={<ReleaseCenter />} />
         <Route path="organization" element={<Organization />} />
         <Route path="reports-overview" element={<ReportsCover />} />
