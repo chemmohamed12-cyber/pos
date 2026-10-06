@@ -1,6 +1,6 @@
 # H3 Verification + Deployment Safety Gate — evidence report, 2026-10-06
 
-**Final status: `H3 = OPEN — hosting verification unavailable`** (D3 hold LIFTED 2026-10-06: D3 CLOSED; normal artifact built and verified; no approved staging host exists yet; `:5433` not evidenced). See "Update 2026-10-06 (post-D3)" at the end.
+**Official status (CTO, 2026-10-06): `D3 CLOSED. H3 OPEN — LOCAL/ARTIFACT VERIFICATION COMPLETE; REAL STAGING DEPLOYMENT AND ROLLBACK EVIDENCE PENDING.`** The remaining evidence is environment proof only (real staging host, staging DB, real restart watcher, backup, swap, health, controlled post-swap failure, real rollback, LKG); `:5433` is NOT EVIDENCED (needs the owner to run the read-only query or an approved read-only path — no further engineering investigation). See "Update 2026-10-06 (post-D3)" at the end.
 Manufacturing M10 remains CLOSED; no Manufacturing code, Event Engine, Company data or `readEnabledModules` architecture was touched.
 Registry fix (`MIGRATION_TAGS` = all 13 tag dirs) stands and is verified.
 **Update (CTO GO on RB-1 only):** the pre-existing Release Engine defect **RB-1 is FIXED and verified** (see below; uncommitted). The open items are now the hosting deployment-safety evidence and the `:5433` check. The three other findings (G-1 missing-directory preflight gap, G-2 silent unknown module code, D-2 untracked `backend/tools/build/`) are **documented only — no implementation scope opened**.
@@ -108,3 +108,5 @@ Package → `uploadPackage` (validator: only `src/ dist/ public/` + manifest/pac
 - **`:5433` impact check — NOT EVIDENCED.** The classifier-blocked read has no approved read-only path yet; not retried.
 - **Phases 5–7 (real staging deployment, real slot swap/restart/health, controlled post-swap failure, real rollback, no-restore proof) — NOT EXECUTED.** No approved staging host / process watcher / staging DB exists on this machine; the runbook (`H3_STAGING_DEPLOYMENT_RUNBOOK_2026-10-06.md`, unchanged) lists what must be confirmed first. Isolated tests are not a substitute; production is excluded.
 - **H3 closure therefore stays OPEN — `H3 OPEN — hosting verification unavailable`.**
+
+**Artifact traceability rule (CTO, 2026-10-06):** the artifact tested on staging must be traceable to ONE exact immutable commit plus its SHA-256. The artifact above is `58f7030e…180d` built from `2b57184`. Either document that exact pairing when staging uses it, or — if staging must run the final HEAD — rebuild from that HEAD and record the new SHA-256. Do not re-run the already-proven local gates (registry, entitlement closure, accounting/manufacturing selection, upgrade, RB-1, failure safety, artifact verification); the next step is Phase 5 real-environment verification only.
