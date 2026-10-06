@@ -50,5 +50,27 @@ Not covered: a Company B disposal is only SUBMITTED (B has no approver user in t
 
 **Regression — worded exactly (isolated seeded PG, serial, this stage):** focused set of 11 suites (the 3 fixed-asset specs + the new reconciliation spec, general-ledger, event-engine, inventory-posting, subledger-controllers, accounting.company-isolation, grni-reconciliation, fiscal-period-closing-workflow): **40/60 first run, 3 suites failed** — all three on `relation "user_roles" does not exist` (event-engine 8, inventory-posting 9, fixed-asset-acquisition-link 3 = 20 tests): **classification: infrastructure/contention** (missing-schema errors from the shared harness, identical to the pattern seen in earlier runs; not an assertion failure, not FA-02-caused; all three passed earlier in this stage's lineage). The three suites were **individually re-run and passed 20/20** (event-engine 8/8, inventory-posting 9/9, fixed-asset-acquisition-link 3/3) — this is NOT a single-run "all passed". Passed in the first run: fixed-asset-disposal-reconciliation 5/5, fixed-asset-disposal-gain-loss 5/5, fixed-asset 4/4, general-ledger 9/9, subledger-controllers 5/5, accounting.company-isolation 5/5, grni-reconciliation 3/3, fiscal-period-closing-workflow 4/4. Earlier in the stage: 17 suites, 133 passed + 1 skipped (T0 baseline, skipped by design). **FA-02-caused failures: none. Unrelated regressions: none observed in this set. A full-repository regression was NOT run for this stage.**
 
+
+## 7. CTO acceptance (2026-10-06) and gate table
+FA-02 accepted: **VERIFIED / UAT READY, Production = HOLD.** Not raised to "UAT VERIFIED": browser verification was not performed and the last regression was not a single clean run (documented, not an FA-02 failure). No further change to FA-02 is authorised.
+
+| Gate | Status |
+|---|---|
+| Implementation | CLOSED |
+| Integration | CLOSED |
+| Accounting verification | VERIFIED |
+| Company isolation | VERIFIED |
+| Regression impact | No FA-02-caused failure |
+| UAT readiness | READY |
+| Browser verification | PENDING |
+| UAT verification | PENDING |
+| Production | HOLD |
+
+**Regression wording to keep (CTO):** Focused regression had 3 infrastructure/harness failures caused by missing `user_roles`; the affected suites passed individually 20/20. No FA-02-caused failure was observed. Full-repository regression was not run.
+
+**UAT verification items (not hidden gaps):**
+1. **Company B approval path not independently executed end-to-end** — B has no approver user in the harness, so a B disposal was only submitted. Covered by: A/B DataSource isolation, B resolving its own chart, the shared posting engine proved through A, B untouched by A. To be executed in UAT with a real B approver.
+2. Browser verification of the disposal screen (the pre-mutation rejection message, the gain/loss outcome) — NOT PERFORMED.
+
 ## Status
-**FA-02 = VERIFIED — UAT READY (2026-10-06). Not "DONE". Production = HOLD.**
+**FA-02 = VERIFIED — UAT READY. Production = HOLD.**
