@@ -59,6 +59,7 @@ import { CommissionBatches } from './pages/commission/CommissionBatches';
 import { CommissionCover } from './pages/covers/CommissionCover';
 import { AccountingCover } from './pages/covers/AccountingCover';
 import { ChartOfAccounts } from './pages/accounting/ChartOfAccounts';
+import { AccountingPolicy } from './pages/accounting/AccountingPolicy';
 import { Journals } from './pages/accounting/Journals';
 import { JournalDetail } from './pages/accounting/JournalDetail';
 import { GeneralLedger } from './pages/accounting/GeneralLedger';
@@ -260,6 +261,7 @@ function AppRoutes() {
         <Route path="commission/batches" element={<CommissionBatches />} />
         <Route path="accounting" element={<AccountingCover />} />
         <Route path="accounting/chart-of-accounts" element={<ChartOfAccounts />} />
+        <Route path="accounting/policy" element={<AccountingPolicy />} />
         <Route path="accounting/journals" element={<Journals />} />
         <Route path="accounting/journals/:id" element={<JournalDetail />} />
         <Route path="accounting/ledger" element={<GeneralLedger />} />

@@ -200,6 +200,12 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       },
       // F03 — General Ledger + Financial Event Engine (ADR-035).
       {
+        to: '/accounting/policy',
+        code: 'nav.accounting_policy',
+        module: 'accounting',
+        permissionNode: 'accounting.account',
+      },
+      {
         to: '/accounting/journals',
         code: 'nav.journals',
         module: 'accounting',

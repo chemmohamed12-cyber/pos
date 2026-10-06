@@ -56,6 +56,8 @@ import { FixedAssetService } from './application/fixed-asset.service';
 import { DepreciationService } from './application/depreciation.service';
 import { FixedAssetDisposalService } from './application/fixed-asset-disposal.service';
 import { FixedAssetAcquisitionService } from './application/fixed-asset-acquisition.service';
+import { AccountingPolicyConfigService } from './application/accounting-policy-config.service';
+import { AccountingPolicyConfigController } from './interface/accounting-policy-config.controller';
 import { FixedAssetReconciliationService } from './application/fixed-asset-reconciliation.service';
 import { ClosingAuditService } from './application/closing-audit.service';
 import { ClosingSnapshotSigningKeyService } from './application/closing-snapshot-signing-key.service';
@@ -194,6 +196,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     CashBankController,
     InventoryAccountingController,
     FixedAssetController,
+    AccountingPolicyConfigController,
     GrniController,
     WipController,
   ],
@@ -224,6 +227,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     DepreciationService,
     FixedAssetDisposalService,
     FixedAssetAcquisitionService,
+    AccountingPolicyConfigService,
     FixedAssetReconciliationService,
     ClosingAuditService,
     ClosingSnapshotSigningKeyService,

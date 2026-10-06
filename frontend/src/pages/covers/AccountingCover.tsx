@@ -43,6 +43,7 @@ export function AccountingCover() {
       titleCode="module.accounting"
       shortcuts={[
         { to: '/accounting/chart-of-accounts', labelCode: 'nav.chart_of_accounts' },
+        { to: '/accounting/policy', labelCode: 'nav.accounting_policy' },
         { to: '/accounting/journals', labelCode: 'nav.journals' },
         { to: '/accounting/ledger', labelCode: 'nav.general_ledger' },
         { to: '/accounting/trial-balance', labelCode: 'nav.trial_balance' },
