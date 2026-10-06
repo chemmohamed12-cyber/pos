@@ -1,6 +1,6 @@
 # H3 Verification + Deployment Safety Gate — evidence report, 2026-10-06
 
-**Final status: `H3 = OPEN — HOSTING DEPLOYMENT BLOCKED BY D3 AUTHORIZATION`** (CTO decision, Option B — see "Decision log" at the end; `:5433` not evidenced).
+**Final status: `H3 = OPEN — hosting verification unavailable`** (D3 hold LIFTED 2026-10-06: D3 CLOSED; normal artifact built and verified; no approved staging host exists yet; `:5433` not evidenced). See "Update 2026-10-06 (post-D3)" at the end.
 Manufacturing M10 remains CLOSED; no Manufacturing code, Event Engine, Company data or `readEnabledModules` architecture was touched.
 Registry fix (`MIGRATION_TAGS` = all 13 tag dirs) stands and is verified.
 **Update (CTO GO on RB-1 only):** the pre-existing Release Engine defect **RB-1 is FIXED and verified** (see below; uncommitted). The open items are now the hosting deployment-safety evidence and the `:5433` check. The three other findings (G-1 missing-directory preflight gap, G-2 silent unknown module code, D-2 untracked `backend/tools/build/`) are **documented only — no implementation scope opened**.
@@ -86,3 +86,25 @@ Package → `uploadPackage` (validator: only `src/ dist/ public/` + manifest/pac
 - `:5433` remains NOT EVIDENCED (classifier-blocked; no workaround; needs an approved read-only path).
 - Documented findings only (no scope): missing-directory preflight gap; silent unknown module code; untracked `backend/tools/build/`; 7-tag boot DataSource list in `database.module.ts`.
 - **Release Readiness checklist — must not drop off:** `backend/tools/build/` is untracked (root `.gitignore` rule `build/`); a fresh checkout/CI has no `build-release.sh`. Confirm the build host has the script and record its sha before any real release.
+
+## Update 2026-10-06 (post-D3) — CTO directive "D3 → H3 Final Closure"
+
+**D3 = CLOSED** (D3 record §11; clean-run spec 3/3, D3 core 39/39, returns+shipment 37/37, domain regression 263/269 first run with 5 environment failures cleared). The hold in the Decision log above is lifted: D3 is part of the normal release tree and is **no longer excluded anywhere** (the H3 real-PG spec's `HELD_MIGRATION_IDS` is now empty and the spec still passes over the full tree).
+
+**Release readiness (Phase 3) — done:**
+- `backend/tools/build/` is **tracked** (commit `8fc3142`; the root `.gitignore` rule `build/` had hidden it → narrow exception `!backend/tools/build/`). Blob `858b516bddcd67a9c9572842c3857c7b5ff6989a`; file SHA-256 `161c871426d71d6efcf6f3066a5043b7c7733619495c349c1a4d4a820138ac64`.
+- `.gitattributes` (`*.sh text eol=lf`, commit `2b57184`): with `core.autocrlf=true` a fresh Windows checkout made `build-release.sh` / `verify-deploy.sh` CRLF, which bash rejects. A Linux checkout/CI was never affected; this closes the Windows case.
+- A genuine fresh-clone build was not run in a second clone; the build below ran from the tracked worktree (clean `git status`, HEAD `2b57184`) after `npm ci` into a real `node_modules`.
+
+**Normal release build (Phase 4) — done:** `npm run build:release` (only `--out` given), 7 m 43 s: `npm ci` backend + frontend, clean `nest build`, vite build, the script's own verification `VERIFY: PASSED` (3636 manifest files, 0 problems, 0 bad dist JS, served bundle consistent, secret scan clean).
+- Artifact `Daii-Release-v1.1.2-2026-10-06.zip`, **SHA-256 `58f7030e835db467f3506b2431f5a7183ca39a2646ed4e5170156e01beef180d`** (re-hashed independently, identical to the `.sha256` file).
+- Manifest: version 1.1.2, `packageType=full`, `database.migrationCount=266`, `migrations[]` 266, **13 tag directories**; per-tag js counts accounting 41 / attendance 6 / commission 5 / core 103 / finance 12 / hr 9 / inventory 15 / logistics 23 / manufacturing 7 / payroll 4 / procurement 13 / sales 24 / targets 4 = 266; contains the Accounting, Manufacturing and both D3 migrations; manifest-vs-tree checksum mismatches 0; the unpacked artifact's migration files are byte-identical to the freshly built worktree `dist`.
+- Identity: built from commit `2b57184`. HEAD is `885bb4f` plus this doc commit (test/doc-only changes, which the package excludes) — rebuild from the final HEAD if the staging run must pin the exact commit.
+- Artifact kept outside the repo under the user temp dir `h3-release-out` (not committed).
+
+**RB-1 focused regression at the committed state (Phase 2):** `src/foundation/release` + `release-orchestration` + `enabled-modules.spec`: **23 suites / 205 tests PASS** (isolated PG 127.0.0.1:5544), including the 21-test registry/RB-1 spec. RB-1 fix is committed in `cf751f2`.
+
+**Not done — and why (STOP, no workaround):**
+- **`:5433` impact check — NOT EVIDENCED.** The classifier-blocked read has no approved read-only path yet; not retried.
+- **Phases 5–7 (real staging deployment, real slot swap/restart/health, controlled post-swap failure, real rollback, no-restore proof) — NOT EXECUTED.** No approved staging host / process watcher / staging DB exists on this machine; the runbook (`H3_STAGING_DEPLOYMENT_RUNBOOK_2026-10-06.md`, unchanged) lists what must be confirmed first. Isolated tests are not a substitute; production is excluded.
+- **H3 closure therefore stays OPEN — `H3 OPEN — hosting verification unavailable`.**
