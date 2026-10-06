@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
+# ...but the release build tooling is source, not build output (H3 release readiness): it must be in a fresh checkout / CI.
+!backend/tools/build/
 
 # Environment / secrets
 .env
