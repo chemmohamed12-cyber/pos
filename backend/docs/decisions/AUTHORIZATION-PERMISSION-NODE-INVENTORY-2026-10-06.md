@@ -318,7 +318,7 @@ Generated read-only from the source by scanning every `*.controller.ts` for `@Re
 
 ## Controllers gated by a hard-coded role key (`@RequireRole`)
 
-- `domains/treasury/interface/treasury.controller.ts :: 'admin', 'finance'`
+- *(correction 2026-10-07: `domains/treasury/interface/treasury.controller.ts` appeared here because the text `@RequireRole('admin','finance')` occurs in a comment describing its former gate; it is NOT role-gated — every route requires `@RequirePermission('finance','editable')`.)*
 - `foundation/admin/admin.controller.ts :: 'admin' | 'admin', 'sales_manager'`
 - `foundation/audit/installation-audit.controller.ts :: 'admin'`
 - `foundation/company/company-registry.controller.ts :: 'admin' | 'admin'`

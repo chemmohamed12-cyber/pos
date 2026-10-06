@@ -1,14 +1,35 @@
 # AUTHORIZATION & USER MANAGEMENT BLUEPRINT — 2026-10-06
 
-**Status: DRAFT FOR CTO ARCHITECTURE GATE — "Architecture Direction: APPROVED IN PRINCIPLE", not closed.**
+**Status: APPROVED IN PRINCIPLE (CTO Architecture Gate, 2026-10-06) — Gate amendments A1–A7 applied (see "Gate amendments log" below). Architecture Gate is NOT closed: it closes only after Phase 0 (read-only) completes. Implementation Readiness: NOT YET.**
 **This document is design only. No code, schema, migration or data was changed in preparing it. No push. Production = HOLD.**
 
 Inputs: `AUTHORIZATION-AND-USER-MANAGEMENT-ARCHITECTURE-AUDIT-2026-10-06.md` (findings AZ-01…AZ-12), `AUTHORIZATION-PERMISSION-NODE-INVENTORY-2026-10-06.md` (209 nodes), the CTO directives of 2026-10-06 (target architecture, five non-negotiable principles, the XNEXUSTECH naming instruction), and a further read-only pass over `plans/company-package.service.ts`, `entitlement/*`, `audit/audit-record.entity.ts`, `scope/*`, `organization/*`, `authentication/*`.
 
+## Gate amendments log (CTO decision 2026-10-06)
+
+| # | Amendment | Where applied |
+|---|---|---|
+| A1 | Decision function restated as **seven layers** with a structured output (not a Boolean formula) | header, §1 |
+| A2 | `company_admin` = **Company Administration Authority**, not ERP God Mode; cannot self-elevate to Critical capabilities | §6, §6.2, §21 (I7, I11) |
+| A3 | Package upgrade does **not** auto-grant operational permissions to `company_admin`; only module *administration* nodes are automatic | §16 (E2), §7, Addendum B (D10) |
+| A4 | F6 = **Controlled Scope Pilot** only (Inventory/Warehouse Transactions, PR/PO/GR, Sales Orders, Treasury Accounts); no enterprise-wide scope in Foundation | §9.5, §23, §26 |
+| A5 | `PolicyService` = orchestration / decision facade only; domain business rules stay in their domains | §15 |
+| A6 | `/auth/me.capabilities` and `can()` are **UX / decision hints, not Security Authority**; the backend re-verifies on every protected operation (Zero Trust) | §12, §13, §21 (I11) |
+| A7 | D14 (DAII operational-data migration) is a **fully independent project**, never combined with the authorization migration | §19, §26, Addendum A (N3), Addendum B |
+| — | Release gate: **AZ-01, AZ-02, AZ-03, AZ-10 are RC blockers** (F1+F2); F3–F6 are Foundation completion | §23, §27 |
+| P0 | **Phase 0 refinements (2026-10-07):** (1) `company_admin` is a **new** system role key for new Companies; existing `admin` rows are kept verbatim and relabelled "Legacy Administrator (Operational)" (resolves A2 vs no-silent-loss; D17); (2) the request-scoped `AuthorizationContext` (§22) lands **first in F1** because `/me/navigation` costs ≈172 statements/call; (3) invitation + acceptance replaces attach-by-id (AZ-18); (4) new findings AZ-13…AZ-18 (see `AUTHORIZATION-PHASE0-REPORT-2026-10-06.md` §15) | §6.2, §22, §3, §23 |
+| — | Order of work: Architecture Gate → **Phase 0 (read-only)** → F1 → F2 → F3 → F4 → F5 → F6 → Expansion; Phase 0 deliverables listed in §23 | §23 |
+
 Convention: **[KEEP]** = exists and is sound, not redesigned. **[CHANGE]** = new or modified in this Blueprint. **[DECISION]** = needs the CTO Gate (collected in Addendum B with a recommendation). Everything marked [CHANGE] is a *proposal*.
 
-> **One-line architecture.** *Complexity belongs inside the engine; simplicity belongs in the UI.* One decision function, six inputs, one audit trail:
-> `ALLOW/DENY = Identity ∧ Membership ∧ CompanyReady ∧ Entitlement ∧ Role-grant ∧ Scope ∧ Policy` → reason code → audit.
+> **One-line architecture.** *Complexity belongs inside the engine; simplicity belongs in the UI.* One decision function, **seven layers**, one audit trail. It is **not** a Boolean formula — Scope and Policy return structured results (a filter, a condition, an approval requirement), not just true/false:
+>
+> ```
+> Authorization Decision  =  Identity + Membership + Company State + Entitlement + Permission + Scope + Policy
+> Output                  =  ALLOW | DENY   +  Reason Code  +  Required Capability  +  Audit Classification
+> ```
+>
+> *Permission = WHAT · Scope = WHERE · Policy = UNDER WHICH CONDITIONS* — the formal architectural principle. Entitlement (Package) decides what the platform can offer a Company; it never decides who may use it.
 
 ---
 
@@ -123,7 +144,7 @@ The existing `grantMembership / revokeMembership / changeMembershipRole` saga **
 
 | Type | Meaning | Editable by Company? | Origin |
 |---|---|---|---|
-| **System** | structural roles the platform needs to function: `company_admin` (see §6.2) | **No** for key/deletion; grants auto-managed by entitlement (§16) | seeded at provisioning |
+| **System** | structural roles the platform needs to function: `company_admin` (Company Administration Authority, §6.2) | **No** for key/deletion; its *administration* grants follow the package (§16); it never receives operational/Critical grants automatically | seeded at provisioning |
 | **Template** | a standard starting point (Finance Manager, Sales Manager, Procurement Manager, Warehouse Manager, HR Manager, Accountant, …) | **Yes** — once cloned it is Company-owned | cloned from the XNEXUSTECH template catalog at provisioning / module enable |
 | **Custom** | created by the Company | Yes (within delegation limits, §21) | Company Admin |
 
@@ -132,8 +153,15 @@ Proposed `roles` metadata (additive columns): `name_ar`, `name_en`, `description
 ### 6.1 Role description in business language
 Every role has a human description ("إدارة العمليات المالية والمحاسبية للشركة") and its capabilities are shown in business groups (§18), never as raw nodes.
 
-### 6.2 Company Admin is not "God mode"
-`company_admin` may: manage the Company's users, memberships, roles, scopes, organization, authorization audit, operational permissions. It may **not**: create/suspend/decommission Companies, change package/entitlements, access another Company, manage platform roles/users, or edit its own protected core (cannot remove its own last-admin status). Today's `admin` additionally carries an unrestricted-scope bypass and module-wide grants; in the target the *unrestricted scope* becomes an explicit property of the role (`grantsAllScope`), not a hard-coded key (`ScopeService.UNRESTRICTED_ROLES`).
+### 6.2 `company_admin` = Company Administration Authority (not ERP God Mode)  — Gate amendment A2
+`company_admin` is the authority to **administer the Company**, not an unrestricted ERP operator.
+
+* **May (by default):** manage Users, Memberships, Roles, Scopes, Organization, Company settings, the Company's authorization audit, and module *administration* (module configuration/roles/users/settings nodes).
+* **May not, by default:** perform **Critical operational or financial capabilities** unless a Role/Capability explicitly grants them — e.g. journal reverse, fiscal-period reopen, critical accounting adjustments, payroll disbursement, destructive financial actions, high-risk treasury actions. (The definition of *Critical* is the `risk = critical` flag in the Permission Catalog, §8; Phase 0 produces the list.)
+* **May not**, ever: create/suspend/decommission Companies, change package/entitlements, access another Company, manage platform users/roles.
+* **Anti-self-elevation rule (security-critical):** Role Management cannot be used to raise one's own authority into Critical capabilities. Concretely: (a) a `company_admin` cannot add a Critical capability to any role that they themselves hold, nor assign themselves a role carrying one, by the same act; (b) granting a Critical capability to anyone requires the grantor to hold that capability **explicitly** (a role grant, not the administration authority) and is audited with before/after; (c) Critical grants are never created by migrations, template upgrades or package changes. Whether (b) additionally needs a second approver is a Gate question (see D16).
+* **Unrestricted scope** stops being a hard-coded key (`ScopeService.UNRESTRICTED_ROLES = ['admin']`) and becomes an explicit property of a role (`grantsAllScope`), assigned deliberately — administration authority does not imply all-scope data access.
+* **Compatibility (no silent permission loss, §20):** today's `admin` role holds module-wide `editable` on every entitled module, so today's Company admins *can* do Critical things. The tightening therefore applies to **newly provisioned Companies and newly created `company_admin` roles**; for existing Companies the migration preserves exactly what each admin can do today by mapping them to an explicit, visible **"Legacy Administrator (Operational)"** role that the Company can then narrow deliberately. Phase 0 quantifies the impact (§23, Company-Admin Critical-Permission analysis).
 
 ---
 
@@ -146,7 +174,7 @@ Every role has a human description ("إدارة العمليات المالية 
 **Upgrade strategy (the rule the CTO asked for: no silent change).**
 1. A new template **version never modifies Company roles automatically.** The system computes a diff per Company role and raises **"Template update available"** to the Company Admin (permission diff in business language: *+ Post journals*, *– Edit suppliers*).
 2. Admin chooses *Apply all / Apply selected / Ignore*. Ignored versions are remembered.
-3. Only two things are automatic: (a) a **new role** from a template for a **newly enabled module** is *created but unassigned*; (b) `company_admin` receives the new module's grants (§16) — documented, audited.
+3. Only two things are automatic: (a) a **new role** from a template for a **newly enabled module** is *created but unassigned*; (b) `company_admin` receives only the new module's **administration** nodes (§16, E2) — documented, audited.
 4. **Customized** roles (`customized = true`) are never touched; the diff is shown as informational.
 5. Removal of a grant from a template is **never applied automatically**.
 
@@ -161,7 +189,7 @@ Every role has a human description ("إدارة العمليات المالية 
 **[KEEP]** the 209 existing nodes and the `hidden | read-only | editable` access levels (independent of the action). **[CHANGE]** (additive only):
 
 1. **Naming rule** `module.resource.action` (e.g. `accounting.journal.view|create|post|reverse`). Existing nodes already follow it; nodes that don't are normalised with an alias map (no breaking rename).
-2. **Complete the verb families** the audit found missing: treasury (today *no nodes* — hard-coded `admin`/`finance`): `treasury.account.view|create|edit`, `treasury.cash_in`, `treasury.cash_out`, `treasury.transfer`, `treasury.reverse`; `export` on reports/lists; `reverse` where the domain allows reversal; read nodes for the families that today have none (customers/sales-orders/returns/invoices/payments/AR-aging/reports overview — AZ-12), introduced **with a compatibility default** (§20) so no current user loses access on day one.
+2. **Complete the verb families** the audit found missing: treasury (today *no action-level nodes* — every route requires the single module-wide node `finance`@`editable`, reads included): `treasury.account.view|create|edit`, `treasury.cash_in`, `treasury.cash_out`, `treasury.transfer`, `treasury.reverse`; `export` on reports/lists; `reverse` where the domain allows reversal; read nodes for the families that today have none (customers/sales-orders/returns/invoices/payments/AR-aging/reports overview — AZ-12), introduced **with a compatibility default** (§20) so no current user loses access on day one.
 3. **Permission Catalog** (metadata, in code, versioned with the templates): every node → `{module, resource, action, group, titleCode, risk (low|sensitive|critical), requires[]}`. `requires` encodes dependencies (post ⇒ view+create) so the UI cannot produce an unusable role.
 4. **Capabilities.** A *capability* is a named bundle of nodes in business language ("Post journals" = `accounting.journal.view` + `.create` + `.post`). Roles are authored from capabilities; the engine still stores node grants (no engine change). Risk flags drive warnings (e.g. `critical`: reverse, user management, period reopen).
 5. **Module-wide grants** (e.g. `accounting.manager` = node `accounting` editable) stay valid (ancestor-walk) but templates are refined into finer roles (Accountant, Finance Manager, Treasury Officer, Auditor-read-only).
@@ -185,8 +213,8 @@ Company (implicit boundary) · **Branch** · **Warehouse** · **Department** (Ex
 ### 9.4 Enforcement — service/domain layer
 Reuse and extend the **existing** `ScopeResolver` + `SCOPE_DERIVATION_REGISTRY` (ADR-031: `direct | org_unit | parent | unscoped`; already enforced for treasury accounts). Each domain entity declares its derivation (warehouse-keyed: stock, movements, warehouse transactions, PR/PO/GR warehouse; branch-keyed: sales orders via `orgUnitId`, treasury accounts, GL dimension values; parent-derived: invoices → sales order). Enforcement points: **list** (filter), **detail** (404), **create** (target must be in scope), **edit/approve/post/reverse** (assert), **reports and exports** (filter before aggregation). Never in the controller only, never in the sidebar. A null `orgUnitId` = unscoped = visible (ADR-031's "zero behaviour change by default" posture is kept so existing single-branch Companies are unaffected).
 
-### 9.5 Foundation vs Expansion
-Foundation: Company-wide vs warehouse/branch sets on three pilot domains (inventory/warehouse transactions, procurement PR/PO/GR, sales orders) + treasury accounts (already) + management UI + effective-access preview. Expansion: all domains, department, per-role-assignment scope, reports/exports everywhere.
+### 9.5 Foundation vs Expansion — Gate amendment A4: F6 is a *controlled pilot*, not an enterprise-wide rollout
+The largest project risk is scope enforcement spreading across ~30 domains at once and causing regressions. Therefore **F6 is limited to exactly**: Inventory / Warehouse Transactions, PR / PO / GR, Sales Orders, Treasury Accounts. **No other domain receives scope enforcement during Foundation**; widening happens only in Expansion, after the model is proven on the pilot (verification matrix V7 green, no regression). Foundation: Company-wide vs warehouse/branch sets on three pilot domains (inventory/warehouse transactions, procurement PR/PO/GR, sales orders) + treasury accounts (already) + management UI + effective-access preview. Expansion: all domains, department, per-role-assignment scope, reports/exports everywhere.
 
 ---
 
@@ -222,7 +250,7 @@ Guard order for every Company route (**[KEEP]** order, extended):
 `JwtAuthGuard → CompanyContextGuard → ModuleEntitlementGuard (RequireModule/feature) → PermissionGuard (node@level) → [service] ScopeEnforcement → PolicyEvaluation → handler → Audit`.
 
 * **Deny semantics [KEEP]:** missing node ⇒ **404** (anti-enumeration).
-* **"Why denied" [CHANGE]:** when the caller can already *see* the resource (read access) and the action is refused, the response carries a safe structured reason — `error.code`, `error.reason` ∈ `PERMISSION_MISSING | MAKER_CHECKER | SCOPE_OUT_OF_RANGE | POLICY_THRESHOLD | MODULE_NOT_ENTITLED | STATE_NOT_ALLOWED`, `error.requiredCapability` (business name). When the caller cannot see the resource, behaviour stays 404. The backend decision is authoritative; the message only explains it. PR/PO "maker cannot approve" already returns such a reason in text.
+* **"Why denied" [CHANGE]:** when the caller can already *see* the resource (read access) and the action is refused, the response carries a safe structured reason — `error.code`, `error.reason` ∈ `PERMISSION_MISSING | MAKER_CHECKER | SCOPE_OUT_OF_RANGE | POLICY_THRESHOLD | MODULE_NOT_ENTITLED | STATE_NOT_ALLOWED`, `error.requiredCapability` (business name). When the caller cannot see the resource, behaviour stays 404. The backend decision is authoritative; the message only explains it (and `/auth/me`/`can()` are hints — A6). PR/PO "maker cannot approve" already returns such a reason in text.
 * Company routes never read the ambient role tables.
 * Every new Company endpoint requires: Company guard, entitlement, node, scope where applicable, audit, A/B isolation spec.
 
@@ -245,6 +273,7 @@ Guard order for every Company route (**[KEEP]** order, extended):
   "legacy":     { "roles": [...], "rolesSource": "platform|company" }       // compatibility field
 }
 ```
+* **Gate amendment A6 — hints, not authority.** `capabilities`, `scopes`, `policyFlags` and the frontend `can()` helper are **UX optimisation / decision hints** (what to show, enable, or explain). They are never trusted by the backend: `POST /journals/:id/post` (like every protected operation) re-runs the full chain `JWT → CompanyContext → Entitlement → Permission → Scope → Policy → Domain` and ignores anything the client or `/auth/me` claims. This preserves the Zero-Trust boundary; a stale or tampered `/auth/me` response can never grant access.
 * Frontend uses `can(capability)` / `inScope(...)`; `hasRole('admin')` is deprecated as an authority source. Backend remains the authority.
 * Compatibility: the existing top-level `roles` field is **kept** with unchanged semantics during transition and flagged by `legacy.rolesSource`; it is re-pointed to Company roles only at the contract phase after the UI no longer depends on it (99 uses in 41 files must be migrated first). Navigation already resolves with Company roles **[KEEP]**.
 * `authzVersion` lets the client refresh when roles/scope change; no roles are embedded in the JWT (the JWT keeps only `sub` + `companyId`) so changes take effect on the next request **[KEEP]**.
@@ -268,6 +297,7 @@ Strategy — **never delete, map, dual-check, then retire**:
 
 * **[KEEP]** the Approval Engine (maker ≠ checker, matrix rules with `minApprovers`, `requiredPermissionNode`, `valueThreshold`, optional `orgUnitId`, queue, expiry). **[KEEP]** CTO decision ESC-3: **PR/PO maker ≠ checker**; **payments/treasury: no additional approval now.**
 * **[CHANGE]** A single **`PolicyService.evaluate(subject, action, context) → { requiresApproval, requiredPermission, minApprovers, makerCheckerRequired, reasons[] }`** that *reads* the existing sources (approval matrix + the PR/PO maker-checker rule, expressed as policy data keyed by document type). It does not add a mechanism: it is the one place future thresholds (payments > X), org-scoped approvals and maker ≠ checker flags are *configured*, so no third/fourth authorization mechanism appears.
+* **Hard limit (Gate amendment A5):** `PolicyService` is an **orchestration / decision facade only** — it coordinates the *general* decisions (needs approval? which permission? maker ≠ checker? threshold?) by delegating to the Approval Engine and the registered policy data. It is **not** a place to collect ERP business rules: every domain keeps its own rules (e.g. stock availability, credit limits, posting rules) in its own services. A rule that is domain-specific must not be moved into `PolicyService`; adding a domain rule to it is a design-review STOP (§26).
 * **Boundary:** Permission answers "may this role ever do X"; Scope "on which records"; **Policy "under what conditions, now"** (amount, state, maker, unit). A payment permission is not blocked by a threshold at the permission layer — it routes to approval at the policy layer.
 * Foundation: facade + `/auth/me.policyFlags` + "why denied" codes. Expansion: threshold governance for payments/treasury (policy *data*, CTO-decided later), advanced matrix.
 
@@ -279,10 +309,10 @@ Strategy — **never delete, map, dual-check, then retire**:
 
 **Rules (Entitlement ≠ Permission):**
 * **E1** Effective capability = role grant ∧ module entitled. `/auth/me.capabilities`, the Role editor and the Effective Access Preview **exclude** non-entitled modules (today only the route guard does).
-* **E2** Upgrade (module ON): its templates become *available* (created, unassigned); `company_admin` gains the grants (documented, audited); **no other user's access changes** unless the Company Admin assigns it.
+* **E2** Upgrade (module ON) — Gate amendment A3: `Package upgrade → Module available → Templates available → Company Administration can configure access`. Templates are *created, unassigned*; **no** user (including `company_admin`) gains operational permissions automatically. The **only** automatic grants to `company_admin` are the module's *administration* nodes (module configuration / roles / users / settings). Operational and sensitive capabilities stay **explicit**. (Today `CompanyPackageService.syncCompanyRoles` extends `admin` module-wide `editable` — that behaviour is changed in F3 behind a flag, with the compatibility rule of §6.2.)
 * **E3** Downgrade (module OFF): grants are **kept dormant**, not deleted; the module is unusable (guard) and shown as *not in package* in the editor; re-enabling restores access exactly as before.
 * **E4** Platform cannot grant a permission for a non-entitled module; a Company Admin cannot either.
-* **E5** Packages decide *module availability*; they never assign users or roles.
+* **E5** Packages decide *module availability*; they never assign users or roles. Fixed chain (final): `Package → Entitlement → Available Capability → Role → User → Scope → Policy` — never `Package → User permissions`.
 
 ---
 
@@ -306,6 +336,8 @@ Three levels over **one** engine:
 | Basic | owner/small company | Users · Roles · Branches |
 | Manager | department/company manager | *Who can do what, where, under which rules* — role capabilities, scopes |
 | Security/Admin | auditor/IT | Effective access · scopes · policies · audit |
+
+**Non-negotiable UX principle (CTO):** *normal users never see 209 checkboxes.* Three abstraction levels over the **same** engine — **Basic:** Users · Roles · Branches. **Manager:** who can do what, and where. **Security:** why, which permission, which scope, which policy, audit trail. The raw node view exists only in the Security level's advanced drawer.
 
 **Screens.** *Platform Administration* (XNEXUSTECH): Companies, Platform Users, Memberships, Packages, Platform Roles, Platform Audit. *Company → Administration:* **Users**, **Roles**, **Organization**, **Authorization Audit**.
 
@@ -353,7 +385,7 @@ Computed server-side from the same decision functions the guards use (so it cann
 
 ## 21. Security & Isolation
 
-**Invariants** (each has a test in §24): **I1** Company identity comes only from the validated JWT/guard, never from a client parameter (except `select-company`, which re-verifies membership). **I2** The Company user directory is derived server-side from membership; no frontend filtering. **I3** No Company route reads control-plane role tables; no platform route reads Company role tables. **I4** No cross-Company id lookup returns data. **I5** Platform authority ≠ ERP authority; Company authority ≠ platform authority. **I6** Least privilege by default (new member = no role, no scope). **I7** *Delegation limit:* a Company role editor cannot grant a permission/scope they do not hold themselves (except `company_admin` within the Company's entitled modules). **I8** *No identity enumeration:* invite-by-e-mail returns the same response whether or not the identity exists elsewhere. **I9** Last-`company_admin` and last-platform-super-admin cannot be removed. **I10** Sensitive/critical capabilities are flagged in the catalog and audited with before/after.
+**Invariants** (each has a test in §24): **I1** Company identity comes only from the validated JWT/guard, never from a client parameter (except `select-company`, which re-verifies membership). **I2** The Company user directory is derived server-side from membership; no frontend filtering. **I3** No Company route reads control-plane role tables; no platform route reads Company role tables. **I4** No cross-Company id lookup returns data. **I5** Platform authority ≠ ERP authority; Company authority ≠ platform authority. **I6** Least privilege by default (new member = no role, no scope). **I7** *Delegation limit (tightened, amendment A2):* a role editor cannot grant a permission/scope they do not hold themselves, and **administration authority never counts as holding a Critical operational capability** — there is no `company_admin` exception for Critical capabilities; self-elevation through Role Management is blocked (§6.2). **I8** *No identity enumeration:* invite-by-e-mail returns the same response whether or not the identity exists elsewhere. **I9** Last-`company_admin` and last-platform-super-admin cannot be removed. **I10** Sensitive/critical capabilities are flagged in the catalog and audited with before/after. **I11** *Zero Trust:* `/auth/me`, `capabilities`, `can()` and any client-supplied claim are hints only; every protected operation re-verifies the full decision chain server-side (A6).
 Other: break-glass/support access is explicit, time-boxed and visible to the Company (§11.3); privilege-changing endpoints are throttled; role/membership changes bump `authzVersion` so caches invalidate; platform support cannot read Company data without a membership.
 
 ---
@@ -371,9 +403,9 @@ Other: break-glass/support access is explicit, time-boxed and visible to the Com
 
 ## 23. Implementation Phases
 
-**Phase 0 — Preparation (read-only, no behaviour change):** inventories & mapping tables (§19), baseline measurements, decisions D1–D15 closed, verification matrix fixed, `bv_*` rehearsal environment ready. *Exit:* signed mapping tables + CTO Gate approval.
+**Phase 0 — Preparation (read-only; no code, schema, migration or data mutation).** Deliverables (CTO-specified): Legacy Role Mapping · Permission → Capability Mapping · Role/Grant Drift Report · Membership/Role Inconsistency Report · Ambient Organization Data Inventory · Platform Authorization Inventory · `hasRole()` migration inventory · Hard-coded Role Call-site inventory · Role Template Classification · Company-Admin Critical-Permission analysis · Authorization Performance Baseline · Final Verification Matrix · Migration/Rehearsal Plan. *Exit:* the Phase 0 report accepted by the CTO → **Architecture Gate formally closed** → F1 may start. Any cross-Company exposure, Protected-Baseline regression, privilege escalation or policy ambiguity found = STOP → REPORT → CTO decision. Report: `AUTHORIZATION-PHASE0-REPORT-2026-10-06.md`.
 
-### Foundation Release
+### Foundation Release (order is binding: F1 → F2 → F3 → F4 → F5 → F6; F1 does not start before the Gate is closed)
 | Phase | Scope | Closes | Exit criteria |
 |---|---|---|---|
 | **F1 — Boundary & `/auth/me`** | Organization controller Company-scoped; additive Company-aware `/auth/me`; `can()` helper; platform vs Company screen split (shell only) | AZ-02 (additive), AZ-03 | A/B isolation specs; `/auth/me` contract tests; no regression |
@@ -381,7 +413,7 @@ Other: break-glass/support access is explicit, time-boxed and visible to the Com
 | **F3 — Roles, Templates, Taxonomy** | role metadata, role CRUD + clone, template catalog + lifecycle, new nodes (treasury, exports, reversals), Permission Catalog & capabilities, missing-module templates, audit events | AZ-04, AZ-12 | role editor works on capabilities; template upgrade diff; no user loses access |
 | **F4 — Platform authorization** | `platform.*` nodes, 4 platform roles, platform controllers on `PermissionGuard`, support access | AZ-09 | Company Admin cannot call any platform route; platform admin cannot read Company data without membership |
 | **F5 — Legacy compatibility** | mapping + `hasLegacyOrCapability`, workflow capabilities, domain-by-domain call-site migration (sales-orders first) | AZ-05 | zero behaviour change; per-domain matrix green |
-| **F6 — Basic scope + Effective Access Preview** | `access_scopes`, `AccessScope` resolution, pilot domains (inventory/warehouse tx, PR/PO/GR, sales orders, treasury), Organization UI, preview | AZ-08 (basic) | list/detail/create/edit/approve/report enforcement on pilots; preview matches guards |
+| **F6 — Controlled Scope Pilot + Effective Access Preview** | `access_scopes`, `AccessScope` resolution, **pilot only**: Inventory/Warehouse Transactions, PR/PO/GR, Sales Orders, Treasury Accounts; Organization UI; preview | AZ-08 (basic) | list/detail/create/edit/approve/report enforcement on pilots; preview matches guards |
 
 ### Expansion
 E1 advanced Branch/Warehouse scope across all domains + reports/exports; E2 Department scope; E3 per-role-assignment scope; E4 `PolicyService` thresholds (payments/treasury — CTO decides policy data); E5 advanced approval matrix; E6 contract phase (retire legacy keys, flip `roles`, remove mirror); E7 MFA / session management hardening.
@@ -441,12 +473,17 @@ Acceptance mapping to the CTO's 12 questions: Addendum C.
 8. Hash-chain verification failure after the audit-context change.
 9. Performance regression beyond the agreed budget.
 10. Any need to change the permission-node naming in place.
+11. Any attempt to apply scope enforcement beyond the F6 pilot domains during Foundation (A4).
+12. Any domain-specific business rule being placed into `PolicyService` (A5).
+13. Any path that lets Role Management raise a user's (or the actor's own) authority to a Critical capability without an explicit grant by a holder (A2).
+14. Any coupling of the DAII operational-data migration with an authorization migration step (A7).
+15. Privilege escalation, cross-Company exposure, a Protected-Baseline regression, or business-policy ambiguity discovered during Phase 0 or later → STOP → REPORT → CTO decision.
 
 ---
 
 ## 27. Release Impact
 
-* **Release gate:** F1 + F2 (AZ-01/02/03 and the Company user directory) are **Release-Candidate blockers** per the CTO's direction. F3–F6 are scheduled Foundation work; ideally F3 (roles/templates) precedes RC because role management is part of "professional user management". Expansion is post-RC.
+* **Release gate (CTO, 2026-10-06):** **AZ-01, AZ-02, AZ-03 and AZ-10 are RC BLOCKERS** — F1 + F2: Company Users, Company-aware `/auth/me`, Company-scoped Organization, Platform/Company separation, and A/B isolation proof. F3–F6 are Foundation completion, not a reason to reopen the architecture. F3–F6 are scheduled Foundation work; ideally F3 (roles/templates) precedes RC because role management is part of "professional user management". Expansion is post-RC.
 * **Risk:** highest on F5 (legacy call-sites in sales/warehouse/shipment) and F6 (scope enforcement correctness); mitigated by dual-check, shadow comparison, per-domain matrices and per-Company flags.
 * **Effect on current work:** NAV-02…NAV-14 and ESC-3 are not reopened. The `/admin` screen is *replaced* by Company Users (F2) and Platform Users (F4 UI), not patched.
 * **Naming:** the visible XNEXUSTECH rebrand (N1) is low-risk and can ship independently; technical identifier renames (N2) are compatibility-controlled and scheduled with a forced re-login window.
@@ -473,7 +510,7 @@ Acceptance mapping to the CTO's 12 questions: Addendum C.
 * **N0** — decisions D13/D14/D15; full inventory (UI strings via terminology, print templates, emails, docs, installers, env/DB names).
 * **N1 Visible branding** — platform brand becomes **one configurable value** (Configuration Engine, installation scope: `platform.brand.name` = `XNEXUSTECH`, with ar/en), used by login, shell, control-plane screens, page title. **Tenant documents stop using the platform brand** and print the Company profile (name, logo, address, tax id) — this needs a Company profile source (Company settings screen) and is the real functional part of the rename. Terminology keys, not hard-coded strings.
 * **N2 Technical identifiers** — rename only with compatibility: storage keys migrated by a read-old-write-new shim (no forced logout beyond a planned window), package/product names changed at packaging time, DB name prefix is a *convention* for new installations (existing DB names are not renamed in place), env defaults keep accepting old variable names for one release. Never done in the same release as authorization phases F4/F5 (avoid coupled risk).
-* **N3 DAII as a Company** — create the DAII Company record with its own provisioned database; plan the move of current DAII operational data from the platform DB/`daii_dev` into it (a data-migration project of its own, rehearsed on `bv_*`, under HOLD rules); DAII's admin becomes a normal `company_admin` (not platform authority); the bootstrap/ambient `admin` becomes `platform_super_admin` of XNEXUSTECH.
+* **N3 DAII as a Company (D14) — a fully independent project (Gate amendment A7).** It is **never combined** with the authorization migration (different risk, different rollback, hard to diagnose together); it has its own plan, rehearsal on `bv_*`, and its own CTO gate. Description (design only): create the DAII Company record with its own provisioned database; plan the move of current DAII operational data from the platform DB/`daii_dev` into it (a data-migration project of its own, rehearsed on `bv_*`, under HOLD rules); DAII's admin becomes a normal `company_admin` (not platform authority); the bootstrap/ambient `admin` becomes `platform_super_admin` of XNEXUSTECH.
 * **Packaged distribution readiness (design constraints only):** no hard dependency on external SaaS services for authorization/licensing; per-installation configuration; offline-verifiable entitlements; installer/first-run creates the platform super admin and optionally the first Company; backup/restore facility (exists) included. No packaging work is started here.
 
 ---
@@ -491,11 +528,13 @@ Acceptance mapping to the CTO's 12 questions: Addendum C.
 | D7 | Organization ownership | Company-scoped over HTTP; ambient rows audited then moved/archived |
 | D8 | Business-policy boundary | `PolicyService` facade over Approval Engine + maker ≠ checker; thresholds for payments/treasury are later *data*, CTO-decided |
 | D9 | Source of truth for role assignment | Company DB `user_roles` (membership = existence/status) |
-| D10 | `company_admin` auto-extension on module enable | Keep auto-extension (today's behaviour) — documented and audited; all other roles never auto-extended |
+| D10 | `company_admin` and module enable (**amended, A3**) | Auto-extension limited to module **administration** nodes only; operational/sensitive/Critical capabilities always explicit; no other role ever auto-extended |
 | D11 | Invitation flow + identity-enumeration rule | invite-by-e-mail with uniform response; platform keeps direct create for support/bootstrap |
 | D12 | Warehouse ↔ org unit; stop seeding ERP templates in the ambient catalog | link via `orgUnitId` (no duplication); stop ambient seeding once no reader remains |
 | D13 | Ambient org data and brand/identifier rename policy | audit then move/archive; visible rebrand first, technical identifiers compatibility-controlled |
-| D14 | DAII-as-Company data migration | separate rehearsed project on `bv_*`; no production data before HOLD release |
+| D14 | DAII-as-Company data migration | **fully independent project** (amendment A7) — separate plan, rehearsal on `bv_*` and CTO gate; never merged with the authorization migration; no production data before HOLD release |
+| D17 | `company_admin` vs legacy `admin` (Phase 0) | new system key `company_admin` for new Companies; existing `admin` rows verbatim as "Legacy Administrator (Operational)"; migrate `admin` literals to capabilities (F5) before any Company retires it |
+| D16 | Critical-capability grant control (A2) | grantor must hold the capability explicitly; Phase 0 decides whether a second approver is also required for Critical grants |
 | D15 | Meaning of "PC program" | confirm: installable/on-prem edition (Blueprint assumes this) |
 
 ---
