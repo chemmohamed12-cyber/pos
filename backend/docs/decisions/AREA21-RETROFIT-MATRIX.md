@@ -3514,6 +3514,8 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Status**: D3 VERIFIED / CLOSED. `daii_dev` stays out of the regression loop.
 
+**§54 addendum (2026-10-06) — D3 re-verified against the CTO-ratified policy.** No code change. Fresh real-PG evidence for movement types A–I (new `domains/accounting/interface/d3-clean-run-closure.company-isolation.spec.ts` 3/3: clean-run lifecycle, Σ valuation = GL 1120 = 95.00, 0 REJECTED/IGNORED events, Company B untouched); D3 core 39/39, D4/returns+shipment 37/37; domain regression 263/269 first run (+1 skipped), 5 failures = missing closing-snapshot signing key in a `.env`-less worktree, cleared 11/11 with a throwaway key. Disclosed: L1 (legacy raw `return_in` stays stock-only, 1-unit stock/valuation difference until D4's path values it), F1 (opt-in T0 baseline spec stale since D7). Detail: D3 record §11.
+
 ## §55 — D4 CLOSED: Returns accounting — blast radius on closed controllers (2026-10-05)
 
 **Scope**: D4 (`D4-RETURNS-ACCOUNTING-POLICY-2026-10-05.md`). Service/foundation/accounting-side change; **controller count unchanged: 27/43**. Closed controllers whose write paths D4 touched, each re-proved with real-PG A/B isolation (no Platform/shared DataSource, write-path coverage):

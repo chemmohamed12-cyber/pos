@@ -142,5 +142,36 @@ Earlier attempts on the same disposable DB (disclosed): attempt 1 invalid (my se
 | D3-caused regressions | **none** |
 | unrelated pre-existing | none observed |
 
-## Status
+## 11. Final re-verification against the ratified policy (CTO directive "D3 → H3", 2026-10-06)
+
+**Policy ratified by the CTO, unchanged from §1:** Opening Stock → GL · Manual Receipt → GL · Adjustment → GL (configured gain/loss accounts) · Transfer → NO GL · Return-In → financial event, never stock-only (revenue/AR/credit-note/COGS/refund = D4) · Dispatch → GL (existing) · Per-Warehouse Inventory GL → **NO** (Model A, `1120` = Company Inventory Control Account) · missing configuration → FAIL CLOSED. **VERIFY result:** the implementation already matches this policy exactly (`glKindFor` publishes opening_stock / manual_receipt / adjustment / return_in / dispatch; transfer publishes nothing; accounts resolved before any valuation mutation). **No code was changed; nothing was re-implemented.**
+
+**Evidence map (all on fresh disposable real-PostgreSQL Companies A/B, isolated instance 127.0.0.1:5544, run 2026-10-06; D3 migrations `inventory/1789860000000` + `core/1789870000000` applied by the harness):**
+
+| CTO item | Proof | Result |
+|---|---|---|
+| A Opening Stock → stock + valuation + GL | `inventory-posting` #1; clean-run lifecycle | PASS |
+| B Manual Receipt → stock + valuation + GL | `manual-receipt` (12), clean-run lifecycle | PASS |
+| C Adjustment ± → stock + valuation + configured GL | `inventory-posting` #3/#4; clean-run | PASS |
+| D Transfer → stock moves, no GL, no event, valuation carried | `inventory-posting` #5; clean-run (journal and event counts unchanged) | PASS |
+| E Return-In → stock + financial event path | `inventory-posting` #6 (event exists, REJECTED with the D4 reason — no invented account); D4 `returns-accounting` (12): completion posts Dr 1120 / Cr COGS at the original cost | PASS (see limit L1) |
+| F Dispatch → existing GL intact | clean-run lifecycle (Dr COGS / Cr 1120 at the moving average); `returns-accounting` setup dispatches; `shipment` isolation | PASS |
+| G Missing configuration → FAIL CLOSED | `inventory-posting` #8; `manual-receipt` 2–5; `returns-accounting` #11; clean-run test 2 (REJECTED naming the config key, valuation not mutated, re-drive → POSTED) | PASS |
+| H Invariant: GL 1120 = Σ valuation, Σ Dr = Σ Cr, 0 unexplained REJECTED/IGNORED | **new** `d3-clean-run-closure.company-isolation.spec.ts` — Opening → Manual Receipt → Adjustment ± → Transfer → Dispatch: Σ valuation = GL 1120 = 95.00, every journal balances, **0 REJECTED/IGNORED events (all POSTED)**, 0 negative on-hand, stock ledger = valuation quantity per warehouse. Afterwards the only non-POSTED events are the two explained ones (return_in → D4; missing config → named key), and re-drive restores the invariant | PASS |
+| I Company A/B isolation | every spec above: B has 0 rows in stock/valuation/events/journals/outbox, control-plane outbox 0, B's DataSource never requested during A's lifecycle | PASS |
+
+**Regression (isolated PG 127.0.0.1:5544, DB env `daii_test_h3_ambient`):**
+- D3 core set: `inventory-posting`, `manual-receipt`, `inventory`, `warehouse-transactions`, `inventory-valuation` = 5 suites / 39 tests PASS; D4/returns + `shipment` isolation = 5 suites / 37 tests PASS; new closure spec = 3/3 PASS.
+- Domain regression `accounting + inventory-warehouse + inventory-valuation + returns + shipment + procurement` (`jest -w 2`): **first run 41 of 44 suites passed; 263 tests passed, 5 failed, 1 suite skipped (opt-in T0)**. The 5 failures (3 suites: `closing-snapshot-recovery`, `closing-snapshot-key-rotation`, `fiscal-period-closing-workflow`) are **environment/configuration, not D3**: the closing snapshot run ended `failed` with "No Closing Snapshot signing key is configured (CLOSING_SNAPSHOT_SIGNING_PRIVATE_KEY / _KID)" because this worktree has no `.env`. Re-run with a throwaway test key (ephemeral Ed25519, random kid — no repo/dev secret used): **3 suites / 11 tests PASS**. Wording per CTO convention: *263/269 first run (+1 skipped), the 5 failures classified (missing signing-key environment) and individually cleared* — not "clean".
+- Baseline comparison: D3-B record §9/§10 (708/760 first run → 97/97 of the dev-DB-dependent suites on a seeded DB; D3-caused regressions: none) — unchanged; no new D3-caused failure.
+
+**Findings (disclosed, no scope opened):**
+- **L1 — raw `return_in` leaves a 1-unit stock/valuation difference until D4's path values it.** A raw `recordMovement('return_in', …)` with no cost (the legacy `ReturnRequest` path, flagged in D4) writes the stock movement and a REJECTED financial event (D4 reason) but does not touch valuation, so stock ledger − valuation quantity = the returned units. Money invariants (Σ valuation = GL 1120, Σ Dr = Σ Cr) are unaffected. The D4 return-completion path (sales/shipment returns) values the stock at the original dispatch cost and posts; only the legacy raw path remains stock-only. This is the documented D3-A limit (§6), restated: CTO to decide whether the legacy raw `return_in` producer should be routed through D4 or retired (D4 follow-up, not D3).
+- **F1 — `t0-clean-company-baseline.spec.ts` (opt-in `T0_BASELINE=1`) is stale since D7**: it builds products as drafts and `ProductLifecycleGate` now rejects the PO (`draft item whose New Item Request has not been approved`). Not D3-related; its role (clean-run reconciliation) is now covered by the new closure spec. Not fixed here.
+- **F2 — the three closing-snapshot suites need `CLOSING_SNAPSHOT_SIGNING_PRIVATE_KEY`/`_KID` in the environment** (a fresh worktree/CI has no `.env`); worth recording in the test-environment notes.
+
+## Status (2026-10-06)
+**D3 = CLOSED — policy ratified by the CTO, implementation verified against it with fresh real-PostgreSQL evidence (items A–I), regression recorded, no code change.** Limits L1 and findings F1/F2 are disclosed above. Per the CTO sequence: D3 CLOSED → H3 final verification (hosting gate) may proceed.
+
+## Status (2026-10-05 record, superseded by the 2026-10-06 status above)
 **D3 = VERIFIED / CLOSED (2026-10-05).** D3-A + D3-B implemented, integrated, real-PG verified (opening, GR, manual receipt, adjustment ±, transfer, return-in event; Σ valuation = GL 1120; A/B isolation; Platform DataSource never requested); build, lint, affected isolation specs, and the full-regression question answered on an isolated seeded PostgreSQL (97/97). Return-in *accounting* stays with D4. `daii_dev` is out of the regression loop. D4 / D5 = HOLD until the CTO releases them.
