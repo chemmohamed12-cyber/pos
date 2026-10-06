@@ -4,6 +4,7 @@ import { SeedSetupGuideTerminology1789997000000 } from '../../database/migration
 import { SeedCommonTasksTerminology1789998000000 } from '../../database/migrations/core/1789998000000-SeedCommonTasksTerminology';
 import { SeedFinancialTraceTerminology1789999000000 } from '../../database/migrations/core/1789999000000-SeedFinancialTraceTerminology';
 import { SeedNavClosureTerminology1790000000000 } from '../../database/migrations/core/1790000000000-SeedNavClosureTerminology';
+import { RefineCommonTasksHints1790001000000 } from '../../database/migrations/core/1790001000000-RefineCommonTasksHints';
 
 /**
  * Navigation & Operational Workflow Gap Closure (NAV-01 … NAV-14) — registry invariants and terminology-seed safety. Pure unit spec (no database):
@@ -64,6 +65,7 @@ describe('NAV closure — terminology seeds', () => {
     new SeedFinancialTraceTerminology1789999000000(),
     new SeedNavClosureTerminology1790000000000(),
   ];
+  const refine = new RefineCommonTasksHints1790001000000() as unknown as { rows: Array<[string, string, string, string]> };
   const rows = seeds.flatMap((s) => (s as unknown as { rows: Array<[string, string, string, string]> }).rows);
 
   it('every text fits the 255-character limit of terminology_entries (a longer one breaks the shared control-plane migration)', () => {
@@ -73,6 +75,15 @@ describe('NAV closure — terminology seeds', () => {
       expect(code.length).toBeLessThanOrEqual(128);
       expect(ar.trim()).not.toBe('');
       expect(en.trim()).not.toBe('');
+    }
+  });
+
+  it('the hint refinement only overrides keys the Common-tasks seed owns, within the length limit (NAV-05)', () => {
+    const owned = new Set(rows.map(([c]) => c));
+    for (const [code, , ar, en] of refine.rows) {
+      expect(owned.has(code)).toBe(true);
+      expect(ar.length).toBeLessThanOrEqual(255);
+      expect(en.length).toBeLessThanOrEqual(255);
     }
   });
 

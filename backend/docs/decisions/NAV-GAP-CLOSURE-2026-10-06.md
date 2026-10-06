@@ -5,18 +5,18 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 | Gap | Status |
 |---|---|
 | NAV-02 Accounting policy configuration | IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY (open escalations ESC-1, ESC-2) |
-| NAV-03 Approval visibility | IMPLEMENTED / INTEGRATED — **browser verification pending (needs the bv test login)** |
+| NAV-03 Approval visibility | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
 | NAV-04 Approval governance (PR maker/checker, payments, treasury) | ESCALATED (ESC-3) — no ratified policy; not decided here |
-| NAV-01 / NAV-09 Setup & process guidance | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-05 Entry points to buried transactions | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-07 Accounting traceability on documents | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-06 Canonical Customers / BOM / returns grouping | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-08 Reports hub | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-10 Settings / Dimensions discoverable | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-01 / NAV-09 Setup & process guidance | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-05 Entry points to buried transactions | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-07 Accounting traceability on documents | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-06 Canonical Customers / BOM / returns grouping | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-08 Reports hub | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-10 Settings / Dimensions discoverable | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
 | NAV-11 Navigation gating consolidation | verified finding, no change (ESC-4) |
-| NAV-12 Fulfilment vs Manufacturing naming | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-13 Dashboard discovery | IMPLEMENTED / INTEGRATED — browser verification pending |
-| NAV-14 Missing terminology keys | IMPLEMENTED / INTEGRATED — browser verification pending |
+| NAV-12 Fulfilment vs Manufacturing naming | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-13 Dashboard discovery | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
+| NAV-14 Missing terminology keys | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
 
 ## NAV-02 — Accounting Policy configuration (IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY)
 
