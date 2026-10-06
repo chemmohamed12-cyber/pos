@@ -3691,7 +3691,7 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Regression**: 205/220 first run (+1 skipped); all 14 failures are four manufacturing/WIP suites missing other sessions' migrations in the isolated DB (pre-existing/infrastructure). Not a full-repository regression.
 
-**Open**: Companies that already produced REJECTED events from this defect need a replay/data-repair decision.
+**Existing data**: none affected (test/disposable environments only) — CTO ruled no replay / repair / recovery. **Status: VERIFIED / CLOSED.**
 
 ## §15 — What This Document Is Not
 
