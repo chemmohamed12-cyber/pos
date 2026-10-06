@@ -37,6 +37,7 @@ export type CustomerLedgerEntryTypeContract =
   | 'sales_invoice'
   | 'deposit'
   | 'payment'
+  | 'payment_application' // CUS-01
   | 'cod_collection'
   | 'return_credit_note'
   | 'debit_note'
@@ -52,7 +53,19 @@ export interface TreasuryAccountTypeView {
 }
 
 export interface FinanceTreasuryContract {
+  /**
+   * D2 (2026-10-04, CTO-approved): the pre-mutation gate for any financial posting made FROM a Treasury
+   * account. Resolves the account's own GL mapping or rejects (409) when it is unmapped — callers invoke it
+   * BEFORE any treasury/ledger write, inside their own transaction, so an unmapped account produces zero side
+   * effects. No fallback to any control account, ever.
+   */
+  requireGlMappedAccount(accountId: string, manager?: EntityManager): Promise<{ glAccountCode: string }>;
+
   /** Only `.id` of the created transaction is ever read by callers — narrowed from the concrete `Promise<TreasuryTransaction>`. */
+  /**
+   * Area 21 Operational Company Scoping Retrofit (2026-09-28): `manager?` added — the concrete
+   * `TreasuryService.createDepositTransaction` gained it during `deposits.controller.ts`'s own retrofit.
+   */
   createDepositTransaction(
     depositId: string,
     salesOrderId: string,
@@ -60,10 +73,16 @@ export interface FinanceTreasuryContract {
     amount: string,
     treasuryAccountId: string,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<{ id: string }>;
 
-  /** P4 Tranche-2 (shipment domain) — only `.id` of the created account is ever read. */
-  createAccount(code: string, name: string, accountTypeId: string, actorUserId: string): Promise<{ id: string }>;
+  /**
+   * P4 Tranche-2 (shipment domain) — only `.id` of the created account is
+   * ever read. Area 21 Operational Company Scoping Retrofit (2026-09-27):
+   * `manager?` added — the concrete `TreasuryService.createAccount`
+   * gained it during `treasury.controller.ts`'s own retrofit.
+   */
+  createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager): Promise<{ id: string }>;
 
   /**
    * P4 Tranche-2 (delivery domain) — only `.id` of the created transaction is ever read.
@@ -131,19 +150,25 @@ export interface FinanceTreasuryContract {
     manager?: EntityManager,
   ): Promise<{ out: { id: string } }>;
 
-  /** Real return is already a primitive `Promise<string>` — no narrowing needed. */
-  getAccountBalance(accountId: string): Promise<string>;
+  /** Real return is already a primitive `Promise<string>` — no narrowing needed. Area 21: `manager?` added — concrete already had it. */
+  getAccountBalance(accountId: string, manager?: EntityManager): Promise<string>;
 
-  /** Only `.code` of each type is ever read by callers. */
-  listAccountTypes(): Promise<TreasuryAccountTypeView[]>;
+  /** Only `.code` of each type is ever read by callers. Area 21: `manager?` added — concrete `TreasuryService.listAccountTypes` gained it during `treasury.controller.ts`'s own retrofit. */
+  listAccountTypes(manager?: EntityManager): Promise<TreasuryAccountTypeView[]>;
 
   /**
    * F06 / F06-H1 (ADR-038 D9) — every Treasury account's derived operational
    * balance + its GL-account mapping, as of an optional date (inclusive of
    * the whole calendar day). F06's Cash/Bank↔GL reconciliation reads this
    * instead of touching `treasury_*` tables.
+   *
+   * Multi-Company Area 9 (2026-09-22) — `manager?` added so a
+   * company-scoped caller (`ClosingSnapshotService`) can run this against
+   * that Company's own connection instead of the ambient one. Falls back
+   * to the ambient connection when omitted, unchanged for every existing
+   * caller.
    */
-  getAllTreasuryBalances(asOfDate?: string): Promise<{
+  getAllTreasuryBalances(asOfDate?: string, manager?: EntityManager): Promise<{
     balances: Array<{ treasuryAccountId: string; code: string; name: string; glAccountCode: string | null; balance: string }>;
   }>;
 
@@ -151,6 +176,7 @@ export interface FinanceTreasuryContract {
   listTreasuryLedger(
     treasuryAccountId: string,
     filter?: { from?: string; to?: string },
+    manager?: EntityManager,
   ): Promise<TreasuryLedgerEntryView[]>;
 }
 export const FINANCE_TREASURY_CONTRACT = Symbol('FINANCE_TREASURY_CONTRACT');
@@ -205,21 +231,47 @@ export interface FinanceCustomerLedgerContract {
    */
   postEntry(input: PostLedgerEntryInputContract, manager?: EntityManager): Promise<unknown>;
   /** P4 Tranche-2 (reports domain) — matches the real method's inline literal return type exactly. */
-  getCreditSummary(customerId: string): Promise<{ balance: string; creditLimit: string | null; availableCredit: string | null; overdueAmount: string }>;
+  getCreditSummary(customerId: string, manager?: EntityManager): Promise<{ balance: string; creditLimit: string | null; availableCredit: string | null; overdueAmount: string }>;
   /** P4 Tranche-2 (reports domain) — narrowed from the real `Promise<CustomerLedgerEntry[]>`. */
-  listLedger(customerId: string, filters?: { entryType?: string; from?: string; to?: string }): Promise<CustomerLedgerEntryViewContract[]>;
-  /** F04 / F04-H1 (ADR-036 D11) — every customer's derived AR balance + the grand total, as of an optional date. F04's AR↔GL reconciliation reads this instead of touching customer-finance tables. */
-  getAllCustomerBalances(asOfDate?: string): Promise<{ balances: Array<{ customerId: string; balance: string }>; total: string }>;
+  listLedger(customerId: string, filters?: { entryType?: string; from?: string; to?: string }, manager?: EntityManager): Promise<CustomerLedgerEntryViewContract[]>;
+  /** F04 / F04-H1 (ADR-036 D11) — every customer's derived AR balance + the grand total, as of an optional date. F04's AR↔GL reconciliation reads this instead of touching customer-finance tables. Multi-Company Area 9 (2026-09-22) — `manager?` added, same reason as `getAllTreasuryBalances` above. */
+  getAllCustomerBalances(asOfDate?: string, manager?: EntityManager): Promise<{ balances: Array<{ customerId: string; balance: string }>; total: string }>;
 }
 export const FINANCE_CUSTOMER_LEDGER_CONTRACT = Symbol('FINANCE_CUSTOMER_LEDGER_CONTRACT');
 
+/**
+ * D4 (2026-10-05) — the ORIGINAL invoice value a return reverses. `totalNet` is tax-exclusive (the invoice's own `totalAmount`),
+ * `taxAmount` is the invoice-level tax frozen at draft. Lines carry the net after discount (`lineTotal`).
+ */
+export interface InvoiceReturnBasis {
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId: string;
+  salesOrderId: string;
+  state: 'posted' | 'partially_paid' | 'paid';
+  totalNet: string;
+  taxAmount: string;
+  lines: Array<{ salesOrderLineId: string | null; quantity: number; lineTotal: string }>;
+}
+
 export interface FinanceInvoiceContract {
-  /** Only `.id` of the found invoice is ever read — narrowed from `Promise<SalesInvoice | null>`. */
-  findOpenInvoiceForOrder(salesOrderId: string): Promise<{ id: string } | null>;
-  getStatus(invoiceId: string): Promise<string>;
-  /** Return value never read at the one call site — kept as the real `Promise<string>` return (the resulting status), same `implements`-compatibility reasoning as `postEntry` above. */
-  recomputeStatus(invoiceId: string, actorUserId: string): Promise<string>;
-  /** P4 Tranche-2 (returns domain) — narrowed from the real `Promise<SalesInvoice & {state, remaining, lines}>` to the 3 fields actually read. */
-  getInvoice(invoiceId: string, actorUserId: string): Promise<{ state: string; customerId: string; salesOrderId: string }>;
+  /**
+   * D4 — the order's invoice that actually created Revenue/AR (state posted / partially_paid / paid), read through the
+   * CALLER's manager (Company context). `null` when the order has no invoice, or only a draft/void one — a return of such a
+   * sale has no Revenue/AR/tax to reverse.
+   */
+  getReturnBasis(salesOrderId: string, manager?: EntityManager): Promise<InvoiceReturnBasis | null>;
+  /**
+   * Only `.id` of the found invoice is ever read — narrowed from `Promise<SalesInvoice | null>`.
+   * Area 21 Operational Company Scoping Retrofit (2026-09-28): `manager?` added — the concrete
+   * `InvoiceService.findOpenInvoiceForOrder` gained it during `delivery.controller.ts`'s own retrofit.
+   */
+  findOpenInvoiceForOrder(salesOrderId: string, manager?: EntityManager): Promise<{ id: string } | null>;
+  /** Area 21: `manager?` added — concrete already had it. */
+  getStatus(invoiceId: string, manager?: EntityManager): Promise<string>;
+  /** Return value never read at the one call site — kept as the real `Promise<string>` return (the resulting status), same `implements`-compatibility reasoning as `postEntry` above. Area 21: `manager?` added — concrete already had it. */
+  recomputeStatus(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<string>;
+  /** P4 Tranche-2 (returns domain) — narrowed from the real `Promise<SalesInvoice & {state, remaining, lines}>` to the 3 fields actually read. Area 21: `manager?` added — concrete `InvoiceService.getInvoice` gained it (§23.1). */
+  getInvoice(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<{ state: string; customerId: string; salesOrderId: string }>;
 }
 export const FINANCE_INVOICE_CONTRACT = Symbol('FINANCE_INVOICE_CONTRACT');

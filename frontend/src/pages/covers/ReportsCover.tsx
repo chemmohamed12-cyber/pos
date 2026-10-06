@@ -37,16 +37,20 @@ export function ReportsCover() {
 
   useEffect(() => {
     (async () => {
-      const [orders, shipments, returns] = await Promise.all([
-        api.get<SalesOrder[]>('/sales-orders'),
-        api.get<Shipment[]>('/shipments'),
-        api.get<ReturnRequest[]>('/returns'),
-      ]);
-      setKpis({
-        openOrders: orders.length,
-        activeShipments: shipments.filter((s) => s.state !== 'delivered' && s.state !== 'returned').length,
-        openReturns: returns.length,
-      });
+      try {
+        const [orders, shipments, returns] = await Promise.all([
+          api.get<SalesOrder[]>('/sales-orders'),
+          api.get<Shipment[]>('/shipments'),
+          api.get<ReturnRequest[]>('/returns'),
+        ]);
+        setKpis({
+          openOrders: orders.length,
+          activeShipments: shipments.filter((s) => s.state !== 'delivered' && s.state !== 'returned').length,
+          openReturns: returns.length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, []);
 

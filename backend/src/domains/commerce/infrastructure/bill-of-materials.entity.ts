@@ -11,6 +11,9 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Update
  * structure; Inventory/Warehouse consumes it as a published read to
  * perform the actual stock movements).
  */
+/** ADR-061 Addendum 1 (A2) — BOM lifecycle status. `inactive` = not usable for new Work Orders / assemblies; released Work Orders are unaffected (they snapshot their components). */
+export type BomStatus = 'active' | 'inactive';
+
 @Entity('bill_of_materials')
 export class BillOfMaterial {
   @PrimaryGeneratedColumn('uuid')
@@ -19,6 +22,9 @@ export class BillOfMaterial {
   @Index({ unique: true })
   @Column('uuid')
   finishedProductId!: string;
+
+  @Column({ type: 'varchar', length: 16, default: 'active' })
+  status!: BomStatus;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

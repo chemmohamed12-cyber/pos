@@ -177,4 +177,15 @@ export const configurationValidationSchema = Joi.object({
     then: Joi.string().min(32).required().disallow('daii_dev_integration_encryption_key_do_not_use_in_prod'),
     otherwise: Joi.string().default('daii_dev_integration_encryption_key_do_not_use_in_prod'),
   }),
+
+  // Multi-Company Phase 3 V7, Area 3 (Database Registry). Same custody
+  // model and fail-closed-in-production rule as INTEGRATION_ENCRYPTION_KEY
+  // above — a deliberately SEPARATE key so a compromise of one secret
+  // domain (integration pairing credentials) does not also expose the
+  // other (per-Company database connection credentials).
+  DATABASE_CREDENTIAL_ENCRYPTION_KEY: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().min(32).required().disallow('daii_dev_database_credential_encryption_key_do_not_use_in_prod'),
+    otherwise: Joi.string().default('daii_dev_database_credential_encryption_key_do_not_use_in_prod'),
+  }),
 });

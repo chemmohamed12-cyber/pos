@@ -149,6 +149,11 @@ export class AppConfigService {
     return this.configService.get<string>('INTEGRATION_ENCRYPTION_KEY')!;
   }
 
+  /** Multi-Company Phase 3 V7, Area 3 (Database Registry) — deliberately separate from `integrationEncryptionKey`. */
+  get databaseCredentialEncryptionKey(): string {
+    return this.configService.get<string>('DATABASE_CREDENTIAL_ENCRYPTION_KEY')!;
+  }
+
   get entitlement(): EntitlementConfig {
     const rawKeys = this.configService.get<string>('ENTITLEMENT_PUBLIC_KEYS') ?? '[]';
     let publicKeys: EntitlementPublicKeyConfig[] = [];

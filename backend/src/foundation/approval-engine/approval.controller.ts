@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { IsBoolean, IsIn, IsNumberString, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApprovalEngineService } from './approval-engine.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../company/company-context.guard';
 import { RolesGuard } from '../authorization/roles.guard';
 import { PermissionGuard } from '../permission/permission.guard';
 import { RequirePermission } from '../permission/require-permission.decorator';
@@ -66,69 +67,76 @@ class DecideDto {
  * service enforces the real gates (maker ≠ checker; the per-request
  * `resolvedRequiredNode` at 'editable').
  */
+/**
+ * Area 21 (2026-10-05): Company-scoped. `CompanyContextGuard` validates the Membership and resolves the
+ * Company's own DataSource; every route threads `req.companyContext.dataSource.manager`, so requests,
+ * decisions and matrix rules are the CALLER'S COMPANY's — an approver never sees or decides another
+ * Company's request (its id simply does not exist in their database).
+ */
 @Controller('approvals')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RolesGuard)
 export class ApprovalController {
   constructor(private readonly approvals: ApprovalEngineService) {}
 
   @Get('request-types')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
-  listRequestTypes() {
-    return this.approvals.listRequestTypes();
+  listRequestTypes(@Req() req: CompanyScopedRequest) {
+    return this.approvals.listRequestTypes(req.companyContext!.dataSource.manager);
   }
 
   @Get('matrix-rules')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
-  listMatrixRules(@Query('requestTypeCode') requestTypeCode?: string) {
-    return this.approvals.listMatrixRules(requestTypeCode);
+  listMatrixRules(@Req() req: CompanyScopedRequest, @Query('requestTypeCode') requestTypeCode?: string) {
+    return this.approvals.listMatrixRules(requestTypeCode, req.companyContext!.dataSource.manager);
   }
 
   @Put('matrix-rules')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.manage', 'editable')
-  upsertMatrixRule(@Body() dto: UpsertMatrixRuleDto, @Req() req: AuthenticatedRequest) {
-    return this.approvals.upsertMatrixRule(dto, req.user.id);
+  upsertMatrixRule(@Body() dto: UpsertMatrixRuleDto, @Req() req: CompanyScopedRequest) {
+    return this.approvals.upsertMatrixRule(dto, req.user!.id, req.companyContext!.dataSource.manager);
   }
 
   @Get('requests')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
   listRequests(
+    @Req() req: CompanyScopedRequest,
     @Query('requestTypeCode') requestTypeCode?: string,
     @Query('makerUserId') makerUserId?: string,
     @Query('resourceType') resourceType?: string,
     @Query('resourceId') resourceId?: string,
   ) {
-    return this.approvals.listRequests({ requestTypeCode, makerUserId, resourceType, resourceId });
+    return this.approvals.listRequests({ requestTypeCode, makerUserId, resourceType, resourceId }, req.companyContext!.dataSource.manager);
   }
 
   @Get('requests/:id')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
-  getRequest(@Param('id', ParseUUIDPipe) id: string) {
-    return this.approvals.getRequest(id);
+  getRequest(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.approvals.getRequest(id, req.companyContext!.dataSource.manager);
   }
 
   @Post('requests/:id/decide')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
-  decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.approvals.decide(id, req.user.id, dto.decision, dto.note ?? null);
+  decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.approvals.decide(id, req.user!.id, dto.decision, dto.note ?? null, req.companyContext!.dataSource.manager);
   }
 
   @Post('requests/:id/withdraw')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.view', 'read-only')
-  withdraw(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.approvals.withdraw(id, req.user.id);
+  withdraw(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.approvals.withdraw(id, req.user!.id, req.companyContext!.dataSource.manager);
   }
 
   @Post('requests/:id/escalate')
   @UseGuards(PermissionGuard)
   @RequirePermission('core.approval.manage', 'editable')
-  escalate(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.approvals.escalate(id, req.user.id);
+  escalate(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.approvals.escalate(id, req.user!.id, req.companyContext!.dataSource.manager);
   }
 }

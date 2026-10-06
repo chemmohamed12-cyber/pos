@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Movement {
   id: string;
@@ -24,24 +25,31 @@ export function InventoryMovementPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<InventoryMovementData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.movement_title', 'field.warehouse', 'field.product']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const movement = await api.get<Movement>(`/inventory/movements/${id}`);
-      const [warehouses, products] = await Promise.all([
-        api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
-        api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
-      ]);
-      const warehouse = warehouses.find((w) => w.id === movement.warehouseId);
-      const product = products.find((p) => p.id === movement.productId);
+      try {
+        const movement = await api.get<Movement>(`/inventory/movements/${id}`);
+        const [warehouses, products] = await Promise.all([
+          api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
+          api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
+        ]);
+        const warehouse = warehouses.find((w) => w.id === movement.warehouseId);
+        const product = products.find((p) => p.id === movement.productId);
 
-      setData({ movement, warehouse, product });
+        setData({ movement, warehouse, product });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { movement, warehouse, product } = data;
 

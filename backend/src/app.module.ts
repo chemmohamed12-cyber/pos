@@ -6,8 +6,12 @@ import { DatabaseModule } from './database/database.module';
 import { ConfigurationModule } from './foundation/configuration/configuration.module';
 import { ConfigurationEngineModule } from './foundation/configuration-engine/configuration-engine.module';
 import { EntitlementModule } from './foundation/entitlement/entitlement.module';
+import { CompanyModule } from './foundation/company/company.module';
+import { DatabaseRegistryModule } from './foundation/database-registry/database-registry.module';
+import { DatabaseProvisioningModule } from './foundation/database-provisioning/database-provisioning.module';
 import { LimitEngineModule } from './foundation/limit-engine/limit-engine.module';
 import { NavigationModule } from './foundation/navigation/navigation.module';
+import { PlansModule } from './foundation/plans/plans.module';
 import { ModuleRoleTemplatesModule } from './foundation/module-role-templates/module-role-templates.module';
 import { IdentityModule } from './foundation/identity/identity.module';
 import { AuthenticationModule } from './foundation/authentication/authentication.module';
@@ -17,6 +21,7 @@ import { ScopeModule } from './foundation/scope/scope.module';
 import { OrganizationModule } from './foundation/organization/organization.module';
 import { AuditModule } from './foundation/audit/audit.module';
 import { EventsModule } from './foundation/events/events.module';
+import { InventoryPostingPolicyModule } from './foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { ErrorContractModule } from './foundation/error-contract/error-contract.module';
 import { ObservabilityModule } from './foundation/observability/observability.module';
 import { TerminologyModule } from './foundation/terminology/terminology.module';
@@ -72,6 +77,10 @@ import { CommissionModule } from './domains/commission/commission.module';
     DatabaseModule,
     ConfigurationEngineModule,
     EntitlementModule,
+    CompanyModule,
+    DatabaseRegistryModule,
+    PlansModule,
+    DatabaseProvisioningModule,
     LimitEngineModule,
     ModuleRoleTemplatesModule,
     IdentityModule,
@@ -82,6 +91,7 @@ import { CommissionModule } from './domains/commission/commission.module';
     OrganizationModule,
     AuditModule,
     EventsModule,
+    InventoryPostingPolicyModule, // D3-B — holder bound by accounting, read by inventory-warehouse
     ErrorContractModule,
     ObservabilityModule,
     TerminologyModule,

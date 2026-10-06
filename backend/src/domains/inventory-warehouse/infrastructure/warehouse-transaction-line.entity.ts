@@ -39,4 +39,8 @@ export class WarehouseTransactionLine {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   notes!: string | null;
+
+  /** D3-B (2026-10-04) — the explicit unit cost (base currency) of a manual-receipt line; mandatory for receipts, null otherwise. */
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  unitCostBase!: string | null;
 }

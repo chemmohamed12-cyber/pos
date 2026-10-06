@@ -41,13 +41,24 @@ export interface InventoryEventBase {
 }
 
 /**
- * `inventory.movement.recorded` — one allow-listed stock movement
- * (`dispatch` only in V1, ADR-040 D2). Quantity is always present; the
- * cost fields are always `null` until a valuation source exists (D3).
+ * D3 (2026-10-04) — which accounting treatment a published movement gets (the handler routes on this, never on
+ * inference). See `D3-INVENTORY-POSTING-POLICY-2026-10-04.md`. `'dispatch'` is also the meaning of an event with no
+ * `glKind` (events published before D3).
+ */
+export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in';
+
+/**
+ * `inventory.movement.recorded` — one allow-listed stock movement (ADR-040 D2, extended by D3 to opening stock,
+ * adjustments and return-in; see `glKindFor` in `inventory.service.ts`). Quantity is always present. Cost fields
+ * are `null` except for `'opening_stock'`, where they carry the maker-SUPPLIED unit cost and its total (an input,
+ * never a derived value); every other kind sources cost from the valuation engine at ingest time.
  */
 export interface InventoryMovementRecordedEvent extends InventoryEventBase {
-  /** `'dispatch'` in V1 — see `ALLOWED_GL_MOVEMENT_TYPES` in `inventory.service.ts`. */
   movementType: string;
+  /** D3 — routing key for the accounting handler; absent on pre-D3 events (= dispatch). */
+  glKind?: InventoryGlKind;
+  /** D3-B — the controlled reason code of a `'manual_receipt'` (drives the configured offset account). */
+  reasonCode?: string | null;
   productId: string;
   warehouseId: string;
   /** signed — negative for a dispatch (stock leaving). */
@@ -105,6 +116,12 @@ export interface InventoryValuationContract {
     idempotencyKey: string,
     manager?: EntityManager,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
+  /**
+   * D4 (2026-10-05) — PURE read. The cost an ORIGINAL issue (dispatch) was actually charged, looked up by the idempotency
+   * key it was consumed under (`inventory:movement:<stockMovementId>:recorded`). Only keys that have a real `issue` row are
+   * returned — a key with no row (dispatch GL event not posted / rejected) is simply absent, so the caller can fail closed.
+   */
+  getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>>;
   /**
    * NEW (ADR-041 D18c) — MUTATING. The ONE approved opening-stock/receipt cost-input flow (D3/D7/D20):
    * a maker-supplied `unitCostBase` on the manual "Record Movement" receipt route in

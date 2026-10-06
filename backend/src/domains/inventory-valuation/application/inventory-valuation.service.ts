@@ -37,6 +37,10 @@ export class InventoryValuationService implements InventoryValuationContract {
     return this.costEngine.applyIssue(productId, warehouseId, quantity, idempotencyKey, manager);
   }
 
+  async getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>> {
+    return this.costEngine.getIssueCostsByKeys(idempotencyKeys, manager);
+  }
+
   async recordReceiptCost(
     productId: string,
     warehouseId: string,

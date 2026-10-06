@@ -60,6 +60,14 @@ export class WarehouseTransaction {
   @Column({ type: 'varchar', length: 255, nullable: true })
   reason!: string | null;
 
+  /**
+   * D3-B (2026-10-04) — the CONTROLLED reason code of a manual receipt (a key of
+   * `accounting.inventory_manual_receipt_reason_accounts`); it — never the free-text `reason` above — selects the
+   * offset GL account. Null on every non-receipt document and on legacy receipts.
+   */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  reasonCode!: string | null;
+
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 

@@ -91,16 +91,21 @@ export function CustodyReturns() {
 
   useEffect(() => {
     (async () => {
-      const [customersData, companiesData, vehiclesData, productsData] = await Promise.all([
-        api.get<Customer[]>('/customers'),
-        api.get<ShippingCompany[]>('/shipments/shipping-companies'),
-        api.get<Vehicle[]>('/shipments/vehicles'),
-        api.get<Product[]>('/products'),
-      ]);
-      setCustomers(customersData);
-      setCompanies(companiesData);
-      setVehicles(vehiclesData);
-      setProducts(productsData);
+      try {
+        const [customersData, companiesData, vehiclesData, productsData] = await Promise.all([
+          api.get<Customer[]>('/customers'),
+          api.get<ShippingCompany[]>('/shipments/shipping-companies'),
+          api.get<Vehicle[]>('/shipments/vehicles'),
+          api.get<Product[]>('/products'),
+        ]);
+        setCustomers(customersData);
+        setCompanies(companiesData);
+        setVehicles(vehiclesData);
+        setProducts(productsData);
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setError(err instanceof ApiError ? err.message : 'Failed to load custody returns data.');
+      }
     })();
   }, []);
 

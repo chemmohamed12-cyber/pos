@@ -49,7 +49,12 @@ export function PayrollRuns() {
   ]);
 
   async function loadPeriods() {
-    setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
+    try {
+      setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
+    } catch (err) {
+      // Foundation fix: no error handling — the period selector silently stayed empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load payroll periods.');
+    }
   }
   async function loadRuns() {
     try {

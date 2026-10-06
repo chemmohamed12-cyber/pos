@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { CashBankReconciliationRun } from '../infrastructure/cash-bank-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
@@ -37,8 +37,12 @@ export class CashBankReconciliationService {
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
   ) {}
 
-  async listRuns(filter?: { treasuryAccountId?: string; status?: string; from?: string; to?: string }): Promise<CashBankReconciliationRun[]> {
-    const qb = this.dataSource.getRepository(CashBankReconciliationRun).createQueryBuilder('r');
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async listRuns(filter?: { treasuryAccountId?: string; status?: string; from?: string; to?: string }, manager?: EntityManager): Promise<CashBankReconciliationRun[]> {
+    const qb = this.em(manager).getRepository(CashBankReconciliationRun).createQueryBuilder('r');
     if (filter?.treasuryAccountId) qb.andWhere('r."treasuryAccountId" = :tid', { tid: filter.treasuryAccountId });
     if (filter?.status) qb.andWhere('r.status = :s', { s: filter.status });
     if (filter?.from) qb.andWhere('r."asOfDate" >= :f', { f: filter.from });
@@ -46,14 +50,14 @@ export class CashBankReconciliationService {
     return qb.orderBy('r."createdAt"', 'DESC').getMany();
   }
 
-  async getRun(id: string): Promise<CashBankReconciliationRun> {
-    const run = await this.dataSource.getRepository(CashBankReconciliationRun).findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<CashBankReconciliationRun> {
+    const run = await this.em(manager).getRepository(CashBankReconciliationRun).findOne({ where: { id } });
     if (!run) throw new NotFoundException(`Cash/Bank reconciliation run "${id}" not found.`);
     return run;
   }
 
-  private async glAccountByCode(code: string): Promise<GLAccount> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { code, isActive: true } });
+  private async glAccountByCode(code: string, manager?: EntityManager): Promise<GLAccount> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { code, isActive: true } });
     if (!acc) {
       throw new ConflictException(`GL account "${code}" (mapped from a Treasury account) is missing or inactive in the chart.`);
     }
@@ -64,9 +68,9 @@ export class CashBankReconciliationService {
    * Reconcile one Treasury account (or every GL-mapped one when
    * `treasuryAccountId` is omitted). Returns the run(s) it created.
    */
-  async reconcile(input: CashBankReconcileInput, actorUserId: string): Promise<CashBankReconciliationRun[]> {
+  async reconcile(input: CashBankReconcileInput, actorUserId: string, manager?: EntityManager): Promise<CashBankReconciliationRun[]> {
     const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
-    const { balances } = await this.treasury.getAllTreasuryBalances(asOfDate);
+    const { balances } = await this.treasury.getAllTreasuryBalances(asOfDate, manager);
 
     let targets = balances.filter((b) => b.glAccountCode && b.glAccountCode.trim() !== '');
     if (input.treasuryAccountId) {
@@ -81,17 +85,17 @@ export class CashBankReconciliationService {
       throw new ConflictException('No GL-mapped Treasury account to reconcile — set glAccountCode on at least one account.');
     }
 
-    const repo = this.dataSource.getRepository(CashBankReconciliationRun);
+    const repo = this.em(manager).getRepository(CashBankReconciliationRun);
     const runs: CashBankReconciliationRun[] = [];
 
     for (const b of targets) {
       const glCode = b.glAccountCode!;
-      const gl = await this.glAccountByCode(glCode);
-      const glLedger = await this.ledger.getAccountLedger(gl.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined });
+      const gl = await this.glAccountByCode(glCode, manager);
+      const glLedger = await this.ledger.getAccountLedger(gl.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
       const glBalanceBase = glLedger.closingBalanceBase;
       const subledgerTotalBase = b.balance;
 
-      const [d] = (await this.dataSource.query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
+      const [d] = (await this.em(manager).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
         subledgerTotalBase,
         glBalanceBase,
       ])) as Array<{ drift: string }>;
@@ -122,7 +126,7 @@ export class CashBankReconciliationService {
         status: matched ? 'matched' : 'drift_found',
         driftBreakdown,
         actorUserId,
-      });
+      }, manager);
       await this.audit.record({
         actorUserId,
         organizationId: null,
@@ -132,18 +136,18 @@ export class CashBankReconciliationService {
         result: 'success',
         correlationId: null,
         after: { treasuryAccountId: b.treasuryAccountId, glAccountCode: glCode, asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status },
-      });
+      }, manager);
       runs.push(saved);
     }
     return runs;
   }
 
-  async closeRun(id: string, actorUserId: string): Promise<CashBankReconciliationRun> {
-    const run = await this.getRun(id);
+  async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<CashBankReconciliationRun> {
+    const run = await this.getRun(id, manager);
     if (run.status === 'closed') return run;
     run.status = 'closed';
     run.closedAt = new Date();
-    const saved = await this.dataSource.getRepository(CashBankReconciliationRun).save(run);
+    const saved = await this.em(manager).getRepository(CashBankReconciliationRun).save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -152,7 +156,7 @@ export class CashBankReconciliationService {
       resourceId: id,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
@@ -160,8 +164,8 @@ export class CashBankReconciliationService {
    * A per-GL-account roll-up of the latest run per Treasury account
    * (ADR-038 D9) — several Treasury accounts may map to one GL account.
    */
-  async rollup(): Promise<Array<{ glAccountCode: string; treasuryLedgerTotalBase: string; glBalanceBase: string; driftBase: string; accountCount: number }>> {
-    const rows = (await this.dataSource.query(
+  async rollup(manager?: EntityManager): Promise<Array<{ glAccountCode: string; treasuryLedgerTotalBase: string; glBalanceBase: string; driftBase: string; accountCount: number }>> {
+    const rows = (await this.em(manager).query(
       `WITH latest AS (
          SELECT DISTINCT ON ("treasuryAccountId") "treasuryAccountId", "glAccountCode", "subledgerTotalBase", "glBalanceBase"
            FROM "accounting_cash_bank_reconciliation_runs"
@@ -183,20 +187,20 @@ export class CashBankReconciliationService {
    * F06's Cash/Bank position statement for one Treasury account: the GL
    * `bank` account movement + the Treasury operational ledger, side by side.
    */
-  async cashBankPositionStatement(input: { treasuryAccountId: string; from?: string; to?: string }): Promise<{
+  async cashBankPositionStatement(input: { treasuryAccountId: string; from?: string; to?: string }, manager?: EntityManager): Promise<{
     treasuryAccountId: string;
     glAccountCode: string | null;
     glLedger: unknown | null;
     treasuryLedger: unknown[];
   }> {
-    const { balances } = await this.treasury.getAllTreasuryBalances(input.to);
+    const { balances } = await this.treasury.getAllTreasuryBalances(input.to, manager);
     const acc = balances.find((b) => b.treasuryAccountId === input.treasuryAccountId);
     if (!acc) throw new NotFoundException(`Treasury account "${input.treasuryAccountId}" not found.`);
-    const treasuryLedger = await this.treasury.listTreasuryLedger(input.treasuryAccountId, { from: input.from, to: input.to });
+    const treasuryLedger = await this.treasury.listTreasuryLedger(input.treasuryAccountId, { from: input.from, to: input.to }, manager);
     let glLedger: unknown | null = null;
     if (acc.glAccountCode) {
-      const gl = await this.glAccountByCode(acc.glAccountCode);
-      glLedger = await this.ledger.getAccountLedger(gl.id, { from: input.from, to: input.to });
+      const gl = await this.glAccountByCode(acc.glAccountCode, manager);
+      glLedger = await this.ledger.getAccountLedger(gl.id, { from: input.from, to: input.to }, manager);
     }
     return { treasuryAccountId: input.treasuryAccountId, glAccountCode: acc.glAccountCode, glLedger, treasuryLedger };
   }
@@ -216,8 +220,7 @@ export class CashBankReconciliationService {
       status: CashBankReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    },
-  ): Promise<CashBankReconciliationRun> {
+    }, manager?: EntityManager): Promise<CashBankReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({

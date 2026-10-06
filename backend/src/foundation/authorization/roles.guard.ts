@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { Reflector } from '@nestjs/core';
 import { AuthorizationService } from './authorization.service';
 import { ROLES_METADATA_KEY } from './require-role.decorator';
-import { AuthenticatedRequest } from '../authentication/jwt-auth.guard';
+import { CompanyScopedRequest } from '../company/company-context.guard';
 
 /**
  * Authorization — Stage 2 build-order item 7.
@@ -37,12 +37,19 @@ export class RolesGuard implements CanActivate {
     ]);
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<CompanyScopedRequest>();
     if (!request.user) {
       throw new UnauthorizedException('Authentication required before authorization can be checked.');
     }
 
-    const userRoles = await this.authorization.getRoleKeysForUser(request.user.id);
+    // Multi-Company Area 6 (2026-09-23) — when `CompanyContextGuard` ran
+    // earlier in this route's guard chain, it already validated Membership
+    // and resolved this Company's own DataSource; routing the role lookup
+    // through it (rather than the ambient connection) is what makes the
+    // Company boundary structural. Routes without `CompanyContextGuard`
+    // are unaffected — `manager` is simply `undefined`.
+    const manager = request.companyContext?.dataSource.manager;
+    const userRoles = await this.authorization.getRoleKeysForUser(request.user.id, manager);
     const authorized = requiredRoles.some((role) => userRoles.includes(role));
     if (!authorized) {
       throw new ForbiddenException('Insufficient role for this action.');

@@ -22,6 +22,8 @@ import { AttendanceModule } from '../attendance/attendance.module';
 import { TreasuryModule } from '../treasury/treasury.module';
 import { CommissionModule } from '../commission/commission.module';
 
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 /**
  * ADR-070 — `payroll`'s composition root, Phase 1. `HrModule` (Employee
  * identity, read-only), `AttendanceModule` (`listApprovedDaysByBatch`,
@@ -34,7 +36,7 @@ import { CommissionModule } from '../commission/commission.module';
  * `manufacturing`'s own precedent).
  */
 @Module({
-  imports: [
+  imports: [CompanyModule, DatabaseRegistryModule, 
     TypeOrmModule.forFeature([
       PayrollPeriod,
       PayrollCompensation,

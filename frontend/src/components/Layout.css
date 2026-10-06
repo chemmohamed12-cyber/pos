@@ -193,6 +193,24 @@
   gap: 10px;
 }
 
+.company-switcher-single {
+  font-size: 0.8rem;
+  color: #374151;
+  margin-block-start: 2px;
+}
+
+.company-switcher {
+  margin-block-start: 4px;
+}
+
+.company-switcher-select {
+  padding: 4px 8px;
+  border: 1px solid #d7dae0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
 .lang-toggle,
 .logout-btn {
   padding: 6px 14px;

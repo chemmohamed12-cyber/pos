@@ -21,16 +21,20 @@ export function AccountingCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [tb, journals] = await Promise.all([
-        api.get<TrialBalance>('/accounting/trial-balance'),
-        api.get<JournalEntry[]>('/accounting/journals'),
-      ]);
-      const today = new Date().toISOString().slice(0, 10);
-      setKpis({
-        totalDebit: tb.totalDebitBase,
-        balanced: tb.balanced,
-        todaysJournals: journals.filter((j) => j.createdAt.slice(0, 10) === today).length,
-      });
+      try {
+        const [tb, journals] = await Promise.all([
+          api.get<TrialBalance>('/accounting/trial-balance'),
+          api.get<JournalEntry[]>('/accounting/journals'),
+        ]);
+        const today = new Date().toISOString().slice(0, 10);
+        setKpis({
+          totalDebit: tb.totalDebitBase,
+          balanced: tb.balanced,
+          todaysJournals: journals.filter((j) => j.createdAt.slice(0, 10) === today).length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

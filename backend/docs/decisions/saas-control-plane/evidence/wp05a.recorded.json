@@ -1,0 +1,86 @@
+{
+  "migrationsAtStart": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "coreMigrationsRan": 96,
+  "baseline": {
+    "roles": 9,
+    "rolePermissions": 33,
+    "users": 1,
+    "userRoles": 1
+  },
+  "addSalesRan": 23,
+  "roleTemplates": {
+    "templates": {
+      "roles": 3,
+      "grants": 6
+    },
+    "adminGrants": {
+      "created": false,
+      "grants": 0
+    },
+    "adminNodesBefore": [
+      "accounting",
+      "core.approval",
+      "core.company.audit.view",
+      "core.company.backup.manage",
+      "core.company.members.manage",
+      "core.config",
+      "core.entitlement",
+      "core.limit",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "reporting",
+      "sales",
+      "system.release",
+      "system.release.backup"
+    ],
+    "adminNodesAfter": [
+      "accounting",
+      "core.approval",
+      "core.company.audit.view",
+      "core.company.backup.manage",
+      "core.company.members.manage",
+      "core.config",
+      "core.entitlement",
+      "core.limit",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "reporting",
+      "sales",
+      "system.release",
+      "system.release.backup"
+    ],
+    "adminAlreadyHadSalesRootBeforeSeeding": true
+  },
+  "accountingWithoutDependencies": {
+    "success": true,
+    "ran": 41,
+    "error": null
+  },
+  "sourceHashesBefore": {
+    "src/foundation/release-orchestration/company-migration-runner.ts": "898fac2eb49175a9",
+    "src/foundation/company/company-role-seeding.ts": "79b7c716f81a00d6",
+    "src/foundation/company/company-authorization-schema-adjustment.ts": "28a9c7bb2393d887",
+    "src/foundation/release/migration-datasource.ts": "ff0aeb67d51c3134"
+  },
+  "sourceHashesAfter": {
+    "src/foundation/release-orchestration/company-migration-runner.ts": "898fac2eb49175a9",
+    "src/foundation/company/company-role-seeding.ts": "79b7c716f81a00d6",
+    "src/foundation/company/company-authorization-schema-adjustment.ts": "28a9c7bb2393d887",
+    "src/foundation/release/migration-datasource.ts": "ff0aeb67d51c3134"
+  },
+  "migrationsTreeBefore": "140cc986cd46b031",
+  "migrationsTreeAfter": "140cc986cd46b031",
+  "residue": [],
+  "migrationsAtEnd": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "cwd": "C:\\Users\\chem_\\AppData\\Local\\Temp\\claude\\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\\84e7fca6-9da1-46cc-b1ed-3e8f7620e909\\scratchpad\\wp05_root"
+}

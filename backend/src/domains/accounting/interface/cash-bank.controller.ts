@@ -3,7 +3,8 @@ import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLengt
 import { CashBankReconciliationService } from '../application/cash-bank-reconciliation.service';
 import { CashBankAdjustmentService } from '../application/cash-bank-adjustment.service';
 import { CASH_BANK_ADJUSTMENT_KINDS } from '../domain/cash-bank';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -88,7 +89,7 @@ class DecideDto {
  * ADR-024 verb — a run is a create; disclosed like F04/F05).
  */
 @Controller('accounting/cash-bank')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('accounting')
 export class CashBankController {
   constructor(
@@ -99,65 +100,61 @@ export class CashBankController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.view', 'read-only')
   @Get('reconciliations')
-  async listReconciliations(
-    @Query('treasuryAccountId') treasuryAccountId?: string,
+  async listReconciliations(@Req() req: CompanyScopedRequest, @Query('treasuryAccountId') treasuryAccountId?: string,
     @Query('status') status?: string,
     @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.reconciliation.listRuns({ treasuryAccountId, status, from, to });
+    @Query('to') to?: string,) {
+    return this.reconciliation.listRuns({ treasuryAccountId, status, from, to }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.view', 'read-only')
   @Get('reconciliations/rollup')
-  async rollup() {
-    return this.reconciliation.rollup();
+  async rollup(@Req() req: CompanyScopedRequest) {
+    return this.reconciliation.rollup(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.view', 'read-only')
   @Get('reconciliations/:id')
-  async getReconciliation(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reconciliation.getRun(id);
+  async getReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.getRun(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.create', 'editable')
   @Post('reconciliations')
-  async runReconciliation(@Body() dto: RunReconciliationDto, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.reconcile(dto, req.user.id);
+  async runReconciliation(@Body() dto: RunReconciliationDto, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.reconcile(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.create', 'editable')
   @Post('reconciliations/:id/close')
-  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.closeRun(id, req.user.id);
+  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.closeRun(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.view', 'read-only')
   @Get('statement')
-  async positionStatement(
-    @Query('treasuryAccountId', ParseUUIDPipe) treasuryAccountId: string,
+  async positionStatement(@Req() req: CompanyScopedRequest, @Query('treasuryAccountId', ParseUUIDPipe) treasuryAccountId: string,
     @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.reconciliation.cashBankPositionStatement({ treasuryAccountId, from, to });
+    @Query('to') to?: string,) {
+    return this.reconciliation.cashBankPositionStatement({ treasuryAccountId, from, to }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.adjust', 'editable')
   @Post('adjustments')
-  async submitAdjustment(@Body() dto: SubmitCashBankAdjustmentDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.submitAdjustment(dto as never, req.user.id);
+  async submitAdjustment(@Body() dto: SubmitCashBankAdjustmentDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.submitAdjustment(dto as never, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.cash.approve', 'editable')
   @Post('approvals/:id/decide')
-  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note);
+  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note, req.companyContext!.dataSource.manager);
   }
 }

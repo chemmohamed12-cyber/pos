@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PurchaseOrderService } from '../application/purchase-order.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -45,7 +46,7 @@ class CreatePurchaseOrderDto {
  * single decision, not a configurable multi-approver flow).
  */
 @Controller('procurement/purchase-orders')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('procurement')
 export class PurchaseOrderController {
   constructor(private readonly purchaseOrders: PurchaseOrderService) {}
@@ -53,49 +54,56 @@ export class PurchaseOrderController {
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.view', 'read-only')
   @Get()
-  async list() {
-    return this.purchaseOrders.list();
+  async list(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.list(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.view', 'read-only')
   @Get(':id')
-  async getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.purchaseOrders.getById(id);
+  async getById(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.getById(id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.create', 'editable')
   @Post()
-  async create(@Body() dto: CreatePurchaseOrderDto, @Req() req: AuthenticatedRequest) {
-    return this.purchaseOrders.create(dto, req.user.id);
+  async create(@Body() dto: CreatePurchaseOrderDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.create(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.edit', 'editable')
   @Post(':id/submit')
-  async submit(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.purchaseOrders.transition(id, 'submit', req.user.id);
+  async submit(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.transition(id, 'submit', req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.approve', 'editable')
   @Post(':id/approve')
-  async approve(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.purchaseOrders.transition(id, 'approve', req.user.id);
+  async approve(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.transition(id, 'approve', req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.approve', 'editable')
   @Post(':id/reject')
-  async reject(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.purchaseOrders.transition(id, 'reject', req.user.id);
+  async reject(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.transition(id, 'reject', req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_order.edit', 'editable')
   @Post(':id/cancel')
-  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.purchaseOrders.transition(id, 'cancel', req.user.id);
+  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.purchaseOrders.transition(id, 'cancel', req.user.id, req.companyContext.dataSource.manager);
   }
 }

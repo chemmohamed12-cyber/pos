@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SupplierInvoiceService } from '../application/supplier-invoice.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -31,6 +32,11 @@ class CreateSupplierInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => CreateSupplierInvoiceLineDto)
   lines!: CreateSupplierInvoiceLineDto[];
+
+  /** D5 — the explicit VAT amount stated by the supplier's invoice (lines are NET). Omit/0 for a VAT-free invoice. */
+  @IsOptional()
+  @IsNumberString()
+  taxAmount?: string;
 }
 
 class VoidInvoiceDto {
@@ -39,8 +45,17 @@ class VoidInvoiceDto {
   reason!: string;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27, CTO-authorized).
+ * `CompanyContextGuard` added at the class level — `SupplierInvoice`/
+ * `SupplierInvoiceLine`/`SupplierLedgerEntry` are genuinely Company-owned
+ * data. `SupplierInvoiceService` has zero cross-domain dependencies
+ * (only `SupplierLedgerService`, same `procurement` domain) — the
+ * cleanest large-ish retrofit since `inventory-valuation.controller.ts`
+ * (see AREA21-RETROFIT-MATRIX.md §27).
+ */
 @Controller('procurement/supplier-invoices')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('procurement')
 export class SupplierInvoiceController {
   constructor(private readonly invoices: SupplierInvoiceService) {}
@@ -48,63 +63,72 @@ export class SupplierInvoiceController {
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get()
-  async listAll() {
-    return this.invoices.listAll();
+  async listAll(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.listAll(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get('ap-aging')
-  async apAgingAll() {
-    return this.invoices.getApAgingForAllSuppliers();
+  async apAgingAll(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.getApAgingForAllSuppliers(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get('by-purchase-order/:purchaseOrderId')
-  async listForPurchaseOrder(@Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
-    return this.invoices.listForPurchaseOrder(purchaseOrderId);
+  async listForPurchaseOrder(@Req() req: CompanyScopedRequest, @Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.listForPurchaseOrder(purchaseOrderId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get('by-supplier/:supplierId')
-  async listForSupplier(@Param('supplierId', ParseUUIDPipe) supplierId: string) {
-    return this.invoices.listForSupplier(supplierId);
+  async listForSupplier(@Req() req: CompanyScopedRequest, @Param('supplierId', ParseUUIDPipe) supplierId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.listForSupplier(supplierId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get('by-supplier/:supplierId/ap-aging')
-  async apAgingForSupplier(@Param('supplierId', ParseUUIDPipe) supplierId: string) {
-    return this.invoices.getApAging(supplierId);
+  async apAgingForSupplier(@Req() req: CompanyScopedRequest, @Param('supplierId', ParseUUIDPipe) supplierId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.getApAging(supplierId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
   @Get(':id')
-  async get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.invoices.getInvoice(id);
+  async get(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.invoices.getInvoice(id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.create', 'editable')
   @Post()
-  async create(@Body() dto: CreateSupplierInvoiceDto, @Req() req: AuthenticatedRequest) {
-    return this.invoices.createDraftInvoice(dto, req.user.id);
+  async create(@Body() dto: CreateSupplierInvoiceDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.invoices.createDraftInvoice(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.post', 'editable')
   @Post(':id/post')
-  async post(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.invoices.postInvoice(id, req.user.id);
+  async post(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.invoices.postInvoice(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.void', 'editable')
   @Post(':id/void')
-  async void(@Param('id', ParseUUIDPipe) id: string, @Body() dto: VoidInvoiceDto, @Req() req: AuthenticatedRequest) {
-    return this.invoices.voidInvoice(id, dto.reason, req.user.id);
+  async void(@Param('id', ParseUUIDPipe) id: string, @Body() dto: VoidInvoiceDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.invoices.voidInvoice(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 }

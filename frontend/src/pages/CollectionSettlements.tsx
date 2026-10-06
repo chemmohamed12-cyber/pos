@@ -69,18 +69,23 @@ export function CollectionSettlements() {
 
   async function loadAll() {
     if (!canView) return;
-    const [pendingData, shipmentData, companiesData, vehiclesData, accountsData] = await Promise.all([
-      api.get<PendingCollection[]>('/delivery/collections/pending-remittance'),
-      api.get<Shipment[]>('/shipments'),
-      api.get<ShippingCompany[]>('/shipments/shipping-companies'),
-      api.get<Vehicle[]>('/shipments/vehicles'),
-      api.get<TreasuryAccount[]>('/treasury/accounts'),
-    ]);
-    setPending(pendingData);
-    setShipments(shipmentData);
-    setCompanies(companiesData);
-    setVehicles(vehiclesData);
-    setTreasuryAccounts(accountsData);
+    try {
+      const [pendingData, shipmentData, companiesData, vehiclesData, accountsData] = await Promise.all([
+        api.get<PendingCollection[]>('/delivery/collections/pending-remittance'),
+        api.get<Shipment[]>('/shipments'),
+        api.get<ShippingCompany[]>('/shipments/shipping-companies'),
+        api.get<Vehicle[]>('/shipments/vehicles'),
+        api.get<TreasuryAccount[]>('/treasury/accounts'),
+      ]);
+      setPending(pendingData);
+      setShipments(shipmentData);
+      setCompanies(companiesData);
+      setVehicles(vehiclesData);
+      setTreasuryAccounts(accountsData);
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load collection settlements.');
+    }
   }
 
   useEffect(() => {

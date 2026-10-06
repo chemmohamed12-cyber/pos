@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Overview {
   totalWarehouses: number;
@@ -38,6 +39,7 @@ export function WarehouseOverview() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'nav.warehouse_overview',
@@ -63,18 +65,39 @@ export function WarehouseOverview() {
     'field.on_hand',
   ]);
 
-  useEffect(() => {
+  function load() {
+    setLoadError(null);
+    setOverview(null);
     (async () => {
-      const [ov, wh, prod] = await Promise.all([
-        api.get<Overview>('/warehouse-transactions/overview'),
-        api.get<Warehouse[]>('/inventory/warehouses'),
-        api.get<Product[]>('/products/all'),
-      ]);
-      setOverview(ov);
-      setWarehouses(wh);
-      setProducts(prod);
+      try {
+        const [ov, wh, prod] = await Promise.all([
+          api.get<Overview>('/warehouse-transactions/overview'),
+          api.get<Warehouse[]>('/inventory/warehouses'),
+          api.get<Product[]>('/products/all'),
+        ]);
+        setOverview(ov);
+        setWarehouses(wh);
+        setProducts(prod);
+      } catch (err) {
+        // Foundation fix: this load had no error handling — a failure left
+        // the page stuck on "Loading…" forever with no explanation.
+        setLoadError(err);
+      }
     })();
-  }, []);
+  }
+
+  useEffect(load, []);
+
+  if (loadError) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('nav.warehouse_overview')}</h1>
+        </div>
+        <ErrorState error={loadError} onRetry={load} />
+      </div>
+    );
+  }
 
   if (!overview) return <div className="empty-state">Loading…</div>;
 

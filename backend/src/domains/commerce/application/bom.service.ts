@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { BillOfMaterial } from '../infrastructure/bill-of-materials.entity';
+import { DataSource, EntityManager, In } from 'typeorm';
+import { BillOfMaterial, BomStatus } from '../infrastructure/bill-of-materials.entity';
+import { Product } from '../infrastructure/product.entity';
 import { BomComponent } from '../infrastructure/bom-component.entity';
 import { ProductsService } from './products.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -14,6 +15,8 @@ export interface BomComponentInput {
 export interface BomComponentView extends BomComponentInput {
   sku: string;
   productName: string;
+  /** Component Product's existing free-text `unit` label — display only. */
+  unit: string | null;
 }
 
 export interface BomView {
@@ -21,6 +24,7 @@ export interface BomView {
   finishedProductId: string;
   finishedProductSku: string;
   finishedProductName: string;
+  status: BomStatus;
   components: BomComponentView[];
 }
 
@@ -28,6 +32,8 @@ export interface BomListEntry {
   finishedProductId: string;
   sku: string;
   name: string;
+  status: BomStatus;
+  componentCount: number;
 }
 
 /**
@@ -61,12 +67,17 @@ export class BomService implements SalesBomContract {
    * the new set, transactionally, so a caller never observes a
    * half-updated recipe.
    */
-  async defineBom(finishedProductId: string, components: BomComponentInput[], actorUserId: string | null): Promise<BillOfMaterial> {
+  async defineBom(
+    finishedProductId: string,
+    components: BomComponentInput[],
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<BillOfMaterial> {
     if (components.length === 0) {
       throw new BadRequestException('A Bill of Materials must have at least one component.');
     }
 
-    const finishedProduct = await this.products.getProductSnapshot(finishedProductId);
+    const finishedProduct = await this.products.getProductSnapshot(finishedProductId, manager);
     if (!finishedProduct) throw new NotFoundException(`Product "${finishedProductId}" not found.`);
 
     const seen = new Set<string>();
@@ -81,13 +92,13 @@ export class BomService implements SalesBomContract {
       if (!Number.isInteger(c.quantityPerUnit) || c.quantityPerUnit < 1) {
         throw new BadRequestException(`Quantity per unit for component "${c.componentProductId}" must be a positive whole number.`);
       }
-      const componentProduct = await this.products.getProductSnapshot(c.componentProductId);
+      const componentProduct = await this.products.getProductSnapshot(c.componentProductId, manager);
       if (!componentProduct) throw new NotFoundException(`Component product "${c.componentProductId}" not found.`);
     }
 
-    const bom = await this.dataSource.transaction(async (manager) => {
-      const bomRepo = manager.getRepository(BillOfMaterial);
-      const componentRepo = manager.getRepository(BomComponent);
+    const bom = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const bomRepo = txManager.getRepository(BillOfMaterial);
+      const componentRepo = txManager.getRepository(BomComponent);
 
       let record = await bomRepo.findOne({ where: { finishedProductId } });
       if (!record) {
@@ -107,76 +118,122 @@ export class BomService implements SalesBomContract {
       return record;
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.bom.defined',
-      resource: 'bill_of_materials',
-      resourceId: bom.id,
-      result: 'success',
-      correlationId: null,
-      after: { finishedProductId, components },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.bom.defined',
+        resource: 'bill_of_materials',
+        resourceId: bom.id,
+        result: 'success',
+        correlationId: null,
+        after: { finishedProductId, components },
+      },
+      manager,
+    );
 
     return bom;
   }
 
-  async getBom(finishedProductId: string): Promise<BomView | null> {
-    const bom = await this.dataSource.getRepository(BillOfMaterial).findOne({ where: { finishedProductId } });
+  async getBom(finishedProductId: string, manager?: EntityManager): Promise<BomView | null> {
+    const m = manager ?? this.dataSource;
+    const bom = await m.getRepository(BillOfMaterial).findOne({ where: { finishedProductId } });
     if (!bom) return null;
-    const finishedProduct = await this.products.getProductSnapshot(finishedProductId);
-    const rows = await this.dataSource.getRepository(BomComponent).find({ where: { billOfMaterialId: bom.id } });
+    const finishedProduct = await this.products.getProductSnapshot(finishedProductId, manager);
+    const rows = await m.getRepository(BomComponent).find({ where: { billOfMaterialId: bom.id } });
+    const productRows = rows.length ? await m.getRepository(Product).find({ where: { id: In(rows.map((r) => r.componentProductId)) } }) : [];
+    const byId = new Map(productRows.map((p) => [p.id, p]));
 
-    const components: BomComponentView[] = [];
-    for (const row of rows) {
-      const product = await this.products.getProductSnapshot(row.componentProductId);
-      components.push({
+    const components: BomComponentView[] = rows.map((row) => {
+      const product = byId.get(row.componentProductId);
+      return {
         componentProductId: row.componentProductId,
         quantityPerUnit: row.quantityPerUnit,
         sku: product?.sku ?? row.componentProductId,
         productName: product?.name ?? row.componentProductId,
-      });
-    }
+        unit: product?.unit ?? null,
+      };
+    });
 
     return {
       id: bom.id,
       finishedProductId,
       finishedProductSku: finishedProduct?.sku ?? finishedProductId,
       finishedProductName: finishedProduct?.name ?? finishedProductId,
+      status: bom.status,
       components,
     };
   }
 
-  /** Backs the BOM management screen's list — every finished product that currently has a defined recipe. */
-  async listBoms(): Promise<BomListEntry[]> {
-    const boms = await this.dataSource.getRepository(BillOfMaterial).find();
-    const entries: BomListEntry[] = [];
-    for (const bom of boms) {
-      const product = await this.products.getProductSnapshot(bom.finishedProductId);
-      entries.push({
-        finishedProductId: bom.finishedProductId,
-        sku: product?.sku ?? bom.finishedProductId,
-        name: product?.name ?? bom.finishedProductId,
-      });
-    }
-    return entries;
+  /** Backs the BOM management screens' list — every finished product that currently has a defined recipe (batched lookups, no N+1). */
+  async listBoms(manager?: EntityManager): Promise<BomListEntry[]> {
+    const m = manager ?? this.dataSource;
+    const boms = await m.getRepository(BillOfMaterial).find();
+    if (boms.length === 0) return [];
+    const products = await m.getRepository(Product).find({ where: { id: In(boms.map((b) => b.finishedProductId)) } });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const counts: Array<{ id: string; n: string }> = await m
+      .getRepository(BomComponent)
+      .createQueryBuilder('c')
+      .select('c.billOfMaterialId', 'id')
+      .addSelect('COUNT(*)', 'n')
+      .groupBy('c.billOfMaterialId')
+      .getRawMany();
+    const countById = new Map(counts.map((c) => [c.id, Number(c.n)]));
+    return boms.map((bom) => ({
+      finishedProductId: bom.finishedProductId,
+      sku: byId.get(bom.finishedProductId)?.sku ?? bom.finishedProductId,
+      name: byId.get(bom.finishedProductId)?.name ?? bom.finishedProductId,
+      status: bom.status,
+      componentCount: countById.get(bom.id) ?? 0,
+    }));
   }
 
-  async deleteBom(finishedProductId: string, actorUserId: string | null): Promise<void> {
-    const bom = await this.dataSource.getRepository(BillOfMaterial).findOne({ where: { finishedProductId } });
+  /** ADR-061 Addendum 1 (A2) — BOM lifecycle: `inactive` BOMs cannot seed new Work Orders / assemblies; no versioning is introduced. */
+  async setBomStatus(finishedProductId: string, status: BomStatus, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    if (status !== 'active' && status !== 'inactive') throw new BadRequestException('BOM status must be "active" or "inactive".');
+    const repo = (manager ?? this.dataSource).getRepository(BillOfMaterial);
+    const bom = await repo.findOne({ where: { finishedProductId } });
     if (!bom) throw new NotFoundException(`No Bill of Materials defined for product "${finishedProductId}".`);
-    await this.dataSource.getRepository(BillOfMaterial).remove(bom); // cascades bom_components (ON DELETE CASCADE)
+    if (bom.status === status) return;
+    const before = bom.status;
+    bom.status = status;
+    await repo.save(bom);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.bom.status_changed',
+        resource: 'bill_of_materials',
+        resourceId: bom.id,
+        result: 'success',
+        correlationId: null,
+        before: { status: before },
+        after: { finishedProductId, status },
+      },
+      manager,
+    );
+  }
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.bom.deleted',
-      resource: 'bill_of_materials',
-      resourceId: bom.id,
-      result: 'success',
-      correlationId: null,
-      before: { finishedProductId },
-    });
+  async deleteBom(finishedProductId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(BillOfMaterial);
+    const bom = await repo.findOne({ where: { finishedProductId } });
+    if (!bom) throw new NotFoundException(`No Bill of Materials defined for product "${finishedProductId}".`);
+    await repo.remove(bom); // cascades bom_components (ON DELETE CASCADE)
+
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.bom.deleted',
+        resource: 'bill_of_materials',
+        resourceId: bom.id,
+        result: 'success',
+        correlationId: null,
+        before: { finishedProductId },
+      },
+      manager,
+    );
   }
 
   /**
@@ -187,10 +244,11 @@ export class BomService implements SalesBomContract {
    * turn that straight into a clear "no recipe defined" business error
    * without a try/catch.
    */
-  async getBomForAssembly(finishedProductId: string): Promise<BomComponentInput[] | null> {
-    const bom = await this.dataSource.getRepository(BillOfMaterial).findOne({ where: { finishedProductId } });
-    if (!bom) return null;
-    const rows = await this.dataSource.getRepository(BomComponent).find({ where: { billOfMaterialId: bom.id } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — `BillOfMaterial`/`BomComponent` are Company-owned, called from `InventoryService.assembleProduct`. */
+  async getBomForAssembly(finishedProductId: string, manager?: EntityManager): Promise<BomComponentInput[] | null> {
+    const bom = await (manager ?? this.dataSource).getRepository(BillOfMaterial).findOne({ where: { finishedProductId } });
+    if (!bom || bom.status !== 'active') return null; // ADR-061 Addendum 1 (A2): an inactive BOM is "no usable recipe"
+    const rows = await (manager ?? this.dataSource).getRepository(BomComponent).find({ where: { billOfMaterialId: bom.id } });
     return rows.map((r) => ({ componentProductId: r.componentProductId, quantityPerUnit: r.quantityPerUnit }));
   }
 }

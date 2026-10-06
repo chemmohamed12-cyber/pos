@@ -21,11 +21,15 @@ export function CommissionCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [results, batches] = await Promise.all([api.get<CommissionResult[]>('/commission/results'), api.get<CommissionApprovalBatch[]>('/commission/batches')]);
-      setKpis({
-        unbatchedResults: results.filter((r) => r.batchId === null).length,
-        pendingBatches: batches.filter((b) => b.status === 'submitted').length,
-      });
+      try {
+        const [results, batches] = await Promise.all([api.get<CommissionResult[]>('/commission/results'), api.get<CommissionApprovalBatch[]>('/commission/batches')]);
+        setKpis({
+          unbatchedResults: results.filter((r) => r.batchId === null).length,
+          pendingBatches: batches.filter((b) => b.status === 'submitted').length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

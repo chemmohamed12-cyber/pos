@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, NotFoundException, Unauthori
 import { Reflector } from '@nestjs/core';
 import { PermissionService } from './permission.service';
 import { PERMISSION_METADATA_KEY, RequiredPermission } from './require-permission.decorator';
-import { AuthenticatedRequest } from '../authentication/jwt-auth.guard';
+import { CompanyScopedRequest } from '../company/company-context.guard';
 
 /**
  * Permission Engine — Stage 2 build-order item 8.
@@ -14,6 +14,16 @@ import { AuthenticatedRequest } from '../authentication/jwt-auth.guard';
  * resource exists. This is the one deliberate difference from
  * RolesGuard (item 7), which throws 403 for its coarser admin/staff
  * role gate — Permission Engine guards actual business resources.
+ *
+ * Membership HTTP Management (2026-09-24) — REAL BUG FOUND & FIXED, same
+ * class as `RolesGuard`'s own documented incident: `getAllAndOverride`,
+ * not `get(..., getHandler())` alone. `CompanyMembershipController`
+ * applies `@RequirePermission` at the CLASS level; a bare
+ * `.get(key, context.getHandler())` never sees class-level metadata and
+ * silently returned `undefined` — `if (!required) return true` then let
+ * ANY authenticated, Company-context-validated caller through with zero
+ * permission check on every route of that controller. Handler-level
+ * metadata still wins when both are present, matching `RolesGuard`.
  */
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -23,15 +33,20 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.get<RequiredPermission>(PERMISSION_METADATA_KEY, context.getHandler());
+    const required = this.reflector.getAllAndOverride<RequiredPermission>(PERMISSION_METADATA_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!required) return true;
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<CompanyScopedRequest>();
     if (!request.user) {
       throw new UnauthorizedException('Authentication required before permission can be checked.');
     }
 
-    const allowed = await this.permission.hasAtLeast(request.user.id, required.nodeKey, required.access);
+    // Multi-Company Area 6 (2026-09-23) — see RolesGuard's identical comment.
+    const manager = request.companyContext?.dataSource.manager;
+    const allowed = await this.permission.hasAtLeast(request.user.id, required.nodeKey, required.access, manager);
     if (!allowed) {
       throw new NotFoundException();
     }

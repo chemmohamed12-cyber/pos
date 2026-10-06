@@ -34,33 +34,37 @@ export function FulfillmentCover() {
 
   useEffect(() => {
     (async () => {
-      const [orders, fos, packs, ships] = await Promise.all([
-        api.get<SalesOrder[]>('/sales-orders'),
-        api.get<FulfillmentOrderRow[]>('/fulfillment/orders'),
-        api.get<Task[]>('/fulfillment/pack-tasks'),
-        api.get<ShipmentRow[]>('/shipments'),
-      ]);
-      const released = orders.filter((o) => o.status === 'released');
-      const foBySalesOrderId = new Map(fos.map((fo) => [fo.salesOrderId, fo]));
-      const packByFoId = new Map(packs.map((p) => [p.fulfillmentOrderId, p]));
-      const shippedFoIds = new Set(ships.map((s) => s.fulfillmentOrderId));
+      try {
+        const [orders, fos, packs, ships] = await Promise.all([
+          api.get<SalesOrder[]>('/sales-orders'),
+          api.get<FulfillmentOrderRow[]>('/fulfillment/orders'),
+          api.get<Task[]>('/fulfillment/pack-tasks'),
+          api.get<ShipmentRow[]>('/shipments'),
+        ]);
+        const released = orders.filter((o) => o.status === 'released');
+        const foBySalesOrderId = new Map(fos.map((fo) => [fo.salesOrderId, fo]));
+        const packByFoId = new Map(packs.map((p) => [p.fulfillmentOrderId, p]));
+        const shippedFoIds = new Set(ships.map((s) => s.fulfillmentOrderId));
 
-      let newCount = 0;
-      let preparationCount = 0;
-      let readyCount = 0;
-      for (const order of released) {
-        const fo = foBySalesOrderId.get(order.id);
-        if (!fo) {
-          newCount += 1;
-          continue;
+        let newCount = 0;
+        let preparationCount = 0;
+        let readyCount = 0;
+        for (const order of released) {
+          const fo = foBySalesOrderId.get(order.id);
+          if (!fo) {
+            newCount += 1;
+            continue;
+          }
+          if (shippedFoIds.has(fo.id)) continue;
+          const pack = packByFoId.get(fo.id);
+          if (pack && pack.state === 'closed') readyCount += 1;
+          else preparationCount += 1;
         }
-        if (shippedFoIds.has(fo.id)) continue;
-        const pack = packByFoId.get(fo.id);
-        if (pack && pack.state === 'closed') readyCount += 1;
-        else preparationCount += 1;
-      }
 
-      setKpis({ new: newCount, preparation: preparationCount, ready: readyCount });
+        setKpis({ new: newCount, preparation: preparationCount, ready: readyCount });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, []);
 

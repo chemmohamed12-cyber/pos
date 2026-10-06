@@ -1,0 +1,49 @@
+path	status	mtime	hint_NOT_ownership_evidence
+backend/src/domains/accounting/accounting-company-entities.ts	UNATTRIBUTED	2026-10-05 07:47:07	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/accounting/interface/ap.controller.ts	UNATTRIBUTED	2026-10-05 07:46:20	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/accounting/interface/ar.controller.ts	UNATTRIBUTED	2026-10-05 07:49:39	none
+backend/src/domains/accounting/interface/cash-bank.controller.ts	UNATTRIBUTED	2026-10-05 07:49:39	none
+backend/src/domains/accounting/interface/event-engine.company-isolation.spec.ts	UNATTRIBUTED	2026-10-04 18:06:54	Multi-Company front (script/command naming this file within 20 min of mtime); this lane (script/command naming this file within 20 min of mtime)
+backend/src/domains/accounting/interface/fixed-asset.controller.ts	UNATTRIBUTED	2026-10-05 15:03:17	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/accounting/interface/inventory-accounting.controller.ts	UNATTRIBUTED	2026-10-05 07:49:40	none
+backend/src/domains/attendance/attendance-company-entities.ts	UNATTRIBUTED	2026-10-05 06:27:38	none
+backend/src/domains/commission/commission-company-entities.ts	UNATTRIBUTED	2026-10-05 06:39:11	none
+backend/src/domains/customer-finance/interface/customer-ledger.controller.ts	UNATTRIBUTED	2026-10-05 04:55:58	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/customer-finance/interface/invoices.controller.ts	UNATTRIBUTED	2026-10-05 07:00:05	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/customer-finance/interface/payments.controller.ts	UNATTRIBUTED	2026-10-04 16:58:36	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/fulfillment/interface/fulfillment.controller.ts	UNATTRIBUTED	2026-10-05 04:55:58	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/hr/hr-company-entities.ts	UNATTRIBUTED	2026-10-05 06:11:38	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts	UNATTRIBUTED	2026-10-04 23:23:06	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/inventory-warehouse/interface/inventory.controller.ts	UNATTRIBUTED	2026-10-05 13:31:39	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 06:30:16	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts	UNATTRIBUTED	2026-10-05 00:01:36	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/inventory-warehouse/inventory-warehouse-company-entities.ts	UNATTRIBUTED	2026-10-05 13:31:39	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/payroll/payroll-company-entities.ts	UNATTRIBUTED	2026-10-05 06:46:49	none
+backend/src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 15:35:24	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/procurement/interface/purchase-order.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 15:33:46	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/procurement/interface/purchase-request.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 15:33:46	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/procurement/procurement-company-entities.ts	UNATTRIBUTED	2026-10-05 15:32:17	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/returns/interface/returns.controller.ts	UNATTRIBUTED	2026-10-05 07:11:14	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/returns/interface/sales-returns.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 06:30:16	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/returns/interface/shipment-returns.company-isolation.spec.ts	UNATTRIBUTED	2026-10-05 06:30:16	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/domains/returns/returns-company-entities.ts	UNATTRIBUTED	2026-10-04 15:09:44	this lane (script/command naming this file within 20 min of mtime)
+backend/src/domains/sales-orders/interface/sales-orders.controller.ts	UNATTRIBUTED	2026-10-05 04:55:58	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/sales/interface/sales.controller.ts	UNATTRIBUTED	2026-10-05 07:24:12	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/domains/sales/sales-company-entities.ts	UNATTRIBUTED	2026-10-05 07:24:14	none
+backend/src/domains/treasury/interface/treasury.company-isolation.spec.ts	UNATTRIBUTED	2026-10-04 18:28:12	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/foundation/approval-engine/approval-engine.module.ts	UNATTRIBUTED	2026-10-05 05:38:38	DAII HR (fork) (script/command naming this file within 20 min of mtime); this lane (script/command naming this file within 20 min of mtime)
+backend/src/foundation/approval-engine/approval-engine.service.ts	UNATTRIBUTED	2026-10-05 05:38:15	DAII HR (fork) (script/command naming this file within 20 min of mtime); this lane (script/command naming this file within 20 min of mtime)
+backend/src/foundation/approval-engine/approval.controller.ts	UNATTRIBUTED	2026-10-05 05:38:38	DAII HR (fork) (script/command naming this file within 20 min of mtime); this lane (script/command naming this file within 20 min of mtime)
+backend/src/foundation/authorization/authorization.service.ts	UNATTRIBUTED	2026-10-05 07:23:52	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/company/company-authorization-schema-adjustment.ts	UNATTRIBUTED	2026-10-05 07:42:08	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/database-registry/company-entity-registry.ts	UNATTRIBUTED	2026-10-05 07:24:14	none
+backend/src/foundation/entitlement/entitlement.controller.ts	UNATTRIBUTED	2026-10-05 01:51:25	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/contracts/ar-events.contract.ts	UNATTRIBUTED	2026-10-05 05:10:39	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/contracts/inventory.contract.ts	UNATTRIBUTED	2026-10-05 05:11:15	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/contracts/sales.contract.ts	UNATTRIBUTED	2026-10-05 15:32:17	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/contracts/tax-engine.contract.ts	UNATTRIBUTED	2026-10-05 06:55:55	82ce681b (script/command naming this file within 20 min of mtime); DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/entitlement-resolver.token.ts	UNATTRIBUTED	2026-10-05 00:59:12	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/module-registry/manifests/logistics.manifest.ts	UNATTRIBUTED	2026-10-05 05:32:18	Multi-Company front (script/command naming this file within 20 min of mtime)
+backend/src/foundation/navigation/navigation.controller.ts	UNATTRIBUTED	2026-10-05 01:50:52	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/navigation/navigation.service.ts	UNATTRIBUTED	2026-10-05 01:51:03	DAII HR (fork) (script/command naming this file within 20 min of mtime)
+backend/src/foundation/plans/plan.entity.ts	UNATTRIBUTED	2026-10-05 01:00:11	DAII HR (fork) (script/command naming this file within 20 min of mtime)

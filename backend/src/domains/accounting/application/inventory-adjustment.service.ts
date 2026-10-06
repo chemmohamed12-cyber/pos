@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import {
   INVENTORY_ADJUSTMENT_META,
   INVENTORY_APPROVAL_REQUEST_TYPES,
@@ -60,6 +60,10 @@ export class InventoryAdjustmentService implements OnModuleInit {
     private readonly audit: AuditService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async onModuleInit(): Promise<void> {
     if (!this.registry.get(INVENTORY_ADJUSTMENT_APPROVED_EVENT)) {
       this.registry.register(INVENTORY_ADJUSTMENT_APPROVED_EVENT, handleInventoryAdjustmentApproved);
@@ -79,23 +83,27 @@ export class InventoryAdjustmentService implements OnModuleInit {
         )
         .catch(() => undefined);
     }
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
   // Submit (maker)
   // ---------------------------------------------------------------------------
 
-  async submitAdjustment(input: SubmitInventoryAdjustmentInput, actorUserId: string): Promise<{ mode: 'approval'; approvalRequestId: string }> {
+  async submitAdjustment(input: SubmitInventoryAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<{ mode: 'approval'; approvalRequestId: string }> {
     if (!isInventoryAdjustmentKind(input.kind)) throw new BadRequestException(`Unknown inventory adjustment kind "${input.kind}".`);
     if (!isPositiveAmount(input.amount)) throw new BadRequestException('Amount must be a positive decimal.');
     if (!input.reason?.trim()) throw new BadRequestException('A reason is required.');
     if (!input.counterAccountCode?.trim()) throw new BadRequestException('A counterAccountCode is required.');
 
     // fail-closed BEFORE any FA-01 request
-    const counterAccountCode = await this.requirePostableNonControlAccount(input.counterAccountCode.trim(), 'counterAccountCode');
+    const counterAccountCode = await this.requirePostableNonControlAccount(input.counterAccountCode.trim(), 'counterAccountCode', manager);
     const meta = INVENTORY_ADJUSTMENT_META[input.kind];
 
     const payload = {
@@ -118,7 +126,7 @@ export class InventoryAdjustmentService implements OnModuleInit {
       payload,
       makerUserId: actorUserId,
       orgUnitId: input.orgUnitId ?? null,
-    });
+    }, manager);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -128,7 +136,7 @@ export class InventoryAdjustmentService implements OnModuleInit {
       result: 'success',
       correlationId: input.productId ?? null,
       after: { kind: input.kind, amount: input.amount, requestTypeCode: meta.requestTypeCode },
-    });
+    }, manager);
     return { mode: 'approval', approvalRequestId: request.id };
   }
 
@@ -136,14 +144,14 @@ export class InventoryAdjustmentService implements OnModuleInit {
   // FA-01 approval subscriber
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (!Object.values(INVENTORY_APPROVAL_REQUEST_TYPES).includes(requestTypeCode as never)) return; // not ours
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
-    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''));
+    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''), manager);
   }
 
-  private async performApprovedAdjustment(p: Record<string, unknown>, actorUserId: string, approvalRequestId: string): Promise<string> {
+  private async performApprovedAdjustment(p: Record<string, unknown>, actorUserId: string, approvalRequestId: string, manager?: EntityManager): Promise<string> {
     const kind = String(p.kind) as InventoryAdjustmentKind;
     const resourceId = String(p.productId ?? p.warehouseId ?? 'inventory');
 
@@ -160,7 +168,7 @@ export class InventoryAdjustmentService implements OnModuleInit {
       reason: p.reason ?? '',
       direction: p.direction ?? 'credit',
       counterAccountCode: p.counterAccountCode ?? null,
-    });
+    }, manager);
 
     await this.audit.record({
       actorUserId,
@@ -171,7 +179,7 @@ export class InventoryAdjustmentService implements OnModuleInit {
       result: result.status === 'POSTED' ? 'success' : 'failure',
       correlationId: approvalRequestId || null,
       after: { kind, amount: String(p.amount), financialEventId: result.financialEventId, status: result.status },
-    });
+    }, manager);
 
     if (result.status === 'REJECTED') {
       throw new ConflictException(`Inventory ${kind} GL posting was rejected — see financial event ${result.financialEventId}.`);
@@ -183,14 +191,14 @@ export class InventoryAdjustmentService implements OnModuleInit {
   // Checker
   // ---------------------------------------------------------------------------
 
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
   // ---------------------------------------------------------------------------
 
-  private async requirePostableNonControlAccount(code: string, label: string): Promise<string> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { code } });
+  private async requirePostableNonControlAccount(code: string, label: string, manager?: EntityManager): Promise<string> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { code } });
     if (!acc) throw new BadRequestException(`${label}: GL account "${code}" not found.`);
     if (!acc.isActive) throw new BadRequestException(`${label}: GL account "${code}" is inactive.`);
     if (!acc.isPostable) throw new BadRequestException(`${label}: GL account "${code}" is not postable.`);

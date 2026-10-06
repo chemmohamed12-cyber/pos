@@ -72,19 +72,23 @@ export class FixedAssetService {
     private readonly audit: AuditService,
   ) {}
 
-  async listAssets(): Promise<FixedAssetView[]> {
-    const assets = await this.dataSource.getRepository(FixedAsset).find({ order: { code: 'ASC' } });
-    return Promise.all(assets.map((a) => this.toView(a)));
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
   }
 
-  async getAsset(id: string): Promise<FixedAssetView> {
-    const asset = await this.dataSource.getRepository(FixedAsset).findOne({ where: { id } });
+  async listAssets(manager?: EntityManager): Promise<FixedAssetView[]> {
+    const assets = await this.em(manager).getRepository(FixedAsset).find({ order: { code: 'ASC' } });
+    return Promise.all(assets.map((a) => this.toView(a, manager)));
+  }
+
+  async getAsset(id: string, manager?: EntityManager): Promise<FixedAssetView> {
+    const asset = await this.em(manager).getRepository(FixedAsset).findOne({ where: { id } });
     if (!asset) throw new NotFoundException(`Fixed asset "${id}" not found.`);
-    return this.toView(asset);
+    return this.toView(asset, manager);
   }
 
-  private async toView(asset: FixedAsset): Promise<FixedAssetView> {
-    const lifecycleState = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id);
+  private async toView(asset: FixedAsset, manager?: EntityManager): Promise<FixedAssetView> {
+    const lifecycleState = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id, manager);
     return { ...asset, lifecycleState };
   }
 
@@ -92,7 +96,7 @@ export class FixedAssetService {
   // Create
   // ---------------------------------------------------------------------------
 
-  async createAsset(input: CreateFixedAssetInput, actorUserId: string): Promise<FixedAssetView> {
+  async createAsset(input: CreateFixedAssetInput, actorUserId: string, manager?: EntityManager): Promise<FixedAssetView> {
     const salvageValue = input.salvageValue ?? '0';
     if (Number(salvageValue) > Number(input.cost)) {
       throw new BadRequestException('salvageValue cannot exceed cost.');
@@ -107,8 +111,8 @@ export class FixedAssetService {
 
     let categoryDefault: FixedAssetCategoryAccountMapping | null = null;
     if (input.categoryDimensionValueId) {
-      await this.assertDimensionValueExists(input.categoryDimensionValueId);
-      categoryDefault = await this.dataSource
+      await this.assertDimensionValueExists(input.categoryDimensionValueId, manager);
+      categoryDefault = await this.em(manager)
         .getRepository(FixedAssetCategoryAccountMapping)
         .findOne({ where: { categoryDimensionValueId: input.categoryDimensionValueId } });
     }
@@ -121,13 +125,13 @@ export class FixedAssetService {
         'costAccountId, accumulatedDepreciationAccountId, and depreciationExpenseAccountId are required (directly, or via a category default mapping).',
       );
     }
-    await this.assertAccountShape(costAccountId, 'asset', false, 'costAccountId');
-    await this.assertAccountShape(accumulatedDepreciationAccountId, 'asset', true, 'accumulatedDepreciationAccountId');
-    await this.assertAccountShape(depreciationExpenseAccountId, 'expense', false, 'depreciationExpenseAccountId');
+    await this.assertAccountShape(costAccountId, 'asset', false, 'costAccountId', manager);
+    await this.assertAccountShape(accumulatedDepreciationAccountId, 'asset', true, 'accumulatedDepreciationAccountId', manager);
+    await this.assertAccountShape(depreciationExpenseAccountId, 'expense', false, 'depreciationExpenseAccountId', manager);
 
     const depreciableBase = normaliseAmount(String(Number(input.cost) - Number(salvageValue)), 4);
 
-    const asset = await this.dataSource.transaction(async (manager) => {
+    const asset = await this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(FixedAsset);
       let saved: FixedAsset;
       try {
@@ -174,15 +178,15 @@ export class FixedAssetService {
       return saved;
     });
 
-    return this.getAsset(asset.id);
+    return this.getAsset(asset.id, manager);
   }
 
   // ---------------------------------------------------------------------------
   // Update (D12 — depreciation-affecting fields lock after the first posted charge)
   // ---------------------------------------------------------------------------
 
-  async updateAsset(id: string, input: UpdateFixedAssetInput, actorUserId: string): Promise<FixedAssetView> {
-    return this.dataSource
+  async updateAsset(id: string, input: UpdateFixedAssetInput, actorUserId: string, manager?: EntityManager): Promise<FixedAssetView> {
+    return this.em(manager)
       .transaction(async (manager) => {
         const repo = manager.getRepository(FixedAsset);
         const asset = await repo.findOne({ where: { id } });
@@ -203,7 +207,7 @@ export class FixedAssetService {
         if (input.name !== undefined) asset.name = input.name;
         if (input.orgUnitId !== undefined) asset.orgUnitId = input.orgUnitId;
         if (input.categoryDimensionValueId !== undefined) {
-          if (input.categoryDimensionValueId) await this.assertDimensionValueExists(input.categoryDimensionValueId);
+          if (input.categoryDimensionValueId) await this.assertDimensionValueExists(input.categoryDimensionValueId, manager);
           asset.categoryDimensionValueId = input.categoryDimensionValueId;
         }
         if (input.cost !== undefined) asset.cost = normaliseAmount(input.cost, 4);
@@ -219,15 +223,15 @@ export class FixedAssetService {
           asset.depreciationMethod = input.depreciationMethod;
         }
         if (input.costAccountId !== undefined) {
-          await this.assertAccountShape(input.costAccountId, 'asset', false, 'costAccountId');
+          await this.assertAccountShape(input.costAccountId, 'asset', false, 'costAccountId', manager);
           asset.costAccountId = input.costAccountId;
         }
         if (input.accumulatedDepreciationAccountId !== undefined) {
-          await this.assertAccountShape(input.accumulatedDepreciationAccountId, 'asset', true, 'accumulatedDepreciationAccountId');
+          await this.assertAccountShape(input.accumulatedDepreciationAccountId, 'asset', true, 'accumulatedDepreciationAccountId', manager);
           asset.accumulatedDepreciationAccountId = input.accumulatedDepreciationAccountId;
         }
         if (input.depreciationExpenseAccountId !== undefined) {
-          await this.assertAccountShape(input.depreciationExpenseAccountId, 'expense', false, 'depreciationExpenseAccountId');
+          await this.assertAccountShape(input.depreciationExpenseAccountId, 'expense', false, 'depreciationExpenseAccountId', manager);
           asset.depreciationExpenseAccountId = input.depreciationExpenseAccountId;
         }
         if (Number(asset.salvageValue) > Number(asset.cost)) {
@@ -254,15 +258,47 @@ export class FixedAssetService {
         );
         return saved.id;
       })
-      .then((id) => this.getAsset(id));
+      .then((id) => this.getAsset(id, manager));
   }
 
   // ---------------------------------------------------------------------------
   // Link acquisition (ADR-045 D7 — full 5-point validation, Mandatory Correction #3)
   // ---------------------------------------------------------------------------
 
-  async linkAcquisitionJournalEntry(id: string, journalEntryId: string, actorUserId: string): Promise<FixedAssetView> {
-    await this.dataSource.transaction(async (manager) => {
+  /**
+   * D8 (2026-10-05, CTO: keep the manual-JE + link-acquisition architecture, complete the UI workflow) — the POSTED journal entries
+   * the maker may link as this asset's acquisition: a line on the asset's cost account whose debit EXACTLY equals the cost, not
+   * already the acquisition of another asset. READ-ONLY — it creates nothing and posts nothing; `linkAcquisitionJournalEntry` still
+   * re-validates every rule at link time. Only a `pending_acquisition` asset has candidates.
+   */
+  async listAcquisitionCandidates(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<Array<{ journalEntryId: string; entryNumber: string | null; businessDate: string; description: string | null; debit: string }>> {
+    const asset = await this.em(manager).getRepository(FixedAsset).findOne({ where: { id } });
+    if (!asset) throw new NotFoundException(`Fixed asset "${id}" not found.`);
+    const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, id, manager);
+    if (state !== 'pending_acquisition') return [];
+    const rows: Array<{ id: string; entryNumber: string | null; businessDate: string; description: string | null; debit: string }> = await this.em(manager).query(
+      `SELECT je.id, je."entryNumber", je."businessDate"::text AS "businessDate", je.description, jl."debitTransaction"::text AS debit
+         FROM "accounting_journal_entries" je
+         JOIN "accounting_journal_lines" jl ON jl."journalEntryId" = je.id
+        WHERE jl."accountId" = $1::uuid AND jl."debitTransaction" = $2::numeric
+          AND NOT EXISTS (SELECT 1 FROM "accounting_fixed_assets" fa WHERE fa."acquisitionJournalEntryId" = je.id)
+        ORDER BY je."businessDate" DESC, je."createdAt" DESC
+        LIMIT 100`,
+      [asset.costAccountId, normaliseAmount(asset.cost, 4)],
+    );
+    const posted: typeof rows = [];
+    for (const row of rows) {
+      if ((await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, row.id, manager)) === 'POSTED') posted.push(row);
+      if (posted.length >= 50) break;
+    }
+    return posted.map((r) => ({ journalEntryId: r.id, entryNumber: r.entryNumber, businessDate: r.businessDate, description: r.description, debit: r.debit }));
+  }
+
+  async linkAcquisitionJournalEntry(id: string, journalEntryId: string, actorUserId: string, manager?: EntityManager): Promise<FixedAssetView> {
+    await this.em(manager).transaction(async (manager) => {
       const asset = await manager.getRepository(FixedAsset).findOne({ where: { id } });
       if (!asset) throw new NotFoundException(`Fixed asset "${id}" not found.`);
       const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, id, manager);
@@ -271,7 +307,7 @@ export class FixedAssetService {
       }
       await this.linkAcquisitionInternal(manager, asset, journalEntryId, actorUserId);
     });
-    return this.getAsset(id);
+    return this.getAsset(id, manager);
   }
 
   private async linkAcquisitionInternal(manager: EntityManager, asset: FixedAsset, journalEntryId: string, actorUserId: string): Promise<void> {
@@ -325,14 +361,14 @@ export class FixedAssetService {
   // Internals
   // ---------------------------------------------------------------------------
 
-  private async assertDimensionValueExists(id: string): Promise<void> {
-    const value = await this.dataSource.getRepository(FinancialDimensionValue).findOne({ where: { id } });
+  private async assertDimensionValueExists(id: string, manager?: EntityManager): Promise<void> {
+    const value = await this.em(manager).getRepository(FinancialDimensionValue).findOne({ where: { id } });
     if (!value) throw new NotFoundException(`Financial dimension value "${id}" not found.`);
     if (!value.isActive) throw new ConflictException(`Financial dimension value "${value.code}" is inactive.`);
   }
 
-  private async assertAccountShape(accountId: string, accountType: string, isContra: boolean, fieldName: string): Promise<void> {
-    const account = await this.glAccounts.getAccount(accountId); // throws NotFoundException
+  private async assertAccountShape(accountId: string, accountType: string, isContra: boolean, fieldName: string, manager?: EntityManager): Promise<void> {
+    const account = await this.glAccounts.getAccount(accountId, manager); // throws NotFoundException
     if (!account.isActive) throw new ConflictException(`${fieldName}: GL account "${account.code}" is inactive.`);
     if (account.accountType !== accountType) {
       throw new ConflictException(`${fieldName}: GL account "${account.code}" must be of type "${accountType}", not "${account.accountType}".`);

@@ -1,8 +1,10 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { WorkOrder } from '../infrastructure/work-order.entity';
 import { WorkOrderComponent } from '../infrastructure/work-order-component.entity';
+import { WorkOrderOperation } from '../infrastructure/work-order-operation.entity';
+import { RoutingService } from './routing.service';
 import { WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE } from '../domain/work-order-process';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
@@ -36,20 +38,21 @@ export class WorkOrderService {
     private readonly events: EventBusService,
     @Inject(SALES_BOM_CONTRACT) private readonly bom: SalesBomContract,
     @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation: InventoryValuationContract,
+    private readonly routings: RoutingService,
   ) {}
 
   // ---------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------
 
-  async getWorkOrderOrThrow(workOrderId: string): Promise<WorkOrder> {
-    const wo = await this.dataSource.getRepository(WorkOrder).findOne({ where: { id: workOrderId } });
+  async getWorkOrderOrThrow(workOrderId: string, manager?: EntityManager): Promise<WorkOrder> {
+    const wo = await (manager ?? this.dataSource).getRepository(WorkOrder).findOne({ where: { id: workOrderId } });
     if (!wo) throw new NotFoundException(`Work Order "${workOrderId}" not found.`);
     return wo;
   }
 
-  async listWorkOrders(): Promise<WorkOrder[]> {
-    return this.dataSource.getRepository(WorkOrder).find({ order: { createdAt: 'DESC' } });
+  async listWorkOrders(manager?: EntityManager): Promise<WorkOrder[]> {
+    return (manager ?? this.dataSource).getRepository(WorkOrder).find({ order: { createdAt: 'DESC' } });
   }
 
   /**
@@ -59,22 +62,27 @@ export class WorkOrderService {
    * does (`getWorkOrderState`/`computeWipValue`) — this is the same
    * composition, just mapped over every row. No new business logic.
    */
-  async listWorkOrdersWithSummary(): Promise<Array<WorkOrder & { state: string; wipValue: string }>> {
-    const workOrders = await this.listWorkOrders();
+  async listWorkOrdersWithSummary(manager?: EntityManager): Promise<Array<WorkOrder & { state: string; wipValue: string }>> {
+    const workOrders = await this.listWorkOrders(manager);
     return Promise.all(
       workOrders.map(async (wo) => {
-        const [state, wipValue] = await Promise.all([this.getWorkOrderState(wo.id), this.computeWipValue(wo.id)]);
+        const [state, wipValue] = await Promise.all([this.getWorkOrderState(wo.id, manager), this.computeWipValue(wo.id, manager)]);
         return { ...wo, state, wipValue: wipValue.toFixed(4) };
       }),
     );
   }
 
-  async getWorkOrderState(workOrderId: string): Promise<string> {
-    return this.processEngine.getState(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId);
+  async getWorkOrderState(workOrderId: string, manager?: EntityManager): Promise<string> {
+    return this.processEngine.getState(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, manager);
   }
 
-  async getWorkOrderComponents(workOrderId: string): Promise<WorkOrderComponent[]> {
-    return this.dataSource.getRepository(WorkOrderComponent).find({ where: { workOrderId } });
+  /** ADR-061 Addendum 1 (A1) — the Work Order's routing snapshot (empty ⇒ no routing was active at release). */
+  async getWorkOrderOperations(workOrderId: string, manager?: EntityManager): Promise<WorkOrderOperation[]> {
+    return (manager ?? this.dataSource).getRepository(WorkOrderOperation).find({ where: { workOrderId }, order: { sequence: 'ASC' } });
+  }
+
+  async getWorkOrderComponents(workOrderId: string, manager?: EntityManager): Promise<WorkOrderComponent[]> {
+    return (manager ?? this.dataSource).getRepository(WorkOrderComponent).find({ where: { workOrderId } });
   }
 
   /**
@@ -93,10 +101,10 @@ export class WorkOrderService {
    * material, the WHOLE warehouse row from `getValuedOnHandTotal` IS
    * `WIP(WO).value` — no per-component loop needed.
    */
-  async computeWipValue(workOrderId: string): Promise<number> {
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
+  async computeWipValue(workOrderId: string, manager?: EntityManager): Promise<number> {
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
     if (!wo.wipWarehouseId) return 0;
-    const rows = await this.valuation.getValuedOnHandTotal(undefined, this.dataSource.manager);
+    const rows = await this.valuation.getValuedOnHandTotal(undefined, manager ?? this.dataSource.manager);
     const row = rows.find((r) => r.warehouseId === wo.wipWarehouseId);
     return row ? Number(row.totalValueBase) : 0;
   }
@@ -118,7 +126,7 @@ export class WorkOrderService {
    * which routing this through Accounting's own
    * `/accounting/financial-events` endpoint would have required.
    */
-  async getFinancialTrail(workOrderId: string): Promise<
+  async getFinancialTrail(workOrderId: string, manager?: EntityManager): Promise<
     Array<{
       id: string;
       eventType: string;
@@ -136,7 +144,7 @@ export class WorkOrderService {
       businessDate: string;
       rejectionReason: string | null;
       journalEntryId: string | null;
-    }> = await this.dataSource.query(
+    }> = await (manager ?? this.dataSource).query(
       `SELECT "id", "eventType", "status", "businessDate", "rejectionReason", "journalEntryId"
        FROM "accounting_financial_events"
        WHERE "idempotencyKey" LIKE $1
@@ -149,7 +157,7 @@ export class WorkOrderService {
     const lines: Array<{ journalEntryId: string; accountCode: string; accountName: string; debitBase: string; creditBase: string }> =
       journalEntryIds.length === 0
         ? []
-        : await this.dataSource.query(
+        : await (manager ?? this.dataSource).query(
             `SELECT jl."journalEntryId", a."code" AS "accountCode", a."name" AS "accountName", jl."debitBase", jl."creditBase"
              FROM "accounting_journal_lines" jl
              JOIN "accounting_gl_accounts" a ON a.id = jl."accountId"
@@ -172,10 +180,11 @@ export class WorkOrderService {
    * wo.id, ... })`) filtered to this one Work Order. No new audit
    * mechanism; this is a read view over the one that already exists.
    */
-  async getAuditTrail(workOrderId: string): Promise<
-    Array<{ seq: number; timestamp: Date; action: string; actorUserId: string | null; result: string; after: Record<string, unknown> | null }>
-  > {
-    return this.dataSource.query(
+  async getAuditTrail(
+    workOrderId: string,
+    manager?: EntityManager,
+  ): Promise<Array<{ seq: number; timestamp: Date; action: string; actorUserId: string | null; result: string; after: Record<string, unknown> | null }>> {
+    return (manager ?? this.dataSource).query(
       `SELECT "seq", "timestamp", "action", "actorUserId", "result", "after"
        FROM "audit_records"
        WHERE "resource" = 'work_order' AND "resourceId" = $1
@@ -188,15 +197,23 @@ export class WorkOrderService {
   // Lifecycle
   // ---------------------------------------------------------------------
 
-  async createWorkOrder(finishedProductId: string, quantityPlanned: number, warehouseId: string, actorUserId: string | null): Promise<WorkOrder> {
+  async createWorkOrder(finishedProductId: string, quantityPlanned: number, warehouseId: string, actorUserId: string | null, manager?: EntityManager): Promise<WorkOrder> {
     if (!Number.isInteger(quantityPlanned) || quantityPlanned <= 0) {
       throw new ConflictException('quantityPlanned must be a positive whole number.');
     }
-    return this.dataSource.transaction(async (manager) => {
-      const workOrderNumber = await this.numbering.getNextNumber('work_order', manager);
-      const repo = manager.getRepository(WorkOrder);
+    // ADR-061 Addendum 1 (A3) — manufacturing eligibility is DERIVED (an active BOM exists), and is now
+    // enforced at creation, not only at release. `getBomForAssembly` is null for a missing/inactive BOM.
+    const recipe = await this.bom.getBomForAssembly(finishedProductId, manager);
+    if (!recipe || recipe.length === 0) {
+      throw new ConflictException(
+        `Finished product "${finishedProductId}" has no active Bill of Materials — define one (Manufacturing → Bills of Materials) before creating a Work Order for it.`,
+      );
+    }
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      const workOrderNumber = await this.numbering.getNextNumber('work_order', txManager);
+      const repo = txManager.getRepository(WorkOrder);
       const wo = await repo.save(repo.create({ workOrderNumber, finishedProductId, quantityPlanned, warehouseId, createdByUserId: actorUserId }));
-      await this.processEngine.start(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, manager);
+      await this.processEngine.start(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, txManager);
       await this.audit.record(
         {
           actorUserId,
@@ -208,7 +225,7 @@ export class WorkOrderService {
           correlationId: null,
           after: { workOrderNumber, finishedProductId, quantityPlanned, warehouseId },
         },
-        manager,
+        txManager,
       );
       return wo;
     });
@@ -223,28 +240,32 @@ export class WorkOrderService {
    * codebase) — idempotent via `findOperationalSubLocation` so a retried
    * release never creates a second WIP warehouse for the same Work Order.
    */
-  async release(workOrderId: string, actorUserId: string | null): Promise<WorkOrder> {
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
-    const state = await this.getWorkOrderState(workOrderId);
+  async release(workOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<WorkOrder> {
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'draft') throw new ConflictException(`Work Order "${workOrderId}" cannot be released from state "${state}".`);
 
-    const bomLines = await this.bom.getBomForAssembly(wo.finishedProductId);
+    const bomLines = await this.bom.getBomForAssembly(wo.finishedProductId, manager);
     if (!bomLines || bomLines.length === 0) {
       throw new ConflictException(`Finished product "${wo.finishedProductId}" has no Bill of Materials — cannot release a Work Order for it.`);
     }
 
+    // ADR-061 Addendum 1 (A1) — resolved BEFORE any release side effect (WIP warehouse creation): an
+    // active routing is snapshotted below; a routing pointing at an inactive Work Center fails here.
+    const routingOperations = await this.routings.getActiveOperationsForRelease(wo.finishedProductId, manager);
+
     const wipCode = `WIP-${wo.workOrderNumber}`;
-    let wipWarehouse = await this.inventory.findOperationalSubLocation(wo.warehouseId, wipCode);
+    let wipWarehouse = await this.inventory.findOperationalSubLocation(wo.warehouseId, wipCode, manager);
     if (!wipWarehouse) {
-      wipWarehouse = await this.inventory.createWarehouse(wipCode, `WIP — ${wo.workOrderNumber}`, null, null, wo.warehouseId, 'operational');
+      wipWarehouse = await this.inventory.createWarehouse(wipCode, `WIP — ${wo.workOrderNumber}`, null, null, wo.warehouseId, 'operational', manager);
     }
     const wipWarehouseId = wipWarehouse.id;
 
-    return this.dataSource.transaction(async (manager) => {
-      const componentRepo = manager.getRepository(WorkOrderComponent);
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      const componentRepo = txManager.getRepository(WorkOrderComponent);
       for (const line of bomLines) {
         const quantityRequired = line.quantityPerUnit * wo.quantityPlanned;
-        const currentCost = await this.valuation.getUnitCost(line.componentProductId, wo.warehouseId, undefined, manager);
+        const currentCost = await this.valuation.getUnitCost(line.componentProductId, wo.warehouseId, undefined, txManager);
         await componentRepo.save(
           componentRepo.create({
             workOrderId: wo.id,
@@ -254,7 +275,7 @@ export class WorkOrderService {
           }),
         );
         await this.inventory.reserveStockForReferenceInTransaction(
-          manager,
+          txManager,
           wo.warehouseId,
           line.componentProductId,
           quantityRequired,
@@ -264,9 +285,27 @@ export class WorkOrderService {
         );
       }
 
-      const woRepo = manager.getRepository(WorkOrder);
+      if (routingOperations) {
+        const opRepo = txManager.getRepository(WorkOrderOperation);
+        await opRepo.save(
+          routingOperations.map((o) =>
+            opRepo.create({
+              workOrderId: wo.id,
+              sequence: o.sequence,
+              name: o.name,
+              description: o.description,
+              workCenterId: o.workCenterId,
+              workCenterCode: o.workCenterCode,
+              workCenterName: o.workCenterName,
+              status: 'pending',
+            }),
+          ),
+        );
+      }
+
+      const woRepo = txManager.getRepository(WorkOrder);
       await woRepo.update(wo.id, { wipWarehouseId });
-      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, 'release', actorUserId, manager);
+      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, 'release', actorUserId, txManager);
 
       await this.audit.record(
         {
@@ -277,9 +316,9 @@ export class WorkOrderService {
           resourceId: wo.id,
           result: 'success',
           correlationId: null,
-          after: { wipWarehouseId, componentCount: bomLines.length },
+          after: { wipWarehouseId, componentCount: bomLines.length, operationCount: routingOperations?.length ?? 0 },
         },
-        manager,
+        txManager,
       );
 
       return (await woRepo.findOne({ where: { id: wo.id } }))!;
@@ -303,19 +342,20 @@ export class WorkOrderService {
     issueQuantity: number,
     actorUserId: string | null,
     requestId: string = randomUUID(),
+    manager?: EntityManager,
   ): Promise<void> {
     if (!Number.isInteger(issueQuantity) || issueQuantity <= 0) {
       throw new ConflictException('issueQuantity must be a positive whole number.');
     }
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
-    const state = await this.getWorkOrderState(workOrderId);
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'released' && state !== 'in_progress') {
       throw new ConflictException(`Work Order "${workOrderId}" cannot accept a Material Issue from state "${state}".`);
     }
     if (!wo.wipWarehouseId) throw new ConflictException(`Work Order "${workOrderId}" has no WIP sub-warehouse — release it first.`);
 
-    await this.dataSource.transaction(async (manager) => {
-      const componentRepo = manager.getRepository(WorkOrderComponent);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const componentRepo = txManager.getRepository(WorkOrderComponent);
       const component = await componentRepo.findOne({ where: { workOrderId, componentProductId } });
       if (!component) throw new ConflictException(`Component "${componentProductId}" is not part of Work Order "${workOrderId}"'s released BOM snapshot.`);
 
@@ -327,7 +367,7 @@ export class WorkOrderService {
       }
 
       const keys = [`${wo.warehouseId}:${componentProductId}`, `${wo.wipWarehouseId}:${componentProductId}`].sort();
-      for (const key of keys) await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+      for (const key of keys) await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
 
       const issueLineId = requestId;
       const consumed = await this.valuation.consumeIssueCost(
@@ -335,33 +375,33 @@ export class WorkOrderService {
         wo.warehouseId,
         issueQuantity,
         `manufacturing:work_order:${wo.id}:material_issue:${issueLineId}:consume`,
-        manager,
+        txManager,
       );
       if (!consumed || 'rejected' in consumed) {
         throw new ConflictException(`Cannot issue ${issueQuantity} of "${componentProductId}" from warehouse "${wo.warehouseId}" — insufficient valued stock.`);
       }
 
-      await this.inventory.recordMovement(wo.warehouseId, componentProductId, -issueQuantity, 'work_order_material_issue', 'work_order', wo.id, actorUserId, manager);
-      await this.inventory.recordMovement(wo.wipWarehouseId!, componentProductId, issueQuantity, 'work_order_material_issue', 'work_order', wo.id, actorUserId, manager);
+      await this.inventory.recordMovement(wo.warehouseId, componentProductId, -issueQuantity, 'work_order_material_issue', 'work_order', wo.id, actorUserId, txManager);
+      await this.inventory.recordMovement(wo.wipWarehouseId!, componentProductId, issueQuantity, 'work_order_material_issue', 'work_order', wo.id, actorUserId, txManager);
       await this.valuation.recordReceiptCost(
         componentProductId,
         wo.wipWarehouseId!,
         issueQuantity,
         consumed.unitCostBase,
         `manufacturing:work_order:${wo.id}:material_issue:${issueLineId}:receipt`,
-        manager,
+        txManager,
       );
 
-      await this.inventory.releaseReservedQuantityForReference('WORK_ORDER', wo.id, componentProductId, wo.warehouseId, issueQuantity, actorUserId, manager);
+      await this.inventory.releaseReservedQuantityForReference('WORK_ORDER', wo.id, componentProductId, wo.warehouseId, issueQuantity, actorUserId, txManager);
 
       component.quantityIssued += issueQuantity;
       await componentRepo.save(component);
 
       if (state === 'released') {
-        await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, 'begin_production', actorUserId, manager);
+        await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, 'begin_production', actorUserId, txManager);
       }
 
-      await this.events.publish(manager, 'manufacturing.work_order.material_issued', {
+      await this.events.publish(txManager, 'manufacturing.work_order.material_issued', {
         idempotencyKey: `manufacturing:work_order:${wo.id}:material_issue:${issueLineId}`,
         workOrderId: wo.id,
         componentProductId,
@@ -381,13 +421,13 @@ export class WorkOrderService {
           correlationId: null,
           after: { componentProductId, issueQuantity, unitCostBase: consumed.unitCostBase },
         },
-        manager,
+        txManager,
       );
     });
     // The outbox row `events.publish` wrote above only becomes a real GL entry once dispatched —
     // without this, it would sit `pending` until some unrelated later sweep, an accidental and
     // non-deterministic delay (same precedent `GoodsReceiptService.post` already established).
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
   }
 
   /**
@@ -401,19 +441,20 @@ export class WorkOrderService {
     returnQuantity: number,
     actorUserId: string | null,
     requestId: string = randomUUID(),
+    manager?: EntityManager,
   ): Promise<void> {
     if (!Number.isInteger(returnQuantity) || returnQuantity <= 0) {
       throw new ConflictException('returnQuantity must be a positive whole number.');
     }
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
-    const state = await this.getWorkOrderState(workOrderId);
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'in_progress' && state !== 'on_hold') {
       throw new ConflictException(`Work Order "${workOrderId}" cannot accept a Material Return from state "${state}".`);
     }
     if (!wo.wipWarehouseId) throw new ConflictException(`Work Order "${workOrderId}" has no WIP sub-warehouse.`);
 
-    await this.dataSource.transaction(async (manager) => {
-      const componentRepo = manager.getRepository(WorkOrderComponent);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const componentRepo = txManager.getRepository(WorkOrderComponent);
       const component = await componentRepo.findOne({ where: { workOrderId, componentProductId } });
       if (!component) throw new ConflictException(`Component "${componentProductId}" is not part of Work Order "${workOrderId}".`);
 
@@ -425,7 +466,7 @@ export class WorkOrderService {
       }
 
       const keys = [`${wo.warehouseId}:${componentProductId}`, `${wo.wipWarehouseId}:${componentProductId}`].sort();
-      for (const key of keys) await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+      for (const key of keys) await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
 
       const returnLineId = requestId;
       // Corrected costing rule (§5) — WIP's OWN current moving-average cost, never the original issue's cost.
@@ -434,21 +475,21 @@ export class WorkOrderService {
         wo.wipWarehouseId!,
         returnQuantity,
         `manufacturing:work_order:${wo.id}:material_return:${returnLineId}:consume`,
-        manager,
+        txManager,
       );
       if (!consumed || 'rejected' in consumed) {
         throw new ConflictException(`Cannot return ${returnQuantity} of "${componentProductId}" — insufficient physical/valued stock in the Work Order's WIP.`);
       }
 
-      await this.inventory.recordMovement(wo.wipWarehouseId!, componentProductId, -returnQuantity, 'work_order_material_return', 'work_order', wo.id, actorUserId, manager);
-      await this.inventory.recordMovement(wo.warehouseId, componentProductId, returnQuantity, 'work_order_material_return', 'work_order', wo.id, actorUserId, manager);
+      await this.inventory.recordMovement(wo.wipWarehouseId!, componentProductId, -returnQuantity, 'work_order_material_return', 'work_order', wo.id, actorUserId, txManager);
+      await this.inventory.recordMovement(wo.warehouseId, componentProductId, returnQuantity, 'work_order_material_return', 'work_order', wo.id, actorUserId, txManager);
       await this.valuation.recordReceiptCost(
         componentProductId,
         wo.warehouseId,
         returnQuantity,
         consumed.unitCostBase,
         `manufacturing:work_order:${wo.id}:material_return:${returnLineId}:receipt`,
-        manager,
+        txManager,
       );
 
       // Re-reserve the returned quantity for THIS Work Order — a return puts the physical unit
@@ -457,12 +498,12 @@ export class WorkOrderService {
       // Material Issue re-draw the same quantity (ADR-061 §8's worked example does exactly this)
       // without ever needing more than quantityRequired reserved in total, and keeps the
       // reservation balance consistent with quantityRequired − quantityIssued at every point.
-      await this.inventory.reserveStockForReferenceInTransaction(manager, wo.warehouseId, componentProductId, returnQuantity, 'WORK_ORDER', wo.id, actorUserId);
+      await this.inventory.reserveStockForReferenceInTransaction(txManager, wo.warehouseId, componentProductId, returnQuantity, 'WORK_ORDER', wo.id, actorUserId);
 
       component.quantityIssued -= returnQuantity;
       await componentRepo.save(component);
 
-      await this.events.publish(manager, 'manufacturing.work_order.material_returned', {
+      await this.events.publish(txManager, 'manufacturing.work_order.material_returned', {
         idempotencyKey: `manufacturing:work_order:${wo.id}:material_return:${returnLineId}`,
         workOrderId: wo.id,
         componentProductId,
@@ -482,10 +523,10 @@ export class WorkOrderService {
           correlationId: null,
           after: { componentProductId, returnQuantity, unitCostBase: consumed.unitCostBase },
         },
-        manager,
+        txManager,
       );
     });
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
   }
 
   /**
@@ -502,12 +543,13 @@ export class WorkOrderService {
     outputQuantity: number,
     actorUserId: string | null,
     requestId: string = randomUUID(),
+    manager?: EntityManager,
   ): Promise<void> {
     if (!Number.isInteger(outputQuantity) || outputQuantity <= 0) {
       throw new ConflictException('outputQuantity must be a positive whole number.');
     }
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
-    const state = await this.getWorkOrderState(workOrderId);
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'in_progress') {
       throw new ConflictException(`Work Order "${workOrderId}" cannot record a Finished Goods Output from state "${state}".`);
     }
@@ -520,27 +562,27 @@ export class WorkOrderService {
       );
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      const componentRepo = manager.getRepository(WorkOrderComponent);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const componentRepo = txManager.getRepository(WorkOrderComponent);
       const components = await componentRepo.find({ where: { workOrderId: wo.id } });
       if (components.length === 0) throw new ConflictException(`Work Order "${workOrderId}" has no components — cannot produce.`);
 
       const lockKeys = new Set<string>();
       for (const c of components) lockKeys.add(`${wo.wipWarehouseId}:${c.componentProductId}`);
       lockKeys.add(`${wo.warehouseId}:${wo.finishedProductId}`);
-      for (const key of Array.from(lockKeys).sort()) await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+      for (const key of Array.from(lockKeys).sort()) await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
 
       // ADR-061 §6/§7 — WIP(WO).value_before, read as F08's own authoritative `totalValueBase` for
       // the WIP sub-warehouse (see `computeWipValue`'s doc comment for why this must NOT be
       // re-derived as Σ(onHand × unitCost) in JS: a component whose on-hand hit zero after a prior
       // policy-valued consumption carries a null average but a real leftover `totalValueBase`).
-      const wipTotals = await this.valuation.getValuedOnHandTotal(undefined, manager);
+      const wipTotals = await this.valuation.getValuedOnHandTotal(undefined, txManager);
       const wipValueBefore = Number(wipTotals.find((r) => r.warehouseId === wo.wipWarehouseId)?.totalValueBase ?? 0);
 
       const perComponent: Array<{ componentProductId: string; onHand: number; unitCost: number; qtyConsumed: number }> = [];
       for (const c of components) {
-        const onHand = await this.inventory.getOnHandQuantityInTransaction(manager, wo.wipWarehouseId!, c.componentProductId);
-        const costRow = await this.valuation.getUnitCost(c.componentProductId, wo.wipWarehouseId!, undefined, manager);
+        const onHand = await this.inventory.getOnHandQuantityInTransaction(txManager, wo.wipWarehouseId!, c.componentProductId);
+        const costRow = await this.valuation.getUnitCost(c.componentProductId, wo.wipWarehouseId!, undefined, txManager);
         const unitCost = costRow ? Number(costRow.unitCostBase) : 0;
 
         // ADR-061 §7 points 1/2 — physical quantity consumed, tied to the BOM snapshot.
@@ -608,7 +650,7 @@ export class WorkOrderService {
           p.qtyConsumed,
           appliedValueBase,
           `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}:${p.componentProductId}`,
-          manager,
+          txManager,
         );
         if (!consumeResult || 'rejected' in consumeResult) {
           throw new ConflictException(`Finished Goods Output failed applying the policy-valued consumption for component "${p.componentProductId}".`);
@@ -621,24 +663,24 @@ export class WorkOrderService {
           'work_order',
           wo.id,
           actorUserId,
-          manager,
+          txManager,
         );
       }
 
-      await this.inventory.recordMovement(wo.warehouseId, wo.finishedProductId, outputQuantity, 'work_order_finished_goods_output', 'work_order', wo.id, actorUserId, manager);
+      await this.inventory.recordMovement(wo.warehouseId, wo.finishedProductId, outputQuantity, 'work_order_finished_goods_output', 'work_order', wo.id, actorUserId, txManager);
       await this.valuation.recordReceiptCost(
         wo.finishedProductId,
         wo.warehouseId,
         outputQuantity,
         unitCostOutput.toFixed(4),
         `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}:receipt`,
-        manager,
+        txManager,
       );
 
-      const woRepo = manager.getRepository(WorkOrder);
+      const woRepo = txManager.getRepository(WorkOrder);
       await woRepo.update(wo.id, { quantityProduced: wo.quantityProduced + outputQuantity });
 
-      await this.events.publish(manager, 'manufacturing.work_order.finished_goods_received', {
+      await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
         idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}`,
         workOrderId: wo.id,
         finishedProductId: wo.finishedProductId,
@@ -658,10 +700,10 @@ export class WorkOrderService {
           correlationId: null,
           after: { outputQuantity, unitCostOutput: unitCostOutput.toFixed(4), valueOutput: valueOutput.toFixed(4) },
         },
-        manager,
+        txManager,
       );
     });
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
   }
 
   /**
@@ -681,32 +723,95 @@ export class WorkOrderService {
     }
   }
 
-  async hold(workOrderId: string, actorUserId: string | null): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'hold', actorUserId, manager);
+  /**
+   * ADR-061 Addendum 1 (A1) — start an operation of the routing snapshot. Pure execution tracking:
+   * no inventory movement, no Financial Event, no cost. Allowed while the Work Order is `released` or
+   * `in_progress` (not `on_hold`); operations run strictly in sequence (every lower sequence must be
+   * `completed` first).
+   */
+  async startOperation(workOrderId: string, operationId: string, actorUserId: string | null, manager?: EntityManager): Promise<WorkOrderOperation> {
+    return this.transitionOperation(workOrderId, operationId, 'start', actorUserId, manager);
+  }
+
+  async completeOperation(workOrderId: string, operationId: string, actorUserId: string | null, manager?: EntityManager): Promise<WorkOrderOperation> {
+    return this.transitionOperation(workOrderId, operationId, 'complete', actorUserId, manager);
+  }
+
+  private async transitionOperation(
+    workOrderId: string,
+    operationId: string,
+    action: 'start' | 'complete',
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<WorkOrderOperation> {
+    await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
+    if (state !== 'released' && state !== 'in_progress') {
+      throw new ConflictException(`Work Order "${workOrderId}" cannot ${action} an operation from state "${state}".`);
+    }
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      const repo = txManager.getRepository(WorkOrderOperation);
+      const all = await repo.find({ where: { workOrderId }, order: { sequence: 'ASC' } });
+      const op = all.find((o) => o.id === operationId);
+      if (!op) throw new NotFoundException(`Operation "${operationId}" not found on Work Order "${workOrderId}".`);
+
+      if (action === 'start') {
+        if (op.status !== 'pending') throw new ConflictException(`Operation ${op.sequence} is already ${op.status}.`);
+        const blocking = all.find((o) => o.sequence < op.sequence && o.status !== 'completed');
+        if (blocking) throw new ConflictException(`Operation ${blocking.sequence} ("${blocking.name}") must be completed before operation ${op.sequence} can start.`);
+        op.status = 'in_progress';
+        op.startedAt = new Date();
+        op.startedByUserId = actorUserId;
+      } else {
+        if (op.status !== 'in_progress') throw new ConflictException(`Operation ${op.sequence} must be in progress to complete (currently ${op.status}).`);
+        op.status = 'completed';
+        op.completedAt = new Date();
+        op.completedByUserId = actorUserId;
+      }
+      const saved = await repo.save(op);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: `manufacturing.work_order.operation_${action === 'start' ? 'started' : 'completed'}`,
+          resource: 'work_order',
+          resourceId: workOrderId,
+          result: 'success',
+          correlationId: null,
+          after: { operationId, sequence: op.sequence, name: op.name, workCenterCode: op.workCenterCode, status: op.status },
+        },
+        txManager,
+      );
+      return saved;
+    });
+  }
+
+  async hold(workOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'hold', actorUserId, txManager);
       await this.audit.record(
         { actorUserId, organizationId: null, action: 'manufacturing.work_order.held', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: null },
-        manager,
+        txManager,
       );
     });
   }
 
-  async resume(workOrderId: string, actorUserId: string | null): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'resume', actorUserId, manager);
+  async resume(workOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'resume', actorUserId, txManager);
       await this.audit.record(
         { actorUserId, organizationId: null, action: 'manufacturing.work_order.resumed', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: null },
-        manager,
+        txManager,
       );
     });
   }
 
   /** ADR-061 §3 — hard guard: WIP(WO).value must be exactly zero (within rounding tolerance) before completion. */
-  async complete(workOrderId: string, actorUserId: string | null): Promise<void> {
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
+  async complete(workOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
     if (!wo.wipWarehouseId) throw new ConflictException(`Work Order "${workOrderId}" has no WIP sub-warehouse.`);
 
-    const wipValue = await this.computeWipValue(workOrderId);
+    const wipValue = await this.computeWipValue(workOrderId, manager);
     const TOLERANCE = 0.01;
     if (Math.abs(wipValue) > TOLERANCE) {
       throw new ConflictException(
@@ -714,9 +819,19 @@ export class WorkOrderService {
       );
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'complete', actorUserId, manager);
-      await this.releaseRemainingReservations(workOrderId, wo.warehouseId, actorUserId, manager);
+    // ADR-061 Addendum 1 (A1) — opt-in by data: a Work Order that snapshotted a routing may complete only
+    // when every operation is completed. A Work Order without operations is unaffected.
+    const operations = await this.getWorkOrderOperations(workOrderId, manager);
+    const open = operations.filter((o) => o.status !== 'completed');
+    if (open.length > 0) {
+      throw new ConflictException(
+        `Cannot complete Work Order "${workOrderId}" — ${open.length} routing operation(s) are not completed (first open: ${open[0].sequence} "${open[0].name}").`,
+      );
+    }
+
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'complete', actorUserId, txManager);
+      await this.releaseRemainingReservations(workOrderId, wo.warehouseId, actorUserId, txManager);
       await this.audit.record(
         {
           actorUserId,
@@ -728,17 +843,17 @@ export class WorkOrderService {
           correlationId: null,
           after: { wipValue: wipValue.toFixed(4) },
         },
-        manager,
+        txManager,
       );
     });
   }
 
   /** ADR-061 §3 — `released -> cancelled` only if zero material has been issued; `draft -> cancelled` always allowed. */
-  async cancel(workOrderId: string, actorUserId: string | null): Promise<void> {
-    const wo = await this.getWorkOrderOrThrow(workOrderId);
-    const state = await this.getWorkOrderState(workOrderId);
+  async cancel(workOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
     if (state === 'released') {
-      const components = await this.getWorkOrderComponents(workOrderId);
+      const components = await this.getWorkOrderComponents(workOrderId, manager);
       if (components.some((c) => c.quantityIssued > 0)) {
         throw new ConflictException(`Cannot cancel Work Order "${workOrderId}" from "released" — material has already been issued.`);
       }
@@ -746,14 +861,14 @@ export class WorkOrderService {
       throw new ConflictException(`Work Order "${workOrderId}" cannot be cancelled from state "${state}".`);
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'cancel', actorUserId, manager);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.processEngine.transition(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, workOrderId, 'cancel', actorUserId, txManager);
       if (state === 'released') {
-        await this.releaseRemainingReservations(workOrderId, wo.warehouseId, actorUserId, manager);
+        await this.releaseRemainingReservations(workOrderId, wo.warehouseId, actorUserId, txManager);
       }
       await this.audit.record(
         { actorUserId, organizationId: null, action: 'manufacturing.work_order.cancelled', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: null },
-        manager,
+        txManager,
       );
     });
   }

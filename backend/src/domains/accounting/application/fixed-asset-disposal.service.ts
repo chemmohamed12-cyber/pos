@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { FixedAsset } from '../infrastructure/fixed-asset.entity';
 import { FixedAssetDisposal } from '../infrastructure/fixed-asset-disposal.entity';
 import {
@@ -12,7 +12,12 @@ import {
 import { GLAccountService } from './gl-account.service';
 import { FinancialEventService } from './financial-events/financial-event.service';
 import { FinancialEventHandlerRegistry } from './financial-events/handler-registry';
-import { handleFixedAssetDisposalApproved } from './financial-events/fixed-asset-disposal.handler';
+import {
+  DISPOSAL_GAIN_ACCOUNT_CONFIG_KEY,
+  DISPOSAL_LOSS_ACCOUNT_CONFIG_KEY,
+  disposalGainLoss,
+  handleFixedAssetDisposalApproved,
+} from './financial-events/fixed-asset-disposal.handler';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -50,6 +55,10 @@ export class FixedAssetDisposalService implements OnModuleInit {
     private readonly audit: AuditService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async onModuleInit(): Promise<void> {
     if (!this.registry.get(FIXED_ASSET_DISPOSAL_APPROVED_EVENT)) {
       this.registry.register(FIXED_ASSET_DISPOSAL_APPROVED_EVENT, handleFixedAssetDisposalApproved);
@@ -68,23 +77,53 @@ export class FixedAssetDisposalService implements OnModuleInit {
       )
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
     // ADR-045 D11 — the concrete, already-existing extension point. F12 is this event's first subscriber.
-    this.events.subscribe(JOURNAL_REVERSED_EVENT, async (payload) => {
-      await this.onJournalReversed(payload);
-    });
+    this.events.subscribe(
+      JOURNAL_REVERSED_EVENT,
+      async (payload, ctx) => {
+        await this.onJournalReversed(payload, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
+  }
+
+  /**
+   * FA-02 (2026-10-06, CTO) — Gain → credit the configured gain account; Loss → debit the configured loss account; the account the
+   * result needs must be configured AND postable, else the disposal is REJECTED BEFORE ANY MUTATION (no disposal row, no approval
+   * request, no approval decision) — never a fallback, never a hard-coded account. Uses the same calculation the posting handler uses
+   * (`disposalGainLoss`) and the same account resolution (`preflightConfiguredPostableAccount`).
+   */
+  private async assertDisposalAccountConfigured(fixedAssetId: string, cost: string, proceeds: string, manager?: EntityManager): Promise<void> {
+    const [row] = (await this.em(manager).query(
+      `SELECT COALESCE(SUM("calculatedAmount"), 0)::numeric(20,4) AS total FROM accounting_depreciation_run_lines WHERE "fixedAssetId" = $1`,
+      [fixedAssetId],
+    )) as Array<{ total: string }>;
+    const { side, gainLoss } = disposalGainLoss(proceeds, row.total, cost);
+    if (side === 'none') return;
+    const key = side === 'gain' ? DISPOSAL_GAIN_ACCOUNT_CONFIG_KEY : DISPOSAL_LOSS_ACCOUNT_CONFIG_KEY;
+    const resolved = await this.financialEvents.preflightConfiguredPostableAccount(key, this.em(manager));
+    if (!resolved.ok) {
+      throw new ConflictException(
+        `This disposal results in a ${side} of ${Math.abs(gainLoss).toFixed(2)}, but the ${side}-on-disposal account is not usable (${resolved.reason}). Configure "${key}" with an active, postable, non-control account before disposing.`,
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
   // Submit (maker)
   // ---------------------------------------------------------------------------
 
-  async submitDisposal(input: SubmitDisposalInput, actorUserId: string): Promise<{ approvalRequestId: string }> {
-    const asset = await this.dataSource.getRepository(FixedAsset).findOne({ where: { id: input.fixedAssetId } });
+  async submitDisposal(input: SubmitDisposalInput, actorUserId: string, manager?: EntityManager): Promise<{ approvalRequestId: string }> {
+    const asset = await this.em(manager).getRepository(FixedAsset).findOne({ where: { id: input.fixedAssetId } });
     if (!asset) throw new NotFoundException(`Fixed asset "${input.fixedAssetId}" not found.`);
-    const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id);
+    const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id, manager);
     if (state !== 'active') {
       throw new ConflictException(`Fixed asset "${asset.code}" is "${state}", not "active" — cannot submit a disposal.`);
     }
@@ -98,13 +137,15 @@ export class FixedAssetDisposalService implements OnModuleInit {
       await this.glAccounts.assertPostable(input.proceedsAccountId, {
         businessDate: input.disposalDate,
         orgUnitId: input.orgUnitId ?? asset.orgUnitId ?? null,
-        currencyCode: (await this.dataSource.query(`SELECT code FROM accounting_currencies WHERE "isBaseCurrency" = true LIMIT 1`))[0]?.code,
+        currencyCode: (await this.em(manager).query(`SELECT code FROM accounting_currencies WHERE "isBaseCurrency" = true LIMIT 1`))[0]?.code,
         systemPosting: true,
-      });
+      }, manager);
     }
 
-    const disposal = await this.dataSource.getRepository(FixedAssetDisposal).save(
-      this.dataSource.getRepository(FixedAssetDisposal).create({
+    await this.assertDisposalAccountConfigured(asset.id, asset.cost, proceeds, manager); // FA-02 — before ANY write
+
+    const disposal = await this.em(manager).getRepository(FixedAssetDisposal).save(
+      this.em(manager).getRepository(FixedAssetDisposal).create({
         fixedAssetId: asset.id,
         disposalDate: input.disposalDate,
         proceeds,
@@ -134,10 +175,10 @@ export class FixedAssetDisposalService implements OnModuleInit {
       },
       makerUserId: actorUserId,
       orgUnitId: input.orgUnitId ?? asset.orgUnitId ?? null,
-    });
+    }, manager);
 
     disposal.approvalRequestId = request.id;
-    await this.dataSource.getRepository(FixedAssetDisposal).save(disposal);
+    await this.em(manager).getRepository(FixedAssetDisposal).save(disposal);
 
     await this.audit.record({
       actorUserId,
@@ -148,20 +189,29 @@ export class FixedAssetDisposalService implements OnModuleInit {
       result: 'success',
       correlationId: request.id,
       after: { disposalId: disposal.id, proceeds },
-    });
+    }, manager);
 
     return { approvalRequestId: request.id };
   }
 
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string, manager?: EntityManager): Promise<unknown> {
+    if (decision === 'approved') {
+      // FA-02 — re-check with FRESH accumulated depreciation (a Depreciation Run may have posted since submission) before the approval
+      // is recorded: a missing/unusable gain/loss account rejects here, not after the approval as a REJECTED event.
+      const disposal = await this.em(manager).getRepository(FixedAssetDisposal).findOne({ where: { approvalRequestId: requestId } });
+      if (disposal) {
+        const asset = await this.em(manager).getRepository(FixedAsset).findOne({ where: { id: disposal.fixedAssetId } });
+        if (asset) await this.assertDisposalAccountConfigured(asset.id, asset.cost, disposal.proceeds, manager);
+      }
+    }
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
   // ---------------------------------------------------------------------------
   // FA-01 approval subscriber
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== FIXED_ASSET_DISPOSAL_META.requestTypeCode) return; // not ours
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
@@ -175,9 +225,9 @@ export class FixedAssetDisposalService implements OnModuleInit {
       sourceEntityId: disposalId,
       payloadVersion: 1,
       ...inner,
-    });
+    }, manager);
 
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       const disposal = await manager.getRepository(FixedAssetDisposal).findOne({ where: { id: disposalId } });
       if (!disposal) return;
       if (result.status === 'POSTED' && result.journalEntryId) {
@@ -221,10 +271,10 @@ export class FixedAssetDisposalService implements OnModuleInit {
   // D11 — reversal extension point
   // ---------------------------------------------------------------------------
 
-  private async onJournalReversed(payload: Record<string, unknown>): Promise<void> {
+  private async onJournalReversed(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const journalEntryId = String(payload.journalEntryId ?? '');
     if (!journalEntryId) return;
-    const disposal = await this.dataSource.getRepository(FixedAssetDisposal).findOne({ where: { journalEntryId } });
+    const disposal = await this.em(manager).getRepository(FixedAssetDisposal).findOne({ where: { journalEntryId } });
     if (!disposal) return; // not a disposal's journal entry — correctly a no-op for F12
 
     await this.processEngine.transition(
@@ -232,8 +282,7 @@ export class FixedAssetDisposalService implements OnModuleInit {
       FIXED_ASSET_ENTITY_TYPE,
       disposal.fixedAssetId,
       'reverse_disposal',
-      '00000000-0000-0000-0000-000000000000',
-    );
+      '00000000-0000-0000-0000-000000000000', manager);
     await this.audit.record({
       actorUserId: '00000000-0000-0000-0000-000000000000',
       organizationId: null,
@@ -243,17 +292,17 @@ export class FixedAssetDisposalService implements OnModuleInit {
       result: 'success',
       correlationId: journalEntryId,
       after: { disposalId: disposal.id },
-    });
+    }, manager);
   }
 
-  async listDisposals(fixedAssetId?: string): Promise<FixedAssetDisposal[]> {
-    return this.dataSource
+  async listDisposals(fixedAssetId?: string, manager?: EntityManager): Promise<FixedAssetDisposal[]> {
+    return this.em(manager)
       .getRepository(FixedAssetDisposal)
       .find({ where: fixedAssetId ? { fixedAssetId } : {}, order: { createdAt: 'DESC' } });
   }
 
-  async getDepreciationToDate(fixedAssetId: string): Promise<string> {
-    const [row] = (await this.dataSource.query(
+  async getDepreciationToDate(fixedAssetId: string, manager?: EntityManager): Promise<string> {
+    const [row] = (await this.em(manager).query(
       `SELECT COALESCE(SUM("calculatedAmount"), 0)::numeric(20,4) AS total FROM accounting_depreciation_run_lines WHERE "fixedAssetId" = $1`,
       [fixedAssetId],
     )) as Array<{ total: string }>;

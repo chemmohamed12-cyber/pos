@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsInt, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SalesReturnsService } from '../application/sales-returns.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -59,7 +60,7 @@ class CreateSalesReturnDto {
  * `sourceOrderIds` array).
  */
 @Controller('sales-returns')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class SalesReturnsController {
   constructor(private readonly salesReturns: SalesReturnsService) {}
@@ -68,14 +69,16 @@ export class SalesReturnsController {
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.sales_return.view')
   @Get('eligible-purchases')
-  async listEligiblePurchases(@Query() query: ListEligiblePurchasesDto) {
-    return this.salesReturns.listEligiblePurchaseLines(query.customerId, new Date(query.returnDate));
+  async listEligiblePurchases(@Req() req: CompanyScopedRequest, @Query() query: ListEligiblePurchasesDto) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.salesReturns.listEligiblePurchaseLines(query.customerId, new Date(query.returnDate), req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.sales_return.create', 'editable')
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateSalesReturnDto) {
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateSalesReturnDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.salesReturns.createSalesReturn(
       dto.customerId,
       dto.salesOrderId ?? null,
@@ -83,28 +86,32 @@ export class SalesReturnsController {
       dto.lines,
       dto.reason ?? null,
       req.user.id,
+      req.companyContext.dataSource.manager,
     );
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.sales_return.post', 'editable')
   @Post(':id/complete')
-  async complete(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    const state = await this.salesReturns.completeSalesReturn(id, req.user.id);
+  async complete(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const state = await this.salesReturns.completeSalesReturn(id, req.user.id, req.companyContext.dataSource.manager);
     return { salesReturnId: id, state };
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.sales_return.view')
   @Get()
-  async list() {
-    return this.salesReturns.listSalesReturns();
+  async list(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.salesReturns.listSalesReturns(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.sales_return.view')
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.salesReturns.getSalesReturnDetail(id);
+  async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.salesReturns.getSalesReturnDetail(id, req.companyContext.dataSource.manager);
   }
 }

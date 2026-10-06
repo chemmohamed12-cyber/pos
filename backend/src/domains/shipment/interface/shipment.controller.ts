@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { ShipmentService } from '../application/shipment.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -165,20 +166,35 @@ class TransitionDto {
   action!: string;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27, CTO-authorized).
+ * `CompanyContextGuard` added at the class level — `Shipment`/
+ * `ShipmentLine`/`ShippingCompany`/`Vehicle`/`TrackingEvent` are
+ * genuinely Company-owned data. Previously STOP/ESCALATED
+ * (AREA21-RETROFIT-MATRIX.md §26) — `TreasuryService.listAccountTypes`/
+ * `createAccount` (§28) and `FulfillmentService.getFulfillmentOrder`/
+ * `getFulfillmentOrderBySalesOrderId` (§26 update) were both closed
+ * afterward, and the remaining `SalesOrdersReadContract`/
+ * `InventoryLogisticsContract`/`SalesCustomersContract` interface-drift
+ * items were widened in the same pass as this retrofit — see this
+ * section's own §29 write-up for the full call-graph audit.
+ */
 @Controller('shipments')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class ShipmentController {
   constructor(private readonly shipments: ShipmentService) {}
 
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateShipmentDto) {
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateShipmentDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.createShipment(
       dto.fulfillmentOrderId,
       req.user.id,
       dto.shippingCompanyId ?? null,
       dto.codAmount ?? null,
       dto.vehicleId ?? null,
+      req.companyContext.dataSource.manager,
     );
   }
 
@@ -188,14 +204,16 @@ export class ShipmentController {
   // writes admin-gated; reads broadly available" boundary Commerce uses.
 
   @Get('shipping-companies')
-  async listShippingCompanies() {
-    return this.shipments.listShippingCompanies();
+  async listShippingCompanies(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.listShippingCompanies(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.carrier.create', 'editable')
   @Post('shipping-companies')
-  async createShippingCompany(@Req() req: AuthenticatedRequest, @Body() dto: CreateShippingCompanyDto) {
+  async createShippingCompany(@Req() req: CompanyScopedRequest, @Body() dto: CreateShippingCompanyDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.createShippingCompany(
       dto.code,
       dto.name,
@@ -204,50 +222,57 @@ export class ShipmentController {
       dto.responsiblePerson ?? null,
       req.user.id,
       dto.parentWarehouseId ?? null,
+      req.companyContext.dataSource.manager,
     );
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.carrier.edit', 'editable')
   @Post('shipping-companies/:id')
-  async updateShippingCompany(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateShippingCompanyDto) {
-    return this.shipments.updateShippingCompany(id, dto, req.user.id);
+  async updateShippingCompany(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateShippingCompanyDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.updateShippingCompany(id, dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('shipping-companies/:id/overview')
-  async getShippingCompanyOverview(@Param('id') id: string) {
-    return this.shipments.getCustodianOverview('company', id);
+  async getShippingCompanyOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getCustodianOverview('company', id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.carrier.edit', 'editable')
   @Post('shipping-companies/:id/treasury-account')
   async setShippingCompanyTreasuryAccount(
-    @Req() req: AuthenticatedRequest,
+    @Req() req: CompanyScopedRequest,
     @Param('id') id: string,
     @Body() dto: SetShippingCompanyTreasuryAccountDto,
   ) {
-    return this.shipments.setShippingCompanyTreasuryAccount(id, dto.treasuryAccountId ?? null, req.user.id);
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setShippingCompanyTreasuryAccount(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.carrier.edit', 'editable')
   @Post('shipping-companies/:id/status')
-  async setShippingCompanyStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetShippingCompanyStatusDto) {
-    return this.shipments.setShippingCompanyStatus(id, dto.status, req.user.id);
+  async setShippingCompanyStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetShippingCompanyStatusDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setShippingCompanyStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
   // ---- Company Vehicles (CTO directive §2) ----
 
   @Get('vehicles')
-  async listVehicles() {
-    return this.shipments.listVehicles();
+  async listVehicles(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.listVehicles(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.create', 'editable')
   @Post('vehicles')
-  async createVehicle(@Req() req: AuthenticatedRequest, @Body() dto: CreateVehicleDto) {
+  async createVehicle(@Req() req: CompanyScopedRequest, @Body() dto: CreateVehicleDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.createVehicle(
       dto.code,
       dto.plateNumber,
@@ -256,62 +281,71 @@ export class ShipmentController {
       dto.branch ?? null,
       req.user.id,
       dto.parentWarehouseId ?? null,
+      req.companyContext.dataSource.manager,
     );
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.edit', 'editable')
   @Post('vehicles/:id')
-  async updateVehicle(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
-    return this.shipments.updateVehicle(id, dto, req.user.id);
+  async updateVehicle(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.updateVehicle(id, dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('vehicles/:id/overview')
-  async getVehicleOverview(@Param('id') id: string) {
-    return this.shipments.getCustodianOverview('vehicle', id);
+  async getVehicleOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getCustodianOverview('vehicle', id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.edit', 'editable')
   @Post('vehicles/:id/driver')
-  async setVehicleDriver(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetVehicleDriverDto) {
-    return this.shipments.setVehicleDriver(id, dto.driverUserId ?? null, req.user.id);
+  async setVehicleDriver(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleDriverDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setVehicleDriver(id, dto.driverUserId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.edit', 'editable')
   @Post('vehicles/:id/status')
-  async setVehicleStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetVehicleStatusDto) {
-    return this.shipments.setVehicleStatus(id, dto.status, req.user.id);
+  async setVehicleStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleStatusDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setVehicleStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.edit', 'editable')
   @Post('vehicles/:id/settlement-account')
-  async setVehicleSettlementAccount(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetVehicleSettlementAccountDto) {
-    return this.shipments.setVehicleSettlementAccount(id, dto.treasuryAccountId ?? null, req.user.id);
+  async setVehicleSettlementAccount(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleSettlementAccountDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setVehicleSettlementAccount(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get()
-  async list(@Req() req: AuthenticatedRequest, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+  async list(@Req() req: CompanyScopedRequest, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
     if (page === undefined && pageSize === undefined) {
-      return this.shipments.listShipments(req.user.id);
+      return this.shipments.listShipments(req.user.id, manager);
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    return this.shipments.listShipmentsPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize });
+    return this.shipments.listShipmentsPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize }, manager);
   }
 
   /** RSH Shipping Orders (CTO directive §3) — declared BEFORE the `:id` wildcard below so `by-sales-order` is never shadowed (same route-ordering discipline already established in this controller). */
   @Get('by-sales-order/:salesOrderId')
-  async getBySalesOrderId(@Req() req: AuthenticatedRequest, @Param('salesOrderId') salesOrderId: string) {
-    return this.shipments.getShipmentBySalesOrderId(salesOrderId, req.user.id);
+  async getBySalesOrderId(@Req() req: CompanyScopedRequest, @Param('salesOrderId') salesOrderId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getShipmentBySalesOrderId(salesOrderId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** Returns Engine Phase B — custody return search screen's backing read. Declared BEFORE the `:id` wildcard below, same discipline as `by-sales-order`. */
   @Get('custody-search')
   async searchCustodyShipments(
-    @Req() req: AuthenticatedRequest,
+    @Req() req: CompanyScopedRequest,
     @Query('customerId') customerId?: string,
     @Query('customerCode') customerCode?: string,
     @Query('shipmentId') shipmentId?: string,
@@ -320,55 +354,65 @@ export class ShipmentController {
     @Query('shippingCompanyId') shippingCompanyId?: string,
     @Query('vehicleId') vehicleId?: string,
   ) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.searchCustodyShipments(
       { customerId, customerCode, shipmentId, waybillNumber, rshNumber, shippingCompanyId, vehicleId },
       req.user.id,
+      req.companyContext.dataSource.manager,
     );
   }
 
   @Get(':id')
-  async get(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.shipments.getShipment(id, req.user.id);
+  async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getShipment(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** Sales/Shipment/Returns workflow review (CTO directive, 2026-09-16) — the shipment-centric detail screen (customer/address/phone/governorate/order total/carrier/line items) in one response. */
   @Get(':id/detail')
-  async getDetail(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.shipments.getShipmentDetail(id, req.user.id);
+  async getDetail(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getShipmentDetail(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Post(':id/assign-driver')
-  async assignDriver(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: AssignDriverDto) {
-    const status = await this.shipments.assignDriver(id, dto.driverUserId, req.user.id);
+  async assignDriver(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: AssignDriverDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const status = await this.shipments.assignDriver(id, dto.driverUserId, req.user.id, req.companyContext.dataSource.manager);
     return { shipmentId: id, status };
   }
 
   /** CTO directive ("Shipping Company waybill-required flow") — record the carrier's own waybill number/photo before `pickup` can be confirmed. */
   @Post(':id/carrier-waybill')
-  async setCarrierWaybill(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetCarrierWaybillDto) {
+  async setCarrierWaybill(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetCarrierWaybillDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.setCarrierWaybill(
       id,
       dto.carrierWaybillNumber ?? null,
       dto.waybillImageMediaAssetId ?? null,
       req.user.id,
       dto.carrierContactPhone ?? null,
+      req.companyContext.dataSource.manager,
     );
   }
 
   /** Shipping Screen Redesign directive §3 — assign/reassign a shipment's route to a shipping company or vehicle, fully audited; locked once pickup is confirmed. */
   @Post(':id/assign-route')
-  async assignShippingRoute(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: AssignShippingRouteDto) {
-    return this.shipments.assignShippingRoute(id, dto.shippingCompanyId ?? null, dto.vehicleId ?? null, req.user.id, dto.reason ?? null);
+  async assignShippingRoute(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: AssignShippingRouteDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.assignShippingRoute(id, dto.shippingCompanyId ?? null, dto.vehicleId ?? null, req.user.id, dto.reason ?? null, req.companyContext.dataSource.manager);
   }
 
   @Post(':id/transition')
-  async transition(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
-    const status = await this.shipments.transitionShipment(id, dto.action, req.user.id);
+  async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const status = await this.shipments.transitionShipment(id, dto.action, req.user.id, req.companyContext.dataSource.manager);
     return { shipmentId: id, status };
   }
 
   @Get(':id/tracking')
-  async tracking(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.shipments.getTrackingHistory(id, req.user.id);
+  async tracking(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.getTrackingHistory(id, req.user.id, req.companyContext.dataSource.manager);
   }
 }

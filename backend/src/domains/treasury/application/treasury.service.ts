@@ -61,79 +61,88 @@ export class TreasuryService implements FinanceTreasuryContract {
     private readonly events: EventBusService,
   ) {}
 
-  async createAccountType(code: string, name: string, actorUserId: string): Promise<TreasuryAccountType> {
-    const repo = this.dataSource.getRepository(TreasuryAccountType);
+  async createAccountType(code: string, name: string, actorUserId: string, manager?: EntityManager): Promise<TreasuryAccountType> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryAccountType);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Treasury account type code "${code}" is already in use.`);
 
     const saved = await repo.save(repo.create({ code, name }));
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'treasury.account_type.created',
-      resource: 'treasury_account_type',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { code, name },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'treasury.account_type.created',
+        resource: 'treasury_account_type',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { code, name },
+      },
+      manager,
+    );
     return saved;
   }
 
-  async listAccountTypes(): Promise<TreasuryAccountType[]> {
-    return this.dataSource.getRepository(TreasuryAccountType).find({ order: { code: 'ASC' } });
+  async listAccountTypes(manager?: EntityManager): Promise<TreasuryAccountType[]> {
+    return (manager ?? this.dataSource).getRepository(TreasuryAccountType).find({ order: { code: 'ASC' } });
   }
 
-  async getAccountType(accountTypeId: string): Promise<TreasuryAccountType> {
-    const type = await this.dataSource.getRepository(TreasuryAccountType).findOne({ where: { id: accountTypeId } });
+  async getAccountType(accountTypeId: string, manager?: EntityManager): Promise<TreasuryAccountType> {
+    const type = await (manager ?? this.dataSource).getRepository(TreasuryAccountType).findOne({ where: { id: accountTypeId } });
     if (!type) throw new NotFoundException(`Treasury account type "${accountTypeId}" not found.`);
     return type;
   }
 
-  async createAccount(code: string, name: string, accountTypeId: string, actorUserId: string): Promise<TreasuryAccount> {
-    const repo = this.dataSource.getRepository(TreasuryAccount);
+  async createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager): Promise<TreasuryAccount> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryAccount);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Treasury account code "${code}" is already in use.`);
-    await this.getAccountType(accountTypeId); // 404s if the type doesn't exist — never silently accept an orphan type id
+    await this.getAccountType(accountTypeId, manager); // 404s if the type doesn't exist — never silently accept an orphan type id
 
     const saved = await repo.save(repo.create({ code, name, accountTypeId }));
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'treasury.account.created',
-      resource: 'treasury_account',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { code, name, accountTypeId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'treasury.account.created',
+        resource: 'treasury_account',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { code, name, accountTypeId },
+      },
+      manager,
+    );
     return saved;
   }
 
-  async getAccount(accountId: string): Promise<TreasuryAccount> {
-    const account = await this.dataSource.getRepository(TreasuryAccount).findOne({ where: { id: accountId } });
+  async getAccount(accountId: string, manager?: EntityManager): Promise<TreasuryAccount> {
+    const account = await (manager ?? this.dataSource).getRepository(TreasuryAccount).findOne({ where: { id: accountId } });
     if (!account) throw new NotFoundException(`Treasury account "${accountId}" not found.`);
     return account;
   }
 
-  async setAccountStatus(accountId: string, status: TreasuryAccountStatus, actorUserId: string): Promise<TreasuryAccount> {
-    const repo = this.dataSource.getRepository(TreasuryAccount);
-    const account = await this.getAccount(accountId);
+  async setAccountStatus(accountId: string, status: TreasuryAccountStatus, actorUserId: string, manager?: EntityManager): Promise<TreasuryAccount> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryAccount);
+    const account = await this.getAccount(accountId, manager);
     if (!canTransitionTreasuryAccountStatus(account.status, status)) {
       throw new ConflictException(`Cannot transition treasury account "${accountId}" from "${account.status}" to "${status}".`);
     }
     account.status = status;
     const saved = await repo.save(account);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: `treasury.account.${status === 'active' ? 'activated' : 'deactivated'}`,
-      resource: 'treasury_account',
-      resourceId: accountId,
-      result: 'success',
-      correlationId: null,
-      after: { status },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: `treasury.account.${status === 'active' ? 'activated' : 'deactivated'}`,
+        resource: 'treasury_account',
+        resourceId: accountId,
+        result: 'success',
+        correlationId: null,
+        after: { status },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -145,22 +154,40 @@ export class TreasuryService implements FinanceTreasuryContract {
    * invalid code makes the GL `FinancialEvent` fail closed (a typed
    * rejection, visible + re-drivable), never a bad posting.
    */
-  async setAccountGlMapping(accountId: string, glAccountCode: string | null, actorUserId: string): Promise<TreasuryAccount> {
-    const repo = this.dataSource.getRepository(TreasuryAccount);
-    const account = await this.getAccount(accountId);
+  /**
+   * D2 (2026-10-04): GL mapping is mandatory at the first FINANCIAL POSTING from an account, not at creation.
+   * Rejects an unmapped account (409) before the caller mutates anything; returns the mapped code otherwise.
+   * Whether that code still resolves to an active postable chart account is the Financial Event handler's
+   * fail-closed check (Treasury does not read the chart — ADR boundary; `AccountingModule` imports `TreasuryModule`).
+   */
+  async requireGlMappedAccount(accountId: string, manager?: EntityManager): Promise<{ glAccountCode: string }> {
+    const account = await this.getAccount(accountId, manager);
+    const code = account.glAccountCode?.trim();
+    if (!code) {
+      throw new ConflictException(`Treasury account "${account.code}" is not GL-mapped — map it to a GL account before any financial posting.`);
+    }
+    return { glAccountCode: code };
+  }
+
+  async setAccountGlMapping(accountId: string, glAccountCode: string | null, actorUserId: string, manager?: EntityManager): Promise<TreasuryAccount> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryAccount);
+    const account = await this.getAccount(accountId, manager);
     const normalized = glAccountCode && glAccountCode.trim() !== '' ? glAccountCode.trim() : null;
     account.glAccountCode = normalized;
     const saved = await repo.save(account);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'treasury.account.gl_mapping_set',
-      resource: 'treasury_account',
-      resourceId: accountId,
-      result: 'success',
-      correlationId: null,
-      after: { glAccountCode: normalized },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'treasury.account.gl_mapping_set',
+        resource: 'treasury_account',
+        resourceId: accountId,
+        result: 'success',
+        correlationId: null,
+        after: { glAccountCode: normalized },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -194,19 +221,20 @@ export class TreasuryService implements FinanceTreasuryContract {
   async listAccountsWithBalances(
     requestingUserId: string,
     options?: { search?: string },
+    manager?: EntityManager,
   ): Promise<Array<TreasuryAccount & { balance: string; accountTypeCode: string; accountTypeName: string }>> {
     const search = options?.search?.trim();
-    const accounts = await this.dataSource.getRepository(TreasuryAccount).find({
+    const accounts = await (manager ?? this.dataSource).getRepository(TreasuryAccount).find({
       where: search ? [{ code: ILike(`%${search}%`) }, { name: ILike(`%${search}%`) }] : {},
       order: { code: 'ASC' },
     });
-    const allowed = await this.scope.filterAllowedByOrgUnit(requestingUserId, accounts);
-    const types = await this.listAccountTypes();
+    const allowed = await this.scope.filterAllowedByOrgUnit(requestingUserId, accounts, manager);
+    const types = await this.listAccountTypes(manager);
     const typeById = new Map(types.map((t) => [t.id, t]));
     return Promise.all(
       allowed.map(async (a) => ({
         ...a,
-        balance: await this.getAccountBalance(a.id),
+        balance: await this.getAccountBalance(a.id, manager),
         accountTypeCode: typeById.get(a.accountTypeId)?.code ?? '',
         accountTypeName: typeById.get(a.accountTypeId)?.name ?? '',
       })),
@@ -220,7 +248,8 @@ export class TreasuryService implements FinanceTreasuryContract {
    * the F04 lesson). Raw SQL `NUMERIC` — no JS `Number` round-trip, so
    * F06's Cash/Bank↔GL reconciliation equality check is exact (ADR-035 D4).
    */
-  async getAllTreasuryBalances(asOfDate?: string): Promise<{
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+  async getAllTreasuryBalances(asOfDate?: string, manager?: EntityManager): Promise<{
     balances: Array<{ treasuryAccountId: string; code: string; name: string; glAccountCode: string | null; balance: string }>;
   }> {
     // NB: no `status` filter — a reversed row and its offsetting reversal
@@ -233,9 +262,10 @@ export class TreasuryService implements FinanceTreasuryContract {
     // `businessDate` (a DATE column) `<= to`. A bare `movementDate <
     // ($1::date + INTERVAL '1 day')` silently drops late-in-the-day UTC
     // movements when the session TZ is ahead of UTC (the F04 lesson).
+    const runner = manager ?? this.dataSource;
     const dateClause = asOfDate ? `AND t."movementDate"::date <= $1::date` : '';
     const params: string[] = asOfDate ? [asOfDate] : [];
-    const rows = (await this.dataSource.query(
+    const rows = (await runner.query(
       `SELECT a."id" AS "treasuryAccountId", a."code", a."name", a."glAccountCode",
               COALESCE(SUM(CASE WHEN t."type" IN ('cash_in','transfer_in') THEN t."amount" ELSE -t."amount" END), 0)::numeric(20,4) AS "balance"
          FROM "treasury_accounts" a
@@ -252,8 +282,9 @@ export class TreasuryService implements FinanceTreasuryContract {
   async listTreasuryLedger(
     treasuryAccountId: string,
     filter?: { from?: string; to?: string },
+    manager?: EntityManager,
   ): Promise<TreasuryLedgerEntryView[]> {
-    const qb = this.dataSource
+    const qb = (manager ?? this.dataSource)
       .getRepository(TreasuryTransaction)
       .createQueryBuilder('t')
       .where('t."treasuryAccountId" = :id', { id: treasuryAccountId });
@@ -272,9 +303,9 @@ export class TreasuryService implements FinanceTreasuryContract {
   }
 
   /** AUDIT-SEC-03 remediation: the ledger-by-account read path — a caller may only view a specific account's ledger if `ScopeResolver` allows it. */
-  async assertLedgerAccountAccess(accountId: string, requestingUserId: string): Promise<void> {
-    const account = await this.getAccount(accountId);
-    await this.scope.assertAccess(requestingUserId, 'treasury_account', accountId, account.orgUnitId);
+  async assertLedgerAccountAccess(accountId: string, requestingUserId: string, manager?: EntityManager): Promise<void> {
+    const account = await this.getAccount(accountId, manager);
+    await this.scope.assertAccess(requestingUserId, 'treasury_account', accountId, account.orgUnitId, manager);
   }
 
   /**
@@ -289,10 +320,10 @@ export class TreasuryService implements FinanceTreasuryContract {
    * already uses, so a write can never reach further than a read already
    * could.
    */
-  async assertTransactionAccess(transactionId: string, requestingUserId: string): Promise<void> {
-    const txn = await this.dataSource.getRepository(TreasuryTransaction).findOne({ where: { id: transactionId } });
+  async assertTransactionAccess(transactionId: string, requestingUserId: string, manager?: EntityManager): Promise<void> {
+    const txn = await (manager ?? this.dataSource).getRepository(TreasuryTransaction).findOne({ where: { id: transactionId } });
     if (!txn) throw new NotFoundException(`Treasury transaction "${transactionId}" not found.`);
-    await this.assertLedgerAccountAccess(txn.treasuryAccountId, requestingUserId);
+    await this.assertLedgerAccountAccess(txn.treasuryAccountId, requestingUserId, manager);
   }
 
   private assertActive(account: TreasuryAccount): void {
@@ -334,7 +365,7 @@ export class TreasuryService implements FinanceTreasuryContract {
       reversalOfTransactionId: string | null;
     },
   ): Promise<TreasuryTransaction> {
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES[input.type]);
+    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES[input.type], manager);
     const repo = manager.getRepository(TreasuryTransaction);
     return repo.save(repo.create({ ...input, transactionNumber }));
   }
@@ -434,7 +465,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     manager?: EntityManager,
   ): Promise<TreasuryTransaction> {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
-    const account = await this.getAccount(accountId);
+    const account = await this.getAccount(accountId, manager);
     this.assertActive(account);
 
     const txn = await this.run(manager, async (m) => {
@@ -460,7 +491,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     // own outbox row alongside this leg) — dispatching before that unit even commits would be
     // premature, so this only fires on the no-manager (standalone) path, same as `opts.emitGlEvent`
     // already gates it below.
-    if (opts.emitGlEvent && !manager) await this.events.dispatchPending();
+    if (opts.emitGlEvent) await this.events.dispatchAfterCommit(manager);
 
     await this.audit.record(
       {
@@ -500,7 +531,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     payrollRef?: { employeeId: string | null; payrollRunId: string | null },
   ): Promise<TreasuryTransaction> {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
-    const account = await this.getAccount(accountId);
+    const account = await this.getAccount(accountId, manager);
     this.assertActive(account);
 
     const txn = await this.run(manager, async (m) => {
@@ -527,27 +558,30 @@ export class TreasuryService implements FinanceTreasuryContract {
       await this.emitCashRecorded(m, { txn: leg, account, direction: 'out', reversalOf: null }, opts);
       return leg;
     });
-    if (opts.emitGlEvent && !manager) await this.events.dispatchPending();
+    if (opts.emitGlEvent) await this.events.dispatchAfterCommit(manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'treasury.cash_out',
-      resource: 'treasury_transaction',
-      resourceId: txn.id,
-      result: 'success',
-      correlationId: null,
-      after: {
-        accountId,
-        amount,
-        customerId,
-        salesOrderId,
-        supplierId: supplierRef?.supplierId ?? null,
-        supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null,
-        employeeId: payrollRef?.employeeId ?? null,
-        payrollRunId: payrollRef?.payrollRunId ?? null,
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'treasury.cash_out',
+        resource: 'treasury_transaction',
+        resourceId: txn.id,
+        result: 'success',
+        correlationId: null,
+        after: {
+          accountId,
+          amount,
+          customerId,
+          salesOrderId,
+          supplierId: supplierRef?.supplierId ?? null,
+          supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null,
+          employeeId: payrollRef?.employeeId ?? null,
+          payrollRunId: payrollRef?.payrollRunId ?? null,
+        },
       },
-    });
+      manager,
+    );
     return txn;
   }
 
@@ -563,7 +597,7 @@ export class TreasuryService implements FinanceTreasuryContract {
   ): Promise<{ out: TreasuryTransaction; in: TreasuryTransaction }> {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
     if (sourceAccountId === destinationAccountId) throw new BadRequestException('Source and destination accounts must differ.');
-    const [source, destination] = await Promise.all([this.getAccount(sourceAccountId), this.getAccount(destinationAccountId)]);
+    const [source, destination] = await Promise.all([this.getAccount(sourceAccountId, manager), this.getAccount(destinationAccountId, manager)]);
     this.assertActive(source);
     this.assertActive(destination);
 
@@ -613,7 +647,7 @@ export class TreasuryService implements FinanceTreasuryContract {
       );
       return { out: outLeg, in: inLegRow };
     });
-    if (opts.emitGlEvent && !manager) await this.events.dispatchPending();
+    if (opts.emitGlEvent) await this.events.dispatchAfterCommit(manager);
 
     await this.audit.record(
       {
@@ -742,8 +776,9 @@ export class TreasuryService implements FinanceTreasuryContract {
     reference: string | null,
     reason: string | null,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<TreasuryTransaction> {
-    return this.cashInCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true });
+    return this.cashInCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true }, manager);
   }
 
   /** Direct Treasury-UI Cash Out. Publishes `treasury.cash.recorded` when the account is GL-mapped. */
@@ -755,8 +790,9 @@ export class TreasuryService implements FinanceTreasuryContract {
     reference: string | null,
     reason: string | null,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<TreasuryTransaction> {
-    return this.cashOutCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true });
+    return this.cashOutCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true }, manager);
   }
 
   /** Direct Treasury-UI Transfer. Publishes `treasury.transfer.completed` when both accounts are GL-mapped. */
@@ -767,8 +803,9 @@ export class TreasuryService implements FinanceTreasuryContract {
     reference: string | null,
     reason: string | null,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<{ out: TreasuryTransaction; in: TreasuryTransaction }> {
-    return this.transferCore(sourceAccountId, destinationAccountId, amount, reference, reason, actorUserId, { emitGlEvent: true });
+    return this.transferCore(sourceAccountId, destinationAccountId, amount, reference, reason, actorUserId, { emitGlEvent: true }, manager);
   }
 
   /**
@@ -790,6 +827,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     amount: string,
     treasuryAccountId: string,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<TreasuryTransaction> {
     // Security Assurance Gate — Track S4, found 2026-09-08: defense in
     // depth alongside the fix in `DepositsService.submitDeposit` — this
@@ -802,12 +840,12 @@ export class TreasuryService implements FinanceTreasuryContract {
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new BadRequestException('Deposit transaction amount must be a positive number.');
     }
-    const account = await this.getAccount(treasuryAccountId);
+    const account = await this.getAccount(treasuryAccountId, manager);
     this.assertActive(account);
 
-    const txn = await this.dataSource.transaction(async (manager) => {
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${treasuryAccountId}`]);
-      return this.insertLeg(manager, {
+    const txn = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${treasuryAccountId}`]);
+      return this.insertLeg(txManager, {
         type: 'cash_in',
         treasuryAccountId,
         amount,
@@ -823,16 +861,19 @@ export class TreasuryService implements FinanceTreasuryContract {
       });
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'treasury.deposit_posted',
-      resource: 'treasury_transaction',
-      resourceId: txn.id,
-      result: 'success',
-      correlationId: null,
-      after: { treasuryAccountId, amount, customerId, salesOrderId, depositId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'treasury.deposit_posted',
+        resource: 'treasury_transaction',
+        resourceId: txn.id,
+        result: 'success',
+        correlationId: null,
+        after: { treasuryAccountId, amount, customerId, salesOrderId, depositId },
+      },
+      manager,
+    );
     return txn;
   }
 
@@ -848,8 +889,8 @@ export class TreasuryService implements FinanceTreasuryContract {
    * built handlers produce the offsetting journal — no dedicated
    * `treasury.transaction.reversed` topic.
    */
-  async reverseTransaction(transactionId: string, reason: string, actorUserId: string): Promise<TreasuryTransaction[]> {
-    const repo = this.dataSource.getRepository(TreasuryTransaction);
+  async reverseTransaction(transactionId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<TreasuryTransaction[]> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryTransaction);
     const original = await repo.findOne({ where: { id: transactionId } });
     if (!original) throw new NotFoundException(`Treasury transaction "${transactionId}" not found.`);
     if (original.status !== 'posted') {
@@ -869,11 +910,11 @@ export class TreasuryService implements FinanceTreasuryContract {
     const sortedAccountIds = [...new Set(targets.map((t) => t.treasuryAccountId))].sort();
     const reversalGroupId = original.transferGroupId ? randomUUID() : null;
     const affectedAccounts = new Map<string, TreasuryAccount>();
-    for (const id of sortedAccountIds) affectedAccounts.set(id, await this.getAccount(id));
+    for (const id of sortedAccountIds) affectedAccounts.set(id, await this.getAccount(id, manager));
 
-    const reversals = await this.dataSource.transaction(async (manager) => {
+    const reversals = await (manager ?? this.dataSource).transaction(async (txManager) => {
       for (const id of sortedAccountIds) {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${id}`]);
+        await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${id}`]);
       }
 
       // Security Assurance Gate — Track S5 (Concurrency/Race Condition),
@@ -891,7 +932,7 @@ export class TreasuryService implements FinanceTreasuryContract {
       // re-reading every target's CURRENT status under the lock and
       // aborting the WHOLE reversal (no partial reversal of a transfer
       // pair) if any of them already changed since the outer check.
-      const freshTargets = await manager.getRepository(TreasuryTransaction).find({ where: { id: In(targets.map((t) => t.id)) } });
+      const freshTargets = await txManager.getRepository(TreasuryTransaction).find({ where: { id: In(targets.map((t) => t.id)) } });
       for (const fresh of freshTargets) {
         if (fresh.status !== 'posted') {
           throw new ConflictException(`Cannot reverse transaction "${fresh.id}" — its status changed to "${fresh.status}" (likely already reversed concurrently).`);
@@ -900,7 +941,7 @@ export class TreasuryService implements FinanceTreasuryContract {
 
       const created: TreasuryTransaction[] = [];
       for (const target of targets) {
-        const reversal = await this.insertLeg(manager, {
+        const reversal = await this.insertLeg(txManager, {
           type: OPPOSITE[target.type],
           treasuryAccountId: target.treasuryAccountId,
           amount: target.amount,
@@ -915,7 +956,7 @@ export class TreasuryService implements FinanceTreasuryContract {
           reversalOfTransactionId: target.id,
         });
         created.push(reversal);
-        await manager.getRepository(TreasuryTransaction).update(target.id, { status: 'reversed' });
+        await txManager.getRepository(TreasuryTransaction).update(target.id, { status: 'reversed' });
       }
 
       // --- F06-H1: publish the offsetting GL event(s) (ADR-038 D6) ---
@@ -929,7 +970,7 @@ export class TreasuryService implements FinanceTreasuryContract {
           const originalSource = affectedAccounts.get(originalOut.treasuryAccountId)!;
           const originalDest = affectedAccounts.get(originalIn.treasuryAccountId)!;
           await this.emitTransferCompleted(
-            manager,
+            txManager,
             {
               out: reversalOutLeg,
               in: reversalInLeg,
@@ -947,7 +988,7 @@ export class TreasuryService implements FinanceTreasuryContract {
         const account = affectedAccounts.get(reversalLeg.treasuryAccountId)!;
         const direction: 'in' | 'out' = reversalLeg.type === 'cash_in' || reversalLeg.type === 'transfer_in' ? 'in' : 'out';
         await this.emitCashRecorded(
-          manager,
+          txManager,
           { txn: reversalLeg, account, direction, reversalOf: original.id },
           { emitGlEvent: true },
         );
@@ -955,25 +996,28 @@ export class TreasuryService implements FinanceTreasuryContract {
 
       return created;
     });
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
 
     for (const target of targets) {
-      await this.audit.record({
-        actorUserId,
-        organizationId: null,
-        action: 'treasury.transaction.reversed',
-        resource: 'treasury_transaction',
-        resourceId: target.id,
-        result: 'success',
-        correlationId: null,
-        after: { reason },
-      });
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'treasury.transaction.reversed',
+          resource: 'treasury_transaction',
+          resourceId: target.id,
+          result: 'success',
+          correlationId: null,
+          after: { reason },
+        },
+        manager,
+      );
     }
     return reversals;
   }
 
-  async listLedger(filters: { accountId?: string; customerId?: string; salesOrderId?: string }): Promise<TreasuryTransaction[]> {
-    const repo = this.dataSource.getRepository(TreasuryTransaction);
+  async listLedger(filters: { accountId?: string; customerId?: string; salesOrderId?: string }, manager?: EntityManager): Promise<TreasuryTransaction[]> {
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryTransaction);
     const where: Record<string, string> = {};
     if (filters.accountId) where.treasuryAccountId = filters.accountId;
     if (filters.customerId) where.customerId = filters.customerId;
@@ -992,8 +1036,9 @@ export class TreasuryService implements FinanceTreasuryContract {
   async listLedgerPage(
     filters: { accountId?: string; customerId?: string; salesOrderId?: string },
     options: { page: number; pageSize: number },
+    manager?: EntityManager,
   ): Promise<{ rows: TreasuryTransaction[]; total: number }> {
-    const repo = this.dataSource.getRepository(TreasuryTransaction);
+    const repo = (manager ?? this.dataSource).getRepository(TreasuryTransaction);
     const where: Record<string, string> = {};
     if (filters.accountId) where.treasuryAccountId = filters.accountId;
     if (filters.customerId) where.customerId = filters.customerId;

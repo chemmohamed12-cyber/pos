@@ -131,20 +131,26 @@ export function Fulfillment() {
   const [error, setError] = useState<string | null>(null);
 
   async function loadAll() {
-    const [orders, fos, picks, packs, ships, prods] = await Promise.all([
-      api.get<SalesOrder[]>('/sales-orders'),
-      api.get<FulfillmentOrderRow[]>('/fulfillment/orders'),
-      api.get<Task[]>('/fulfillment/pick-tasks'),
-      api.get<Task[]>('/fulfillment/pack-tasks'),
-      api.get<ShipmentRow[]>('/shipments'),
-      api.get<ProductLite[]>('/products'),
-    ]);
-    setSalesOrders(orders.filter((o) => o.status === 'released'));
-    setFulfillmentOrders(fos);
-    setPickTasks(picks);
-    setPackTasks(packs);
-    setShipments(ships);
-    setProducts(prods);
+    try {
+      const [orders, fos, picks, packs, ships, prods] = await Promise.all([
+        api.get<SalesOrder[]>('/sales-orders'),
+        api.get<FulfillmentOrderRow[]>('/fulfillment/orders'),
+        api.get<Task[]>('/fulfillment/pick-tasks'),
+        api.get<Task[]>('/fulfillment/pack-tasks'),
+        api.get<ShipmentRow[]>('/shipments'),
+        api.get<ProductLite[]>('/products'),
+      ]);
+      setSalesOrders(orders.filter((o) => o.status === 'released'));
+      setFulfillmentOrders(fos);
+      setPickTasks(picks);
+      setPackTasks(packs);
+      setShipments(ships);
+      setProducts(prods);
+    } catch (err) {
+      // Foundation fix: this mount-time load had no error handling — a
+      // failure left every list on this screen silently empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load fulfillment data.');
+    }
   }
 
   /** CTO directive ("PRIORITY: ITEM PREPARATION") — loads the per-item breakdown for the Preparation screen, called whenever a pick task in `in_progress` is opened. */

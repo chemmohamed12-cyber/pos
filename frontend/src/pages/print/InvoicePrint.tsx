@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface InvoiceLine {
   productId: string;
@@ -65,24 +66,31 @@ export function InvoicePrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<InvoicePrintData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.invoice_title', 'field.customer', 'field.sales_order', 'field.due_date', 'field.total_amount', 'field.remaining']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const inv = await api.get<Invoice>(`/invoices/${id}`);
-      const [customer, order, products, users] = await Promise.all([
-        api.get<Customer>(`/customers/${inv.customerId}`),
-        api.get<Order>(`/sales-orders/${inv.salesOrderId}`),
-        api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
-        api.get<AdminUser[]>('/admin/users').catch(() => [] as AdminUser[]),
-      ]);
-      const preparer = users.find((u) => u.id === inv.createdByUserId)?.fullName;
-      setData({ inv, customer, order, products, preparer });
+      try {
+        const inv = await api.get<Invoice>(`/invoices/${id}`);
+        const [customer, order, products, users] = await Promise.all([
+          api.get<Customer>(`/customers/${inv.customerId}`),
+          api.get<Order>(`/sales-orders/${inv.salesOrderId}`),
+          api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
+          api.get<AdminUser[]>('/admin/users').catch(() => [] as AdminUser[]),
+        ]);
+        const preparer = users.find((u) => u.id === inv.createdByUserId)?.fullName;
+        setData({ inv, customer, order, products, preparer });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { inv, customer, order, products, preparer } = data;
 

@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min, MinLength, ValidateIf } from 'class-validator';
 import { CustomersService, CustomerImportRow } from '../application/customers.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -174,9 +175,24 @@ const EXPORT_COLUMNS: ColumnSpec[] = [
  * automatically Scope-filtered exactly like the operational screen — a
  * plain sales_rep can never export another rep's customers (CTO
  * finalization directive §8).
+ *
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27,
+ * CTO-authorized). `CompanyContextGuard` added at the class level —
+ * `Customer`/`CustomerAssignment` are genuinely Company-owned data
+ * (established by `sales-orders.controller.ts`'s own retrofit; both
+ * entities already registered in `crm-company-entities.ts`). Every route
+ * threads `req.companyContext.dataSource.manager` into
+ * `CustomersService`, which in turn threads it into every nested
+ * `ScopeService`/`AuthorizationService`/`NumberingService`/`AuditService`/
+ * `LimitService` call — none of those stop at this controller's own
+ * boundary. `LimitService.check()` itself gained a `manager?` parameter
+ * during this pass — it previously had none at all, so
+ * `createCustomer`'s `sales.max_customers` pre-check would otherwise have
+ * kept silently resolving the ambient (Platform) connection's counters
+ * even after every other part of this retrofit was correct.
  */
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('sales')
 export class CustomersController {
   constructor(
@@ -185,8 +201,9 @@ export class CustomersController {
   ) {}
 
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateCustomerDto) {
-    return this.customers.createCustomer(dto, req.user.id);
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateCustomerDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.customers.createCustomer(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /**
@@ -215,18 +232,23 @@ export class CustomersController {
    */
   @Get()
   async list(
-    @Req() req: AuthenticatedRequest,
+    @Req() req: CompanyScopedRequest,
     @Query('salesRepUserId') salesRepUserId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     if (!page && !pageSize && !search) {
-      return this.customers.listCustomersForRep(req.user.id, salesRepUserId);
+      return this.customers.listCustomersForRep(req.user.id, salesRepUserId, req.companyContext.dataSource.manager);
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    return this.customers.listCustomersPage(req.user.id, { salesRepUserId, search, page: parsedPage, pageSize: parsedPageSize });
+    return this.customers.listCustomersPage(
+      req.user.id,
+      { salesRepUserId, search, page: parsedPage, pageSize: parsedPageSize },
+      req.companyContext.dataSource.manager,
+    );
   }
 
   @Get('import-template')
@@ -249,9 +271,11 @@ export class CustomersController {
   // `ReportsController.salesOrdersExport`'s own comment for full rationale).
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('export')
-  async export(@Req() req: AuthenticatedRequest, @Res() res: Response) {
-    const rows = await this.customers.listCustomers(req.user.id);
-    const repNames = await this.customers.getPrimaryRepNamesByCustomerId(rows.map((c) => c.id));
+  async export(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const rows = await this.customers.listCustomers(req.user.id, manager);
+    const repNames = await this.customers.getPrimaryRepNamesByCustomerId(rows.map((c) => c.id), manager);
     const buffer = await this.excel.buildExport(
       'Customers',
       EXPORT_COLUMNS,
@@ -287,25 +311,33 @@ export class CustomersController {
 
   @Post('import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
-  async import(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+  async import(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const { rows, headerErrors } = await this.excel.parseWorkbook(file.buffer, IMPORT_COLUMNS);
     if (headerErrors.length > 0) {
       return { totalRows: 0, succeededCount: 0, rejected: [], headerErrors };
     }
-    const { succeeded, rejected } = await this.customers.importRows(rows as unknown as CustomerImportRow[], req.user.id);
+    const { succeeded, rejected } = await this.customers.importRows(
+      rows as unknown as CustomerImportRow[],
+      req.user.id,
+      req.companyContext.dataSource.manager,
+    );
     return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [] };
   }
 
   @Get(':id')
-  async get(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.customers.getCustomer(id, req.user.id);
+  async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.customers.getCustomer(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** ERP UI Integration (CTO directive) — Customer Account header's "Sales Representative" field. Reuses the existing `getPrimaryRepNamesByCustomerId` (built for the Excel export) for a single customer, Scope-checked via `getCustomer` first. */
   @Get(':id/primary-rep')
-  async primaryRep(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    await this.customers.getCustomer(id, req.user.id);
-    const names = await this.customers.getPrimaryRepNamesByCustomerId([id]);
+  async primaryRep(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    const names = await this.customers.getPrimaryRepNamesByCustomerId([id], manager);
     return { name: names.get(id) ?? null };
   }
 
@@ -334,9 +366,11 @@ export class CustomersController {
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.customer.assign', 'editable')
   @Post(':id/assign')
-  async assign(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: AssignSalesRepDto) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.customers.assignSalesRep(id, dto.salesRepUserId, dto.assignmentType, req.user.id);
+  async assign(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: AssignSalesRepDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.customers.assignSalesRep(id, dto.salesRepUserId, dto.assignmentType, req.user.id, manager);
   }
 
   /**
@@ -359,21 +393,25 @@ export class CustomersController {
   @RequirePermission('sales.customer.edit', 'editable')
   @Post(':id/workflow-policy')
   async setWorkflowPolicy(
-    @Req() req: AuthenticatedRequest,
+    @Req() req: CompanyScopedRequest,
     @Param('id') id: string,
     @Body() dto: SetWorkflowPolicyDto,
   ) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.customers.setOrderWorkflowPolicy(id, dto.orderWorkflowPolicy, req.user.id);
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.customers.setOrderWorkflowPolicy(id, dto.orderWorkflowPolicy, req.user.id, manager);
   }
 
   /** Gap G-3 — same role tier as workflow-policy above: a commercial-policy decision, not a per-rep action. */
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.customer.edit', 'editable')
   @Post(':id/price-list')
-  async setPriceList(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetPriceListDto) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.customers.setPriceList(id, dto.priceListId, req.user.id);
+  async setPriceList(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetPriceListDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.customers.setPriceList(id, dto.priceListId, req.user.id, manager);
   }
 
   /**
@@ -387,26 +425,32 @@ export class CustomersController {
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.customer_status.edit', 'editable')
   @Post(':id/status')
-  async setStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetCustomerStatusDto) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.customers.setStatus(id, dto.status, req.user.id);
+  async setStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetCustomerStatusDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.customers.setStatus(id, dto.status, req.user.id, manager);
   }
 
   /** Same gap class as setStatus above — `Customer.classification` existed in the schema with zero write path anywhere. */
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.customer.edit', 'editable')
   @Post(':id/classification')
-  async setClassification(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetClassificationDto) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.customers.setClassification(id, dto.classification || null, req.user.id);
+  async setClassification(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetClassificationDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.customers.setClassification(id, dto.classification || null, req.user.id, manager);
   }
 
   /** Customer Financial Account / AR (CTO directive §10 — Credit Control) — admin-only, a finance-policy decision. */
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.customer_financial.edit', 'editable')
   @Post(':id/financial-settings')
-  async setFinancialSettings(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetFinancialSettingsDto) {
-    await this.customers.getCustomer(id, req.user.id);
+  async setFinancialSettings(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetFinancialSettingsDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
     return this.customers.setFinancialSettings(
       id,
       {
@@ -416,6 +460,7 @@ export class CustomersController {
         financialStatus: dto.financialStatus,
       },
       req.user.id,
+      manager,
     );
   }
 }

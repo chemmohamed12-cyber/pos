@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface PaymentRow {
   id: string;
@@ -11,7 +12,7 @@ interface PaymentRow {
   customerId: string;
   customerCode: string;
   customerName: string;
-  invoiceId: string;
+  invoiceId: string | null;
   invoiceNumber: string | null;
   amount: string;
   method: string;
@@ -28,20 +29,27 @@ export function PaymentReceiptPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<PaymentReceiptData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.payment_receipt_title', 'field.customer', 'field.invoice', 'field.payment_method', 'field.reference', 'field.total_amount']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const payments = await api.get<PaymentRow[]>('/payments');
-      const payment = payments.find((p) => p.id === id);
-      if (!payment) return;
+      try {
+        const payments = await api.get<PaymentRow[]>('/payments');
+        const payment = payments.find((p) => p.id === id);
+        if (!payment) return;
 
-      setData({ payment });
+        setData({ payment });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { payment } = data;
 

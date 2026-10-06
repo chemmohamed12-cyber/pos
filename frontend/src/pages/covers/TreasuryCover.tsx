@@ -26,16 +26,20 @@ export function TreasuryCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [accounts, ledger] = await Promise.all([
-        api.get<TreasuryAccount[]>('/treasury/accounts'),
-        api.get<LedgerEntry[]>('/treasury/ledger'),
-      ]);
-      const today = new Date().toISOString().slice(0, 10);
-      setKpis({
-        totalBalance: accounts.reduce((sum, a) => sum + Number(a.balance), 0).toFixed(2),
-        todaysCount: ledger.filter((e) => e.createdAt.slice(0, 10) === today).length,
-      });
-      setTopAccounts([...accounts].sort((a, b) => Number(b.balance) - Number(a.balance)).slice(0, 5));
+      try {
+        const [accounts, ledger] = await Promise.all([
+          api.get<TreasuryAccount[]>('/treasury/accounts'),
+          api.get<LedgerEntry[]>('/treasury/ledger'),
+        ]);
+        const today = new Date().toISOString().slice(0, 10);
+        setKpis({
+          totalBalance: accounts.reduce((sum, a) => sum + Number(a.balance), 0).toFixed(2),
+          todaysCount: ledger.filter((e) => e.createdAt.slice(0, 10) === today).length,
+        });
+        setTopAccounts([...accounts].sort((a, b) => Number(b.balance) - Number(a.balance)).slice(0, 5));
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

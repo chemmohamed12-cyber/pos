@@ -23,19 +23,26 @@ export function AdminCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [users, connectors] = await Promise.all([
-        api.get<AdminUser[]>('/admin/users'),
-        api.get<Connector[]>('/integrations/connectors'),
-      ]);
-      setKpis({
-        totalUsers: users.length,
-        activeIntegrations: connectors.filter((c) => c.status === 'connected').length,
-      });
-      const counts = new Map<string, number>();
-      for (const u of users) {
-        for (const role of u.roles) counts.set(role, (counts.get(role) ?? 0) + 1);
+      try {
+        const [users, connectors] = await Promise.all([
+          api.get<AdminUser[]>('/admin/users'),
+          api.get<Connector[]>('/integrations/connectors'),
+        ]);
+        setKpis({
+          totalUsers: users.length,
+          activeIntegrations: connectors.filter((c) => c.status === 'connected').length,
+        });
+        const counts = new Map<string, number>();
+        for (const u of users) {
+          for (const role of u.roles) counts.set(role, (counts.get(role) ?? 0) + 1);
+        }
+        setRoleBreakdown([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([role, count]) => ({ label: t(`role.${role}`), value: count })));
+      } catch {
+        // Foundation fix: a Cover's KPI widget failing to load degrades to
+        // "no numbers shown" (SectionCover already renders fine with
+        // kpis=undefined) rather than an unhandled rejection — this is a
+        // landing-page summary, not a workflow the failure should block.
       }
-      setRoleBreakdown([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([role, count]) => ({ label: t(`role.${role}`), value: count })));
     })();
   }, [canView, t]);
 

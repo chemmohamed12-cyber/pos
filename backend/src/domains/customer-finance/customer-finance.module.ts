@@ -23,6 +23,8 @@ import { FINANCE_CUSTOMER_LEDGER_CONTRACT, FINANCE_INVOICE_CONTRACT } from '../.
 import { PermissionModule } from '../../foundation/permission/permission.module';
 import { ErrorContractModule } from '../../foundation/error-contract/error-contract.module';
 import { TaxEngineModule } from '../accounting/tax-engine.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
  * Customer Financial Account / Invoice / AR (CTO directive) — a genuinely
@@ -52,6 +54,15 @@ import { TaxEngineModule } from '../accounting/tax-engine.module';
     // see tax-engine.module.ts's own doc comment for why importing
     // AccountingModule here would create a real NestJS module cycle.
     TaxEngineModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27/28) — for
+    // `CompanyContextGuard`, now on both `CustomerLedgerController` (§25)
+    // and `PaymentsController` (§32). `InvoicesController`, also in this
+    // module, is still BLOCKED on `TaxEngineService` — see
+    // AREA21-RETROFIT-MATRIX.md §24. `DatabaseRegistryModule` alongside
+    // it, the same required pairing discovered during
+    // `products.controller.ts`'s retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [InvoicesController, PaymentsController, CustomerLedgerController],
   providers: [

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { mkdir, stat, rm, writeFile } from 'fs/promises';
 import { dirname, basename, join, resolve } from 'path';
 import { execFile } from 'child_process';
@@ -8,16 +8,22 @@ import { BackupRun } from './backup-run.entity';
 import { BackupArtifact } from './backup-artifact.entity';
 import { BackupTrigger } from './backup-trigger';
 import { BackupRunStatus } from './backup-status';
+import { CompanyBackupSettings } from './company-backup-settings.entity';
+import { BackupOperationService } from './backup-operation.service';
 import { readAppVersion } from './app-version';
 import { computeFileChecksum } from './checksum';
 import { PgDumpRunnerService } from './pg-dump-runner.service';
-import { AppConfigService } from '../configuration/app-config.service';
+import { AppConfigService, DatabaseConfig } from '../configuration/app-config.service';
 import { AuditService } from '../audit/audit.service';
+import { DatabaseRegistryService } from '../database-registry/database-registry.service';
+import { CompanyService } from '../company/company.service';
 
 const execFileAsync = promisify(execFile);
 const MEDIA_ARCHIVE_TIMEOUT_MS = 10 * 60 * 1000;
-/** Retention never deletes below this many most-recent runs, regardless of age — CTO directive: "do not assume a single backup file is sufficient." */
+/** Retention never deletes below this many most-recent runs, regardless of age — CTO directive: "do not assume a single backup file is sufficient." Evaluated per-Company for a Company backup (Track D, D-Backup-02) — never across Companies. */
 const MIN_KEEP_RUNS = 3;
+/** Backup/DR Architecture V1 (2026-09-24, Track D §Step 4 freeze) — independent of `MembershipOperation`'s own retry cap by design. */
+export const BACKUP_MAX_ATTEMPTS = 5;
 
 /**
  * Release Center — Phase A (Backup Foundation). Orchestrates one backup
@@ -39,47 +45,74 @@ export class BackupManagerService {
     private readonly config: AppConfigService,
     private readonly pgDump: PgDumpRunnerService,
     private readonly audit: AuditService,
+    private readonly databaseRegistry: DatabaseRegistryService,
+    private readonly backupOperations: BackupOperationService,
+    private readonly companies: CompanyService,
   ) {}
 
-  async createBackup(trigger: BackupTrigger, initiatedByUserId: string | null): Promise<BackupRun> {
+  /**
+   * Backup/DR Architecture V1 (2026-09-24, Track D). `companyId` omitted
+   * (or `null`) — EXACT existing behavior, unchanged (AC-7: platform
+   * backup is provably unaffected). `companyId` supplied — backs up that
+   * Company's own database instead, via the mandatory §9 chain
+   * (`DatabaseRegistryService.getConnectionConfigForCompany`, never an
+   * ambient/default connection), skips the media artifact entirely (Step 1
+   * characterization: no Company-owned media concept exists in V1), and
+   * drives the attempt through the `BackupOperation` durable ledger
+   * (D-Backup-03) so a failure is retried, never silently dropped.
+   */
+  async createBackup(trigger: BackupTrigger, initiatedByUserId: string | null, companyId: string | null = null): Promise<BackupRun> {
     const runRepo = this.dataSource.getRepository(BackupRun);
     const artifactRepo = this.dataSource.getRepository(BackupArtifact);
+
+    const databaseConfig = companyId ? await this.databaseRegistry.getConnectionConfigForCompany(companyId) : this.config.database;
+    const installationId = companyId ? (await this.companies.findById(companyId))?.installationId ?? null : null;
 
     const run = await runRepo.save(
       runRepo.create({
         trigger,
         initiatedByUserId,
+        companyId,
         status: 'running',
         sourceAppVersion: readAppVersion(),
         completedAt: null,
         errorMessage: null,
       }),
     );
+    const operation = await this.backupOperations.start(companyId, run.id);
+    await this.backupOperations.markRunning(operation.id);
 
     await this.audit.record({
       actorUserId: initiatedByUserId,
-      organizationId: null,
+      organizationId: null, // NOT companyId — 'organizationId' is a distinct existing concept (OrgUnit/OrgMembership); companyId travels in 'after' below (D-Backup-06)
       action: 'release.backup.started',
       resource: 'backup_run',
       resourceId: run.id,
       result: 'success',
-      correlationId: null,
-      after: { trigger, sourceAppVersion: run.sourceAppVersion },
+      correlationId: operation.correlationId,
+      after: { trigger, sourceAppVersion: run.sourceAppVersion, companyId },
     });
 
     const { storagePath } = this.config.releaseBackup;
     await mkdir(join(storagePath, 'db'), { recursive: true });
-    await mkdir(join(storagePath, 'media'), { recursive: true });
 
-    const dbOk = await this.runDatabaseArtifact(run, artifactRepo, storagePath, initiatedByUserId);
-    const mediaOutcome = await this.runMediaArtifact(run, artifactRepo, storagePath, initiatedByUserId);
+    const dbOk = await this.runDatabaseArtifact(run, artifactRepo, storagePath, initiatedByUserId, databaseConfig);
+    // Media is a platform-wide concept only in V1 (Step 1 characterization) — never attempted for a Company backup.
+    if (!companyId) await mkdir(join(storagePath, 'media'), { recursive: true });
+    const mediaOutcome = companyId ? 'skipped' : await this.runMediaArtifact(run, artifactRepo, storagePath, initiatedByUserId);
 
     const finalStatus = this.resolveRunStatus(dbOk, mediaOutcome);
     run.status = finalStatus;
     run.completedAt = new Date();
     const saved = await runRepo.save(run);
 
-    await this.writeBackupManifest(saved, artifactRepo, storagePath);
+    await this.writeBackupManifest(saved, artifactRepo, storagePath, databaseConfig, companyId, installationId);
+
+    if (finalStatus === 'failed') {
+      await this.backupOperations.markFailed(operation.id, 'database artifact did not verify', BACKUP_MAX_ATTEMPTS);
+    } else {
+      await this.backupOperations.markCompleted(operation.id);
+    }
 
     await this.audit.record({
       actorUserId: initiatedByUserId,
@@ -88,10 +121,57 @@ export class BackupManagerService {
       resource: 'backup_run',
       resourceId: run.id,
       result: finalStatus === 'failed' ? 'failure' : 'success',
-      correlationId: null,
-      after: { status: finalStatus },
+      correlationId: operation.correlationId,
+      after: { status: finalStatus, companyId },
     });
 
+    return saved;
+  }
+
+  /**
+   * Backup/DR Architecture V1 (2026-09-24, Track D §Step 4/10, D-Backup-03).
+   * `BackupReconciliationScheduler`'s entry point — re-attempts the SAME
+   * `BackupRun` (same deterministic file path, so a retry overwrites the
+   * previous failed attempt rather than creating a parallel one),
+   * resolving the SAME `databaseConfig` (Company or platform) the original
+   * attempt used. Never invents a new run for a retry.
+   */
+  async retryBackup(backupRunId: string, operationId: string): Promise<BackupRun> {
+    const runRepo = this.dataSource.getRepository(BackupRun);
+    const artifactRepo = this.dataSource.getRepository(BackupArtifact);
+    const run = await runRepo.findOneOrFail({ where: { id: backupRunId } });
+
+    const companyId = run.companyId;
+    const databaseConfig = companyId ? await this.databaseRegistry.getConnectionConfigForCompany(companyId) : this.config.database;
+    const installationId = companyId ? (await this.companies.findById(companyId))?.installationId ?? null : null;
+
+    const { storagePath } = this.config.releaseBackup;
+    await mkdir(join(storagePath, 'db'), { recursive: true });
+
+    const dbOk = await this.runDatabaseArtifact(run, artifactRepo, storagePath, run.initiatedByUserId, databaseConfig);
+    const mediaOutcome = companyId ? 'skipped' : await this.runMediaArtifact(run, artifactRepo, storagePath, run.initiatedByUserId);
+
+    const finalStatus = this.resolveRunStatus(dbOk, mediaOutcome);
+    run.status = finalStatus;
+    run.completedAt = new Date();
+    const saved = await runRepo.save(run);
+
+    await this.writeBackupManifest(saved, artifactRepo, storagePath, databaseConfig, companyId, installationId);
+
+    await this.audit.record({
+      actorUserId: run.initiatedByUserId,
+      organizationId: null,
+      action: finalStatus === 'failed' ? 'release.backup.failed' : 'release.backup.completed',
+      resource: 'backup_run',
+      resourceId: run.id,
+      result: finalStatus === 'failed' ? 'failure' : 'success',
+      correlationId: operationId,
+      after: { status: finalStatus, companyId, retried: true },
+    });
+
+    if (finalStatus === 'failed') {
+      throw new Error('Retried database artifact did not verify.');
+    }
     return saved;
   }
 
@@ -104,30 +184,51 @@ export class BackupManagerService {
    * DB. A failure to write it is logged, never fails the backup (the
    * artifacts + rows are the source of truth; this is a convenience index).
    */
+  /**
+   * Backup/DR Architecture V1 (2026-09-24, Track D §Step 2 frozen schema).
+   * `installationId`/`companyId` are added, `edition`/entitlement snapshot
+   * is best-effort (a failure here never fails the manifest write, same
+   * "never fails the backup" discipline as this method's own outer
+   * try/catch) — the frozen minimum schema requires the FIELD to exist,
+   * not that it can never be `null` when unavailable.
+   */
   private async writeBackupManifest(
     run: BackupRun,
     artifactRepo: Repository<BackupArtifact>,
     storagePath: string,
+    databaseConfig: DatabaseConfig,
+    companyId: string | null,
+    installationId: string | null,
   ): Promise<void> {
     try {
       const artifacts = await artifactRepo.find({ where: { backupRunId: run.id } });
+      // A Company backup's migration head would have to come from a fresh connection to
+      // THAT Company's own database, never the ambient one — not worth opening one just
+      // for this best-effort manifest field (same "never fails the backup" discipline this
+      // whole method already applies); `pg_restore --list` on the dump itself is the real
+      // structural proof (`PgDumpRunnerService.verifyDumpStructure`), this is only a convenience index.
       let migrationHead: string | null = null;
-      try {
-        const rows: Array<{ name: string }> = await this.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1');
-        migrationHead = rows[0]?.name ?? null;
-      } catch {
-        migrationHead = null;
+      if (!companyId) {
+        try {
+          const rows: Array<{ name: string }> = await this.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1');
+          migrationHead = rows[0]?.name ?? null;
+        } catch {
+          migrationHead = null;
+        }
       }
 
       const manifest = {
         schema: 'daii.backup-manifest/1',
+        installationId,
+        companyId,
         backupRunId: run.id,
         status: run.status,
         trigger: run.trigger,
         sourceAppVersion: run.sourceAppVersion,
         startedAt: run.startedAt,
         completedAt: run.completedAt,
-        database: { name: this.config.database.database, host: this.config.database.host, migrationHead },
+        database: { name: databaseConfig.database, host: databaseConfig.host, migrationHead },
+        editionEntitlementSnapshot: null as unknown, // Track D Step 2 — populated once Area 7's entitlement snapshot accessor exists; frozen schema requires the field present, not populated in V1
         runtime: { node: process.version, platform: process.platform, arch: process.arch },
         appRoots: {
           releaseAppRoot: this.config.releaseExecution.appRoot,
@@ -165,11 +266,12 @@ export class BackupManagerService {
     artifactRepo: Repository<BackupArtifact>,
     storagePath: string,
     initiatedByUserId: string | null,
+    databaseConfig: DatabaseConfig,
   ): Promise<boolean> {
     const relativePath = join('db', `${run.id}.dump`);
     const absolutePath = join(storagePath, relativePath);
     try {
-      await this.pgDump.dump(this.config.database, absolutePath);
+      await this.pgDump.dump(databaseConfig, absolutePath);
       const artifact = await this.recordArtifact(artifactRepo, run.id, 'database', relativePath, absolutePath);
       await this.verifyArtifact(artifactRepo, artifact, absolutePath);
       return artifact.status === 'verified';
@@ -304,12 +406,23 @@ export class BackupManagerService {
    * age — "do not assume a single backup file is sufficient" applies in
    * both directions: never zero backups, and never an unbounded pile.
    */
-  async applyRetentionPolicy(): Promise<{ deletedRuns: number }> {
+  /**
+   * Backup/DR Architecture V1 (2026-09-24, Track D §Step 6, D-Backup-02).
+   * `companyId` omitted (or `null`) — EXACT existing platform-retention
+   * behavior. `companyId` supplied — retention is evaluated ONLY over that
+   * Company's own runs (`where: { companyId }`, never a global query), and
+   * `MIN_KEEP_RUNS` is enforced per-Company: another Company's (or the
+   * platform's) larger backup count can NEVER push a Company's own
+   * still-protected runs past its own floor (AC-3).
+   */
+  async applyRetentionPolicy(companyId: string | null = null): Promise<{ deletedRuns: number }> {
     const runRepo = this.dataSource.getRepository(BackupRun);
     const artifactRepo = this.dataSource.getRepository(BackupArtifact);
-    const { storagePath, retentionDays } = this.config.releaseBackup;
+    const { storagePath, retentionDays: installationDefaultRetentionDays } = this.config.releaseBackup;
 
-    const allRuns = await runRepo.find({ order: { startedAt: 'DESC' } });
+    const retentionDays = companyId ? await this.getEffectiveRetentionDays(companyId, installationDefaultRetentionDays) : installationDefaultRetentionDays;
+
+    const allRuns = await runRepo.find({ where: { companyId: companyId ?? IsNull() }, order: { startedAt: 'DESC' } });
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const candidates = allRuns.slice(MIN_KEEP_RUNS).filter((r) => r.startedAt < cutoff);
 
@@ -336,5 +449,11 @@ export class BackupManagerService {
     }
 
     return { deletedRuns };
+  }
+
+  /** D-Backup-02 — a Company's own override if one exists, otherwise the Installation-wide default. Never the reverse (an override never affects any other Company). */
+  private async getEffectiveRetentionDays(companyId: string, installationDefault: number): Promise<number> {
+    const settings = await this.dataSource.getRepository(CompanyBackupSettings).findOne({ where: { companyId } });
+    return settings?.retentionDaysOverride ?? installationDefault;
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { SalesReturn } from '../infrastructure/sales-return.entity';
 import { SalesReturnLine } from '../infrastructure/sales-return-line.entity';
 import { SALES_RETURN_PROCESS } from '../domain/sales-return-process';
@@ -10,6 +10,8 @@ import { ConfigurationEngineService } from '../../../foundation/configuration-en
 import { INVENTORY_LOGISTICS_CONTRACT, InventoryLogisticsContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 import { SALES_ORDERS_READ_CONTRACT, SalesOrdersReadContract, SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { OrderLineReturnCapacityService, OrderLineReturnCapacity } from './order-line-return-capacity.service';
+import { ReturnFinancialsService } from './return-financials.service';
+import { EventBusService } from '../../../foundation/events/event-bus.service';
 
 const ENTITY_TYPE = 'sales_return';
 const DEFAULT_ELIGIBILITY_WINDOW_DAYS = 365;
@@ -42,6 +44,9 @@ export class SalesReturnsService {
     @Inject(SALES_ORDERS_READ_CONTRACT) private readonly salesOrders: SalesOrdersReadContract,
     @Inject(SALES_CUSTOMERS_CONTRACT) private readonly customers: SalesCustomersContract,
     private readonly capacity: OrderLineReturnCapacityService,
+    // D4 (2026-10-05) — the shared financial policy of both return types, and the Company event bus (post-commit flush).
+    private readonly financials: ReturnFinancialsService,
+    private readonly events: EventBusService,
   ) {}
 
   private getEligibilityWindowDays(): number {
@@ -55,9 +60,9 @@ export class SalesReturnsService {
    * window is read from config (`logistics.sales_return_eligibility_
    * window_days`, default 365), never hardcoded in a controller/UI.
    */
-  async listEligiblePurchaseLines(customerId: string, returnDate: Date) {
+  async listEligiblePurchaseLines(customerId: string, returnDate: Date, manager?: EntityManager) {
     const windowDays = this.getEligibilityWindowDays();
-    return this.salesOrders.findEligibleReturnPurchaseLines(customerId, returnDate, windowDays);
+    return this.salesOrders.findEligibleReturnPurchaseLines(customerId, returnDate, windowDays, manager);
   }
 
   /**
@@ -78,6 +83,7 @@ export class SalesReturnsService {
     lines: SalesReturnLineInput[],
     reason: string | null,
     requestedByUserId: string,
+    manager?: EntityManager,
   ): Promise<SalesReturn> {
     if (lines.length === 0) throw new BadRequestException('At least one return line is required.');
     for (const line of lines) {
@@ -92,15 +98,15 @@ export class SalesReturnsService {
     // Fetched once, outside the loop — the eligibility set doesn't change per-line, only the
     // membership check does. getOrder/getOrderSnapshot don't expose createdAt directly, so the
     // window check is re-derived the same way the picker computes it, never trusted from the client.
-    const eligible = await this.salesOrders.findEligibleReturnPurchaseLines(customerId, returnDate, windowDays);
+    const eligible = await this.salesOrders.findEligibleReturnPurchaseLines(customerId, returnDate, windowDays, manager);
     const eligibleByLineId = new Map(eligible.map((e) => [e.salesOrderLineId, e]));
 
     type ResolvedLine = SalesReturnLineInput & { sourceSalesOrderId: string; productId: string; originalQuantity: number; originalUnitPrice: string };
     const resolved: ResolvedLine[] = [];
     for (const line of lines) {
-      const orderLine = await this.salesOrders.getOrderLineById(line.sourceSalesOrderLineId);
+      const orderLine = await this.salesOrders.getOrderLineById(line.sourceSalesOrderLineId, manager);
       if (!orderLine) throw new NotFoundException(`Sales order line "${line.sourceSalesOrderLineId}" not found.`);
-      const order = await this.salesOrders.getOrder(orderLine.salesOrderId, requestedByUserId);
+      const order = await this.salesOrders.getOrder(orderLine.salesOrderId, requestedByUserId, manager);
       if (order.customerId !== customerId) {
         throw new BadRequestException(
           `Sales order line "${line.sourceSalesOrderLineId}" belongs to a different customer — cannot attach it to this Sales Return.`,
@@ -121,10 +127,10 @@ export class SalesReturnsService {
       });
     }
 
-    await this.numbering.registerDocumentType('sales_return', 'SLR');
-    const returnNumber = await this.numbering.getNextNumber('sales_return');
+    await this.numbering.registerDocumentType('sales_return', 'SLR', true, manager);
+    const returnNumber = await this.numbering.getNextNumber('sales_return', manager);
 
-    const header = await this.dataSource.transaction(async (manager) => {
+    const header = await (manager ?? this.dataSource).transaction(async (txManager) => {
       // Cross-Return Data Integrity (CTO-approved Option 1, 2026-09-16). Same shared
       // OrderLineReturnCapacityService as ShipmentReturnsService — neither service calls the
       // other; both independently lock+read through this one stateless helper. The lock this
@@ -135,7 +141,7 @@ export class SalesReturnsService {
       const orderLineIds = [...new Set(resolved.map((l) => l.sourceSalesOrderLineId))].sort();
       const capacityByOrderLine = new Map<string, OrderLineReturnCapacity>();
       for (const orderLineId of orderLineIds) {
-        capacityByOrderLine.set(orderLineId, await this.capacity.getLockedCapacity(manager, orderLineId));
+        capacityByOrderLine.set(orderLineId, await this.capacity.getLockedCapacity(txManager, orderLineId));
       }
 
       // Aggregate requested quantity per order line first (a multi-order "All Orders" return
@@ -156,12 +162,12 @@ export class SalesReturnsService {
 
       const totalAmount = resolved.reduce((sum, l) => sum + Number(l.returnPrice) * l.returnQuantity, 0).toFixed(2);
 
-      const headerRepo = manager.getRepository(SalesReturn);
+      const headerRepo = txManager.getRepository(SalesReturn);
       const saved = await headerRepo.save(
         headerRepo.create({ returnNumber, customerId, salesOrderId, returnDate, totalAmount, reason, requestedByUserId }),
       );
 
-      const lineRepo = manager.getRepository(SalesReturnLine);
+      const lineRepo = txManager.getRepository(SalesReturnLine);
       for (const line of resolved) {
         const lineTotal = (Number(line.returnPrice) * line.returnQuantity).toFixed(2);
         await lineRepo.save(
@@ -178,66 +184,88 @@ export class SalesReturnsService {
         );
       }
 
-      await this.processEngine.start(SALES_RETURN_PROCESS, ENTITY_TYPE, saved.id, manager);
+      await this.processEngine.start(SALES_RETURN_PROCESS, ENTITY_TYPE, saved.id, txManager);
       return saved;
     });
 
-    await this.audit.record({
-      actorUserId: requestedByUserId,
-      organizationId: null,
-      action: 'sales_return.requested',
-      resource: 'sales_return',
-      resourceId: header.id,
-      result: 'success',
-      correlationId: null,
-      after: { customerId, salesOrderId, returnNumber, lineCount: resolved.length, sourceOrders: [...new Set(resolved.map((l) => l.sourceSalesOrderId))] },
-    });
+    await this.audit.record(
+      {
+        actorUserId: requestedByUserId,
+        organizationId: null,
+        action: 'sales_return.requested',
+        resource: 'sales_return',
+        resourceId: header.id,
+        result: 'success',
+        correlationId: null,
+        after: { customerId, salesOrderId, returnNumber, lineCount: resolved.length, sourceOrders: [...new Set(resolved.map((l) => l.sourceSalesOrderId))] },
+      },
+      manager,
+    );
 
     return header;
   }
 
-  /** The warehouse-facing step — posts `return_in` per line into that line's OWN source order's warehouse (a multi-order return can have lines destined for different warehouses; never assume one). */
-  async completeSalesReturn(salesReturnId: string, actorUserId: string): Promise<string> {
-    const header = await this.dataSource.getRepository(SalesReturn).findOne({ where: { id: salesReturnId } });
+  /**
+   * The warehouse-facing step — posts `return_in` per line into that line's OWN source order's warehouse (a multi-order return
+   * can have lines destined for different warehouses; never assume one).
+   *
+   * D4 (2026-10-05): this is now ALSO the financial step. Inside ONE transaction: `ReturnFinancialsService.plan` validates the
+   * source, resolves the ORIGINAL cost, the original invoice value and every GL account — reading only, so a rejection leaves
+   * everything untouched — THEN the process transition, stock back at the original cost (`Dr Inventory / Cr COGS`) and, for an
+   * invoiced sale, the Customer Ledger credit + `Dr Sales Returns [+ tax] / Cr AR` event.
+   */
+  async completeSalesReturn(salesReturnId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    const header = await (manager ?? this.dataSource).getRepository(SalesReturn).findOne({ where: { id: salesReturnId } });
     if (!header) throw new NotFoundException(`Sales return "${salesReturnId}" not found.`);
 
-    const currentState = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId);
+    const currentState = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId, manager);
     if (currentState !== 'requested') {
       throw new ConflictException(`Cannot complete a sales return in state "${currentState}".`);
     }
 
-    const lines = await this.dataSource.getRepository(SalesReturnLine).find({ where: { salesReturnId } });
+    const lines = await (manager ?? this.dataSource).getRepository(SalesReturnLine).find({ where: { salesReturnId } });
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId, 'complete', actorUserId, manager);
-      for (const line of lines) {
-        const order = await this.salesOrders.getOrder(line.sourceSalesOrderId, actorUserId);
-        if (!order.warehouseId) continue; // disclosed: a source order with no warehouse cannot receive a physical restock — the document still completes, the line's inventory effect is skipped, never silently guessed at.
-        await this.inventory.recordMovement(order.warehouseId, line.productId, line.returnQuantity, 'return_in', 'sales_return', salesReturnId, actorUserId, manager);
-      }
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const plan = await this.financials.plan(
+        lines.map((l) => ({
+          lineId: l.id,
+          salesOrderId: l.sourceSalesOrderId,
+          salesOrderLineId: l.sourceSalesOrderLineId,
+          productId: l.productId,
+          quantity: l.returnQuantity,
+        })),
+        actorUserId,
+        txManager,
+      );
+      await this.processEngine.transition(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId, 'complete', actorUserId, txManager);
+      await this.financials.apply('sales_return', { id: salesReturnId, number: header.returnNumber, customerId: header.customerId }, plan, actorUserId, txManager);
     });
+    await this.events.dispatchAfterCommit(manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'sales_return.completed',
-      resource: 'sales_return',
-      resourceId: salesReturnId,
-      result: 'success',
-      correlationId: null,
-      after: { lineCount: lines.length },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'sales_return.completed',
+        resource: 'sales_return',
+        resourceId: salesReturnId,
+        result: 'success',
+        correlationId: null,
+        after: { lineCount: lines.length },
+      },
+      manager,
+    );
 
-    return this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId);
+    return this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId, manager);
   }
 
   /** List-screen fields per CTO directive §9: customer name + return amount visible without a detail fetch. */
-  async listSalesReturns(): Promise<Array<SalesReturn & { state: string; customerName: string | null }>> {
-    const headers = await this.dataSource.getRepository(SalesReturn).find({ order: { createdAt: 'DESC' } });
+  async listSalesReturns(manager?: EntityManager): Promise<Array<SalesReturn & { state: string; customerName: string | null }>> {
+    const headers = await (manager ?? this.dataSource).getRepository(SalesReturn).find({ order: { createdAt: 'DESC' } });
     return Promise.all(
       headers.map(async (h) => {
-        const state = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, h.id);
-        const customer = await this.customers.getCustomerSnapshot(h.customerId);
+        const state = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, h.id, manager);
+        const customer = await this.customers.getCustomerSnapshot(h.customerId, manager);
         return { ...h, state, customerName: customer?.name ?? null };
       }),
     );
@@ -246,13 +274,14 @@ export class SalesReturnsService {
   /** Return Details per CTO directive §9: all source orders, not just one — `sourceOrderIds` is always an array, never a single value. */
   async getSalesReturnDetail(
     salesReturnId: string,
+    manager?: EntityManager,
   ): Promise<{ header: SalesReturn; state: string; lines: SalesReturnLine[]; sourceOrderIds: string[]; customerName: string | null }> {
-    const header = await this.dataSource.getRepository(SalesReturn).findOne({ where: { id: salesReturnId } });
+    const header = await (manager ?? this.dataSource).getRepository(SalesReturn).findOne({ where: { id: salesReturnId } });
     if (!header) throw new NotFoundException(`Sales return "${salesReturnId}" not found.`);
-    const state = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId);
-    const lines = await this.dataSource.getRepository(SalesReturnLine).find({ where: { salesReturnId } });
+    const state = await this.processEngine.getState(SALES_RETURN_PROCESS, ENTITY_TYPE, salesReturnId, manager);
+    const lines = await (manager ?? this.dataSource).getRepository(SalesReturnLine).find({ where: { salesReturnId } });
     const sourceOrderIds = [...new Set(lines.map((l) => l.sourceSalesOrderId))];
-    const customer = await this.customers.getCustomerSnapshot(header.customerId);
+    const customer = await this.customers.getCustomerSnapshot(header.customerId, manager);
     return { header, state, lines, sourceOrderIds, customerName: customer?.name ?? null };
   }
 }

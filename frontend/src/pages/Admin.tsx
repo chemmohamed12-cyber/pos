@@ -61,9 +61,14 @@ export function Admin() {
   ]);
 
   async function load() {
-    const data = await api.get<AdminUser[]>('/admin/users');
-    setUsers(data);
-    setProfileEdits(Object.fromEntries(data.map((u) => [u.id, { fullName: u.fullName, email: u.email }])));
+    try {
+      const data = await api.get<AdminUser[]>('/admin/users');
+      setUsers(data);
+      setProfileEdits(Object.fromEntries(data.map((u) => [u.id, { fullName: u.fullName, email: u.email }])));
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load users.');
+    }
   }
 
   useEffect(() => {

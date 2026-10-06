@@ -7,6 +7,7 @@ import { PURCHASE_ORDER_PROCESS } from '../domain/purchase-order-process';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { ProcessInstance } from '../../../foundation/process-engine/process-instance.entity';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { ProductLifecycleGate } from './product-lifecycle-gate.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 
 const PO_DOCUMENT_TYPE = 'purchase_order';
@@ -38,37 +39,39 @@ export class PurchaseOrderService {
     private readonly processEngine: ProcessEngineService,
     private readonly numbering: NumberingService,
     private readonly audit: AuditService,
+    private readonly lifecycleGate: ProductLifecycleGate,
   ) {}
 
-  private async statesFor(ids: string[]): Promise<Map<string, string>> {
+  private async statesFor(ids: string[], manager?: EntityManager): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
-    const rows = await this.dataSource
+    const rows = await (manager ?? this.dataSource)
       .getRepository(ProcessInstance)
       .find({ where: { definitionKey: PURCHASE_ORDER_PROCESS.key, entityType: PO_ENTITY_TYPE, entityId: In(ids) } });
     return new Map(rows.map((r) => [r.entityId, r.currentState]));
   }
 
-  async list(): Promise<Array<PurchaseOrder & { state: string }>> {
-    const pos = await this.dataSource.getRepository(PurchaseOrder).find({ order: { createdAt: 'DESC' } });
-    const states = await this.statesFor(pos.map((p) => p.id));
+  async list(manager?: EntityManager): Promise<Array<PurchaseOrder & { state: string }>> {
+    const pos = await (manager ?? this.dataSource).getRepository(PurchaseOrder).find({ order: { createdAt: 'DESC' } });
+    const states = await this.statesFor(pos.map((p) => p.id), manager);
     return pos.map((p) => ({ ...p, state: states.get(p.id) ?? 'draft' }));
   }
 
-  async getById(id: string): Promise<{ purchaseOrder: PurchaseOrder; state: string; lines: PurchaseOrderLine[] }> {
-    const purchaseOrder = await this.dataSource.getRepository(PurchaseOrder).findOne({ where: { id } });
+  async getById(id: string, manager?: EntityManager): Promise<{ purchaseOrder: PurchaseOrder; state: string; lines: PurchaseOrderLine[] }> {
+    const purchaseOrder = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id } });
     if (!purchaseOrder) throw new NotFoundException(`Purchase Order "${id}" not found.`);
-    const lines = await this.dataSource.getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: id } });
-    const state = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id);
+    const lines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: id } });
+    const state = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, manager);
     return { purchaseOrder, state, lines };
   }
 
   async create(input: CreatePurchaseOrderInput, actorUserId: string, externalManager?: EntityManager): Promise<PurchaseOrder> {
     if (input.lines.length === 0) throw new BadRequestException('A Purchase Order needs at least one line.');
-    const supplier = await this.dataSource.getRepository(Supplier).findOne({ where: { id: input.supplierId } });
+    const supplier = await (externalManager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: input.supplierId } });
     if (!supplier) throw new NotFoundException(`Supplier "${input.supplierId}" not found.`);
     if (supplier.status !== 'active') throw new ConflictException(`Supplier "${supplier.legalName}" is inactive — cannot raise a Purchase Order against it.`);
 
-    await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO');
+    await this.lifecycleGate.assertNoneDraft(input.lines.map((l) => l.productId), 'Cannot create this Purchase Order', externalManager); // D7 gate (before any mutation)
+    await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO', true, externalManager);
 
     const run = async (manager: EntityManager): Promise<PurchaseOrder> => {
       const poNumber = await this.numbering.getNextNumber(PO_DOCUMENT_TYPE, manager);
@@ -116,23 +119,33 @@ export class PurchaseOrderService {
       return saved;
     };
 
-    return externalManager ? run(externalManager) : this.dataSource.transaction(run);
+    // Join the caller's transaction only when one is actually active (RfqService's award flow); a Company-scoped
+    // `dataSource.manager` (the controller path) is not a transaction, so open one on it.
+    return externalManager?.queryRunner?.isTransactionActive ? run(externalManager) : (externalManager ?? this.dataSource).transaction(run);
   }
 
-  async transition(id: string, action: 'submit' | 'approve' | 'reject' | 'cancel', actorUserId: string): Promise<{ state: string }> {
-    const exists = await this.dataSource.getRepository(PurchaseOrder).findOne({ where: { id } });
+  async transition(
+    id: string,
+    action: 'submit' | 'approve' | 'reject' | 'cancel',
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<{ state: string }> {
+    const exists = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id } });
     if (!exists) throw new NotFoundException(`Purchase Order "${id}" not found.`);
-    const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: `purchase_order.${action}`,
-      resource: 'purchase_order',
-      resourceId: id,
-      result: 'success',
-      correlationId: id,
-      after: { state: instance.currentState },
-    });
+    const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId, manager);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: `purchase_order.${action}`,
+        resource: 'purchase_order',
+        resourceId: id,
+        result: 'success',
+        correlationId: id,
+        after: { state: instance.currentState },
+      },
+      manager,
+    );
     return { state: instance.currentState };
   }
 }

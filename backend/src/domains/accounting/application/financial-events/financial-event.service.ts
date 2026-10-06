@@ -55,6 +55,8 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   // F09 (ADR-042 D3) — the sole GL trigger for a COD collection.
   'collection.remitted': 'delivery',
   'return.completed': 'returns',
+  // D4 — the Revenue/AR leg of a completed return of an invoiced sale
+  'returns.sale_return.credited': 'returns',
   'inventory.movement.recorded': 'inventory',
   'manufacturing.work_order.material_issued': 'manufacturing',
   'manufacturing.work_order.material_returned': 'manufacturing',
@@ -105,9 +107,16 @@ export class FinancialEventService implements OnModuleInit {
       if (!this.registry.get(eventType)) this.registry.register(eventType, handler);
     }
     for (const topic of SUBSCRIBED_TOPICS) {
-      this.events.subscribe(topic, async (payload) => {
-        await this.ingest(topic, payload);
-      });
+      // ADR-075 (D10): Company-scope — a Company outbox's event is ingested against THAT Company's
+      // database (`ctx.manager`); under ambient dispatch `ctx.manager` is null and this falls back to
+      // the ambient DataSource exactly as before.
+      this.events.subscribe(
+        topic,
+        async (payload, ctx) => {
+          await this.ingest(topic, payload, ctx.manager ?? undefined);
+        },
+        { scope: 'company' },
+      );
     }
   }
 
@@ -115,16 +124,16 @@ export class FinancialEventService implements OnModuleInit {
   // Queries
   // ---------------------------------------------------------------------------
 
-  async listEvents(filter?: { status?: FinancialEventStatus; sourceDomain?: string; eventType?: string }): Promise<FinancialEvent[]> {
+  async listEvents(filter?: { status?: FinancialEventStatus; sourceDomain?: string; eventType?: string }, manager?: EntityManager): Promise<FinancialEvent[]> {
     const where: Record<string, unknown> = {};
     if (filter?.status) where.status = filter.status;
     if (filter?.sourceDomain) where.sourceDomain = filter.sourceDomain;
     if (filter?.eventType) where.eventType = filter.eventType;
-    return this.dataSource.getRepository(FinancialEvent).find({ where, order: { receivedAt: 'DESC' } });
+    return (manager ?? this.dataSource).getRepository(FinancialEvent).find({ where, order: { receivedAt: 'DESC' } });
   }
 
-  async getEvent(id: string): Promise<FinancialEvent> {
-    const ev = await this.dataSource.getRepository(FinancialEvent).findOne({ where: { id } });
+  async getEvent(id: string, manager?: EntityManager): Promise<FinancialEvent> {
+    const ev = await (manager ?? this.dataSource).getRepository(FinancialEvent).findOne({ where: { id } });
     if (!ev) throw new NotFoundException(`Financial event "${id}" not found.`);
     return ev;
   }
@@ -133,7 +142,7 @@ export class FinancialEventService implements OnModuleInit {
   // Ingest (Blueprint §6.1)
   // ---------------------------------------------------------------------------
 
-  async ingest(eventType: string, rawPayload: Record<string, unknown>): Promise<IngestResult> {
+  async ingest(eventType: string, rawPayload: Record<string, unknown>, manager?: EntityManager): Promise<IngestResult> {
     const payload = rawPayload ?? {};
     const sourceDomain = DOMAIN_OF_TOPIC[eventType] ?? 'unknown';
     const sourceEntityType = str(payload.sourceEntityType) ?? str(payload.entityType) ?? eventType.split('.')[1] ?? 'unknown';
@@ -145,9 +154,9 @@ export class FinancialEventService implements OnModuleInit {
     // 1. idempotency-guarded landing (ADR-035 D6)
     let event: FinancialEvent;
     try {
-      event = await this.dataSource.transaction(async (manager) => {
-        const repo = manager.getRepository(FinancialEvent);
-        const base = await this.currencies.getBaseCurrency();
+      event = await (manager ?? this.dataSource).transaction(async (txManager) => {
+        const repo = txManager.getRepository(FinancialEvent);
+        const base = await this.currencies.getBaseCurrency(txManager);
         return repo.save(
           repo.create({
             eventType,
@@ -168,7 +177,7 @@ export class FinancialEventService implements OnModuleInit {
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        const existing = await this.dataSource.getRepository(FinancialEvent).findOne({ where: { idempotencyKey } });
+        const existing = await (manager ?? this.dataSource).getRepository(FinancialEvent).findOne({ where: { idempotencyKey } });
         if (existing) {
           return { financialEventId: existing.id, status: existing.status, journalEntryId: existing.journalEntryId, deduped: true };
         }
@@ -179,7 +188,7 @@ export class FinancialEventService implements OnModuleInit {
     // 2. no handler -> IGNORED (recorded, never dropped)
     const handler = this.registry.get(eventType);
     if (!handler) {
-      await this.mark(event.id, 'IGNORED', null, 'no handler registered for this event type in V1');
+      await this.mark(event.id, 'IGNORED', null, 'no handler registered for this event type in V1', manager);
       return { financialEventId: event.id, status: 'IGNORED', journalEntryId: null, deduped: false };
     }
 
@@ -188,15 +197,15 @@ export class FinancialEventService implements OnModuleInit {
     // observes no behavior change; a handler that mutates something via `ctx.manager` (F08's
     // inventory-costing bridge) gets that mutation rolled back together with everything else here
     // on ANY failure — including a later posting-gate rejection.
-    return this.runHandlerThroughPosting(event, handler);
+    return this.runHandlerThroughPosting(event, handler, manager);
   }
 
   // ---------------------------------------------------------------------------
   // Re-drive a REJECTED (or stuck) event (Blueprint §6.1 / API §20)
   // ---------------------------------------------------------------------------
 
-  async redrive(id: string): Promise<IngestResult> {
-    const event = await this.getEvent(id);
+  async redrive(id: string, manager?: EntityManager): Promise<IngestResult> {
+    const event = await this.getEvent(id, manager);
     if (event.status === 'POSTED') {
       return { financialEventId: id, status: 'POSTED', journalEntryId: event.journalEntryId, deduped: true };
     }
@@ -204,14 +213,14 @@ export class FinancialEventService implements OnModuleInit {
       throw new NotFoundException(`No handler is registered for "${event.eventType}" — nothing to re-drive.`);
     }
     // discard any prior draft from a failed attempt
-    if (event.journalEntryId) await this.discardDraft(event.journalEntryId);
+    if (event.journalEntryId) await this.discardDraft(event.journalEntryId, manager);
 
     const handler = this.registry.get(event.eventType);
     if (!handler) {
-      await this.mark(id, 'IGNORED', null, 'no handler registered');
+      await this.mark(id, 'IGNORED', null, 'no handler registered', manager);
       return { financialEventId: id, status: 'IGNORED', journalEntryId: null, deduped: false };
     }
-    return this.runHandlerThroughPosting(event, handler);
+    return this.runHandlerThroughPosting(event, handler, manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -227,7 +236,7 @@ export class FinancialEventService implements OnModuleInit {
    * exactly as the pre-D18a two-transaction design produced it — this is a change to the
    * TRANSACTIONAL SHAPE only, not to any observable message or to the posting gate's own checks.
    */
-  private async runHandlerThroughPosting(event: FinancialEvent, handler: FinancialEventHandler): Promise<IngestResult> {
+  private async runHandlerThroughPosting(event: FinancialEvent, handler: FinancialEventHandler, manager?: EntityManager): Promise<IngestResult> {
     type Outcome =
       | { status: 'IGNORED'; reason: string | null }
       | { status: 'REJECTED'; reason: string }
@@ -242,8 +251,8 @@ export class FinancialEventService implements OnModuleInit {
     // this loop only ever retries the specific, transient failure class the RCA reproduced.
     for (let attempt = 1; attempt <= MAX_POSTING_ATTEMPTS; attempt++) {
       try {
-        outcome = await this.dataSource.transaction(async (manager) => {
-          const ctx = await this.buildContext(manager);
+        outcome = await (manager ?? this.dataSource).transaction(async (txManager) => {
+          const ctx = await this.buildContext(txManager);
           let result: HandlerResult;
           try {
             result = await handler(event, ctx);
@@ -268,7 +277,7 @@ export class FinancialEventService implements OnModuleInit {
                 lines: result.draft.lines,
               },
               SYSTEM_ACTOR_ID,
-              manager,
+              txManager,
             );
             entryId = created.id;
           } catch (e) {
@@ -277,7 +286,7 @@ export class FinancialEventService implements OnModuleInit {
             throw wrapped;
           }
           try {
-            await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, manager);
+            await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, txManager);
           } catch (e) {
             const wrapped = new Error(`posting gate rejected: ${(e as Error).message}`) as Error & { pgCode?: unknown };
             wrapped.pgCode = (e as { code?: unknown })?.code;
@@ -302,24 +311,24 @@ export class FinancialEventService implements OnModuleInit {
       // handler-side mutation survives; `discardDraft` is therefore unreachable on this path
       // (nothing left to discard).
       const message = finalError.message;
-      await this.mark(event.id, 'REJECTED', null, message);
-      await this.publishRejected(event, message);
+      await this.mark(event.id, 'REJECTED', null, message, manager);
+      await this.publishRejected(event, message, manager);
       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
     }
     const result = outcome as Outcome;
 
     if (result.status === 'IGNORED') {
-      await this.mark(event.id, 'IGNORED', null, result.reason);
+      await this.mark(event.id, 'IGNORED', null, result.reason, manager);
       return { financialEventId: event.id, status: 'IGNORED', journalEntryId: null, deduped: false };
     }
     if (result.status === 'REJECTED') {
-      await this.mark(event.id, 'REJECTED', null, result.reason);
-      await this.publishRejected(event, result.reason);
+      await this.mark(event.id, 'REJECTED', null, result.reason, manager);
+      await this.publishRejected(event, result.reason, manager);
       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
     }
 
-    await this.mark(event.id, 'POSTED', result.journalEntryId, null);
-    await this.dataSource.transaction(async (manager) => {
+    await this.mark(event.id, 'POSTED', result.journalEntryId, null, manager);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
       await this.audit.record(
         {
           actorUserId: SYSTEM_ACTOR_ID,
@@ -331,15 +340,33 @@ export class FinancialEventService implements OnModuleInit {
           correlationId: event.id,
           after: { eventType: event.eventType, journalEntryId: result.journalEntryId },
         },
-        manager,
+        txManager,
       );
     });
     return { financialEventId: event.id, status: 'POSTED', journalEntryId: result.journalEntryId, deduped: false };
   }
 
+  /**
+   * FA-02 (2026-10-06) — a publisher's PRE-MUTATION check that a configured account is resolvable AND postable, using exactly the
+   * resolution the handler will perform later (so "accepted now, rejected at posting" cannot happen for a config reason).
+   */
+  async preflightConfiguredPostableAccount(configKey: string, manager?: EntityManager): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+    const ctx = await this.buildContext(manager ?? this.dataSource.manager);
+    return ctx.resolveConfiguredPostableAccount(configKey);
+  }
+
   private async buildContext(manager: EntityManager): Promise<HandlerContext> {
-    const base = await this.currencies.getBaseCurrency();
-    const accRepo = this.dataSource.getRepository(GLAccount);
+    const base = await this.currencies.getBaseCurrency(manager);
+    const accRepo = manager.getRepository(GLAccount);
+    const resolvePostableNonControlByCode = async (code: string) => {
+      if (!code) return { ok: false as const, reason: 'unset' as const };
+      const acc = await accRepo.findOne({ where: { code } });
+      if (!acc) return { ok: false as const, reason: 'not_found' as const };
+      if (!acc.isActive) return { ok: false as const, reason: 'inactive' as const };
+      if (!acc.isPostable) return { ok: false as const, reason: 'not_postable' as const };
+      if (acc.controlFunction) return { ok: false as const, reason: 'is_control_account' as const };
+      return { ok: true as const, id: acc.id };
+    };
     return {
       manager,
       baseCurrencyCode: base?.code ?? 'XXX',
@@ -354,19 +381,26 @@ export class FinancialEventService implements OnModuleInit {
       },
       resolveConfiguredPostableAccount: async (configKey: string) => {
         const code = (this.config.get<string>(configKey) ?? '').trim();
-        if (!code) return { ok: false as const, reason: 'unset' as const };
-        const acc = await accRepo.findOne({ where: { code } });
-        if (!acc) return { ok: false as const, reason: 'not_found' as const };
-        if (!acc.isActive) return { ok: false as const, reason: 'inactive' as const };
-        if (!acc.isPostable) return { ok: false as const, reason: 'not_postable' as const };
-        if (acc.controlFunction) return { ok: false as const, reason: 'is_control_account' as const };
-        return { ok: true as const, id: acc.id };
+        return resolvePostableNonControlByCode(code);
+      },
+      resolveUniqueControlAccount: async (fn: ControlFunction) => {
+        const found = await accRepo.find({ where: { controlFunction: fn, isActive: true, isPostable: true }, take: 2 });
+        if (found.length === 0) return { ok: false as const, reason: 'none' as const };
+        if (found.length > 1) return { ok: false as const, reason: 'ambiguous' as const };
+        return { ok: true as const, id: found[0].id };
+      },
+      resolveConfiguredMappedAccount: async (configKey: string, mapKey: string) => {
+        const raw = this.config.get<unknown>(configKey);
+        const map = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+        const entry = map[mapKey];
+        const code = typeof entry === 'string' ? entry.trim() : '';
+        return resolvePostableNonControlByCode(code);
       },
       resolveDimension: async (typeCode: string, valueCode: string) => {
         if (!typeCode || !valueCode) return null;
-        const type = await this.dataSource.getRepository(FinancialDimensionType).findOne({ where: { code: typeCode, isActive: true } });
+        const type = await manager.getRepository(FinancialDimensionType).findOne({ where: { code: typeCode, isActive: true } });
         if (!type) return null;
-        const value = await this.dataSource
+        const value = await manager
           .getRepository(FinancialDimensionValue)
           .findOne({ where: { dimensionTypeId: type.id, code: valueCode, isActive: true } });
         if (!value) return null;
@@ -375,8 +409,8 @@ export class FinancialEventService implements OnModuleInit {
     };
   }
 
-  private async mark(id: string, status: FinancialEventStatus, journalEntryId: string | null, reason: string | null): Promise<void> {
-    await this.dataSource.getRepository(FinancialEvent).update(
+  private async mark(id: string, status: FinancialEventStatus, journalEntryId: string | null, reason: string | null, manager?: EntityManager): Promise<void> {
+    await (manager ?? this.dataSource).getRepository(FinancialEvent).update(
       { id },
       {
         status,
@@ -387,18 +421,18 @@ export class FinancialEventService implements OnModuleInit {
     );
   }
 
-  private async discardDraft(entryId: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const lines = await manager.getRepository(JournalLine).find({ where: { journalEntryId: entryId } });
-      for (const l of lines) await manager.getRepository(JournalLineDimension).delete({ journalLineId: l.id });
-      await manager.getRepository(JournalLine).delete({ journalEntryId: entryId });
-      await manager.getRepository(JournalEntry).delete({ id: entryId });
+  private async discardDraft(entryId: string, manager?: EntityManager): Promise<void> {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const lines = await txManager.getRepository(JournalLine).find({ where: { journalEntryId: entryId } });
+      for (const l of lines) await txManager.getRepository(JournalLineDimension).delete({ journalLineId: l.id });
+      await txManager.getRepository(JournalLine).delete({ journalEntryId: entryId });
+      await txManager.getRepository(JournalEntry).delete({ id: entryId });
     });
   }
 
-  private async publishRejected(event: FinancialEvent, reason: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await this.events.publish(manager, 'accounting.financial_event.rejected', {
+  private async publishRejected(event: FinancialEvent, reason: string, manager?: EntityManager): Promise<void> {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.events.publish(txManager, 'accounting.financial_event.rejected', {
         financialEventId: event.id,
         eventType: event.eventType,
         sourceDomain: event.sourceDomain,

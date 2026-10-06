@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { ScopeService } from './scope.service';
 import { OrganizationService } from '../organization/organization.service';
 import { AuthorizationService } from '../authorization/authorization.service';
@@ -23,8 +24,8 @@ export class ScopeResolver {
     private readonly authorization: AuthorizationService,
   ) {}
 
-  private async isUnrestricted(userId: string): Promise<boolean> {
-    const roles = await this.authorization.getRoleKeysForUser(userId);
+  private async isUnrestricted(userId: string, manager?: EntityManager): Promise<boolean> {
+    const roles = await this.authorization.getRoleKeysForUser(userId, manager);
     return roles.some((r) => UNRESTRICTED_ROLES.includes(r));
   }
 
@@ -42,30 +43,30 @@ export class ScopeResolver {
    *   installation that hasn't populated it (ADR-031 §3 — zero behaviour
    *   change by construction).
    */
-  async assertAccess(userId: string, resourceType: string, resourceId: string, derivationRef?: string | null): Promise<void> {
+  async assertAccess(userId: string, resourceType: string, resourceId: string, derivationRef?: string | null, manager?: EntityManager): Promise<void> {
     const entry = SCOPE_DERIVATION_REGISTRY[resourceType];
     if (!entry || entry.strategy === 'unscoped') return; // deliberate, reviewable declaration — not a missing check
 
     if (entry.strategy === 'direct') {
-      return this.scope.assertAccess(userId, resourceType, resourceId);
+      return this.scope.assertAccess(userId, resourceType, resourceId, manager);
     }
 
     if (entry.strategy === 'parent') {
       if (!derivationRef) return; // no parent recorded (e.g. an ad hoc shipment with no sales order) — nothing to derive from, defer to accessible
-      return this.assertAccess(userId, entry.parentType!, derivationRef);
+      return this.assertAccess(userId, entry.parentType!, derivationRef, undefined, manager);
     }
 
     // 'org_unit'
-    if (await this.isUnrestricted(userId)) return;
+    if (await this.isUnrestricted(userId, manager)) return;
     if (!derivationRef) return; // no branch assigned to this resource = root = everyone, today's behaviour unchanged
-    const accessible = await this.accessibleOrgUnitIds(userId);
+    const accessible = await this.accessibleOrgUnitIds(userId, manager);
     if (!accessible.has(derivationRef)) throw new NotFoundException(); // 404, not 403 — anti-enumeration, ADR-005
   }
 
   /** List-query safety net — same role as `ScopeService.filterAllowed`, extended to org-unit derivation. */
-  async filterAllowedByOrgUnit<T extends { id: string; orgUnitId?: string | null }>(userId: string, rows: T[]): Promise<T[]> {
-    if (await this.isUnrestricted(userId)) return rows;
-    const accessible = await this.accessibleOrgUnitIds(userId);
+  async filterAllowedByOrgUnit<T extends { id: string; orgUnitId?: string | null }>(userId: string, rows: T[], manager?: EntityManager): Promise<T[]> {
+    if (await this.isUnrestricted(userId, manager)) return rows;
+    const accessible = await this.accessibleOrgUnitIds(userId, manager);
     return rows.filter((r) => !r.orgUnitId || accessible.has(r.orgUnitId));
   }
 
@@ -77,9 +78,9 @@ export class ScopeResolver {
    * two-hop one (e.g. a collection's parent shipment's `salesOrderId`).
    * `null`/`undefined` = no scope info recorded = row kept (ADR-031 §3).
    */
-  async filterAllowedByReference<T>(userId: string, rows: T[], resourceType: string, refIdOf: (row: T) => string | null | undefined): Promise<T[]> {
-    if (await this.isUnrestricted(userId)) return rows;
-    const allowed = await this.scope.getAssignedResourceIds(userId, resourceType);
+  async filterAllowedByReference<T>(userId: string, rows: T[], resourceType: string, refIdOf: (row: T) => string | null | undefined, manager?: EntityManager): Promise<T[]> {
+    if (await this.isUnrestricted(userId, manager)) return rows;
+    const allowed = await this.scope.getAssignedResourceIds(userId, resourceType, manager);
     if (allowed === 'ALL') return rows;
     const allowedSet = new Set(allowed);
     return rows.filter((row) => {
@@ -88,11 +89,11 @@ export class ScopeResolver {
     });
   }
 
-  private async accessibleOrgUnitIds(userId: string): Promise<Set<string>> {
-    const myUnits = await this.organization.getUnitIdsForUser(userId);
+  private async accessibleOrgUnitIds(userId: string, manager?: EntityManager): Promise<Set<string>> {
+    const myUnits = await this.organization.getUnitIdsForUser(userId, manager);
     const accessible = new Set<string>(myUnits);
     for (const unit of myUnits) {
-      for (const d of await this.organization.getDescendantIds(unit)) accessible.add(d);
+      for (const d of await this.organization.getDescendantIds(unit, manager)) accessible.add(d);
     }
     return accessible;
   }

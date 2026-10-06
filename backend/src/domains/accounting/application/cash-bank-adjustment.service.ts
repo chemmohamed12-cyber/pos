@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import {
   CASH_BANK_ADJUSTMENT_META,
   CASH_BANK_ADJUSTMENT_POSTING,
@@ -70,6 +70,10 @@ export class CashBankAdjustmentService implements OnModuleInit {
     @Optional() @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury?: FinanceTreasuryContract,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async onModuleInit(): Promise<void> {
     if (!this.registry.get(CASH_BANK_ADJUSTMENT_APPROVED_EVENT)) {
       this.registry.register(CASH_BANK_ADJUSTMENT_APPROVED_EVENT, handleCashBankAdjustmentApproved);
@@ -89,9 +93,13 @@ export class CashBankAdjustmentService implements OnModuleInit {
         )
         .catch(() => undefined);
     }
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
@@ -100,8 +108,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
 
   async submitAdjustment(
     input: SubmitCashBankAdjustmentInput,
-    actorUserId: string,
-  ): Promise<{ mode: 'approval'; approvalRequestId: string } | { mode: 'straight_through'; financialEventId: string }> {
+    actorUserId: string, manager?: EntityManager): Promise<{ mode: 'approval'; approvalRequestId: string } | { mode: 'straight_through'; financialEventId: string }> {
     if (!isCashBankAdjustmentKind(input.kind)) throw new BadRequestException(`Unknown cash/bank adjustment kind "${input.kind}".`);
     if (!isPositiveAmount(input.amount)) throw new BadRequestException('Amount must be a positive decimal.');
     if (!input.reason?.trim()) throw new BadRequestException('A reason is required.');
@@ -120,15 +127,15 @@ export class CashBankAdjustmentService implements OnModuleInit {
       if (!input.counterAccountCode?.trim()) {
         throw new BadRequestException(`A "${input.kind}" requires a counterAccountCode.`);
       }
-      counterAccountCode = await this.requirePostableNonControlAccount(input.counterAccountCode.trim(), 'counterAccountCode');
+      counterAccountCode = await this.requirePostableNonControlAccount(input.counterAccountCode.trim(), 'counterAccountCode', manager);
     } else if (input.kind === 'reclassification') {
       if (!input.contraAccountCode?.trim()) {
         throw new BadRequestException('A "reclassification" requires a contraAccountCode.');
       }
-      contraAccountCode = await this.requirePostableNonControlAccount(input.contraAccountCode.trim(), 'contraAccountCode');
-      clearingAccountCode = await this.requireConfiguredAccount(CLEARING_ACCOUNT_KEY);
+      contraAccountCode = await this.requirePostableNonControlAccount(input.contraAccountCode.trim(), 'contraAccountCode', manager);
+      clearingAccountCode = await this.requireConfiguredAccount(CLEARING_ACCOUNT_KEY, manager);
     } else if (input.kind === 'opening_balance') {
-      openingBalanceAccountCode = await this.requireConfiguredAccount(OPENING_BALANCE_KEY);
+      openingBalanceAccountCode = await this.requireConfiguredAccount(OPENING_BALANCE_KEY, manager);
     }
 
     // resolve the target `bank` GL account: explicit code wins; else the
@@ -137,11 +144,11 @@ export class CashBankAdjustmentService implements OnModuleInit {
     // falls back to the single `bank` control account.
     let glAccountCode = input.glAccountCode?.trim() || null;
     if (!glAccountCode && input.treasuryAccountId && this.treasury) {
-      const { balances } = await this.treasury.getAllTreasuryBalances();
+      const { balances } = await this.treasury.getAllTreasuryBalances(undefined, manager);
       glAccountCode = balances.find((b) => b.treasuryAccountId === input.treasuryAccountId)?.glAccountCode ?? null;
     }
 
-    const threshold = this.resolveThreshold();
+    const threshold = this.resolveThreshold(manager);
     const gated = meta.alwaysGated || threshold === null || Number(input.amount) > Number(threshold);
 
     const payload = {
@@ -160,7 +167,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
     };
 
     if (!gated) {
-      const financialEventId = await this.performApprovedAdjustment(payload, actorUserId);
+      const financialEventId = await this.performApprovedAdjustment(payload, actorUserId, undefined, manager);
       await this.audit.record({
         actorUserId,
         organizationId: null,
@@ -170,7 +177,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
         result: 'success',
         correlationId: null,
         after: { kind: input.kind, amount: input.amount },
-      });
+      }, manager);
       return { mode: 'straight_through', financialEventId };
     }
 
@@ -182,7 +189,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
       payload,
       makerUserId: actorUserId,
       orgUnitId: input.orgUnitId ?? null,
-    });
+    }, manager);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -192,7 +199,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
       result: 'success',
       correlationId: input.treasuryAccountId ?? null,
       after: { kind: input.kind, amount: input.amount, requestTypeCode: meta.requestTypeCode },
-    });
+    }, manager);
     return { mode: 'approval', approvalRequestId: request.id };
   }
 
@@ -200,14 +207,14 @@ export class CashBankAdjustmentService implements OnModuleInit {
   // FA-01 approval subscriber
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (!Object.values(CASH_BANK_APPROVAL_REQUEST_TYPES).includes(requestTypeCode as never)) return; // not ours
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
-    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''));
+    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''), manager);
   }
 
-  private async performApprovedAdjustment(p: Record<string, unknown>, actorUserId: string, approvalRequestId = ''): Promise<string> {
+  private async performApprovedAdjustment(p: Record<string, unknown>, actorUserId: string, approvalRequestId = '', manager?: EntityManager): Promise<string> {
     const kind = String(p.kind) as CashBankAdjustmentKind;
     const treasuryAccountId = p.treasuryAccountId ? String(p.treasuryAccountId) : null;
     const idBase = approvalRequestId || `${treasuryAccountId ?? p.glAccountCode ?? 'cash'}:${kind}:${p.amount}:${p.businessDate}`;
@@ -229,7 +236,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
       contraAccountCode: p.contraAccountCode ?? null,
       openingBalanceAccountCode: p.openingBalanceAccountCode ?? null,
       clearingAccountCode: p.clearingAccountCode ?? null,
-    });
+    }, manager);
 
     await this.audit.record({
       actorUserId,
@@ -240,7 +247,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
       result: result.status === 'POSTED' ? 'success' : 'failure',
       correlationId: approvalRequestId || null,
       after: { kind, amount: String(p.amount), financialEventId: result.financialEventId, status: result.status },
-    });
+    }, manager);
 
     if (result.status === 'REJECTED') {
       throw new ConflictException(`Cash/Bank ${kind} GL posting was rejected — see financial event ${result.financialEventId}.`);
@@ -252,14 +259,14 @@ export class CashBankAdjustmentService implements OnModuleInit {
   // Checker
   // ---------------------------------------------------------------------------
 
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
   // ---------------------------------------------------------------------------
 
   /** `''` / non-numeric → null (fail-closed = always gated). */
-  private resolveThreshold(): string | null {
+  private resolveThreshold(manager?: EntityManager): string | null {
     const raw = (this.config.get<string>(THRESHOLD_KEY) ?? '').trim();
     if (!raw) return null;
     const n = Number(raw);
@@ -267,16 +274,16 @@ export class CashBankAdjustmentService implements OnModuleInit {
   }
 
   /** A config-keyed account code — fail-closed: exists + active + postable + no controlFunction. */
-  private async requireConfiguredAccount(configKey: string): Promise<string> {
+  private async requireConfiguredAccount(configKey: string, manager?: EntityManager): Promise<string> {
     const code = (this.config.get<string>(configKey) ?? '').trim();
     if (!code) {
       throw new BadRequestException(`Config "${configKey}" is not set — set it to a postable non-control GL account code before submitting this adjustment.`);
     }
-    return this.requirePostableNonControlAccount(code, configKey);
+    return this.requirePostableNonControlAccount(code, configKey, manager);
   }
 
-  private async requirePostableNonControlAccount(code: string, label: string): Promise<string> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { code } });
+  private async requirePostableNonControlAccount(code: string, label: string, manager?: EntityManager): Promise<string> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { code } });
     if (!acc) throw new BadRequestException(`${label}: GL account "${code}" not found.`);
     if (!acc.isActive) throw new BadRequestException(`${label}: GL account "${code}" is inactive.`);
     if (!acc.isPostable) throw new BadRequestException(`${label}: GL account "${code}" is not postable.`);

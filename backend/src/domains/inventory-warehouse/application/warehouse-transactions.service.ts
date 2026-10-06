@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { WarehouseTransaction } from '../infrastructure/warehouse-transaction.entity';
 import { WarehouseTransactionLine } from '../infrastructure/warehouse-transaction-line.entity';
@@ -11,11 +11,14 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { InventoryService } from './inventory.service';
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 export interface TransactionLineInput {
   productId: string;
   quantity: number;
   notes?: string | null;
+  /** D3-B — mandatory (and > 0) on a `receipt` line: the accounting value is quantity × this cost. Never defaulted. */
+  unitCostBase?: string | number | null;
 }
 
 const ENTITY_TYPE = 'warehouse_transaction';
@@ -38,6 +41,8 @@ export class WarehouseTransactionsService {
     private readonly audit: AuditService,
     @Inject(SALES_PRODUCTS_CONTRACT) private readonly products: SalesProductsContract,
     private readonly inventory: InventoryService,
+    // D3-B — the manual-receipt gate bound by accounting; unbound ⇒ receipts are rejected (fail-closed).
+    @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
   ) {}
 
   async createTransaction(
@@ -50,6 +55,9 @@ export class WarehouseTransactionsService {
     notes: string | null,
     actorUserId: string,
     movementDate?: Date,
+    manager?: EntityManager,
+    // D3-B — controlled reason code; mandatory for `receipt`, ignored for every other type.
+    reasonCode?: string | null,
   ): Promise<WarehouseTransaction> {
     if (lines.length === 0) {
       throw new BadRequestException('A warehouse transaction must have at least one line.');
@@ -67,22 +75,38 @@ export class WarehouseTransactionsService {
     // Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — an
     // inactive warehouse is taken out of operational use; no new
     // document may target it (source or transfer destination).
-    await this.assertWarehouseActive(warehouseId);
-    if (destinationWarehouseId) await this.assertWarehouseActive(destinationWarehouseId);
+    await this.assertWarehouseActive(warehouseId, manager);
+    if (destinationWarehouseId) await this.assertWarehouseActive(destinationWarehouseId, manager);
 
     // Validate every product exists BEFORE opening the write transaction
     // (same ordering discipline as SalesOrdersService.createOrder).
     for (const line of lines) {
       if (line.quantity <= 0) throw new BadRequestException('Every line quantity must be a positive whole number.');
-      const snapshot = await this.products.getProductSnapshot(line.productId);
+      const snapshot = await this.products.getProductSnapshot(line.productId, manager);
       if (!snapshot) throw new BadRequestException(`Product "${line.productId}" was not found.`);
     }
 
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[type]);
+    // D3-B (CTO-approved Manual Receipt policy) — a receipt needs an explicit unit cost on EVERY line and a controlled
+    // reason code with a valid configured offset account. Rejected here, before any write; re-checked at posting.
+    const receiptReasonCode = type === 'receipt' ? (reasonCode ?? '').trim() : '';
+    if (type === 'receipt') {
+      if (!receiptReasonCode) throw new BadRequestException('A receipt requires a reason code.');
+      for (const line of lines) {
+        const cost = line.unitCostBase == null || String(line.unitCostBase).trim() === '' ? NaN : Number(line.unitCostBase);
+        if (!Number.isFinite(cost) || cost <= 0) {
+          throw new BadRequestException('Every receipt line requires an explicit unit cost greater than zero (no fallback cost is used).');
+        }
+      }
+      const policy = this.postingPolicy?.get();
+      if (!policy) throw new ConflictException('Receipts cannot be validated: the accounting posting policy is not available.');
+      await policy.assertManualReceiptReason(receiptReasonCode, manager ?? this.dataSource.manager);
+    }
 
-    const transaction = await this.dataSource.transaction(async (manager) => {
-      const txnRepo = manager.getRepository(WarehouseTransaction);
-      const lineRepo = manager.getRepository(WarehouseTransactionLine);
+    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[type], manager);
+
+    const transaction = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const txnRepo = txManager.getRepository(WarehouseTransaction);
+      const lineRepo = txManager.getRepository(WarehouseTransactionLine);
 
       const saved = await txnRepo.save(
         txnRepo.create({
@@ -92,29 +116,39 @@ export class WarehouseTransactionsService {
           destinationWarehouseId,
           reference,
           reason,
+          reasonCode: type === 'receipt' ? receiptReasonCode : null,
           notes,
           createdByUserId: actorUserId,
           movementDate: movementDate ?? new Date(),
         }),
       );
       const lineEntities = lines.map((l) =>
-        lineRepo.create({ warehouseTransactionId: saved.id, productId: l.productId, quantity: l.quantity, notes: l.notes ?? null }),
+        lineRepo.create({
+          warehouseTransactionId: saved.id,
+          productId: l.productId,
+          quantity: l.quantity,
+          notes: l.notes ?? null,
+          unitCostBase: type === 'receipt' ? Number(l.unitCostBase).toFixed(4) : null,
+        }),
       );
       await lineRepo.save(lineEntities);
       return saved;
     });
 
-    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transaction.id);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'warehouse_transaction.created',
-      resource: 'warehouse_transaction',
-      resourceId: transaction.id,
-      result: 'success',
-      correlationId: null,
-      after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length },
-    });
+    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transaction.id, manager);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'warehouse_transaction.created',
+        resource: 'warehouse_transaction',
+        resourceId: transaction.id,
+        result: 'success',
+        correlationId: null,
+        after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length },
+      },
+      manager,
+    );
 
     return transaction;
   }
@@ -126,14 +160,14 @@ export class WarehouseTransactionsService {
    * the resulting variance (via the normal submit/approve pipeline,
    * `type: 'count'` posts as `movementType: 'adjustment'`).
    */
-  async startCount(warehouseId: string, productIds: string[], actorUserId: string): Promise<WarehouseTransaction> {
+  async startCount(warehouseId: string, productIds: string[], actorUserId: string, manager?: EntityManager): Promise<WarehouseTransaction> {
     if (productIds.length === 0) throw new BadRequestException('A stock count must include at least one product.');
-    await this.assertWarehouseActive(warehouseId);
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE.count);
+    await this.assertWarehouseActive(warehouseId, manager);
+    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE.count, manager);
 
-    const transaction = await this.dataSource.transaction(async (manager) => {
-      const txnRepo = manager.getRepository(WarehouseTransaction);
-      const lineRepo = manager.getRepository(WarehouseTransactionLine);
+    const transaction = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const txnRepo = txManager.getRepository(WarehouseTransaction);
+      const lineRepo = txManager.getRepository(WarehouseTransactionLine);
       const saved = await txnRepo.save(
         txnRepo.create({
           transactionNumber,
@@ -146,7 +180,7 @@ export class WarehouseTransactionsService {
       );
       const lineEntities: WarehouseTransactionLine[] = [];
       for (const productId of productIds) {
-        const systemQuantity = await this.inventory.getOnHand(warehouseId, productId);
+        const systemQuantity = await this.inventory.getOnHand(warehouseId, productId, txManager);
         lineEntities.push(
           lineRepo.create({ warehouseTransactionId: saved.id, productId, quantity: 0, systemQuantity, physicalQuantity: null }),
         );
@@ -155,26 +189,33 @@ export class WarehouseTransactionsService {
       return saved;
     });
 
-    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transaction.id);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'warehouse_transaction.count_started',
-      resource: 'warehouse_transaction',
-      resourceId: transaction.id,
-      result: 'success',
-      correlationId: null,
-      after: { transactionNumber, warehouseId, productCount: productIds.length },
-    });
+    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transaction.id, manager);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'warehouse_transaction.count_started',
+        resource: 'warehouse_transaction',
+        resourceId: transaction.id,
+        result: 'success',
+        correlationId: null,
+        after: { transactionNumber, warehouseId, productCount: productIds.length },
+      },
+      manager,
+    );
     return transaction;
   }
 
   /** Records the physically-counted quantities and computes each line's variance — still just a draft edit, no ledger effect yet. */
-  async recordCountResults(transactionId: string, physicalQuantities: Array<{ lineId: string; physicalQuantity: number }>): Promise<void> {
-    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId);
+  async recordCountResults(
+    transactionId: string,
+    physicalQuantities: Array<{ lineId: string; physicalQuantity: number }>,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, manager);
     if (state !== 'draft') throw new ConflictException(`Cannot record count results for a transaction in state "${state}".`);
 
-    const lineRepo = this.dataSource.getRepository(WarehouseTransactionLine);
+    const lineRepo = (manager ?? this.dataSource).getRepository(WarehouseTransactionLine);
     for (const { lineId, physicalQuantity } of physicalQuantities) {
       const line = await lineRepo.findOne({ where: { id: lineId, warehouseTransactionId: transactionId } });
       if (!line) throw new NotFoundException(`Count line "${lineId}" not found on this transaction.`);
@@ -184,15 +225,15 @@ export class WarehouseTransactionsService {
     }
   }
 
-  async getTransaction(transactionId: string): Promise<WarehouseTransaction & { state: string }> {
-    const txn = await this.dataSource.getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
+  async getTransaction(transactionId: string, manager?: EntityManager): Promise<WarehouseTransaction & { state: string }> {
+    const txn = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
     if (!txn) throw new NotFoundException(`Warehouse transaction "${transactionId}" not found.`);
-    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId);
+    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, manager);
     return { ...txn, state };
   }
 
-  async getLines(transactionId: string): Promise<WarehouseTransactionLine[]> {
-    return this.dataSource.getRepository(WarehouseTransactionLine).find({ where: { warehouseTransactionId: transactionId } });
+  async getLines(transactionId: string, manager?: EntityManager): Promise<WarehouseTransactionLine[]> {
+    return (manager ?? this.dataSource).getRepository(WarehouseTransactionLine).find({ where: { warehouseTransactionId: transactionId } });
   }
 
   /**
@@ -206,7 +247,7 @@ export class WarehouseTransactionsService {
    * per-product/warehouse minimum-stock threshold exists to compare
    * against yet.
    */
-  async getOverview(): Promise<{
+  async getOverview(manager?: EntityManager): Promise<{
     totalWarehouses: number;
     totalInventoryValueAtSellingPrice: string;
     todaysMovementsCount: number;
@@ -216,16 +257,16 @@ export class WarehouseTransactionsService {
     negativeStockItems: Array<{ warehouseId: string; productId: string; onHand: number }>;
   }> {
     const [warehouses, stockReport, products, allTransactions] = await Promise.all([
-      this.inventory.listWarehouses(),
-      this.inventory.getStockReport(),
-      this.products.listAllProducts(),
-      this.listTransactions({}),
+      this.inventory.listWarehouses(manager),
+      this.inventory.getStockReport(undefined, manager),
+      this.products.listAllProducts(manager),
+      this.listTransactions({}, manager),
     ]);
     const priceById = new Map(products.map((p) => [p.id, Number(p.unitPrice)]));
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString() });
+    const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString() }, manager);
 
     return {
       totalWarehouses: warehouses.length,
@@ -241,13 +282,16 @@ export class WarehouseTransactionsService {
   }
 
   /** Backs the Movement Center / Warehouse screen's transaction list — filterable by warehouse/type, newest first. */
-  async listTransactions(filters: { warehouseId?: string; type?: WarehouseTransactionType }): Promise<Array<WarehouseTransaction & { state: string }>> {
-    const repo = this.dataSource.getRepository(WarehouseTransaction);
+  async listTransactions(
+    filters: { warehouseId?: string; type?: WarehouseTransactionType },
+    manager?: EntityManager,
+  ): Promise<Array<WarehouseTransaction & { state: string }>> {
+    const repo = (manager ?? this.dataSource).getRepository(WarehouseTransaction);
     const where: Record<string, unknown> = {};
     if (filters.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters.type) where.type = filters.type;
     const rows = await repo.find({ where, order: { createdAt: 'DESC' } });
-    return Promise.all(rows.map(async (r) => ({ ...r, state: await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, r.id) })));
+    return Promise.all(rows.map(async (r) => ({ ...r, state: await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, r.id, manager) })));
   }
 
   /**
@@ -264,8 +308,9 @@ export class WarehouseTransactionsService {
    */
   async listTransactionsPage(
     filters: { warehouseId?: string; type?: WarehouseTransactionType; page: number; pageSize: number },
+    manager?: EntityManager,
   ): Promise<{ rows: Array<WarehouseTransaction & { state: string }>; total: number }> {
-    const repo = this.dataSource.getRepository(WarehouseTransaction);
+    const repo = (manager ?? this.dataSource).getRepository(WarehouseTransaction);
     const where: Record<string, unknown> = {};
     if (filters.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters.type) where.type = filters.type;
@@ -276,7 +321,7 @@ export class WarehouseTransactionsService {
       skip: (filters.page - 1) * filters.pageSize,
     });
     const enriched = await Promise.all(
-      rows.map(async (r) => ({ ...r, state: await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, r.id) })),
+      rows.map(async (r) => ({ ...r, state: await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, r.id, manager) })),
     );
     return { rows: enriched, total };
   }
@@ -289,7 +334,7 @@ export class WarehouseTransactionsService {
    * one click both approves AND posts, while the audit trail still
    * records both events distinctly with their own timestamps.
    */
-  async transition(transactionId: string, action: string, actorUserId: string): Promise<string> {
+  async transition(transactionId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     // V1 Release Audit HIGH fix — default-deny: an action absent from
     // the map (e.g. 'auto_post', an internal-only transition this
     // service fires itself further down, never meant to be client-
@@ -300,25 +345,25 @@ export class WarehouseTransactionsService {
     if (!requiredRoles) {
       throw new ForbiddenException(`"${action}" is not a valid client-initiated action.`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAdmin = userRoles.includes('admin');
     if (!isAdmin && !requiredRoles.some((r) => userRoles.includes(r))) {
       throw new ForbiddenException(`Role required for action "${action}": one of [${requiredRoles.join(', ')}].`);
     }
 
-    const txn = await this.dataSource.getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
+    const txn = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
     if (!txn) throw new NotFoundException(`Warehouse transaction "${transactionId}" not found.`);
 
     if (action === 'submit' && txn.type === 'count') {
-      const lines = await this.getLines(transactionId);
+      const lines = await this.getLines(transactionId, manager);
       if (lines.some((l) => l.physicalQuantity === null)) {
         throw new BadRequestException('Every line must have a physical count recorded before this count can be submitted.');
       }
     }
 
     if (action === 'reverse') {
-      await this.reverseTransaction(txn, actorUserId);
-      return this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId);
+      await this.reverseTransaction(txn, actorUserId, manager);
+      return this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, manager);
     }
 
     // POST THE LEDGER FIRST, advance the lifecycle state SECOND — but as
@@ -341,36 +386,39 @@ export class WarehouseTransactionsService {
     // situation and retry, never mislabeled "posted" with no movements
     // actually written.
     if (action === 'submit' && NO_APPROVAL_REQUIRED.has(txn.type)) {
-      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'submit', actorUserId);
-      await this.postTransaction(txn, actorUserId, null, 'auto_post');
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'submit', actorUserId, manager);
+      await this.postTransaction(txn, actorUserId, null, 'auto_post', manager);
     } else if (action === 'approve') {
-      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'approve', actorUserId);
-      await this.postTransaction(txn, actorUserId, actorUserId, 'post');
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'approve', actorUserId, manager);
+      await this.postTransaction(txn, actorUserId, actorUserId, 'post', manager);
     } else if (action === 'post') {
-      await this.postTransaction(txn, actorUserId, actorUserId, 'post');
+      await this.postTransaction(txn, actorUserId, actorUserId, 'post', manager);
     } else {
-      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, action, actorUserId);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, action, actorUserId, manager);
     }
 
-    const finalState = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId);
+    const finalState = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: `warehouse_transaction.${action}`,
-      resource: 'warehouse_transaction',
-      resourceId: transactionId,
-      result: 'success',
-      correlationId: null,
-      after: { state: finalState },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: `warehouse_transaction.${action}`,
+        resource: 'warehouse_transaction',
+        resourceId: transactionId,
+        result: 'success',
+        correlationId: null,
+        after: { state: finalState },
+      },
+      manager,
+    );
 
     return finalState;
   }
 
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — no new document may target a deactivated warehouse. */
-  private async assertWarehouseActive(warehouseId: string): Promise<void> {
-    const warehouse = await this.inventory.getWarehouse(warehouseId);
+  private async assertWarehouseActive(warehouseId: string, manager?: EntityManager): Promise<void> {
+    const warehouse = await this.inventory.getWarehouse(warehouseId, manager);
     if (warehouse.status !== 'active') {
       throw new ConflictException(`Warehouse "${warehouse.code}" is inactive — no new transactions can target it.`);
     }
@@ -454,8 +502,9 @@ export class WarehouseTransactionsService {
     actorUserId: string,
     approvedByUserId: string | null,
     postAction: 'post' | 'auto_post',
+    manager?: EntityManager,
   ): Promise<{ posted: boolean }> {
-    const allLines = await this.getLines(txn.id);
+    const allLines = await this.getLines(txn.id, manager);
     // A zero-variance count/adjustment line has nothing to post and
     // nothing to check — excluded up front, same as the original
     // `if (line.quantity === 0) continue`.
@@ -468,15 +517,15 @@ export class WarehouseTransactionsService {
     }
     const sortedPairs = [...pairs].sort();
 
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    return (manager ?? this.dataSource).transaction(async (txManager: EntityManager) => {
       // Document-level lock FIRST — serializes any two concurrent posting
       // attempts for THIS SAME document against each other, before either
       // touches stock at all.
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`warehouse_transaction_post:${txn.id}`]);
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`warehouse_transaction_post:${txn.id}`]);
 
       // Re-check state fresh, inside the lock — never trust a state read
       // (by this call or its caller) from before the lock was acquired.
-      const currentState = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, txn.id, manager);
+      const currentState = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, txn.id, txManager);
       if (currentState === 'posted') {
         // A concurrent call already posted this exact document while this
         // call was waiting on the lock above — idempotent no-op, matching
@@ -486,21 +535,21 @@ export class WarehouseTransactionsService {
       }
 
       for (const pair of sortedPairs) {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [pair]);
+        await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [pair]);
       }
 
       const shortages: Array<{ line: WarehouseTransactionLine; required: number; available: number }> = [];
       for (const line of lines) {
         const required = this.requiredCheckQuantity(txn, line);
         if (required === null) continue;
-        const available = await this.inventory.getAvailableInTransaction(manager, txn.warehouseId, line.productId);
+        const available = await this.inventory.getAvailableInTransaction(txManager, txn.warehouseId, line.productId);
         if (available < required) shortages.push({ line, required, available });
       }
 
       if (shortages.length > 0) {
         const details = await Promise.all(
           shortages.map(async ({ line, required, available }) => {
-            const product = await this.products.getProductSnapshot(line.productId);
+            const product = await this.products.getProductSnapshot(line.productId, txManager);
             const label = product ? `${product.sku} (${product.name})` : line.productId;
             return `${label}: requested ${required}, available ${available}, short by ${required - available}`;
           }),
@@ -512,25 +561,31 @@ export class WarehouseTransactionsService {
 
       for (const line of lines) {
         if (txn.type === 'receipt') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, manager);
+          if (txn.reversalOfTransactionId) {
+            // Reversal of a LEGACY (pre-D3-B, cost-less) receipt — stock only, exactly as before. A D3-B receipt can't be
+            // reversed here (rejected in reverseTransaction before any mutation).
+            await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager);
+          } else {
+            // D3-B — explicit cost + controlled reason, re-validated here, inside the posting transaction, before any stock write.
+            await this.inventory.recordManualReceipt(txn.warehouseId, line.productId, line.quantity, line.unitCostBase, txn.reasonCode, txn.id, actorUserId, txManager);
+          }
         } else if (txn.type === 'issue') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, manager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, txManager);
         } else if (txn.type === 'transfer') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'transfer_out', 'warehouse_transaction', txn.id, actorUserId, manager);
-          await this.inventory.recordMovement(txn.destinationWarehouseId!, line.productId, line.quantity, 'transfer_in', 'warehouse_transaction', txn.id, actorUserId, manager);
+          await this.inventory.recordTransfer(txn.warehouseId, txn.destinationWarehouseId!, line.productId, line.quantity, 'warehouse_transaction', txn.id, actorUserId, txManager);
         } else if (txn.type === 'adjustment' || txn.type === 'count') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, manager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, txManager);
         }
       }
 
-      await manager.getRepository(WarehouseTransaction).update(txn.id, {
+      await txManager.getRepository(WarehouseTransaction).update(txn.id, {
         postedByUserId: actorUserId,
         ...(approvedByUserId ? { approvedByUserId } : {}),
       });
 
       // State transition INSIDE the same locked transaction — see this method's own doc comment
       // for why this must not happen after the lock is released.
-      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, txn.id, postAction, actorUserId, manager);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, txn.id, postAction, actorUserId, txManager);
 
       return { posted: true };
     });
@@ -545,21 +600,29 @@ export class WarehouseTransactionsService {
    * Engine history is untouched — both the original and its reversal
    * remain permanently in the ledger and in `process_transition_records`.
    */
-  private async reverseTransaction(original: WarehouseTransaction, actorUserId: string): Promise<WarehouseTransaction> {
-    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id);
+  private async reverseTransaction(original: WarehouseTransaction, actorUserId: string, manager?: EntityManager): Promise<WarehouseTransaction> {
+    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, manager);
     if (state !== 'posted') throw new ConflictException(`Cannot reverse a transaction in state "${state}" — only posted transactions can be reversed.`);
+    // D3-B — a cost-bearing manual receipt posted Dr Inventory / Cr its reason account at the supplied cost. A document
+    // reversal cannot exactly unwind that valuation (the moving average may have moved since), so it is rejected BEFORE
+    // any mutation; the approved way to take the stock out is an Adjustment decrease (Dr Loss / Cr Inventory).
+    if (original.type === 'receipt' && original.reasonCode) {
+      throw new ConflictException(
+        'A manual receipt that carries a unit cost and reason code cannot be reversed as a document — post an Adjustment (decrease) instead.',
+      );
+    }
 
-    const originalLines = await this.getLines(original.id);
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type]);
+    const originalLines = await this.getLines(original.id, manager);
+    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type], manager);
 
     // Move the ORIGINAL transaction's own lifecycle to 'reversed' first —
     // this is the state check that must hold even if the reversal-document
     // creation below were to fail.
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId);
+    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId, manager);
 
-    const reversal = await this.dataSource.transaction(async (manager) => {
-      const txnRepo = manager.getRepository(WarehouseTransaction);
-      const lineRepo = manager.getRepository(WarehouseTransactionLine);
+    const reversal = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const txnRepo = txManager.getRepository(WarehouseTransaction);
+      const lineRepo = txManager.getRepository(WarehouseTransactionLine);
       const saved = await txnRepo.save(
         txnRepo.create({
           transactionNumber,
@@ -579,26 +642,29 @@ export class WarehouseTransactionsService {
       return saved;
     });
 
-    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id);
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId);
+    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, manager);
+    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId, manager);
     // Post THEN mark posted — same ordering fix as transition() above. `postTransaction` now
     // performs the 'auto_post' state transition itself, inside its own document-locked
     // transaction (Inventory Integrity concurrency fix, 2026-09-13) — no separate call needed here.
-    await this.postTransaction(reversal, actorUserId, null, 'auto_post');
+    await this.postTransaction(reversal, actorUserId, null, 'auto_post', manager);
 
     // The original transaction stays 'posted' in its own process instance;
     // marking that IT was reversed lives in the audit trail + the reversal
     // row's own `reversalOfTransactionId` pointer, not a mutation of the original.
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'warehouse_transaction.reversed',
-      resource: 'warehouse_transaction',
-      resourceId: original.id,
-      result: 'success',
-      correlationId: null,
-      after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'warehouse_transaction.reversed',
+        resource: 'warehouse_transaction',
+        resourceId: original.id,
+        result: 'success',
+        correlationId: null,
+        after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
+      },
+      manager,
+    );
 
     return reversal;
   }

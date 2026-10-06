@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Task {
   fulfillmentOrderId: string;
@@ -38,34 +39,41 @@ export function PickListPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<PickListData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.pick_list_title', 'field.sales_order', 'field.warehouse']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const task = await api.get<Task>(`/fulfillment/pick-tasks/${id}`);
-      const fulfillmentOrder = await api.get<FulfillmentOrder>(`/fulfillment/orders/${task.fulfillmentOrderId}`);
-      const [order, warehouses, products, lines] = await Promise.all([
-        api.get<Order>(`/sales-orders/${fulfillmentOrder.salesOrderId}`),
-        api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
-        api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
-        api.get<PickTaskLineRow[]>(`/fulfillment/pick-tasks/${id}/lines`),
-      ]);
-      const warehouse = warehouses.find((w) => w.id === fulfillmentOrder.warehouseId);
+      try {
+        const task = await api.get<Task>(`/fulfillment/pick-tasks/${id}`);
+        const fulfillmentOrder = await api.get<FulfillmentOrder>(`/fulfillment/orders/${task.fulfillmentOrderId}`);
+        const [order, warehouses, products, lines] = await Promise.all([
+          api.get<Order>(`/sales-orders/${fulfillmentOrder.salesOrderId}`),
+          api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
+          api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
+          api.get<PickTaskLineRow[]>(`/fulfillment/pick-tasks/${id}/lines`),
+        ]);
+        const warehouse = warehouses.find((w) => w.id === fulfillmentOrder.warehouseId);
 
-      // CTO directive ("PRIORITY: ITEM PREPARATION" / printing across every
-      // operational screen) — the pick list now shows Prepared/Requested
-      // per item and its Preparation status, not just what was ORIGINALLY
-      // requested, sourced from the same `PickTaskLine` rows the
-      // Preparation screen itself reads (never a separate print-only
-      // calculation).
-      const source = lines.length > 0 ? lines : order.lines.map((l) => ({ ...l, requestedQuantity: l.quantity, preparedQuantity: 0, status: 'pending' as const }));
+        // CTO directive ("PRIORITY: ITEM PREPARATION" / printing across every
+        // operational screen) — the pick list now shows Prepared/Requested
+        // per item and its Preparation status, not just what was ORIGINALLY
+        // requested, sourced from the same `PickTaskLine` rows the
+        // Preparation screen itself reads (never a separate print-only
+        // calculation).
+        const source = lines.length > 0 ? lines : order.lines.map((l) => ({ ...l, requestedQuantity: l.quantity, preparedQuantity: 0, status: 'pending' as const }));
 
-      setData({ task, order, warehouse, fulfillmentOrder, products, source });
+        setData({ task, order, warehouse, fulfillmentOrder, products, source });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { task, order, warehouse, fulfillmentOrder, products, source } = data;
   const productName = (pid: string) => {

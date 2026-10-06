@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { TreasuryService } from '../application/treasury.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -105,8 +106,22 @@ class ReverseDto {
  * `@RequireModule`/`RequireModuleGuard` stays class-level (it DOES
  * fall back to `context.getClass()`).
  */
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27, CTO-authorized).
+ * `CompanyContextGuard` added at the class level — `TreasuryAccount`/
+ * `TreasuryAccountType`/`TreasuryTransaction` are genuinely Company-owned
+ * data. Picked specifically because §26 (`shipment.controller.ts`
+ * STOP/ESCALATE) named `TreasuryService.listAccountTypes`/`createAccount`
+ * as blockers — both are now manager-capable, unblocking that controller's
+ * eventual retrofit. Two foundation-level gaps were found and fixed in the
+ * same pass, both discovered via this controller's own `ScopeResolver`
+ * dependency: `OrganizationService` and `IdempotencyService` were still
+ * `@InjectRepository`-based, the exact same structural gap `ScopeService`
+ * had before its own fix (§16) — see `organization.service.ts`/
+ * `idempotency.service.ts`.
+ */
 @Controller('treasury')
-@UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
 @RequireModule('finance')
 export class TreasuryController {
   constructor(
@@ -116,26 +131,30 @@ export class TreasuryController {
 
   @RequirePermission('finance', 'editable')
   @Post('account-types')
-  async createAccountType(@Req() req: AuthenticatedRequest, @Body() dto: CreateAccountTypeDto) {
-    return this.treasury.createAccountType(dto.code, dto.name, req.user.id);
+  async createAccountType(@Req() req: CompanyScopedRequest, @Body() dto: CreateAccountTypeDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.treasury.createAccountType(dto.code, dto.name, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @RequirePermission('finance', 'editable')
   @Get('account-types')
-  async listAccountTypes() {
-    return this.treasury.listAccountTypes();
+  async listAccountTypes(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.treasury.listAccountTypes(req.companyContext.dataSource.manager);
   }
 
   @RequirePermission('finance', 'editable')
   @Post('accounts')
-  async createAccount(@Req() req: AuthenticatedRequest, @Body() dto: CreateAccountDto) {
-    return this.treasury.createAccount(dto.code, dto.name, dto.accountTypeId, req.user.id);
+  async createAccount(@Req() req: CompanyScopedRequest, @Body() dto: CreateAccountDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.treasury.createAccount(dto.code, dto.name, dto.accountTypeId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @RequirePermission('finance', 'editable')
   @Get('accounts')
-  async listAccounts(@Req() req: AuthenticatedRequest, @Query('search') search?: string) {
-    return this.treasury.listAccountsWithBalances(req.user.id, { search });
+  async listAccounts(@Req() req: CompanyScopedRequest, @Query('search') search?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.treasury.listAccountsWithBalances(req.user.id, { search }, req.companyContext.dataSource.manager);
   }
 
   // AUDIT-SEC-28 (S21, 2026-09-10): `setAccountStatus` had a permission
@@ -144,9 +163,11 @@ export class TreasuryController {
   // deactivate/reactivate any branch's account. Now scope-checked first.
   @RequirePermission('finance', 'editable')
   @Post('accounts/:id/status')
-  async setAccountStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetAccountStatusDto) {
-    await this.treasury.assertLedgerAccountAccess(id, req.user.id);
-    return this.treasury.setAccountStatus(id, dto.status, req.user.id);
+  async setAccountStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetAccountStatusDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.treasury.assertLedgerAccountAccess(id, req.user.id, manager);
+    return this.treasury.setAccountStatus(id, dto.status, req.user.id, manager);
   }
 
   /**
@@ -156,9 +177,11 @@ export class TreasuryController {
    */
   @RequirePermission('finance', 'editable')
   @Post('accounts/:id/gl-mapping')
-  async setGlMapping(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetGlMappingDto) {
-    await this.treasury.assertLedgerAccountAccess(id, req.user.id);
-    return this.treasury.setAccountGlMapping(id, dto.glAccountCode ?? null, req.user.id);
+  async setGlMapping(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetGlMappingDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.treasury.assertLedgerAccountAccess(id, req.user.id, manager);
+    return this.treasury.setAccountGlMapping(id, dto.glAccountCode ?? null, req.user.id, manager);
   }
 
   /**
@@ -172,30 +195,45 @@ export class TreasuryController {
    */
   @RequirePermission('finance', 'editable')
   @Post('cash-in')
-  async cashIn(@Req() req: AuthenticatedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
+  async cashIn(@Req() req: CompanyScopedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
     // F06-H1: the Treasury-UI path uses `cashInDirect` — the emitting
     // variant. The `FinanceTreasuryContract.cashIn` other domains call
     // stays non-emitting (ADR-038 D4).
-    return this.idempotency.withIdempotency('treasury.cash-in', idempotencyKey, () =>
-      this.treasury.cashInDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user.id),
+    return this.idempotency.withIdempotency(
+      'treasury.cash-in',
+      idempotencyKey,
+      () => this.treasury.cashInDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      manager,
     );
   }
 
   /** Same finding/fix as `cashIn` above. */
   @RequirePermission('finance', 'editable')
   @Post('cash-out')
-  async cashOut(@Req() req: AuthenticatedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
-    return this.idempotency.withIdempotency('treasury.cash-out', idempotencyKey, () =>
-      this.treasury.cashOutDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user.id),
+  async cashOut(@Req() req: CompanyScopedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.idempotency.withIdempotency(
+      'treasury.cash-out',
+      idempotencyKey,
+      () => this.treasury.cashOutDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      manager,
     );
   }
 
   /** Same finding/fix as `cashIn` above — a retried transfer would otherwise post a second pair of legs. */
   @RequirePermission('finance', 'editable')
   @Post('transfer')
-  async transfer(@Req() req: AuthenticatedRequest, @Body() dto: TransferDto, @Headers('idempotency-key') idempotencyKey?: string) {
-    return this.idempotency.withIdempotency('treasury.transfer', idempotencyKey, () =>
-      this.treasury.transferDirect(dto.sourceAccountId, dto.destinationAccountId, dto.amount, dto.reference ?? null, dto.reason ?? null, req.user.id),
+  async transfer(@Req() req: CompanyScopedRequest, @Body() dto: TransferDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.idempotency.withIdempotency(
+      'treasury.transfer',
+      idempotencyKey,
+      () => this.treasury.transferDirect(dto.sourceAccountId, dto.destinationAccountId, dto.amount, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      manager,
     );
   }
 
@@ -203,20 +241,22 @@ export class TreasuryController {
   @RequirePermission('finance', 'editable')
   @Get('ledger')
   async ledger(
-    @Req() req: AuthenticatedRequest,
+    @Req() req: CompanyScopedRequest,
     @Query('accountId') accountId?: string,
     @Query('customerId') customerId?: string,
     @Query('salesOrderId') salesOrderId?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    if (accountId) await this.treasury.assertLedgerAccountAccess(accountId, req.user.id);
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    if (accountId) await this.treasury.assertLedgerAccountAccess(accountId, req.user.id, manager);
     if (page === undefined && pageSize === undefined) {
-      return this.treasury.listLedger({ accountId, customerId, salesOrderId });
+      return this.treasury.listLedger({ accountId, customerId, salesOrderId }, manager);
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    return this.treasury.listLedgerPage({ accountId, customerId, salesOrderId }, { page: parsedPage, pageSize: parsedPageSize });
+    return this.treasury.listLedgerPage({ accountId, customerId, salesOrderId }, { page: parsedPage, pageSize: parsedPageSize }, manager);
   }
 
   // AUDIT-SEC-28 (S21, 2026-09-10): same gap — `reverseTransaction` had
@@ -226,8 +266,10 @@ export class TreasuryController {
   // scope-checks it first, via the same mechanism the ledger read uses.
   @RequirePermission('finance', 'editable')
   @Post('transactions/:id/reverse')
-  async reverse(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: ReverseDto) {
-    await this.treasury.assertTransactionAccess(id, req.user.id);
-    return this.treasury.reverseTransaction(id, dto.reason, req.user.id);
+  async reverse(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: ReverseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.treasury.assertTransactionAccess(id, req.user.id, manager);
+    return this.treasury.reverseTransaction(id, dto.reason, req.user.id, manager);
   }
 }

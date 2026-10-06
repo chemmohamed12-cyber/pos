@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ApprovalEngineService } from './approval-engine.service';
 import { ConfigurationEngineService } from '../configuration-engine/configuration-engine.service';
+import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
 
 /**
  * FA-01 (contract §4). The scheduled `expire` sweep — same
@@ -14,6 +15,16 @@ import { ConfigurationEngineService } from '../configuration-engine/configuratio
  * from the Configuration Engine. Inert under test (`NODE_ENV === 'test'`)
  * — the sweep is exercised directly via `ApprovalEngineService.expire()`
  * in the specs, never through a real timer.
+ *
+ * Multi-Company Area 9 (2026-09-22) — `approval_requests` lives inside
+ * EACH Company's own database (private-DB-per-Company architecture), not
+ * one shared table. A single ambient-connection sweep therefore only ever
+ * reached whichever one database the app's default `TypeOrmModule`
+ * connection happened to point at. `runOnce` now sweeps every Company
+ * whose database is `'ACTIVE'`, once each, via
+ * `CompanyConnectionManagerService` — never the ambient connection for
+ * this per-Company data. One Company's failure is logged and does not
+ * stop the sweep for the rest.
  */
 @Injectable()
 export class ApprovalExpiryScheduler implements OnModuleInit, OnModuleDestroy {
@@ -23,6 +34,7 @@ export class ApprovalExpiryScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly engine: ApprovalEngineService,
     private readonly config: ConfigurationEngineService,
+    private readonly connections: CompanyConnectionManagerService,
   ) {}
 
   onModuleInit(): void {
@@ -52,7 +64,16 @@ export class ApprovalExpiryScheduler implements OnModuleInit, OnModuleDestroy {
       /* default on */
     }
     if (!enabled) return;
-    const { expired } = await this.engine.expire();
-    if (expired > 0) this.logger.log(`Approval expiry sweep: ${expired} stale request(s) expired.`);
+
+    const companyIds = await this.connections.listActiveCompanyIds();
+    for (const companyId of companyIds) {
+      try {
+        const dataSource = await this.connections.getDataSource(companyId);
+        const { expired } = await this.engine.expire(dataSource);
+        if (expired > 0) this.logger.log(`Approval expiry sweep — Company ${companyId}: ${expired} stale request(s) expired.`);
+      } catch (err) {
+        this.logger.error(`Approval expiry sweep failed for Company ${companyId}`, err instanceof Error ? err.stack : String(err));
+      }
+    }
   }
 }

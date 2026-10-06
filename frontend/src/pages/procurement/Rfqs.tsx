@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 
 interface Supplier {
   id: string;
@@ -29,7 +30,25 @@ interface PurchaseRequestLine {
   productId: string;
   quantity: string;
 }
+/** D6 — the visible state of the award's maker-checker approval (read-only; the rule itself is unchanged). */
+interface AwardApproval {
+  approvalRequestId: string;
+  state: string;
+  makerUserId: string;
+  submittedAt: string;
+  decidedAt: string | null;
+  requiredNode: string;
+  minApprovers: number;
+  approvedCount: number;
+  supplierId: string | null;
+  totalAmount: string;
+  purchaseOrderId: string | null;
+  purchaseOrderNumber: string | null;
+}
 interface RfqDetail {
+  /** PRC-01 — the originating Purchase Request's warehouse (for the stock lookup). */
+  warehouseId?: string | null;
+  awardApproval?: AwardApproval | null;
   rfq: RfqRow;
   state: string;
   invitedSupplierIds: string[];
@@ -44,7 +63,7 @@ interface ProductOption {
 
 /** ADR-048 — Path B, steps 2-4: RFQ, Supplier Quotations (side-by-side comparison, cheapest first), and the Evaluation/Approval award step. */
 export function Rfqs() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { t, preload } = useLanguage();
   const [searchParams] = useSearchParams();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -59,9 +78,25 @@ export function Rfqs() {
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // PRC-01 — official on-hand / reserved / available for the request's warehouse (read-only, informational)
+  const stock = useStockAvailability(detail?.warehouseId, (detail?.purchaseRequestLines ?? []).map((l) => l.productId));
 
   preload([
+    'field.on_hand',
+    'field.reserved',
+    'field.available',
     'nav.rfqs',
+    'panel.award_pending_approval',
+    'panel.award_pending_hint',
+    'panel.award_submitted_by_you',
+    'panel.award_approved_po',
+    'panel.award_rejected_hint',
+    'panel.award_submitted_notice',
+    'field.approval_request_id',
+    'field.required_permission_node',
+    'action.open_approvals',
     'field.rfq_number',
     'field.quotation_number',
     'field.invited_suppliers',
@@ -105,9 +140,14 @@ export function Rfqs() {
 
   async function loadDetail(id: string) {
     setSelectedId(id);
-    const d = await api.get<RfqDetail>(`/procurement/rfqs/${id}`);
-    setDetail(d);
-    if (d.invitedSupplierIds[0]) setQuoteSupplierId((v) => v || d.invitedSupplierIds[0]);
+    try {
+      const d = await api.get<RfqDetail>(`/procurement/rfqs/${id}`);
+      setDetail(d);
+      if (d.invitedSupplierIds[0]) setQuoteSupplierId((v) => v || d.invitedSupplierIds[0]);
+    } catch (err) {
+      // Foundation fix: called from a row onClick and from a mount effect below, neither guarded.
+      setError(err instanceof ApiError ? err.message : 'Failed to load RFQ detail.');
+    }
   }
 
   useEffect(() => {
@@ -157,8 +197,10 @@ export function Rfqs() {
     if (!selectedId) return;
     setBusyAction('award');
     setError(null);
+    setNotice(null);
     try {
-      await api.post(`/procurement/rfqs/${selectedId}/award`, { quotationId });
+      const res = await api.post<{ approvalRequestId: string }>(`/procurement/rfqs/${selectedId}/award`, { quotationId });
+      setNotice(`${t('panel.award_submitted_notice')} (${res.approvalRequestId})`);
       await load();
       await loadDetail(selectedId);
     } catch (err) {
@@ -169,6 +211,9 @@ export function Rfqs() {
   }
 
   const cheapestId = detail && detail.quotations.length > 0 ? detail.quotations[0].id : null;
+  const award = detail?.awardApproval ?? null;
+  const awardPending = award?.state === 'pending' || award?.state === 'escalated';
+  const awardIsMine = !!award && !!user && award.makerUserId === user.id;
 
   return (
     <div>
@@ -213,6 +258,41 @@ export function Rfqs() {
               <StatusBadge code={`rfq_lifecycle.state.${detail.state}`} />
             </div>
 
+            {notice && <div style={{ color: '#166534', marginBottom: 8 }}>{notice}</div>}
+            {award && (
+              <div
+                className="card"
+                style={{ marginBottom: 14, padding: 10, borderInlineStart: `4px solid ${award.state === 'approved' ? '#16a34a' : award.state === 'rejected' ? '#dc2626' : '#d97706'}` }}
+              >
+                {awardPending && (
+                  <>
+                    <strong>{t('panel.award_pending_approval')}</strong>
+                    <div style={{ fontSize: '0.85rem', marginTop: 4 }}>
+                      {t('field.approval_request_id')}: <code>{award.approvalRequestId}</code> · {supplierName(award.supplierId ?? '')} · {award.totalAmount}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', marginTop: 4 }}>
+                      {awardIsMine ? t('panel.award_submitted_by_you') + ' — ' : ''}
+                      {t('panel.award_pending_hint')} (<code>{award.requiredNode}</code> × {award.minApprovers}; {award.approvedCount}/{award.minApprovers})
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <Link to="/approvals">{t('action.open_approvals')}</Link>
+                    </div>
+                  </>
+                )}
+                {award.state === 'approved' && (
+                  <strong>
+                    {t('panel.award_approved_po')}: {award.purchaseOrderNumber ?? '—'}
+                  </strong>
+                )}
+                {(award.state === 'rejected' || award.state === 'withdrawn' || award.state === 'expired') && (
+                  <>
+                    <strong>{award.state}</strong>
+                    <div style={{ fontSize: '0.85rem', marginTop: 4 }}>{t('panel.award_rejected_hint')}</div>
+                  </>
+                )}
+              </div>
+            )}
+
             {hasRole('admin') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 {detail.state === 'draft' && (
@@ -246,7 +326,7 @@ export function Rfqs() {
                   <tr>
                     <th>{t('field.supplier')}</th>
                     <th>{t('field.total_quotation_amount')}</th>
-                    {hasRole('admin') && detail.state === 'sent' && <th></th>}
+                    {hasRole('admin') && detail.state === 'sent' && !awardPending && <th></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -254,7 +334,7 @@ export function Rfqs() {
                     <tr key={q.id} style={q.id === cheapestId ? { background: '#e8f6ee' } : undefined}>
                       <td>{supplierName(q.supplierId)}</td>
                       <td>{q.totalAmount}</td>
-                      {hasRole('admin') && detail.state === 'sent' && (
+                      {hasRole('admin') && detail.state === 'sent' && !awardPending && (
                         <td>
                           <button className="btn btn-secondary" disabled={busyAction === 'award'} onClick={() => onAward(q.id)}>
                             {t('action.award')}
@@ -285,6 +365,7 @@ export function Rfqs() {
                     <tr>
                       <th>{t('field.product')}</th>
                       <th>{t('field.quantity')}</th>
+                      <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
                       <th>{t('field.unit_cost')}</th>
                     </tr>
                   </thead>
@@ -293,6 +374,7 @@ export function Rfqs() {
                       <tr key={l.id}>
                         <td>{productName(l.productId)}</td>
                         <td>{l.quantity}</td>
+                        <StockCell stock={stock[l.productId]} />
                         <td>
                           <input
                             type="number"

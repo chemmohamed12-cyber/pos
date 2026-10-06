@@ -102,14 +102,79 @@ export async function handleInvoiceVoided(event: FinancialEvent, ctx: HandlerCon
   };
 }
 
+/**
+ * D4 (2026-10-05, CTO-approved) — `returns.sale_return.credited` → Dr Sales Returns (configured contra-revenue) net
+ * [+ Dr Output tax] / Cr AR gross. The amounts come from the ORIGINAL invoice value (computed by the returns domain);
+ * the AR and tax accounts are resolved exactly as `handleInvoicePosted` resolved them, taking the account trail from the
+ * ORIGINAL posted-invoice Financial Event (so the reversal hits the same tax account the sale used — never the ambient tax
+ * engine, never a guess). The Sales Returns account is CONFIGURATION (`accounting.sales_returns_account_code`), fail-closed.
+ */
+export const SALES_RETURNS_ACCOUNT_CONFIG_KEY = 'accounting.sales_returns_account_code';
+
+export async function handleSalesReturnCredited(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
+  const p = event.payload;
+  const net = amt(p.netAmount);
+  const tax = amt(p.taxAmount) ?? '0';
+  const invoiceId = str(p.invoiceId);
+  if (!net || !invoiceId) return { kind: 'rejected', reason: 'sales_return.credited: missing/invalid netAmount or invoiceId' };
+
+  // The original posted-invoice event is the account trail (and proof the sale really created Revenue/AR).
+  const originals: Array<{ payload: Record<string, unknown> }> = await ctx.manager.query(
+    `SELECT "payload" FROM "accounting_financial_events"
+      WHERE "eventType" = 'finance.invoice.posted' AND "sourceEntityId" = $1 AND "status" = 'POSTED'
+      ORDER BY "receivedAt" DESC LIMIT 1`,
+    [invoiceId],
+  );
+  if (originals.length === 0) return { kind: 'rejected', reason: `sales_return.credited: the original invoice "${invoiceId}" has no POSTED finance.invoice.posted event — nothing to reverse` };
+  const original = originals[0].payload ?? {};
+
+  const salesReturns = await ctx.resolveConfiguredPostableAccount(SALES_RETURNS_ACCOUNT_CONFIG_KEY);
+  if (!salesReturns.ok) {
+    return { kind: 'rejected', reason: `sales_return.credited: Sales Returns account is ${salesReturns.reason} — set ${SALES_RETURNS_ACCOUNT_CONFIG_KEY} to a postable non-control GL account` };
+  }
+  const ar = await resolveAccount(ctx, original.arAccountCode, 'ar');
+  if (!ar) return { kind: 'rejected', reason: 'sales_return.credited: no AR control account in the chart' };
+
+  const gross = (Number(net) + Number(tax)).toFixed(4);
+  const lines: JournalDraftLine[] = [{ accountId: salesReturns.id, debit: net, description: 'Sales returns (revenue reversal)' }];
+  if (Number(tax) > 0) {
+    const taxAcc = await resolveAccount(ctx, original.taxAccountCode, 'tax_payable');
+    if (!taxAcc) return { kind: 'rejected', reason: 'sales_return.credited: tax part present but no tax account (original or tax_payable control)' };
+    lines.push({ accountId: taxAcc, debit: tax, description: 'Output tax reversal' });
+  }
+  lines.push({ accountId: ar, credit: gross, description: 'Accounts receivable (customer credit)' });
+
+  return {
+    kind: 'draft',
+    draft: {
+      businessDate: event.businessDate,
+      description: `Sales return ${str(p.returnNumber) ?? event.sourceEntityId} (invoice ${str(p.invoiceNumber) ?? invoiceId})`,
+      transactionCurrencyCode: event.transactionCurrencyCode,
+      orgUnitId: event.orgUnitId,
+      lines,
+    },
+  };
+}
+
+/**
+ * D2 (2026-10-04, CTO-approved): the bank leg of a cash event is the paying/receiving Treasury account's OWN
+ * mapped GL account (`glAccountCode`, resolved by the publisher) — resolved by code ONLY. Never a fallback to
+ * "the first active `bank` control account" (which silently posted every payment to the same account regardless
+ * of which Treasury account moved the cash), never DB order. Missing/unknown code ⇒ the caller rejects.
+ */
+async function resolveBankLeg(ctx: HandlerContext, p: Record<string, unknown>): Promise<string | null> {
+  const code = str(p.glAccountCode) ?? str(p.bankAccountCode) ?? str(p.accountCode);
+  return code ? ctx.findAccountByCode(code) : null;
+}
+
 /** `finance.payment.recorded` → Dr Bank/Cash / Cr AR. */
 export async function handlePaymentRecorded(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
   const p = event.payload;
   const amount = amt(p.amount);
   if (!amount) return { kind: 'rejected', reason: 'payment.recorded: missing/invalid amount' };
-  const bank = await resolveAccount(ctx, p.bankAccountCode ?? p.accountCode, 'bank');
+  const bank = await resolveBankLeg(ctx, p);
   const ar = await resolveAccount(ctx, p.arAccountCode, 'ar');
-  if (!bank) return { kind: 'rejected', reason: 'payment.recorded: no bank/cash control account resolvable' };
+  if (!bank) return { kind: 'rejected', reason: 'payment.recorded: the receiving Treasury account is not GL-mapped to an active chart account' };
   if (!ar) return { kind: 'rejected', reason: 'payment.recorded: no AR control account in the chart' };
   return {
     kind: 'draft',
@@ -211,8 +276,8 @@ export async function handleCashRecorded(event: FinancialEvent, ctx: HandlerCont
   const direction = str(p.direction);
   if (!amount) return { kind: 'rejected', reason: 'cash.recorded: missing/invalid amount' };
   if (direction !== 'in' && direction !== 'out') return { kind: 'rejected', reason: 'cash.recorded: direction must be "in" or "out"' };
-  const bank = await resolveAccount(ctx, p.accountCode ?? p.bankAccountCode, 'bank');
-  if (!bank) return { kind: 'rejected', reason: 'cash.recorded: no bank control account resolvable' };
+  const bank = await resolveBankLeg(ctx, p);
+  if (!bank) return { kind: 'rejected', reason: 'cash.recorded: the Treasury account is not GL-mapped to an active chart account' };
 
   const counterCode = str(p.counterAccountCode);
   let counterAcc: string | null;
@@ -272,6 +337,8 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   'finance.invoice.posted': handleInvoicePosted,
   'finance.invoice.voided': handleInvoiceVoided,
   'finance.payment.recorded': handlePaymentRecorded,
+  // D4 — Revenue/AR/tax reversal of a completed return of an invoiced sale
+  'returns.sale_return.credited': handleSalesReturnCredited,
   // ADR-048 — Procurement's Supplier Invoice/AP, the credit-normal mirror of the AR trio above.
   // The first REAL publisher AP_EVENT_TOPICS ever had (ADR-037 shipped only the contract).
   'finance.supplier_invoice.posted': handleSupplierInvoicePosted,

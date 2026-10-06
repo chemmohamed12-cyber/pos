@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsObject, IsString } from 'class-validator';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementManifest } from './manifest.type';
@@ -6,6 +6,8 @@ import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.g
 import { RolesGuard } from '../authorization/roles.guard';
 import { PermissionGuard } from '../permission/permission.guard';
 import { RequirePermission } from '../permission/require-permission.decorator';
+import { CompanyEntitlementService } from '../plans/company-entitlement.service';
+import { CompanyViewContextService } from '../plans/company-view-context.service';
 
 class ApplyManifestDto {
   @IsObject()
@@ -18,12 +20,34 @@ class ApplyManifestDto {
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EntitlementController {
-  constructor(private readonly entitlement: EntitlementService) {}
+  constructor(
+    private readonly entitlement: EntitlementService,
+    @Optional() private readonly companyView?: CompanyViewContextService,
+    @Optional() private readonly companyEntitlement?: CompanyEntitlementService,
+  ) {}
 
   /** For the current principal — feeds the P7 server-driven frontend nav. */
   @Get('me/entitlements')
-  meEntitlements(@Req() _req: AuthenticatedRequest) {
+  async meEntitlements(@Req() req: AuthenticatedRequest) {
     const e = this.entitlement.resolve();
+    // Company Plans / Packages: when the caller has a Membership-validated Company, report THAT Company's
+    // effective entitlement (package ∩ installation licence) so the UI and the guards agree.
+    const company = this.companyView && this.companyEntitlement ? await this.companyView.resolve(req.user) : null;
+    if (company && this.companyEntitlement) {
+      const c = await this.companyEntitlement.resolve(company.companyId);
+      return {
+        editionCode: e.editionCode,
+        editionVersion: e.editionVersion,
+        status: c.status,
+        verificationState: e.verificationState,
+        modules: [...c.modules].sort(),
+        features: [...c.features].sort(),
+        limits: Object.fromEntries(e.limits),
+        companyId: company.companyId,
+        source: c.source,
+        planCode: c.planCode,
+      };
+    }
     return {
       editionCode: e.editionCode,
       editionVersion: e.editionVersion,

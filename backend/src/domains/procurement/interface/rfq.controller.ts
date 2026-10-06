@@ -2,7 +2,8 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } fro
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RfqService } from '../application/rfq.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -40,7 +41,7 @@ class AwardDto {
 
 /** ADR-048 — Path B, steps 2-4: RFQ, Supplier Quotations, Evaluation/Approval (award). */
 @Controller('procurement/rfqs')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('procurement')
 export class RfqController {
   constructor(private readonly rfqs: RfqService) {}
@@ -48,49 +49,49 @@ export class RfqController {
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.view', 'read-only')
   @Get()
-  async list() {
-    return this.rfqs.list();
+  async list(@Req() req: CompanyScopedRequest) {
+    return this.rfqs.list(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.view', 'read-only')
   @Get(':id')
-  async getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.rfqs.getById(id);
+  async getById(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.getById(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.view', 'read-only')
   @Get('quotations/:quotationId/lines')
-  async getQuotationLines(@Param('quotationId', ParseUUIDPipe) quotationId: string) {
-    return this.rfqs.getQuotationLines(quotationId);
+  async getQuotationLines(@Param('quotationId', ParseUUIDPipe) quotationId: string, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.getQuotationLines(quotationId, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.edit', 'editable')
   @Post(':id/send')
-  async send(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.rfqs.send(id, req.user.id);
+  async send(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.send(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.edit', 'editable')
   @Post(':id/cancel')
-  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.rfqs.cancel(id, req.user.id);
+  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.cancel(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.record_quotation', 'editable')
   @Post(':id/quotations')
-  async recordQuotation(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordQuotationDto, @Req() req: AuthenticatedRequest) {
-    return this.rfqs.recordQuotation({ rfqId: id, supplierId: dto.supplierId, notes: dto.notes ?? null, lines: dto.lines }, req.user.id);
+  async recordQuotation(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordQuotationDto, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.recordQuotation({ rfqId: id, supplierId: dto.supplierId, notes: dto.notes ?? null, lines: dto.lines }, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.rfq.award', 'editable')
   @Post(':id/award')
-  async award(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AwardDto, @Req() req: AuthenticatedRequest) {
-    return this.rfqs.awardToSupplier(id, dto.quotationId, req.user.id);
+  async award(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AwardDto, @Req() req: CompanyScopedRequest) {
+    return this.rfqs.awardToSupplier(id, dto.quotationId, req.user.id, req.companyContext!.dataSource.manager);
   }
 }

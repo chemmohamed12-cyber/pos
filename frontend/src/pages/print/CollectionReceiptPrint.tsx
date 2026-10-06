@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Collection {
   id: string;
@@ -58,6 +59,7 @@ export function CollectionReceiptPrint() {
   const { shipmentId } = useParams<{ shipmentId: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<CollectionReceiptData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'document.collection_receipt_title', 'field.waybill', 'field.rsh_number', 'field.sales_order',
@@ -68,22 +70,29 @@ export function CollectionReceiptPrint() {
   useEffect(() => {
     (async () => {
       if (!shipmentId) return;
-      const collection = await api.get<Collection | null>(`/delivery/collections/by-shipment/${shipmentId}`);
-      if (!collection) return;
+      try {
+        const collection = await api.get<Collection | null>(`/delivery/collections/by-shipment/${shipmentId}`);
+        if (!collection) return;
 
-      const shipment = await api.get<Shipment>(`/shipments/${shipmentId}`);
-      const [order, companies, vehicles] = await Promise.all([
-        shipment.salesOrderId ? api.get<SalesOrderDetail>(`/sales-orders/${shipment.salesOrderId}`).catch(() => null) : Promise.resolve(null),
-        api.get<ShippingCompany[]>('/shipments/shipping-companies').catch(() => []),
-        api.get<Vehicle[]>('/shipments/vehicles').catch(() => []),
-      ]);
-      const company = shipment.shippingCompanyId ? (companies.find((c) => c.id === shipment.shippingCompanyId) ?? null) : null;
-      const vehicle = shipment.vehicleId ? (vehicles.find((v) => v.id === shipment.vehicleId) ?? null) : null;
+        const shipment = await api.get<Shipment>(`/shipments/${shipmentId}`);
+        const [order, companies, vehicles] = await Promise.all([
+          shipment.salesOrderId ? api.get<SalesOrderDetail>(`/sales-orders/${shipment.salesOrderId}`).catch(() => null) : Promise.resolve(null),
+          api.get<ShippingCompany[]>('/shipments/shipping-companies').catch(() => []),
+          api.get<Vehicle[]>('/shipments/vehicles').catch(() => []),
+        ]);
+        const company = shipment.shippingCompanyId ? (companies.find((c) => c.id === shipment.shippingCompanyId) ?? null) : null;
+        const vehicle = shipment.vehicleId ? (vehicles.find((v) => v.id === shipment.vehicleId) ?? null) : null;
 
-      setData({ collection, shipment, order, company, vehicle });
+        setData({ collection, shipment, order, company, vehicle });
+      } catch (err) {
+        // Foundation fix: the two PRIMARY calls here (collection, shipment)
+        // had no error handling — only the supplementary lookups did.
+        setLoadError(err);
+      }
     })();
   }, [shipmentId]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { collection, shipment, order, company, vehicle } = data;
 

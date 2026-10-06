@@ -8,6 +8,7 @@ export type CustomerLedgerEntryType =
   | 'sales_invoice'
   | 'deposit'
   | 'payment'
+  | 'payment_application' // CUS-01 — moves part/all of an unapplied receipt onto an invoice (debit out of "unapplied" + credit onto the invoice); net customer balance unchanged
   | 'cod_collection'
   | 'return_credit_note'
   | 'debit_note'
@@ -19,6 +20,7 @@ export const CUSTOMER_LEDGER_ENTRY_TYPES: CustomerLedgerEntryType[] = [
   'sales_invoice',
   'deposit',
   'payment',
+  'payment_application',
   'cod_collection',
   'return_credit_note',
   'debit_note',

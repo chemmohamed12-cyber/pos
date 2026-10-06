@@ -1,6 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, In, IsNull, Repository } from 'typeorm';
+import { Between, DataSource, In, IsNull, Repository, EntityManager } from 'typeorm';
 import { createHash } from 'crypto';
 import { AttendanceConnector } from '../infrastructure/attendance-connector.entity';
 import { AttendanceEmployeeMapping } from '../infrastructure/attendance-employee-mapping.entity';
@@ -132,14 +131,6 @@ function parseAbsentFlag(value: string): { ok: true; value: boolean | null } | {
 @Injectable()
 export class AttendanceService implements OnModuleInit {
   constructor(
-    @InjectRepository(AttendanceConnector) private readonly connectors: Repository<AttendanceConnector>,
-    @InjectRepository(AttendanceEmployeeMapping) private readonly mappings: Repository<AttendanceEmployeeMapping>,
-    @InjectRepository(AttendanceImportBatch) private readonly importBatches: Repository<AttendanceImportBatch>,
-    @InjectRepository(AttendanceRawRecord) private readonly rawRecords: Repository<AttendanceRawRecord>,
-    @InjectRepository(AttendanceBiometricDailyFact) private readonly biometricFacts: Repository<AttendanceBiometricDailyFact>,
-    @InjectRepository(AttendanceDay) private readonly days: Repository<AttendanceDay>,
-    @InjectRepository(AttendanceApprovalBatch) private readonly approvalBatches: Repository<AttendanceApprovalBatch>,
-    @InjectRepository(AttendanceCorrectionRequest) private readonly correctionRequests: Repository<AttendanceCorrectionRequest>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
@@ -147,6 +138,25 @@ export class AttendanceService implements OnModuleInit {
     private readonly excel: ExcelService,
     private readonly hr: HrService,
   ) {}
+
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  /** Area 21: repositories bound to the caller's connection — the Company's own when a Company `manager` is passed, the ambient one otherwise. */
+  private repos(manager?: EntityManager) {
+    const em = this.em(manager);
+    return {
+      connectors: em.getRepository(AttendanceConnector),
+      mappings: em.getRepository(AttendanceEmployeeMapping),
+      importBatches: em.getRepository(AttendanceImportBatch),
+      rawRecords: em.getRepository(AttendanceRawRecord),
+      biometricFacts: em.getRepository(AttendanceBiometricDailyFact),
+      days: em.getRepository(AttendanceDay),
+      approvalBatches: em.getRepository(AttendanceApprovalBatch),
+      correctionRequests: em.getRepository(AttendanceCorrectionRequest),
+    };
+  }
 
   async onModuleInit(): Promise<void> {
     await this.approvals.registerRequestType(APPROVAL_BATCH_TYPE, 'action.attendance_submit_approval_batch');
@@ -165,12 +175,21 @@ export class AttendanceService implements OnModuleInit {
       )
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload as Record<string, unknown>);
-    });
-    this.events.subscribe('approval.request.rejected', async (payload) => {
-      await this.onApprovalRejected(payload as Record<string, unknown>);
-    });
+    // Company scope (ADR-075): runs for the Company outbox the event was published in (ctx.manager); unchanged for the ambient one.
+    this.events.subscribe(
+      'approval.request.approved',
+      async (payload, ctx) => {
+        await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
+    this.events.subscribe(
+      'approval.request.rejected',
+      async (payload, ctx) => {
+        await this.onApprovalRejected(payload as Record<string, unknown>, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -178,8 +197,8 @@ export class AttendanceService implements OnModuleInit {
   // this contract; the shape is ready for a future device adapter.
   // ---------------------------------------------------------------------------
 
-  async createConnector(name: string, connectorType: string, actorUserId: string): Promise<AttendanceConnector> {
-    const saved = await this.connectors.save(this.connectors.create({ name, connectorType, status: 'connected', config: {} }));
+  async createConnector(name: string, connectorType: string, actorUserId: string, manager?: EntityManager): Promise<AttendanceConnector> {
+    const saved = await this.repos(manager).connectors.save(this.repos(manager).connectors.create({ name, connectorType, status: 'connected', config: {} }));
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -189,24 +208,24 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { name, connectorType },
-    });
+    }, manager);
     return saved;
   }
 
-  async listConnectors(): Promise<AttendanceConnector[]> {
-    return this.connectors.find({ order: { createdAt: 'ASC' } });
+  async listConnectors(manager?: EntityManager): Promise<AttendanceConnector[]> {
+    return this.repos(manager).connectors.find({ order: { createdAt: 'ASC' } });
   }
 
   // ---------------------------------------------------------------------------
   // Employee / device mapping — ADR-065 §3, mirrors IntegrationProductMapping.
   // ---------------------------------------------------------------------------
 
-  async createMapping(input: CreateMappingInput, actorUserId: string): Promise<AttendanceEmployeeMapping> {
-    const connector = await this.connectors.findOne({ where: { id: input.connectorId } });
+  async createMapping(input: CreateMappingInput, actorUserId: string, manager?: EntityManager): Promise<AttendanceEmployeeMapping> {
+    const connector = await this.repos(manager).connectors.findOne({ where: { id: input.connectorId } });
     if (!connector) throw new NotFoundException(`Attendance connector "${input.connectorId}" not found.`);
-    await this.hr.getEmployee(input.employeeId); // throws NotFoundException if the employee does not exist — same guard as recordManualPunch
+    await this.hr.getEmployee(input.employeeId, manager); // throws NotFoundException if the employee does not exist — same guard as recordManualPunch
 
-    const existingActive = await this.mappings.findOne({
+    const existingActive = await this.repos(manager).mappings.findOne({
       where: { connectorId: input.connectorId, deviceUserRef: input.deviceUserRef, effectiveTo: IsNull() },
     });
     if (existingActive) {
@@ -215,31 +234,31 @@ export class AttendanceService implements OnModuleInit {
       );
     }
 
-    const saved = await this.mappings.save(
-      this.mappings.create({ connectorId: input.connectorId, employeeId: input.employeeId, deviceUserRef: input.deviceUserRef, effectiveFrom: new Date(), effectiveTo: null }),
+    const saved = await this.repos(manager).mappings.save(
+      this.repos(manager).mappings.create({ connectorId: input.connectorId, employeeId: input.employeeId, deviceUserRef: input.deviceUserRef, effectiveFrom: new Date(), effectiveTo: null }),
     );
 
     // ADR-062 §5 — resolve retroactively: any raw record already sitting
     // unmapped for this exact (connector, device ref) now resolves.
-    await this.rawRecords.update(
+    await this.repos(manager).rawRecords.update(
       { sourceConnectorId: input.connectorId, deviceEmployeeRef: input.deviceUserRef, resolvedEmployeeId: IsNull() },
       { resolvedEmployeeId: input.employeeId },
     );
-    const affected = await this.rawRecords.find({ where: { sourceConnectorId: input.connectorId, deviceEmployeeRef: input.deviceUserRef, resolvedEmployeeId: input.employeeId } });
+    const affected = await this.repos(manager).rawRecords.find({ where: { sourceConnectorId: input.connectorId, deviceEmployeeRef: input.deviceUserRef, resolvedEmployeeId: input.employeeId } });
     const affectedDates = new Set(affected.map((r) => toDateOnly(r.punchTimestamp)));
     for (const date of affectedDates) {
-      await this.deriveDay(input.employeeId, date);
+      await this.deriveDay(input.employeeId, date, manager);
     }
 
     // Biometric daily-summary facts (CTO directive, 2026-09-20) resolve retroactively the same
     // way — matched by deviceUserRef alone, since these rows are connector-agnostic at import
     // time exactly like Excel-sourced raw records already are.
-    const unresolvedFacts = await this.biometricFacts.find({ where: { deviceUserRef: input.deviceUserRef, resolvedEmployeeId: IsNull() } });
+    const unresolvedFacts = await this.repos(manager).biometricFacts.find({ where: { deviceUserRef: input.deviceUserRef, resolvedEmployeeId: IsNull() } });
     for (const fact of unresolvedFacts) {
       fact.resolvedEmployeeId = input.employeeId;
       fact.sourceConnectorId = input.connectorId;
-      const savedFact = await this.biometricFacts.save(fact);
-      await this.applyBiometricFactToDay(savedFact);
+      const savedFact = await this.repos(manager).biometricFacts.save(fact);
+      await this.applyBiometricFactToDay(savedFact, manager);
     }
 
     await this.audit.record({
@@ -251,17 +270,17 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { connectorId: input.connectorId, employeeId: input.employeeId, deviceUserRef: input.deviceUserRef },
-    });
+    }, manager);
     return saved;
   }
 
   /** Closes an active mapping without deleting it — device reassignment (ADR-062 §5) never loses history. */
-  async closeMapping(id: string, actorUserId: string): Promise<AttendanceEmployeeMapping> {
-    const mapping = await this.mappings.findOne({ where: { id } });
+  async closeMapping(id: string, actorUserId: string, manager?: EntityManager): Promise<AttendanceEmployeeMapping> {
+    const mapping = await this.repos(manager).mappings.findOne({ where: { id } });
     if (!mapping) throw new NotFoundException(`Mapping "${id}" not found.`);
     if (mapping.effectiveTo) throw new ConflictException(`Mapping "${id}" is already closed.`);
     mapping.effectiveTo = new Date();
-    const saved = await this.mappings.save(mapping);
+    const saved = await this.repos(manager).mappings.save(mapping);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -271,22 +290,22 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { effectiveTo: saved.effectiveTo },
-    });
+    }, manager);
     return saved;
   }
 
-  async listMappings(): Promise<AttendanceEmployeeMapping[]> {
-    return this.mappings.find({ order: { createdAt: 'DESC' } });
+  async listMappings(manager?: EntityManager): Promise<AttendanceEmployeeMapping[]> {
+    return this.repos(manager).mappings.find({ order: { createdAt: 'DESC' } });
   }
 
   // ---------------------------------------------------------------------------
   // Raw ingestion — manual entry + Excel import. ADR-065 §3/§6.
   // ---------------------------------------------------------------------------
 
-  async recordManualPunch(input: ManualPunchInput, actorUserId: string): Promise<AttendanceRawRecord> {
-    await this.hr.getEmployee(input.employeeId); // throws NotFoundException if the employee does not exist
-    const saved = await this.rawRecords.save(
-      this.rawRecords.create({
+  async recordManualPunch(input: ManualPunchInput, actorUserId: string, manager?: EntityManager): Promise<AttendanceRawRecord> {
+    await this.hr.getEmployee(input.employeeId, manager); // throws NotFoundException if the employee does not exist
+    const saved = await this.repos(manager).rawRecords.save(
+      this.repos(manager).rawRecords.create({
         sourceType: 'manual',
         sourceConnectorId: null,
         importBatchId: null,
@@ -307,23 +326,23 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { employeeId: input.employeeId, punchTimestamp: input.punchTimestamp, punchType: input.punchType },
-    });
-    await this.deriveDay(input.employeeId, toDateOnly(saved.punchTimestamp));
+    }, manager);
+    await this.deriveDay(input.employeeId, toDateOnly(saved.punchTimestamp), manager);
     return saved;
   }
 
-  buildImportTemplate(): Promise<Buffer> {
+  buildImportTemplate(manager?: EntityManager): Promise<Buffer> {
     return this.excel.buildTemplate('Attendance', IMPORT_COLUMNS);
   }
 
   /** Parses + validates only — no write. Same `ImportSummary<T>` shape a real import returns, per ADR-065 §6's Preview requirement. */
-  async previewImport(buffer: Buffer): Promise<ImportSummary<AttendanceImportRow>> {
+  async previewImport(buffer: Buffer, manager?: EntityManager): Promise<ImportSummary<AttendanceImportRow>> {
     const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, IMPORT_COLUMNS);
     if (headerErrors.length > 0) return { totalRows: 0, succeeded: [], rejected: [], warnings: headerErrors };
-    return this.validateRows(rows as unknown as AttendanceImportRow[]);
+    return this.validateRows(rows as unknown as AttendanceImportRow[], manager);
   }
 
-  private validateRows(rows: AttendanceImportRow[]): ImportSummary<AttendanceImportRow> {
+  private validateRows(rows: AttendanceImportRow[], manager?: EntityManager): ImportSummary<AttendanceImportRow> {
     const succeeded: AttendanceImportRow[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     for (let i = 0; i < rows.length; i++) {
@@ -346,19 +365,19 @@ export class AttendanceService implements OnModuleInit {
   }
 
   /** ADR-065 §6 — `fileHash` is the idempotency key; a byte-identical re-upload is rejected before any row is touched. */
-  async importExcel(buffer: Buffer, fileName: string, actorUserId: string): Promise<AttendanceImportBatch> {
+  async importExcel(buffer: Buffer, fileName: string, actorUserId: string, manager?: EntityManager): Promise<AttendanceImportBatch> {
     const fileHash = createHash('sha256').update(buffer).digest('hex');
-    const existing = await this.importBatches.findOne({ where: { fileHash } });
+    const existing = await this.repos(manager).importBatches.findOne({ where: { fileHash } });
     if (existing) {
       throw new ConflictException(`This exact file was already imported as batch "${existing.id}" on ${existing.importedAt.toISOString()} — re-upload refused.`);
     }
 
     const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, IMPORT_COLUMNS);
     if (headerErrors.length > 0) throw new ConflictException(`Import template headers are invalid: ${headerErrors.join('; ')}`);
-    const summary = this.validateRows(rows as unknown as AttendanceImportRow[]);
+    const summary = this.validateRows(rows as unknown as AttendanceImportRow[], manager);
 
-    const batch = await this.importBatches.save(
-      this.importBatches.create({
+    const batch = await this.repos(manager).importBatches.save(
+      this.repos(manager).importBatches.create({
         fileHash,
         fileName,
         totalRows: summary.totalRows,
@@ -372,10 +391,10 @@ export class AttendanceService implements OnModuleInit {
     for (const row of summary.succeeded) {
       // Excel-sourced device refs resolve through the mapping the same way any other connector-sourced punch would —
       // this contract does not seed a real device connector, so an Excel row's ref is looked up against every active mapping.
-      const mapping = await this.mappings.findOne({ where: { deviceUserRef: row.deviceUserRef, effectiveTo: IsNull() } });
+      const mapping = await this.repos(manager).mappings.findOne({ where: { deviceUserRef: row.deviceUserRef, effectiveTo: IsNull() } });
       const punchTimestamp = new Date(row.punchTimestamp);
-      const saved = await this.rawRecords.save(
-        this.rawRecords.create({
+      const saved = await this.repos(manager).rawRecords.save(
+        this.repos(manager).rawRecords.create({
           sourceType: 'excel_import',
           sourceConnectorId: mapping?.connectorId ?? null,
           importBatchId: batch.id,
@@ -394,7 +413,7 @@ export class AttendanceService implements OnModuleInit {
       }
     }
     for (const [employeeId, dates] of affected) {
-      for (const date of dates) await this.deriveDay(employeeId, date);
+      for (const date of dates) await this.deriveDay(employeeId, date, manager);
     }
 
     await this.audit.record({
@@ -406,12 +425,12 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { fileName, totalRows: summary.totalRows, succeededCount: summary.succeeded.length, rejectedCount: summary.rejected.length },
-    });
+    }, manager);
     return batch;
   }
 
-  async listUnmappedRecords(): Promise<AttendanceRawRecord[]> {
-    return this.rawRecords.find({ where: { resolvedEmployeeId: IsNull() }, order: { punchTimestamp: 'DESC' }, take: 500 });
+  async listUnmappedRecords(manager?: EntityManager): Promise<AttendanceRawRecord[]> {
+    return this.repos(manager).rawRecords.find({ where: { resolvedEmployeeId: IsNull() }, order: { punchTimestamp: 'DESC' }, take: 500 });
   }
 
   // ---------------------------------------------------------------------------
@@ -428,18 +447,18 @@ export class AttendanceService implements OnModuleInit {
   // payroll deduction (that boundary is Payroll's own, per ADR-067 §C).
   // ---------------------------------------------------------------------------
 
-  buildBiometricDailyImportTemplate(): Promise<Buffer> {
+  buildBiometricDailyImportTemplate(manager?: EntityManager): Promise<Buffer> {
     return this.excel.buildTemplate('Biometric Daily Attendance', BIOMETRIC_DAILY_COLUMNS);
   }
 
   /** Parses + validates only — no write. Same `ImportSummary<T>` shape every import in this service returns. */
-  async previewBiometricDailyImport(buffer: Buffer): Promise<ImportSummary<BiometricDailyImportRow>> {
+  async previewBiometricDailyImport(buffer: Buffer, manager?: EntityManager): Promise<ImportSummary<BiometricDailyImportRow>> {
     const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, BIOMETRIC_DAILY_COLUMNS);
     if (headerErrors.length > 0) return { totalRows: 0, succeeded: [], rejected: [], warnings: headerErrors };
-    return this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[]);
+    return this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[], manager);
   }
 
-  private validateBiometricDailyRows(rows: BiometricDailyImportRow[]): ImportSummary<BiometricDailyImportRow> {
+  private validateBiometricDailyRows(rows: BiometricDailyImportRow[], manager?: EntityManager): ImportSummary<BiometricDailyImportRow> {
     const succeeded: BiometricDailyImportRow[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     for (let i = 0; i < rows.length; i++) {
@@ -488,19 +507,19 @@ export class AttendanceService implements OnModuleInit {
   }
 
   /** `fileHash` idempotency — same shape as `importExcel` (ADR-065 §6): a byte-identical re-upload is rejected before any row is touched. A different file that re-reports an already-imported (AC-No., Date) row upserts that one fact row in place (§9's row-level idempotency) rather than duplicating it. */
-  async importBiometricDailySummary(buffer: Buffer, fileName: string, actorUserId: string): Promise<AttendanceImportBatch> {
+  async importBiometricDailySummary(buffer: Buffer, fileName: string, actorUserId: string, manager?: EntityManager): Promise<AttendanceImportBatch> {
     const fileHash = createHash('sha256').update(buffer).digest('hex');
-    const existing = await this.importBatches.findOne({ where: { fileHash } });
+    const existing = await this.repos(manager).importBatches.findOne({ where: { fileHash } });
     if (existing) {
       throw new ConflictException(`This exact file was already imported as batch "${existing.id}" on ${existing.importedAt.toISOString()} — re-upload refused.`);
     }
 
     const { rows, headerErrors } = await this.excel.parseWorkbook(buffer, BIOMETRIC_DAILY_COLUMNS);
     if (headerErrors.length > 0) throw new ConflictException(`Import template headers are invalid: ${headerErrors.join('; ')}`);
-    const summary = this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[]);
+    const summary = this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[], manager);
 
-    const batch = await this.importBatches.save(
-      this.importBatches.create({
+    const batch = await this.repos(manager).importBatches.save(
+      this.repos(manager).importBatches.create({
         fileHash,
         fileName,
         totalRows: summary.totalRows,
@@ -511,7 +530,7 @@ export class AttendanceService implements OnModuleInit {
     );
 
     for (const row of summary.succeeded) {
-      await this.upsertBiometricDailyFact(row, batch.id, actorUserId);
+      await this.upsertBiometricDailyFact(row, batch.id, actorUserId, manager);
     }
 
     await this.audit.record({
@@ -523,21 +542,21 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { fileName, totalRows: summary.totalRows, succeededCount: summary.succeeded.length, rejectedCount: summary.rejected.length },
-    });
+    }, manager);
     return batch;
   }
 
-  private async upsertBiometricDailyFact(row: BiometricDailyImportRow, importBatchId: string, actorUserId: string): Promise<void> {
+  private async upsertBiometricDailyFact(row: BiometricDailyImportRow, importBatchId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
     const absentParsed = parseAbsentFlag(row.absent);
     const sourceAbsent = absentParsed.ok ? absentParsed.value : null;
 
     // AC-No. is the authoritative identity — resolved connector-agnostically against any active
     // mapping, mirroring how Excel-sourced raw records already resolve (no device connector is
     // seeded for a file-based import). Never resolved by Name.
-    const mapping = await this.mappings.findOne({ where: { deviceUserRef: row.acNo, effectiveTo: IsNull() } });
+    const mapping = await this.repos(manager).mappings.findOne({ where: { deviceUserRef: row.acNo, effectiveTo: IsNull() } });
 
-    let fact = await this.biometricFacts.findOne({ where: { deviceUserRef: row.acNo, calendarDate: row.date } });
-    fact = fact ?? this.biometricFacts.create({ deviceUserRef: row.acNo, calendarDate: row.date });
+    let fact = await this.repos(manager).biometricFacts.findOne({ where: { deviceUserRef: row.acNo, calendarDate: row.date } });
+    fact = fact ?? this.repos(manager).biometricFacts.create({ deviceUserRef: row.acNo, calendarDate: row.date });
     fact.importBatchId = importBatchId;
     fact.sourceName = row.name || null;
     fact.resolvedEmployeeId = mapping?.employeeId ?? null;
@@ -553,23 +572,23 @@ export class AttendanceService implements OnModuleInit {
     fact.rawPayload = row as unknown as Record<string, unknown>;
     fact.ingestedByUserId = actorUserId;
     fact.updatedAt = new Date();
-    const saved = await this.biometricFacts.save(fact);
+    const saved = await this.repos(manager).biometricFacts.save(fact);
 
     // Unmapped AC-No.: preserved (the fact row above), never auto-assigned to another employee,
     // never auto-creates an Employee. No punch records are produced until a mapping resolves it.
     if (saved.resolvedEmployeeId) {
-      await this.applyBiometricFactToDay(saved);
+      await this.applyBiometricFactToDay(saved, manager);
     }
   }
 
   /** Converts one resolved biometric fact row into 0/1/2 punch records and re-derives that day — reused at import time and at retroactive-mapping time (createMapping). Idempotent: only THIS fact's own biometric-sourced punches for this employee/day are replaced, never another source's. */
-  private async applyBiometricFactToDay(fact: AttendanceBiometricDailyFact): Promise<void> {
+  private async applyBiometricFactToDay(fact: AttendanceBiometricDailyFact, manager?: EntityManager): Promise<void> {
     const employeeId = fact.resolvedEmployeeId;
     if (!employeeId) return;
 
     const dayStart = new Date(`${fact.calendarDate}T00:00:00.000Z`);
     const dayEnd = new Date(`${fact.calendarDate}T23:59:59.999Z`);
-    await this.rawRecords.delete({ sourceType: 'biometric', resolvedEmployeeId: employeeId, punchTimestamp: Between(dayStart, dayEnd) });
+    await this.repos(manager).rawRecords.delete({ sourceType: 'biometric', resolvedEmployeeId: employeeId, punchTimestamp: Between(dayStart, dayEnd) });
 
     const punches: Array<{ punchTimestamp: Date; punchType: AttendancePunchType }> = [];
     // Clock In/Clock Out are the ONLY source of actual attendance timestamps (directive §3) —
@@ -579,8 +598,8 @@ export class AttendanceService implements OnModuleInit {
     if (fact.clockOut) punches.push({ punchTimestamp: combineDateAndTime(fact.calendarDate, fact.clockOut), punchType: 'out' });
 
     for (const p of punches) {
-      await this.rawRecords.save(
-        this.rawRecords.create({
+      await this.repos(manager).rawRecords.save(
+        this.repos(manager).rawRecords.create({
           sourceType: 'biometric',
           sourceConnectorId: fact.sourceConnectorId,
           importBatchId: fact.importBatchId,
@@ -596,23 +615,23 @@ export class AttendanceService implements OnModuleInit {
 
     // Zero punches (e.g. Absent = True with blank Clock In/Out) is a deliberate, expected case —
     // `deriveDay` already derives `status = 'absent'` from zero same-day punches, unchanged.
-    await this.deriveDay(employeeId, fact.calendarDate);
+    await this.deriveDay(employeeId, fact.calendarDate, manager);
   }
 
-  async listUnmappedBiometricRows(): Promise<AttendanceBiometricDailyFact[]> {
-    return this.biometricFacts.find({ where: { resolvedEmployeeId: IsNull() }, order: { calendarDate: 'DESC' }, take: 500 });
+  async listUnmappedBiometricRows(manager?: EntityManager): Promise<AttendanceBiometricDailyFact[]> {
+    return this.repos(manager).biometricFacts.find({ where: { resolvedEmployeeId: IsNull() }, order: { calendarDate: 'DESC' }, take: 500 });
   }
 
-  async listBiometricFacts(employeeId?: string): Promise<AttendanceBiometricDailyFact[]> {
-    return this.biometricFacts.find({ where: employeeId ? { resolvedEmployeeId: employeeId } : {}, order: { calendarDate: 'DESC' }, take: 500 });
+  async listBiometricFacts(employeeId?: string, manager?: EntityManager): Promise<AttendanceBiometricDailyFact[]> {
+    return this.repos(manager).biometricFacts.find({ where: employeeId ? { resolvedEmployeeId: employeeId } : {}, order: { calendarDate: 'DESC' }, take: 500 });
   }
 
   /** "Import history/status" — every `AttendanceImportBatch` that produced at least one biometric fact row. No new column on the shared batch table: derived from `AttendanceBiometricDailyFact.importBatchId`, which the punch-log Excel importer never populates. */
-  async listBiometricImportBatches(): Promise<AttendanceImportBatch[]> {
-    const rows = await this.biometricFacts.createQueryBuilder('f').select('DISTINCT f."importBatchId"', 'importBatchId').where('f."importBatchId" IS NOT NULL').getRawMany<{ importBatchId: string }>();
+  async listBiometricImportBatches(manager?: EntityManager): Promise<AttendanceImportBatch[]> {
+    const rows = await this.repos(manager).biometricFacts.createQueryBuilder('f').select('DISTINCT f."importBatchId"', 'importBatchId').where('f."importBatchId" IS NOT NULL').getRawMany<{ importBatchId: string }>();
     const ids = rows.map((r) => r.importBatchId);
     if (ids.length === 0) return [];
-    return this.importBatches.find({ where: { id: In(ids) }, order: { importedAt: 'DESC' } });
+    return this.repos(manager).importBatches.find({ where: { id: In(ids) }, order: { importedAt: 'DESC' } });
   }
 
   // ---------------------------------------------------------------------------
@@ -620,14 +639,14 @@ export class AttendanceService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   /** Re-derives (or first-derives) one employee's one calendar day. A no-op if that day already belongs to an APPROVED batch (§8:C's own gate — never silently mutated outside the correction flow). */
-  async deriveDay(employeeId: string, calendarDate: string): Promise<AttendanceDay | null> {
-    const existing = await this.days.findOne({ where: { employeeId, calendarDate } });
+  async deriveDay(employeeId: string, calendarDate: string, manager?: EntityManager): Promise<AttendanceDay | null> {
+    const existing = await this.repos(manager).days.findOne({ where: { employeeId, calendarDate } });
     if (existing?.batchId) {
-      const batch = await this.approvalBatches.findOne({ where: { id: existing.batchId } });
+      const batch = await this.repos(manager).approvalBatches.findOne({ where: { id: existing.batchId } });
       if (batch?.status === 'approved') return existing; // protected — correction-only from here
     }
 
-    const onLeave = await this.hr.isApprovedLeaveDate(employeeId, calendarDate);
+    const onLeave = await this.hr.isApprovedLeaveDate(employeeId, calendarDate, manager);
     let status: AttendanceDayStatus;
     let checkIn: Date | null = null;
     let checkOut: Date | null = null;
@@ -638,7 +657,7 @@ export class AttendanceService implements OnModuleInit {
     } else {
       const dayStart = new Date(`${calendarDate}T00:00:00.000Z`);
       const dayEnd = new Date(`${calendarDate}T23:59:59.999Z`);
-      const sameDay = await this.rawRecords.find({
+      const sameDay = await this.repos(manager).rawRecords.find({
         where: { resolvedEmployeeId: employeeId, punchTimestamp: Between(dayStart, dayEnd) },
         order: { punchTimestamp: 'ASC' },
       });
@@ -655,38 +674,38 @@ export class AttendanceService implements OnModuleInit {
       }
     }
 
-    const day = existing ?? this.days.create({ employeeId, calendarDate });
+    const day = existing ?? this.repos(manager).days.create({ employeeId, calendarDate });
     day.status = status;
     day.checkIn = checkIn;
     day.checkOut = checkOut;
     day.hoursWorked = hoursWorked;
-    return this.days.save(day);
+    return this.repos(manager).days.save(day);
   }
 
-  async listDays(employeeId?: string): Promise<AttendanceDay[]> {
-    return this.days.find({ where: employeeId ? { employeeId } : {}, order: { calendarDate: 'DESC' } });
+  async listDays(employeeId?: string, manager?: EntityManager): Promise<AttendanceDay[]> {
+    return this.repos(manager).days.find({ where: employeeId ? { employeeId } : {}, order: { calendarDate: 'DESC' } });
   }
 
   /** ADR-070 §9 — the one additive, read-only method Payroll's own contract requires: `attendance.period.approved`'s payload carries no per-employee facts, so Payroll resolves the approved days for a batch through this instead of reading raw attendance data directly. */
-  async listApprovedDaysByBatch(batchId: string): Promise<AttendanceDay[]> {
-    return this.days.find({ where: { batchId }, order: { calendarDate: 'ASC' } });
+  async listApprovedDaysByBatch(batchId: string, manager?: EntityManager): Promise<AttendanceDay[]> {
+    return this.repos(manager).days.find({ where: { batchId }, order: { calendarDate: 'ASC' } });
   }
 
   // ---------------------------------------------------------------------------
   // Approval batches — ADR-065 §5, FA-01, zero new mechanism.
   // ---------------------------------------------------------------------------
 
-  async submitApprovalBatch(periodStart: string, periodEnd: string, actorUserId: string): Promise<AttendanceApprovalBatch> {
+  async submitApprovalBatch(periodStart: string, periodEnd: string, actorUserId: string, manager?: EntityManager): Promise<AttendanceApprovalBatch> {
     if (periodStart > periodEnd) throw new ConflictException('periodStart must be on or before periodEnd.');
-    const inRange = await this.days.find({
+    const inRange = await this.repos(manager).days.find({
       where: { calendarDate: Between(periodStart, periodEnd), batchId: IsNull() },
     });
     if (inRange.length === 0) {
       throw new ConflictException('No un-batched attendance days exist in this period.');
     }
 
-    const batch = await this.approvalBatches.save(this.approvalBatches.create({ periodStart, periodEnd, status: 'draft', createdByUserId: actorUserId }));
-    await this.days.update(inRange.map((d) => d.id), { batchId: batch.id });
+    const batch = await this.repos(manager).approvalBatches.save(this.repos(manager).approvalBatches.create({ periodStart, periodEnd, status: 'draft', createdByUserId: actorUserId }));
+    await this.repos(manager).days.update(inRange.map((d) => d.id), { batchId: batch.id });
 
     let approvalRequest: { id: string };
     try {
@@ -697,20 +716,20 @@ export class AttendanceService implements OnModuleInit {
         requestedAction: 'approve',
         payload: { periodStart, periodEnd, dayCount: inRange.length },
         makerUserId: actorUserId,
-      });
+      }, manager);
     } catch (err) {
       // ApprovalEngineService.submit failed after the days were already stamped with this
       // batch's id — unlike a rejected batch (onApprovalRejected), nothing would otherwise
       // ever clear that batchId, permanently excluding these days from every future
       // submission attempt (they'd never again match `batchId: IsNull()`). Reverse the
       // stamp and drop the orphaned draft batch so the days remain submittable.
-      await this.days.update(inRange.map((d) => d.id), { batchId: null as unknown as string });
-      await this.approvalBatches.delete(batch.id);
+      await this.repos(manager).days.update(inRange.map((d) => d.id), { batchId: null as unknown as string });
+      await this.repos(manager).approvalBatches.delete(batch.id);
       throw err;
     }
     batch.approvalRequestId = approvalRequest.id;
     batch.status = 'submitted';
-    await this.approvalBatches.save(batch);
+    await this.repos(manager).approvalBatches.save(batch);
 
     await this.audit.record({
       actorUserId,
@@ -721,17 +740,17 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: approvalRequest.id,
       after: { periodStart, periodEnd, dayCount: inRange.length },
-    });
+    }, manager);
     return batch;
   }
 
-  async listApprovalBatches(): Promise<AttendanceApprovalBatch[]> {
-    return this.approvalBatches.find({ order: { createdAt: 'DESC' } });
+  async listApprovalBatches(manager?: EntityManager): Promise<AttendanceApprovalBatch[]> {
+    return this.repos(manager).approvalBatches.find({ order: { createdAt: 'DESC' } });
   }
 
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide`. */
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -741,12 +760,11 @@ export class AttendanceService implements OnModuleInit {
   async correctDay(
     dayId: string,
     input: { checkIn?: string | null; checkOut?: string | null; reason: string },
-    actorUserId: string,
-  ): Promise<{ applied: boolean; day?: AttendanceDay; correctionRequestId?: string }> {
-    const day = await this.days.findOne({ where: { id: dayId } });
+    actorUserId: string, manager?: EntityManager): Promise<{ applied: boolean; day?: AttendanceDay; correctionRequestId?: string }> {
+    const day = await this.repos(manager).days.findOne({ where: { id: dayId } });
     if (!day) throw new NotFoundException(`Attendance day "${dayId}" not found.`);
 
-    const batch = day.batchId ? await this.approvalBatches.findOne({ where: { id: day.batchId } }) : null;
+    const batch = day.batchId ? await this.repos(manager).approvalBatches.findOne({ where: { id: day.batchId } }) : null;
     const requiresApproval = batch?.status === 'approved';
 
     const proposedCheckIn = input.checkIn !== undefined ? (input.checkIn ? new Date(input.checkIn) : null) : day.checkIn;
@@ -760,7 +778,7 @@ export class AttendanceService implements OnModuleInit {
       day.status = proposedCheckIn && proposedCheckOut ? 'present' : proposedCheckIn || proposedCheckOut ? 'missing_punch' : day.status;
       day.correctedByUserId = actorUserId;
       day.correctedAt = new Date();
-      const saved = await this.days.save(day);
+      const saved = await this.repos(manager).days.save(day);
       await this.audit.record({
         actorUserId,
         organizationId: null,
@@ -771,7 +789,7 @@ export class AttendanceService implements OnModuleInit {
         correlationId: null,
         before,
         after: { checkIn: saved.checkIn, checkOut: saved.checkOut, status: saved.status, hoursWorked: saved.hoursWorked, reason: input.reason },
-      });
+      }, manager);
       return { applied: true, day: saved };
     }
 
@@ -788,9 +806,9 @@ export class AttendanceService implements OnModuleInit {
         reason: input.reason,
       },
       makerUserId: actorUserId,
-    });
-    const correctionRequest = await this.correctionRequests.save(
-      this.correctionRequests.create({
+    }, manager);
+    const correctionRequest = await this.repos(manager).correctionRequests.save(
+      this.repos(manager).correctionRequests.create({
         attendanceDayId: dayId,
         approvalRequestId: approvalRequest.id,
         proposedCheckIn,
@@ -808,7 +826,7 @@ export class AttendanceService implements OnModuleInit {
       result: 'success',
       correlationId: approvalRequest.id,
       after: { proposedCheckIn: proposedCheckIn?.toISOString() ?? null, proposedCheckOut: proposedCheckOut?.toISOString() ?? null, reason: input.reason },
-    });
+    }, manager);
     return { applied: false, correctionRequestId: correctionRequest.id };
   }
 
@@ -816,16 +834,16 @@ export class AttendanceService implements OnModuleInit {
   // FA-01 subscribers — ADR-046 D7 pattern, idempotent against duplicate delivery.
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     const resourceId = String(payload.resourceId ?? '');
 
     if (requestTypeCode === APPROVAL_BATCH_TYPE) {
-      const batch = await this.approvalBatches.findOne({ where: { id: resourceId } });
+      const batch = await this.repos(manager).approvalBatches.findOne({ where: { id: resourceId } });
       if (!batch || batch.status === 'approved') return; // not found, or already applied — benign no-op
       batch.status = 'approved';
       batch.decidedAt = new Date();
-      await this.approvalBatches.save(batch);
+      await this.repos(manager).approvalBatches.save(batch);
       await this.events.publish(this.dataSource.manager, 'attendance.period.approved', {
         batchId: batch.id,
         periodStart: batch.periodStart,
@@ -839,14 +857,14 @@ export class AttendanceService implements OnModuleInit {
         resourceId: batch.id,
         result: 'success',
         correlationId: String(payload.approvalRequestId ?? ''),
-      });
+      }, manager);
       return;
     }
 
     if (requestTypeCode === CORRECTION_TYPE) {
-      const correctionRequest = await this.correctionRequests.findOne({ where: { approvalRequestId: String(payload.approvalRequestId ?? '') } });
+      const correctionRequest = await this.repos(manager).correctionRequests.findOne({ where: { approvalRequestId: String(payload.approvalRequestId ?? '') } });
       if (!correctionRequest) return;
-      const day = await this.days.findOne({ where: { id: correctionRequest.attendanceDayId } });
+      const day = await this.repos(manager).days.findOne({ where: { id: correctionRequest.attendanceDayId } });
       if (!day) return;
       const before = { checkIn: day.checkIn, checkOut: day.checkOut, status: day.status, hoursWorked: day.hoursWorked };
       day.checkIn = correctionRequest.proposedCheckIn;
@@ -858,7 +876,7 @@ export class AttendanceService implements OnModuleInit {
       day.status = correctionRequest.proposedCheckIn && correctionRequest.proposedCheckOut ? 'present' : correctionRequest.proposedCheckIn || correctionRequest.proposedCheckOut ? 'missing_punch' : day.status;
       day.correctedByUserId = correctionRequest.requestedByUserId;
       day.correctedAt = new Date();
-      await this.days.save(day);
+      await this.repos(manager).days.save(day);
       await this.audit.record({
         actorUserId: SYSTEM_ACTOR_ID,
         organizationId: null,
@@ -869,20 +887,20 @@ export class AttendanceService implements OnModuleInit {
         correlationId: correctionRequest.approvalRequestId,
         before,
         after: { checkIn: day.checkIn, checkOut: day.checkOut, status: day.status, hoursWorked: day.hoursWorked },
-      });
+      }, manager);
     }
   }
 
   /** A rejected batch clears `batchId` off its days so they become eligible for a fresh submission — a safe, reversible, non-financial recovery, not a new policy. Rejected corrections need no action (the day is simply left as it was, matching this codebase's existing "no domain subscribes to rejected" convention for pure requests). */
-  private async onApprovalRejected(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalRejected(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_BATCH_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const batch = await this.approvalBatches.findOne({ where: { id: resourceId } });
+    const batch = await this.repos(manager).approvalBatches.findOne({ where: { id: resourceId } });
     if (!batch || batch.status === 'rejected') return;
     batch.status = 'rejected';
     batch.decidedAt = new Date();
-    await this.approvalBatches.save(batch);
-    await this.days.update({ batchId: batch.id }, { batchId: null as unknown as string });
+    await this.repos(manager).approvalBatches.save(batch);
+    await this.repos(manager).days.update({ batchId: batch.id }, { batchId: null as unknown as string });
   }
 }

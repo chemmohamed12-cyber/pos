@@ -60,7 +60,7 @@ interface Invoice {
 interface Payment {
   id: string;
   paymentNumber: string;
-  invoiceId: string;
+  invoiceId: string | null; // null = on-account / advance payment (CUS-01)
   amount: string;
   method: string;
   occurredAt: string;
@@ -91,6 +91,17 @@ interface ReturnCreditRow {
   remainingAmount: string;
   status: string;
   returnNumber: string | null;
+}
+
+/** CUS-01 — a payment (Customer Advance) that still carries an unapplied balance. */
+interface UnappliedPayment {
+  id: string;
+  paymentNumber: string;
+  salesOrderId: string | null;
+  amount: string;
+  unappliedAmount: string;
+  method: string;
+  occurredAt: string;
 }
 
 interface TreasuryAccount {
@@ -189,6 +200,14 @@ export function CustomerAccount() {
     'customer_ledger_entry_type.sales_invoice',
     'customer_ledger_entry_type.deposit',
     'customer_ledger_entry_type.payment',
+    'customer_ledger_entry_type.payment_application',
+    'panel.customer_advance_unapplied',
+    'panel.on_account_note',
+    'panel.no_unapplied_receipts',
+    'action.record_on_account_payment',
+    'action.apply_unapplied_payment',
+    'field.unapplied_amount',
+    'field.treasury_account',
     'customer_ledger_entry_type.cod_collection',
     'customer_ledger_entry_type.return_credit_note',
     'customer_ledger_entry_type.debit_note',
@@ -216,12 +235,16 @@ export function CustomerAccount() {
   const [paymentAmount, setPaymentAmount] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<Record<string, string>>({});
   const [paymentAccount, setPaymentAccount] = useState<Record<string, string>>({});
+  const [unapplied, setUnapplied] = useState<UnappliedPayment[]>([]);
+  const [onAccount, setOnAccount] = useState({ amount: '', method: 'cash', treasuryAccountId: '', salesOrderId: '' });
+  const [unappliedInvoice, setUnappliedInvoice] = useState<Record<string, string>>({});
+  const [unappliedAmount, setUnappliedAmount] = useState<Record<string, string>>({});
   const [creditApplyInvoice, setCreditApplyInvoice] = useState<Record<string, string>>({});
   const [creditApplyAmount, setCreditApplyAmount] = useState<Record<string, string>>({});
 
   async function loadAll() {
     if (!id) return;
-    const [customerData, statementData, invoicesData, paymentsData, agingData, ordersData, creditsData, treasuryData, repData] = await Promise.all([
+    const [customerData, statementData, invoicesData, paymentsData, agingData, ordersData, creditsData, treasuryData, repData, unappliedData] = await Promise.all([
       api.get<Customer>(`/customers/${id}`),
       api.get<Statement>(`/reports/customer-accounts/${id}`),
       api.get<Invoice[]>(`/customers/${id}/invoices`),
@@ -231,6 +254,7 @@ export function CustomerAccount() {
       api.get<ReturnCreditRow[]>(`/returns/credits?customerId=${id}`),
       api.get<TreasuryAccount[]>('/treasury/accounts'),
       api.get<{ name: string | null }>(`/customers/${id}/primary-rep`),
+      api.get<UnappliedPayment[]>(`/payments/unapplied?customerId=${id}`).catch(() => [] as UnappliedPayment[]),
     ]);
     setCustomer(customerData);
     setStatement(statementData);
@@ -241,6 +265,7 @@ export function CustomerAccount() {
     setCredits(creditsData);
     setTreasuryAccounts(treasuryData);
     setPrimaryRep(repData.name);
+    setUnapplied(unappliedData);
   }
 
   useEffect(() => {
@@ -316,6 +341,56 @@ export function CustomerAccount() {
       await loadAll();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to record payment.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** CUS-01 — record money received BEFORE an invoice (Customer Advance / Unapplied Receipt); the server posts Dr bank / Cr AR and an unapplied ledger credit. */
+  async function recordOnAccount() {
+    if (!id) return;
+    if (!onAccount.amount || !onAccount.treasuryAccountId) {
+      setError('Amount and Treasury account are required to record an on-account payment.');
+      return;
+    }
+    setBusy('on-account');
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post('/payments/on-account', {
+        customerId: id,
+        amount: onAccount.amount,
+        method: onAccount.method || 'cash',
+        treasuryAccountId: onAccount.treasuryAccountId,
+        salesOrderId: onAccount.salesOrderId || undefined,
+      });
+      setOnAccount({ amount: '', method: 'cash', treasuryAccountId: '', salesOrderId: '' });
+      setNotice('On-account payment recorded.');
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to record the on-account payment.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function applyUnapplied(paymentId: string) {
+    const invoiceId = unappliedInvoice[paymentId];
+    const amount = unappliedAmount[paymentId];
+    if (!invoiceId || !amount) {
+      setError('Select a target invoice and an amount to apply the receipt.');
+      return;
+    }
+    setBusy(paymentId + 'apply-unapplied');
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post(`/payments/${paymentId}/apply`, { invoiceId, amount });
+      setUnappliedAmount((prev) => ({ ...prev, [paymentId]: '' }));
+      setNotice('Receipt applied to invoice.');
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to apply the receipt.');
     } finally {
       setBusy(null);
     }
@@ -600,6 +675,59 @@ export function CustomerAccount() {
             </div>
           )}
 
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h3 style={{ marginTop: 0 }}>{t('panel.customer_advance_unapplied')}</h3>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>{t('panel.on_account_note')}</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
+              <input type="number" min={0} step="0.01" style={{ width: 110 }} placeholder={t('field.total_amount')} value={onAccount.amount} onChange={(e) => setOnAccount({ ...onAccount, amount: e.target.value })} />
+              <input style={{ width: 90 }} placeholder="method" value={onAccount.method} onChange={(e) => setOnAccount({ ...onAccount, method: e.target.value })} />
+              <select value={onAccount.treasuryAccountId} onChange={(e) => setOnAccount({ ...onAccount, treasuryAccountId: e.target.value })}>
+                <option value="">{t('field.treasury_account')}</option>
+                {treasuryAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <select value={onAccount.salesOrderId} onChange={(e) => setOnAccount({ ...onAccount, salesOrderId: e.target.value })}>
+                <option value="">{t('field.sales_order')}</option>
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.orderNumber}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-primary" disabled={busy === 'on-account'} onClick={recordOnAccount}>
+                {t('action.record_on_account_payment')}
+              </button>
+            </div>
+            {unapplied.length === 0 ? (
+              <div className="empty-state" style={{ padding: 10 }}>{t('panel.no_unapplied_receipts')}</div>
+            ) : (
+              unapplied.map((u) => (
+                <div key={u.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    {u.paymentNumber} — {t('field.unapplied_amount')}: <strong>{u.unappliedAmount}</strong> / {u.amount}
+                  </div>
+                  <select value={unappliedInvoice[u.id] ?? ''} onChange={(e) => setUnappliedInvoice((prev) => ({ ...prev, [u.id]: e.target.value }))}>
+                    <option value="">{t('field.invoice')}</option>
+                    {invoices
+                      .filter((inv) => inv.state === 'posted' || inv.state === 'partially_paid')
+                      .map((inv) => (
+                        <option key={inv.id} value={inv.id}>
+                          {inv.invoiceNumber} ({inv.remaining})
+                        </option>
+                      ))}
+                  </select>
+                  <input type="number" style={{ width: 100 }} placeholder={u.unappliedAmount} value={unappliedAmount[u.id] ?? ''} onChange={(e) => setUnappliedAmount((prev) => ({ ...prev, [u.id]: e.target.value }))} />
+                  <button className="btn btn-secondary" disabled={busy === u.id + 'apply-unapplied'} onClick={() => applyUnapplied(u.id)}>
+                    {t('action.apply_unapplied_payment')}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
           {invoices.length === 0 ? (
             <div className="empty-state">{t('panel.no_invoices_yet')}</div>
           ) : (
@@ -697,7 +825,7 @@ export function CustomerAccount() {
                   {payments.map((p) => (
                     <tr key={p.id}>
                       <td>{p.paymentNumber}</td>
-                      <td>{invoices.find((i) => i.id === p.invoiceId)?.invoiceNumber ?? p.invoiceId}</td>
+                      <td>{p.invoiceId ? (invoices.find((i) => i.id === p.invoiceId)?.invoiceNumber ?? p.invoiceId) : t('panel.customer_advance_unapplied')}</td>
                       <td>{p.amount}</td>
                       <td>{p.method}</td>
                       <td>{new Date(p.occurredAt).toLocaleString()}</td>

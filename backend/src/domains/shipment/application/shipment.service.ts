@@ -63,9 +63,14 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * is what makes a retry safe rather than a source of duplicates.
    */
   onModuleInit(): void {
-    this.events.subscribe('fulfillment.ready-for-dispatch', async (payload) => {
-      await this.createShipment(payload.fulfillmentOrderId as string, null);
-    });
+    // ADR-075 (D10): Company-scope — the handoff runs against the Company whose outbox carried the event.
+    this.events.subscribe(
+      'fulfillment.ready-for-dispatch',
+      async (payload, ctx) => {
+        await this.createShipment(payload.fulfillmentOrderId as string, null, null, null, null, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
   }
 
   /**
@@ -76,8 +81,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * Treasury Core concept). Looked up by code every call rather than
    * cached — company/vehicle creation is rare, not a hot path.
    */
-  private async getCustodyAccountTypeId(): Promise<string> {
-    const types = await this.treasury.listAccountTypes();
+  private async getCustodyAccountTypeId(manager?: EntityManager): Promise<string> {
+    const types = await this.treasury.listAccountTypes(manager);
     const custodyType = types.find((t) => t.code === CUSTODY_ACCOUNT_TYPE_CODE);
     if (!custodyType) {
       throw new ConflictException(`Treasury account type "${CUSTODY_ACCOUNT_TYPE_CODE}" is not provisioned — run the seed migration first.`);
@@ -86,9 +91,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   }
 
   /** The default parent for an auto-created Operational Sub-location — the first active top-level ('main') warehouse, unless the caller names one explicitly. */
-  private async resolveParentWarehouseId(explicit: string | null): Promise<string> {
+  private async resolveParentWarehouseId(explicit: string | null, manager?: EntityManager): Promise<string> {
     if (explicit) return explicit;
-    const warehouses = await this.inventory.listWarehouses();
+    const warehouses = await this.inventory.listWarehouses(manager);
     const mainWarehouse = warehouses.find((w) => w.kind === 'main' && w.status === 'active');
     if (!mainWarehouse) {
       throw new ConflictException('No active main warehouse exists to nest an Operational Sub-location under — create one first.');
@@ -115,14 +120,15 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     parentWarehouseId: string,
     driverUserId: string | null,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<{ warehouseId: string; custodyAccountId: string }> {
-    await this.numbering.registerDocumentType('shipping_sub_location', 'SLOC', false);
-    await this.numbering.registerDocumentType('shipping_custody_account', 'CUST', false);
-    const warehouseCode = await this.numbering.getNextNumber('shipping_sub_location');
-    const custodyCode = await this.numbering.getNextNumber('shipping_custody_account');
+    await this.numbering.registerDocumentType('shipping_sub_location', 'SLOC', false, manager);
+    await this.numbering.registerDocumentType('shipping_custody_account', 'CUST', false, manager);
+    const warehouseCode = await this.numbering.getNextNumber('shipping_sub_location', manager);
+    const custodyCode = await this.numbering.getNextNumber('shipping_custody_account', manager);
 
-    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational');
-    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(), actorUserId);
+    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational', manager);
+    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(manager), actorUserId, manager);
     return { warehouseId: warehouse.id, custodyAccountId: custodyAccount.id };
   }
 
@@ -153,32 +159,33 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     shippingCompanyId: string | null = null,
     codAmount: string | null = null,
     vehicleId: string | null = null,
+    manager?: EntityManager,
   ): Promise<Shipment> {
-    const existing = await this.dataSource.getRepository(Shipment).findOne({ where: { fulfillmentOrderId } });
+    const existing = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { fulfillmentOrderId } });
     if (existing) {
       throw new ConflictException(`A shipment already exists for fulfillment order "${fulfillmentOrderId}" (${existing.rshNumber ?? existing.id}).`);
     }
     if (shippingCompanyId) {
-      const company = await this.getShippingCompany(shippingCompanyId);
+      const company = await this.getShippingCompany(shippingCompanyId, manager);
       if (company.status !== 'active') {
         throw new ConflictException(`Shipping company "${company.name}" is inactive.`);
       }
     }
     if (vehicleId) {
-      const vehicle = await this.getVehicle(vehicleId);
+      const vehicle = await this.getVehicle(vehicleId, manager);
       if (vehicle.status !== 'active') {
         throw new ConflictException(`Vehicle "${vehicle.code}" is retired.`);
       }
     }
-    const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(fulfillmentOrderId);
-    const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId);
+    const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(fulfillmentOrderId, manager);
+    const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId, manager);
 
-    const waybillNumber = await this.numbering.getNextNumber('shipment');
-    await this.numbering.registerDocumentType(SHIPPING_ORDER_DOCUMENT_TYPE, 'RSH', true); // idempotent
-    const rshNumber = await this.numbering.getNextNumber(SHIPPING_ORDER_DOCUMENT_TYPE);
+    const waybillNumber = await this.numbering.getNextNumber('shipment', manager);
+    await this.numbering.registerDocumentType(SHIPPING_ORDER_DOCUMENT_TYPE, 'RSH', true, manager); // idempotent
+    const rshNumber = await this.numbering.getNextNumber(SHIPPING_ORDER_DOCUMENT_TYPE, manager);
 
-    const shipment = await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(Shipment);
+    const shipment = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const repo = txManager.getRepository(Shipment);
       const saved = await repo.save(
         repo.create({
           fulfillmentOrderId,
@@ -203,10 +210,10 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       // is a known, pre-existing ambiguity in this codebase (returns.service.ts
       // has the identical caveat for the same reason) — the first matching
       // unconsumed line is used, never split heuristically.
-      const orderLines = await this.salesOrders.getOrderLines(fulfillmentOrder.salesOrderId);
-      const reservations = await this.inventory.getActiveReservationsForOrder(fulfillmentOrder.salesOrderId);
+      const orderLines = await this.salesOrders.getOrderLines(fulfillmentOrder.salesOrderId, txManager);
+      const reservations = await this.inventory.getActiveReservationsForOrder(fulfillmentOrder.salesOrderId, txManager);
       const consumedLineIds = new Set<string>();
-      const lineRepo = manager.getRepository(ShipmentLine);
+      const lineRepo = txManager.getRepository(ShipmentLine);
       for (const reservation of reservations) {
         const orderLine = orderLines.find((l) => l.productId === reservation.productId && !consumedLineIds.has(l.id));
         if (!orderLine) continue; // no matching order line to snapshot a price from — nothing to freeze
@@ -225,23 +232,26 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         );
       }
 
-      await this.events.publish(manager, 'shipment.created', { shipmentId: saved.id, waybillNumber, rshNumber, fulfillmentOrderId });
+      await this.events.publish(txManager, 'shipment.created', { shipmentId: saved.id, waybillNumber, rshNumber, fulfillmentOrderId });
       return saved;
     });
 
-    await this.processEngine.start(SHIPMENT_PROCESS, ENTITY_TYPE, shipment.id);
-    await this.recordTrackingEvent(shipment.id, 'created', `Waybill ${waybillNumber} created.`);
+    await this.processEngine.start(SHIPMENT_PROCESS, ENTITY_TYPE, shipment.id, manager);
+    await this.recordTrackingEvent(shipment.id, 'created', `Waybill ${waybillNumber} created.`, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.created',
-      resource: 'shipment',
-      resourceId: shipment.id,
-      result: 'success',
-      correlationId: null,
-      after: { waybillNumber, rshNumber, fulfillmentOrderId, salesOrderId: fulfillmentOrder.salesOrderId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.created',
+        resource: 'shipment',
+        resourceId: shipment.id,
+        result: 'success',
+        correlationId: null,
+        after: { waybillNumber, rshNumber, fulfillmentOrderId, salesOrderId: fulfillmentOrder.salesOrderId },
+      },
+      manager,
+    );
 
     return shipment;
   }
@@ -254,26 +264,26 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * for an order outside their own Scope. Delegates to the Sales Order's own already-Scope-checked
    * `getOrder`, same "parent" derivation idiom every other cross-domain read in this codebase uses.
    */
-  async getShipmentBySalesOrderId(salesOrderId: string, actorUserId: string): Promise<Shipment | null> {
-    await this.salesOrders.getOrder(salesOrderId, actorUserId);
-    return this.dataSource.getRepository(Shipment).findOne({ where: { salesOrderId } });
+  async getShipmentBySalesOrderId(salesOrderId: string, actorUserId: string, manager?: EntityManager): Promise<Shipment | null> {
+    await this.salesOrders.getOrder(salesOrderId, actorUserId, manager);
+    return (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { salesOrderId } });
   }
 
-  async assignDriver(shipmentId: string, driverUserId: string, actorUserId: string): Promise<string> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+  async assignDriver(shipmentId: string, driverUserId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     if (!roles.includes('admin')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign a driver to a shipment.');
     }
-    const repo = this.dataSource.getRepository(Shipment);
+    const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
 
     shipment.driverUserId = driverUserId;
     await repo.save(shipment);
 
-    await this.processEngine.transition(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, 'assign_driver', actorUserId);
-    await this.recordTrackingEvent(shipmentId, 'assigned', `Assigned to driver ${driverUserId}.`);
-    return this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId);
+    await this.processEngine.transition(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, 'assign_driver', actorUserId, manager);
+    await this.recordTrackingEvent(shipmentId, 'assigned', `Assigned to driver ${driverUserId}.`, manager);
+    return this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, manager);
   }
 
   /**
@@ -298,8 +308,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     vehicleId: string | null,
     actorUserId: string,
     reason: string | null = null,
+    manager?: EntityManager,
   ): Promise<Shipment> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     if (!roles.includes('admin')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign or change a shipment\'s shipping route.');
     }
@@ -307,11 +318,11 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       throw new BadRequestException('A shipment is routed through a shipping company or a vehicle, never both.');
     }
 
-    const repo = this.dataSource.getRepository(Shipment);
+    const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
 
-    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId);
+    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, manager);
     if (state !== 'created' && state !== 'assigned') {
       throw new ConflictException(
         `Cannot change shipment "${shipmentId}"'s shipping route once pickup has been confirmed (current state: "${state}") — custody has already transferred.`,
@@ -319,11 +330,11 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     }
 
     if (shippingCompanyId) {
-      const company = await this.getShippingCompany(shippingCompanyId);
+      const company = await this.getShippingCompany(shippingCompanyId, manager);
       if (company.status !== 'active') throw new ConflictException(`Shipping company "${company.name}" is inactive.`);
     }
     if (vehicleId) {
-      const vehicle = await this.getVehicle(vehicleId);
+      const vehicle = await this.getVehicle(vehicleId, manager);
       if (vehicle.status !== 'active') throw new ConflictException(`Vehicle "${vehicle.code}" is retired.`);
     }
 
@@ -332,21 +343,25 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     shipment.vehicleId = vehicleId;
     const saved = await repo.save(shipment);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.route_assigned',
-      resource: 'shipment',
-      resourceId: shipmentId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { shippingCompanyId, vehicleId, reason },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.route_assigned',
+        resource: 'shipment',
+        resourceId: shipmentId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { shippingCompanyId, vehicleId, reason },
+      },
+      manager,
+    );
     await this.recordTrackingEvent(
       shipmentId,
       'route_assigned',
       shippingCompanyId ? `Routed to shipping company ${shippingCompanyId}.` : vehicleId ? `Routed to vehicle ${vehicleId}.` : 'Route cleared.',
+      manager,
     );
 
     return saved;
@@ -370,9 +385,10 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     waybillImageMediaAssetId: string | null,
     actorUserId: string,
     carrierContactPhone: string | null = null,
+    manager?: EntityManager,
   ): Promise<Shipment> {
-    await this.assertDriverOrAdmin(shipmentId, actorUserId);
-    const repo = this.dataSource.getRepository(Shipment);
+    await this.assertDriverOrAdmin(shipmentId, actorUserId, manager);
+    const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
 
@@ -394,30 +410,33 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     if (carrierContactPhone?.trim()) shipment.carrierContactPhone = carrierContactPhone.trim();
     const saved = await repo.save(shipment);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.carrier_waybill.set',
-      resource: 'shipment',
-      resourceId: shipmentId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: {
-        carrierWaybillNumber: saved.carrierWaybillNumber,
-        waybillImageMediaAssetId: saved.waybillImageMediaAssetId,
-        carrierContactPhone: saved.carrierContactPhone,
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.carrier_waybill.set',
+        resource: 'shipment',
+        resourceId: shipmentId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: {
+          carrierWaybillNumber: saved.carrierWaybillNumber,
+          waybillImageMediaAssetId: saved.waybillImageMediaAssetId,
+          carrierContactPhone: saved.carrierContactPhone,
+        },
       },
-    });
+      manager,
+    );
 
     return saved;
   }
 
   /** Shared by transitionShipment and Delivery's recordCollection (V1 Release Audit MEDIUM fix — collection recording had no check at all). Driver ACTIONS only (pickup/depart/.../setCarrierWaybill/recordCollection) — never widen this to `finance` (see `assertCanReadShipment` below for the read-only counterpart). */
-  async assertDriverOrAdmin(shipmentId: string, actorUserId: string): Promise<void> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  async assertDriverOrAdmin(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
     const isAdmin = roles.includes('admin');
     if (!isAssignedDriver && !isAdmin) {
@@ -440,10 +459,10 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * would be a real privilege escalation, not a fix. This one only ever
    * backs a read.
    */
-  private async assertCanReadShipment(shipmentId: string, actorUserId: string): Promise<Shipment> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  private async assertCanReadShipment(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<Shipment> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
     const isReviewer = roles.some((r) => ['admin', 'finance'].includes(r));
     if (!isAssignedDriver && !isReviewer) {
@@ -454,13 +473,14 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
 
   /**
    * Gap Resolution Package 3 (2026-09-14, row 37) — `manager?` added so `DeliveryService.recordOutcome`
-   * can make the shipment's own state transition part of its one atomic operation. Threaded only
-   * through the `processEngine`/`recordTrackingEvent`/state-change-event path actually used by the
-   * outcome actions (`deliver`/`fail_delivery`/`return_to_sender`) — deliberately NOT threaded into
-   * `transferCustodyOnPickup` (the `pickup`-only branch below, never reached from `recordOutcome`,
-   * whose own `relocateReservedStock` calls have no `manager?` parameter at all today). Combining a
-   * supplied `manager` with `action === 'pickup'` is out of this package's scope; no current caller
-   * does that combination.
+   * can make the shipment's own state transition part of its one atomic operation.
+   *
+   * Area 21 Operational Company Scoping Retrofit (2026-09-27): the prior version of this doc comment
+   * said `manager` was deliberately NOT threaded into `transferCustodyOnPickup` (the `pickup`-only
+   * branch) — that was an ATOMICITY decision (no current caller combined a supplied `manager` with
+   * `action === 'pickup'`), unrelated to Company-routing. Area 21 requires every nested call to
+   * resolve the correct Company regardless of atomicity concerns, so `transferCustodyOnPickup` (and
+   * `InventoryService.relocateReservedStock`, which already accepts `manager?`) now both receive it.
    */
   async transitionShipment(shipmentId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     // V1 Release Audit MEDIUM fix — default-deny: an action absent from
@@ -468,12 +488,12 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     // assigned-driver/admin check entirely instead of being rejected,
     // letting any authenticated user transition someone else's shipment.
     if (!DRIVER_ACTIONS.has(action)) {
-      const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+      const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
       if (!roles.includes('admin')) {
         throw new ForbiddenException(`Role required for action "${action}": admin.`);
       }
     } else {
-      await this.assertDriverOrAdmin(shipmentId, actorUserId);
+      await this.assertDriverOrAdmin(shipmentId, actorUserId, manager);
     }
 
     // CTO directive ("Shipping Company waybill-required flow") — block
@@ -486,7 +506,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     // `shippingCompanyId` at all (a plain in-house driver delivery has no
     // carrier waybill to begin with).
     if (action === 'pickup') {
-      const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+      const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
       if (shipment?.shippingCompanyId && (!shipment.carrierWaybillNumber || !shipment.waybillImageMediaAssetId)) {
         throw new BadRequestException(
           'Cannot confirm pickup for a shipment routed through a shipping company without its carrier waybill number and a photo of it — set both first.',
@@ -502,10 +522,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       // CTO directive §5 — Chain of Custody: the real-world moment goods
       // leave the warehouse's custody and enter the driver/vehicle/
       // company's is pickup, not shipment creation (before pickup the
-      // goods are still physically sitting in the warehouse). Not
-      // manager-threaded — see this method's own doc comment above.
+      // goods are still physically sitting in the warehouse).
       if (action === 'pickup') {
-        await this.transferCustodyOnPickup(shipmentId, actorUserId);
+        await this.transferCustodyOnPickup(shipmentId, actorUserId, m);
       }
 
       if (newState === 'delivered' || newState === 'failed' || newState === 'returned') {
@@ -530,14 +549,15 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    */
   async listShipments(
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
-    const repo = this.dataSource.getRepository(Shipment);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipments = roles.some((r) => ['admin', 'warehouse_worker'].includes(r))
       ? await repo.find({ order: { createdAt: 'DESC' } })
       : await repo.find({ where: { driverUserId: actorUserId }, order: { createdAt: 'DESC' } });
     const repNameById = await this.buildUserNameMap();
-    return Promise.all(shipments.map((s) => this.enrichForBoard(s, repNameById)));
+    return Promise.all(shipments.map((s) => this.enrichForBoard(s, repNameById, manager)));
   }
 
   /**
@@ -565,13 +585,14 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   private async enrichForBoard(
     s: Shipment,
     repNameById: Map<string, string>,
+    manager?: EntityManager,
   ): Promise<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }> {
-    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id);
+    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id, manager);
     const salesRepName = s.salesRepUserId ? repNameById.get(s.salesRepUserId) ?? null : null;
     if (!s.salesOrderId) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
-    const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId);
+    const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
     if (!order) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
-    const customer = await this.customers.getCustomerSnapshot(order.customerId);
+    const customer = await this.customers.getCustomerSnapshot(order.customerId, manager);
     return {
       ...s,
       state,
@@ -602,24 +623,25 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async listShipmentsPage(
     actorUserId: string,
     options: { page: number; pageSize: number },
+    manager?: EntityManager,
   ): Promise<{
     rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>;
     total: number;
   }> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
-    const repo = this.dataSource.getRepository(Shipment);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const isBoardViewer = roles.some((r) => ['admin', 'warehouse_worker'].includes(r));
     const where = isBoardViewer ? {} : { driverUserId: actorUserId };
     const skip = (options.page - 1) * options.pageSize;
 
     const [shipments, total] = await repo.findAndCount({ where, order: { createdAt: 'DESC' }, take: options.pageSize, skip });
     const repNameById = await this.buildUserNameMap();
-    const rows = await Promise.all(shipments.map((s) => this.enrichForBoard(s, repNameById)));
+    const rows = await Promise.all(shipments.map((s) => this.enrichForBoard(s, repNameById, manager)));
     return { rows, total };
   }
 
-  async getShipmentByFulfillmentOrderId(fulfillmentOrderId: string): Promise<Shipment | null> {
-    return this.dataSource.getRepository(Shipment).findOne({ where: { fulfillmentOrderId } });
+  async getShipmentByFulfillmentOrderId(fulfillmentOrderId: string, manager?: EntityManager): Promise<Shipment | null> {
+    return (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { fulfillmentOrderId } });
   }
 
   /**
@@ -634,9 +656,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * `assertDriverOrAdmin` — see that method's own comment for why the
    * two are deliberately separate.
    */
-  async getShipment(shipmentId: string, actorUserId: string): Promise<Shipment & { state: string }> {
-    const shipment = await this.assertCanReadShipment(shipmentId, actorUserId);
-    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId);
+  async getShipment(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<Shipment & { state: string }> {
+    const shipment = await this.assertCanReadShipment(shipmentId, actorUserId, manager);
+    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, manager);
     return { ...shipment, state };
   }
 
@@ -651,28 +673,28 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * display name from a user id (grepped, confirmed absent) — disclosed
    * gap, not silently worked around with a direct cross-domain query.
    */
-  async getShipmentDetail(shipmentId: string, actorUserId: string): Promise<{
+  async getShipmentDetail(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<{
     shipment: Shipment & { state: string };
     customer: { id: string; name: string; phone: string | null; address: string | null; governorate: string | null } | null;
     orderTotalAmount: string | null;
     carrier: { type: 'company' | 'vehicle' | null; id: string | null; name: string | null };
     lines: Array<{ id: string; productId: string; quantity: number; unitPrice: string; lineTotal: string; salesOrderLineId: string }>;
   }> {
-    const shipmentWithState = await this.getShipment(shipmentId, actorUserId);
-    const orderSnapshot = shipmentWithState.salesOrderId ? await this.salesOrders.getOrderSnapshot(shipmentWithState.salesOrderId) : null;
-    const customer = orderSnapshot ? await this.customers.getCustomerSnapshot(orderSnapshot.customerId) : null;
+    const shipmentWithState = await this.getShipment(shipmentId, actorUserId, manager);
+    const orderSnapshot = shipmentWithState.salesOrderId ? await this.salesOrders.getOrderSnapshot(shipmentWithState.salesOrderId, manager) : null;
+    const customer = orderSnapshot ? await this.customers.getCustomerSnapshot(orderSnapshot.customerId, manager) : null;
     const orderTotalAmount = orderSnapshot?.totalAmount ?? null;
 
     let carrier: { type: 'company' | 'vehicle' | null; id: string | null; name: string | null } = { type: null, id: null, name: null };
     if (shipmentWithState.vehicleId) {
-      const vehicle = await this.getVehicle(shipmentWithState.vehicleId);
+      const vehicle = await this.getVehicle(shipmentWithState.vehicleId, manager);
       carrier = { type: 'vehicle', id: vehicle.id, name: vehicle.plateNumber };
     } else if (shipmentWithState.shippingCompanyId) {
-      const company = await this.getShippingCompany(shipmentWithState.shippingCompanyId);
+      const company = await this.getShippingCompany(shipmentWithState.shippingCompanyId, manager);
       carrier = { type: 'company', id: company.id, name: company.name };
     }
 
-    const lines = await this.dataSource.getRepository(ShipmentLine).find({ where: { shipmentId } });
+    const lines = await (manager ?? this.dataSource).getRepository(ShipmentLine).find({ where: { shipmentId } });
 
     return {
       shipment: shipmentWithState,
@@ -705,10 +727,13 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * ("Duplicate function implementation") during real verification —
    * renamed rather than silently shadowing the pre-existing method.
    */
-  async getShipmentLinesSnapshot(shipmentId: string): Promise<{ id: string; salesOrderId: string | null; lines: ShipmentLine[] } | null> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  async getShipmentLinesSnapshot(
+    shipmentId: string,
+    manager?: EntityManager,
+  ): Promise<{ id: string; salesOrderId: string | null; lines: ShipmentLine[] } | null> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) return null;
-    const lines = await this.dataSource.getRepository(ShipmentLine).find({ where: { shipmentId } });
+    const lines = await (manager ?? this.dataSource).getRepository(ShipmentLine).find({ where: { shipmentId } });
     return { id: shipment.id, salesOrderId: shipment.salesOrderId, lines };
   }
 
@@ -718,15 +743,15 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   }
 
   /** V1 Release Audit MEDIUM fix (IDOR) — same missing check as getShipment, same read-only `assertCanReadShipment` (not `assertDriverOrAdmin`) for the same reason. */
-  async getTrackingHistory(shipmentId: string, actorUserId: string): Promise<TrackingEvent[]> {
-    await this.assertCanReadShipment(shipmentId, actorUserId);
-    return this.dataSource
+  async getTrackingHistory(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<TrackingEvent[]> {
+    await this.assertCanReadShipment(shipmentId, actorUserId, manager);
+    return (manager ?? this.dataSource)
       .getRepository(TrackingEvent)
       .find({ where: { shipmentId }, order: { occurredAt: 'ASC' } });
   }
 
-  async getStatus(shipmentId: string): Promise<string> {
-    return this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId);
+  async getStatus(shipmentId: string, manager?: EntityManager): Promise<string> {
+    return this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, manager);
   }
 
   /**
@@ -736,7 +761,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * finance/admin (never the shipment's assigned driver) and was never
    * granted per-shipment access the way `getShipment` requires.
    */
-  async getShipmentSnapshot(shipmentId: string): Promise<{
+  async getShipmentSnapshot(shipmentId: string, manager?: EntityManager): Promise<{
     id: string;
     fulfillmentOrderId: string;
     shippingCompanyId: string | null;
@@ -744,7 +769,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     codAmount: string | null;
     salesOrderId: string | null;
   } | null> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) return null;
     return {
       id: shipment.id,
@@ -767,21 +792,22 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    */
   async getCustodianForShipment(
     shipmentId: string,
+    manager?: EntityManager,
   ): Promise<{ custodyAccountId: string; settlementAccountId: string | null } | null> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) return null;
     if (shipment.vehicleId) {
-      const vehicle = await this.getVehicle(shipment.vehicleId);
+      const vehicle = await this.getVehicle(shipment.vehicleId, manager);
       if (!vehicle.custodyAccountId) return null;
       let settlementAccountId = vehicle.settlementAccountId;
       if (!settlementAccountId && vehicle.shippingCompanyId) {
-        const company = await this.getShippingCompany(vehicle.shippingCompanyId);
+        const company = await this.getShippingCompany(vehicle.shippingCompanyId, manager);
         settlementAccountId = company.treasuryAccountId;
       }
       return { custodyAccountId: vehicle.custodyAccountId, settlementAccountId };
     }
     if (shipment.shippingCompanyId) {
-      const company = await this.getShippingCompany(shipment.shippingCompanyId);
+      const company = await this.getShippingCompany(shipment.shippingCompanyId, manager);
       if (!company.custodyAccountId) return null;
       return { custodyAccountId: company.custodyAccountId, settlementAccountId: company.treasuryAccountId };
     }
@@ -812,30 +838,34 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     responsiblePerson: string | null,
     actorUserId: string,
     parentWarehouseId: string | null = null,
+    manager?: EntityManager,
   ): Promise<ShippingCompany> {
-    const repo = this.dataSource.getRepository(ShippingCompany);
+    const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Shipping company code "${code}" is already in use.`);
     const saved = await repo.save(
       repo.create({ code, name, contactPhone, address, responsiblePerson, warehouseId: null, custodyAccountId: null, treasuryAccountId: null, status: 'active' }),
     );
 
-    const resolvedParentId = await this.resolveParentWarehouseId(parentWarehouseId);
-    const { warehouseId, custodyAccountId } = await this.provisionCustodianResources(name, resolvedParentId, null, actorUserId);
+    const resolvedParentId = await this.resolveParentWarehouseId(parentWarehouseId, manager);
+    const { warehouseId, custodyAccountId } = await this.provisionCustodianResources(name, resolvedParentId, null, actorUserId, manager);
     saved.warehouseId = warehouseId;
     saved.custodyAccountId = custodyAccountId;
     await repo.save(saved);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.shipping_company.created',
-      resource: 'shipping_company',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { code, name, warehouseId, custodyAccountId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.shipping_company.created',
+        resource: 'shipping_company',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { code, name, warehouseId, custodyAccountId },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -844,35 +874,39 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     shippingCompanyId: string,
     updates: { name?: string; contactPhone?: string | null; address?: string | null; responsiblePerson?: string | null },
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<ShippingCompany> {
-    const repo = this.dataSource.getRepository(ShippingCompany);
-    const company = await this.getShippingCompany(shippingCompanyId);
+    const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
+    const company = await this.getShippingCompany(shippingCompanyId, manager);
     const before = { name: company.name, contactPhone: company.contactPhone, address: company.address, responsiblePerson: company.responsiblePerson };
     if (updates.name !== undefined) company.name = updates.name;
     if (updates.contactPhone !== undefined) company.contactPhone = updates.contactPhone;
     if (updates.address !== undefined) company.address = updates.address;
     if (updates.responsiblePerson !== undefined) company.responsiblePerson = updates.responsiblePerson;
     const saved = await repo.save(company);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.shipping_company.updated',
-      resource: 'shipping_company',
-      resourceId: shippingCompanyId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: updates,
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.shipping_company.updated',
+        resource: 'shipping_company',
+        resourceId: shippingCompanyId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: updates,
+      },
+      manager,
+    );
     return saved;
   }
 
-  async listShippingCompanies(): Promise<ShippingCompany[]> {
-    return this.dataSource.getRepository(ShippingCompany).find({ order: { code: 'ASC' } });
+  async listShippingCompanies(manager?: EntityManager): Promise<ShippingCompany[]> {
+    return (manager ?? this.dataSource).getRepository(ShippingCompany).find({ order: { code: 'ASC' } });
   }
 
-  async getShippingCompany(shippingCompanyId: string): Promise<ShippingCompany> {
-    const company = await this.dataSource.getRepository(ShippingCompany).findOne({ where: { id: shippingCompanyId } });
+  async getShippingCompany(shippingCompanyId: string, manager?: EntityManager): Promise<ShippingCompany> {
+    const company = await (manager ?? this.dataSource).getRepository(ShippingCompany).findOne({ where: { id: shippingCompanyId } });
     if (!company) throw new NotFoundException(`Shipping company "${shippingCompanyId}" not found.`);
     return company;
   }
@@ -882,23 +916,27 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     shippingCompanyId: string,
     treasuryAccountId: string | null,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<ShippingCompany> {
-    const repo = this.dataSource.getRepository(ShippingCompany);
-    const company = await this.getShippingCompany(shippingCompanyId);
+    const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
+    const company = await this.getShippingCompany(shippingCompanyId, manager);
     const before = { treasuryAccountId: company.treasuryAccountId };
     company.treasuryAccountId = treasuryAccountId;
     const saved = await repo.save(company);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.shipping_company.treasury_account_set',
-      resource: 'shipping_company',
-      resourceId: shippingCompanyId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { treasuryAccountId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.shipping_company.treasury_account_set',
+        resource: 'shipping_company',
+        resourceId: shippingCompanyId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { treasuryAccountId },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -906,21 +944,25 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     shippingCompanyId: string,
     status: 'active' | 'inactive',
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<ShippingCompany> {
-    const repo = this.dataSource.getRepository(ShippingCompany);
-    const company = await this.getShippingCompany(shippingCompanyId);
+    const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
+    const company = await this.getShippingCompany(shippingCompanyId, manager);
     company.status = status;
     const saved = await repo.save(company);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.shipping_company.status_changed',
-      resource: 'shipping_company',
-      resourceId: shippingCompanyId,
-      result: 'success',
-      correlationId: null,
-      after: { status },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.shipping_company.status_changed',
+        resource: 'shipping_company',
+        resourceId: shippingCompanyId,
+        result: 'success',
+        correlationId: null,
+        after: { status },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -935,11 +977,12 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     branch: string | null,
     actorUserId: string,
     parentWarehouseId: string | null = null,
+    manager?: EntityManager,
   ): Promise<Vehicle> {
-    const repo = this.dataSource.getRepository(Vehicle);
+    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Vehicle code "${code}" is already in use.`);
-    if (shippingCompanyId) await this.getShippingCompany(shippingCompanyId); // 404s if unknown
+    if (shippingCompanyId) await this.getShippingCompany(shippingCompanyId, manager); // 404s if unknown
 
     const saved = await repo.save(
       repo.create({
@@ -955,118 +998,134 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       }),
     );
 
-    const resolvedParentId = await this.resolveParentWarehouseId(parentWarehouseId);
+    const resolvedParentId = await this.resolveParentWarehouseId(parentWarehouseId, manager);
     const { warehouseId, custodyAccountId } = await this.provisionCustodianResources(
       `${code} — ${plateNumber}`,
       resolvedParentId,
       driverUserId,
       actorUserId,
+      manager,
     );
     saved.warehouseId = warehouseId;
     saved.custodyAccountId = custodyAccountId;
     await repo.save(saved);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.vehicle.created',
-      resource: 'vehicle',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.vehicle.created',
+        resource: 'vehicle',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId },
+      },
+      manager,
+    );
     return saved;
   }
 
-  async listVehicles(): Promise<Vehicle[]> {
-    return this.dataSource.getRepository(Vehicle).find({ order: { code: 'ASC' } });
+  async listVehicles(manager?: EntityManager): Promise<Vehicle[]> {
+    return (manager ?? this.dataSource).getRepository(Vehicle).find({ order: { code: 'ASC' } });
   }
 
-  async getVehicle(vehicleId: string): Promise<Vehicle> {
-    const vehicle = await this.dataSource.getRepository(Vehicle).findOne({ where: { id: vehicleId } });
+  async getVehicle(vehicleId: string, manager?: EntityManager): Promise<Vehicle> {
+    const vehicle = await (manager ?? this.dataSource).getRepository(Vehicle).findOne({ where: { id: vehicleId } });
     if (!vehicle) throw new NotFoundException(`Vehicle "${vehicleId}" not found.`);
     return vehicle;
   }
 
   /** CTO directive §2 — "تعديل" (edit): plate number and branch. Driver changes go through `setVehicleDriver` (its own audited action). */
-  async updateVehicle(vehicleId: string, updates: { plateNumber?: string; branch?: string | null }, actorUserId: string): Promise<Vehicle> {
-    const repo = this.dataSource.getRepository(Vehicle);
-    const vehicle = await this.getVehicle(vehicleId);
+  async updateVehicle(vehicleId: string, updates: { plateNumber?: string; branch?: string | null }, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+    const vehicle = await this.getVehicle(vehicleId, manager);
     const before = { plateNumber: vehicle.plateNumber, branch: vehicle.branch };
     if (updates.plateNumber !== undefined) vehicle.plateNumber = updates.plateNumber;
     if (updates.branch !== undefined) vehicle.branch = updates.branch;
     const saved = await repo.save(vehicle);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.vehicle.updated',
-      resource: 'vehicle',
-      resourceId: vehicleId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: updates,
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.vehicle.updated',
+        resource: 'vehicle',
+        resourceId: vehicleId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: updates,
+      },
+      manager,
+    );
     return saved;
   }
 
   /** CTO directive §2 — "تغيير السائق" (change driver), its own explicit action distinct from a general edit. */
-  async setVehicleDriver(vehicleId: string, driverUserId: string | null, actorUserId: string): Promise<Vehicle> {
-    const repo = this.dataSource.getRepository(Vehicle);
-    const vehicle = await this.getVehicle(vehicleId);
+  async setVehicleDriver(vehicleId: string, driverUserId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+    const vehicle = await this.getVehicle(vehicleId, manager);
     const before = { driverUserId: vehicle.driverUserId };
     vehicle.driverUserId = driverUserId;
     const saved = await repo.save(vehicle);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.vehicle.driver_changed',
-      resource: 'vehicle',
-      resourceId: vehicleId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { driverUserId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.vehicle.driver_changed',
+        resource: 'vehicle',
+        resourceId: vehicleId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { driverUserId },
+      },
+      manager,
+    );
     return saved;
   }
 
   /** CTO directive §2 — "إيقاف/إخراج السيارة من الخدمة" (take out of service): never deleted, only retired/reactivated. */
-  async setVehicleStatus(vehicleId: string, status: 'active' | 'retired', actorUserId: string): Promise<Vehicle> {
-    const repo = this.dataSource.getRepository(Vehicle);
-    const vehicle = await this.getVehicle(vehicleId);
+  async setVehicleStatus(vehicleId: string, status: 'active' | 'retired', actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+    const vehicle = await this.getVehicle(vehicleId, manager);
     vehicle.status = status;
     const saved = await repo.save(vehicle);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.vehicle.status_changed',
-      resource: 'vehicle',
-      resourceId: vehicleId,
-      result: 'success',
-      correlationId: null,
-      after: { status },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.vehicle.status_changed',
+        resource: 'vehicle',
+        resourceId: vehicleId,
+        result: 'success',
+        correlationId: null,
+        after: { status },
+      },
+      manager,
+    );
     return saved;
   }
 
   /** Links (or clears) a vehicle's OWN settlement account — when unset, `DeliveryService.remitCollection` falls back to the owning shipping company's. */
-  async setVehicleSettlementAccount(vehicleId: string, treasuryAccountId: string | null, actorUserId: string): Promise<Vehicle> {
-    const repo = this.dataSource.getRepository(Vehicle);
-    const vehicle = await this.getVehicle(vehicleId);
+  async setVehicleSettlementAccount(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+    const vehicle = await this.getVehicle(vehicleId, manager);
     vehicle.settlementAccountId = treasuryAccountId;
     const saved = await repo.save(vehicle);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.vehicle.settlement_account_set',
-      resource: 'vehicle',
-      resourceId: vehicleId,
-      result: 'success',
-      correlationId: null,
-      after: { treasuryAccountId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.vehicle.settlement_account_set',
+        resource: 'vehicle',
+        resourceId: vehicleId,
+        result: 'success',
+        correlationId: null,
+        after: { treasuryAccountId },
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -1084,6 +1143,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async getCustodianOverview(
     custodianType: 'company' | 'vehicle',
     custodianId: string,
+    manager?: EntityManager,
   ): Promise<{
     warehouseId: string | null;
     custodyAccountId: string | null;
@@ -1092,11 +1152,11 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     activeShipmentsCount: number;
   }> {
     const custodian: { warehouseId: string | null; custodyAccountId: string | null } =
-      custodianType === 'company' ? await this.getShippingCompany(custodianId) : await this.getVehicle(custodianId);
+      custodianType === 'company' ? await this.getShippingCompany(custodianId, manager) : await this.getVehicle(custodianId, manager);
 
     const [stock, custodianShipments] = await Promise.all([
-      custodian.warehouseId ? this.inventory.getStockReport(custodian.warehouseId) : Promise.resolve([]),
-      this.dataSource.getRepository(Shipment).find(
+      custodian.warehouseId ? this.inventory.getStockReport(custodian.warehouseId, manager) : Promise.resolve([]),
+      (manager ?? this.dataSource).getRepository(Shipment).find(
         custodianType === 'company' ? { where: { shippingCompanyId: custodianId } } : { where: { vehicleId: custodianId } },
       ),
     ]);
@@ -1109,10 +1169,10 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     // shipment's actual current Process Engine state instead, same
     // "terminal = delivered/returned" definition `searchCustodyShipments`
     // already uses just above.
-    const states = await Promise.all(custodianShipments.map((s) => this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id)));
+    const states = await Promise.all(custodianShipments.map((s) => this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id, manager)));
     const activeShipmentsCount = states.filter((state) => state !== 'delivered' && state !== 'returned').length;
 
-    const custodyBalance = custodian.custodyAccountId ? await this.treasury.getAccountBalance(custodian.custodyAccountId) : null;
+    const custodyBalance = custodian.custodyAccountId ? await this.treasury.getAccountBalance(custodian.custodyAccountId, manager) : null;
 
     return {
       warehouseId: custodian.warehouseId,
@@ -1136,13 +1196,13 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * reservation was originally booked against, since one or more custody
    * transfers may have moved them since).
    */
-  private async resolveCustodyWarehouseId(shipment: Shipment): Promise<string | null> {
+  private async resolveCustodyWarehouseId(shipment: Shipment, manager?: EntityManager): Promise<string | null> {
     if (shipment.vehicleId) {
-      const vehicle = await this.getVehicle(shipment.vehicleId);
+      const vehicle = await this.getVehicle(shipment.vehicleId, manager);
       return vehicle.warehouseId;
     }
     if (shipment.shippingCompanyId) {
-      const company = await this.getShippingCompany(shipment.shippingCompanyId);
+      const company = await this.getShippingCompany(shipment.shippingCompanyId, manager);
       return company.warehouseId;
     }
     return null;
@@ -1156,10 +1216,10 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * the caller falls back to the Fulfillment Order's own warehouse in
    * that case, since custody never left it.
    */
-  async getCurrentCustodyWarehouseId(shipmentId: string): Promise<string | null> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  async getCurrentCustodyWarehouseId(shipmentId: string, manager?: EntityManager): Promise<string | null> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) return null;
-    return this.resolveCustodyWarehouseId(shipment);
+    return this.resolveCustodyWarehouseId(shipment, manager);
   }
 
   /**
@@ -1193,15 +1253,25 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * reservation already sitting at the destination (e.g. a retried
    * transition) is skipped, not re-transferred.
    */
-  private async transferCustodyOnPickup(shipmentId: string, actorUserId: string): Promise<void> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  /**
+   * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+   * added — this method predates Area 21's own Company-routing
+   * requirement (its own earlier doc comment on `transitionShipment`
+   * explicitly deferred this as "out of scope" for a DIFFERENT reason —
+   * atomicity with `DeliveryService.recordOutcome`'s transaction, not
+   * Company-routing). The CTO's Area 21 authorization requires every
+   * nested call to thread the Company-scoped manager regardless — see
+   * `transitionShipment`'s own updated call site below.
+   */
+  private async transferCustodyOnPickup(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) return;
 
-    const destinationWarehouseId = await this.resolveCustodyWarehouseId(shipment);
+    const destinationWarehouseId = await this.resolveCustodyWarehouseId(shipment, manager);
     if (!destinationWarehouseId) return; // no custodian assigned — nothing to transfer
 
-    const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipment.fulfillmentOrderId);
-    const reservations = await this.inventory.getActiveReservationsForOrder(fulfillmentOrder.salesOrderId);
+    const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipment.fulfillmentOrderId, manager);
+    const reservations = await this.inventory.getActiveReservationsForOrder(fulfillmentOrder.salesOrderId, manager);
 
     for (const reservation of reservations) {
       if (reservation.warehouseId === destinationWarehouseId) continue; // already there
@@ -1214,6 +1284,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         'shipment_custody_transfer',
         shipmentId,
         actorUserId,
+        manager,
       );
     }
   }
@@ -1231,25 +1302,29 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * to transition the WHOLE waybill to `returned` stays a separate, human
    * dispatcher decision via the existing `return_to_sender` action.
    */
-  async recordCustodyReversal(shipmentId: string, productId: string, quantity: number, actorUserId: string): Promise<void> {
-    const shipment = await this.dataSource.getRepository(Shipment).findOne({ where: { id: shipmentId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — called cross-domain from `ReturnsService.initiateCustodyReturn`. */
+  async recordCustodyReversal(shipmentId: string, productId: string, quantity: number, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
-    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId);
+    const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, manager);
     if (state === 'delivered' || state === 'returned') {
       throw new ConflictException(`Cannot record a custody reversal for a shipment in state "${state}".`);
     }
 
-    await this.recordTrackingEvent(shipmentId, 'custody_reversed', `${quantity} × product ${productId} reversed out of custody (return).`);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment.custody_reversed',
-      resource: 'shipment',
-      resourceId: shipmentId,
-      result: 'success',
-      correlationId: null,
-      after: { productId, quantity },
-    });
+    await this.recordTrackingEvent(shipmentId, 'custody_reversed', `${quantity} × product ${productId} reversed out of custody (return).`, manager);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment.custody_reversed',
+        resource: 'shipment',
+        resourceId: shipmentId,
+        result: 'success',
+        correlationId: null,
+        after: { productId, quantity },
+      },
+      manager,
+    );
   }
 
   /**
@@ -1276,6 +1351,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       vehicleId?: string;
     },
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<
     Array<{
       shipmentId: string;
@@ -1295,14 +1371,14 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       items: Array<{ productId: string; quantity: number }>;
     }>
   > {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     if (!roles.some((r) => ['admin', 'warehouse_worker', 'sales_supervisor'].includes(r))) {
       throw new ForbiddenException('Role required: admin, warehouse_worker, or sales_supervisor.');
     }
 
     let resolvedCustomerId = filters.customerId ?? null;
     if (!resolvedCustomerId && filters.customerCode) {
-      const customer = await this.customers.findByCode(filters.customerCode);
+      const customer = await this.customers.findByCode(filters.customerCode, manager);
       if (!customer) return [];
       resolvedCustomerId = customer.id;
     }
@@ -1314,7 +1390,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     if (filters.shippingCompanyId) where.shippingCompanyId = filters.shippingCompanyId;
     if (filters.vehicleId) where.vehicleId = filters.vehicleId;
 
-    const candidates = await this.dataSource.getRepository(Shipment).find({ where, order: { createdAt: 'DESC' } });
+    const candidates = await (manager ?? this.dataSource).getRepository(Shipment).find({ where, order: { createdAt: 'DESC' } });
     const withCustodian = candidates.filter((s) => s.shippingCompanyId || s.vehicleId);
 
     const results: Array<{
@@ -1337,19 +1413,19 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
 
     for (const shipment of withCustodian) {
       if (!shipment.salesOrderId) continue;
-      const order = await this.salesOrders.getOrderSnapshot(shipment.salesOrderId);
+      const order = await this.salesOrders.getOrderSnapshot(shipment.salesOrderId, manager);
       if (!order) continue;
       if (resolvedCustomerId && order.customerId !== resolvedCustomerId) continue;
 
-      const customerSnapshot = await this.customers.getCustomerSnapshot(order.customerId);
+      const customerSnapshot = await this.customers.getCustomerSnapshot(order.customerId, manager);
       const custodianType: 'company' | 'vehicle' = shipment.vehicleId ? 'vehicle' : 'company';
       const custodianId = shipment.vehicleId ?? shipment.shippingCompanyId!;
       const custodianName =
-        custodianType === 'vehicle' ? (await this.getVehicle(custodianId)).plateNumber : (await this.getShippingCompany(custodianId)).name;
-      const custodyWarehouseId = await this.resolveCustodyWarehouseId(shipment);
-      const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipment.id);
+        custodianType === 'vehicle' ? (await this.getVehicle(custodianId, manager)).plateNumber : (await this.getShippingCompany(custodianId, manager)).name;
+      const custodyWarehouseId = await this.resolveCustodyWarehouseId(shipment, manager);
+      const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipment.id, manager);
 
-      const reservations = custodyWarehouseId ? await this.inventory.getActiveReservationsForOrder(shipment.salesOrderId) : [];
+      const reservations = custodyWarehouseId ? await this.inventory.getActiveReservationsForOrder(shipment.salesOrderId, manager) : [];
       const items = reservations
         .filter((r) => r.warehouseId === custodyWarehouseId)
         .map((r) => ({ productId: r.productId, quantity: r.quantity }));

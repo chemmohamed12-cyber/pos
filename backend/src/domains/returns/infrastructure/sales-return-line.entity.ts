@@ -46,4 +46,22 @@ export class SalesReturnLine {
 
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   lineTotal!: string;
+  /** D4 — the ORIGINAL unit cost the returned stock re-entered at (null before D4 / when no financial effect). */
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  unitCostBase!: string | null;
+
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  costTotalBase!: string | null;
+
+  /** D4 — Revenue part credited, derived from the ORIGINAL invoice value (never from `returnPrice`). */
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  creditNetBase!: string | null;
+
+  /** D4 — tax part reversed, pro-rata to the original invoice tax. */
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  creditTaxBase!: string | null;
+
+  /** D4 — the original posted invoice this line's Revenue/AR/tax reverses (null ⇒ the sale created no Revenue/AR). */
+  @Column({ type: 'uuid', nullable: true })
+  creditInvoiceId!: string | null;
 }

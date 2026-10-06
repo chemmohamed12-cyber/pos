@@ -11,6 +11,9 @@ import { AppConfigService } from '../configuration/app-config.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { User } from '../identity/user.entity';
 import { JWT_SIGN_OPTIONS } from './jwt-constants';
+import { MembershipService } from '../company/membership.service';
+import { CompanyService } from '../company/company.service';
+import { CompanyNotReadyException, isCompanyOperational } from '../company/company-operational-status';
 
 export interface TokenPair {
   accessToken: string;
@@ -49,6 +52,8 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
     private readonly authorization: AuthorizationService,
+    private readonly memberships: MembershipService,
+    private readonly companies: CompanyService,
   ) {}
 
   /**
@@ -158,6 +163,35 @@ export class AuthService {
   }
 
   /**
+   * Multi-Company Area 5 (2026-09-23, locked decision). Issues a NEW,
+   * Company-scoped token pair carrying `companyId` as a JWT claim — a
+   * transport mechanism only, never authorization proof by itself
+   * (`CompanyContextGuard` re-validates `Membership` against the database
+   * on every subsequent request; this method's own check is what makes a
+   * FRESHLY issued token trustworthy enough to hand to the caller in the
+   * first place, not a substitute for that per-request re-check).
+   * Switching Company always goes through here — there is no
+   * session-based "active Company" state to mutate in place.
+   */
+  async selectCompany(userId: string, companyId: string): Promise<TokenPair> {
+    const membership = await this.memberships.findByUserAndCompany(userId, companyId);
+    if (!membership) {
+      throw new UnauthorizedException('You are not a member of this Company.');
+    }
+    // WP-4.1 / DP-9 D-4: only a READY Company may be selected. Checked after the
+    // Membership (a non-member learns nothing about the Company's state), before
+    // any token is issued. Status is read fresh (DP-9 O-5, no cache).
+    const company = await this.companies.findById(companyId);
+    if (!company) {
+      throw new UnauthorizedException('You are not a member of this Company.');
+    }
+    if (!isCompanyOperational(company.status)) {
+      throw new CompanyNotReadyException();
+    }
+    return this.issueTokenPair(userId, randomUUID(), companyId);
+  }
+
+  /**
    * Rotates a refresh token. Reuse of an already-rotated-out token
    * revokes the whole family — breach detection per
    * DAII_SECURITY_ARCHITECTURE.md §2.
@@ -190,7 +224,28 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token reuse detected; session revoked.');
     }
     await this.refreshTokens.update({ id: record.id }, { revokedAt: new Date() });
-    return this.issueTokenPair(record.userId, record.family);
+
+    // Preserve the Company claim across rotation — but only if the Membership it
+    // named is STILL there; a refresh is a natural point to fail a revoked
+    // Company context fast rather than mint a token `CompanyContextGuard`
+    // would just reject on its first real use anyway.
+    let companyId: string | null = record.companyId;
+    if (companyId && !(await this.memberships.findByUserAndCompany(record.userId, companyId))) {
+      companyId = null;
+    }
+    // WP-4.1 / DP-9 D-6: the Company claim is NOT carried over when the Company
+    // is no longer READY (nor when it no longer exists). The refresh itself still
+    // succeeds — the user keeps an Installation-level session (no refresh-family
+    // revocation, per the CTO ruling) and simply has no Company context until a
+    // READY Company is selected again.
+    if (companyId) {
+      const company = await this.companies.findById(companyId);
+      if (!company || !isCompanyOperational(company.status)) {
+        companyId = null;
+      }
+    }
+
+    return this.issueTokenPair(record.userId, record.family, companyId);
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
@@ -200,10 +255,10 @@ export class AuthService {
     await this.refreshTokens.update({ family: record.family }, { revokedAt: new Date() });
   }
 
-  private async issueTokenPair(userId: string, family: string): Promise<TokenPair> {
+  private async issueTokenPair(userId: string, family: string, companyId: string | null = null): Promise<TokenPair> {
     const { accessSecret, accessTtlSeconds, refreshTtlDays } = this.config.auth;
     const accessToken = await this.jwt.signAsync(
-      { sub: userId },
+      companyId ? { sub: userId, companyId } : { sub: userId },
       { secret: accessSecret, expiresIn: accessTtlSeconds, ...JWT_SIGN_OPTIONS },
     );
 
@@ -212,6 +267,7 @@ export class AuthService {
     const entity = this.refreshTokens.create({
       userId,
       family,
+      companyId,
       tokenHash: hashToken(rawRefreshToken),
       revokedAt: null,
       expiresAt,

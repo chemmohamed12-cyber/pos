@@ -1,3 +1,4 @@
+import type { EntityManager } from 'typeorm';
 /**
  * ERP Foundation — P4 Tranche-2 (`P4_T2_BLUEPRINT.md` §3), `reports`
  * domain. Public contracts `logistics` (`returns`/`shipment`/`delivery`)
@@ -20,9 +21,10 @@ export interface ReturnRequestViewContract {
 }
 
 export interface LogisticsReturnsContract {
-  listReturns(): Promise<ReturnRequestViewContract[]>;
+  /** Area 21 (2026-09-28): `manager?` added to every method below — concretes gained/had it during `reports.controller.ts`'s retrofit. */
+  listReturns(manager?: EntityManager): Promise<ReturnRequestViewContract[]>;
   /** Only `.originalAmount` is ever read — narrowed from the real `Promise<ReturnCredit | null>`. */
-  getCreditForReturnRequest(returnRequestId: string): Promise<{ originalAmount: string } | null>;
+  getCreditForReturnRequest(returnRequestId: string, manager?: EntityManager): Promise<{ originalAmount: string } | null>;
 }
 export const LOGISTICS_RETURNS_CONTRACT = Symbol('LOGISTICS_RETURNS_CONTRACT');
 
@@ -50,10 +52,10 @@ export interface CustodianOverviewContract {
 
 export interface LogisticsShipmentContract {
   /** Only `.id`/`.waybillNumber` are ever read — narrowed from the real `Promise<Shipment | null>`. */
-  getShipmentByFulfillmentOrderId(fulfillmentOrderId: string): Promise<{ id: string; waybillNumber: string | null } | null>;
-  listShippingCompanies(): Promise<ShippingCompanyViewContract[]>;
-  listVehicles(): Promise<VehicleViewContract[]>;
-  getCustodianOverview(custodianType: 'company' | 'vehicle', custodianId: string): Promise<CustodianOverviewContract>;
+  getShipmentByFulfillmentOrderId(fulfillmentOrderId: string, manager?: EntityManager): Promise<{ id: string; waybillNumber: string | null } | null>;
+  listShippingCompanies(manager?: EntityManager): Promise<ShippingCompanyViewContract[]>;
+  listVehicles(manager?: EntityManager): Promise<VehicleViewContract[]>;
+  getCustodianOverview(custodianType: 'company' | 'vehicle', custodianId: string, manager?: EntityManager): Promise<CustodianOverviewContract>;
 }
 export const LOGISTICS_SHIPMENT_CONTRACT = Symbol('LOGISTICS_SHIPMENT_CONTRACT');
 
@@ -67,7 +69,7 @@ export interface CollectionViewContract {
 }
 
 export interface LogisticsDeliveryContract {
-  getCollectionForShipmentUnscoped(shipmentId: string): Promise<CollectionViewContract | null>;
-  listAllCollections(): Promise<CollectionViewContract[]>;
+  getCollectionForShipmentUnscoped(shipmentId: string, manager?: EntityManager): Promise<CollectionViewContract | null>;
+  listAllCollections(manager?: EntityManager): Promise<CollectionViewContract[]>;
 }
 export const LOGISTICS_DELIVERY_CONTRACT = Symbol('LOGISTICS_DELIVERY_CONTRACT');

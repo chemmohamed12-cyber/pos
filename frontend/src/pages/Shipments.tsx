@@ -140,7 +140,10 @@ function ShipmentDetail({
   useEffect(() => {
     (async () => {
       const [products, trackingData] = await Promise.all([
-        api.get<Product[]>('/products/all'),
+        // Foundation fix: every sibling call in this Promise.all already
+        // degrades gracefully on failure — this one didn't, so a single
+        // /products/all failure silently broke the whole detail load.
+        api.get<Product[]>('/products/all').catch(() => []),
         api.get<TrackingEvent[]>(`/shipments/${shipment.id}/tracking`).catch(() => []),
       ]);
       setProducts(products);

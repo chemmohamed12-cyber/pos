@@ -14,6 +14,8 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
 import { ScopeModule } from '../../foundation/scope/scope.module';
 import { ErrorContractModule } from '../../foundation/error-contract/error-contract.module';
 import { EventsModule } from '../../foundation/events/events.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -26,6 +28,12 @@ import { EventsModule } from '../../foundation/events/events.module';
     ScopeModule,
     ErrorContractModule,
     EventsModule, // F06-H1 — the Transactional Outbox for `treasury.cash.recorded` / `treasury.transfer.completed`
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard`. `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [TreasuryController],
   providers: [TreasuryService, { provide: FINANCE_TREASURY_CONTRACT, useExisting: TreasuryService }],

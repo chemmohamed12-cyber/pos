@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, LessThanOrEqual } from 'typeorm';
+import { DataSource, EntityManager, LessThanOrEqual } from 'typeorm';
 import { Currency } from '../infrastructure/currency.entity';
 import { ExchangeRate } from '../infrastructure/exchange-rate.entity';
 import { FiscalYear } from '../infrastructure/fiscal-year.entity';
@@ -29,8 +29,12 @@ export class CurrencyService {
     private readonly audit: AuditService,
   ) {}
 
-  async createCurrency(input: CreateCurrencyInput, actorUserId: string): Promise<Currency> {
-    return this.dataSource.transaction(async (manager) => {
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async createCurrency(input: CreateCurrencyInput, actorUserId: string, manager?: EntityManager): Promise<Currency> {
+    return this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(Currency);
       if (input.isBaseCurrency) {
         await repo.update({ isBaseCurrency: true }, { isBaseCurrency: false });
@@ -64,18 +68,18 @@ export class CurrencyService {
     });
   }
 
-  async listCurrencies(): Promise<Currency[]> {
-    return this.dataSource.getRepository(Currency).find({ order: { code: 'ASC' } });
+  async listCurrencies(manager?: EntityManager): Promise<Currency[]> {
+    return this.em(manager).getRepository(Currency).find({ order: { code: 'ASC' } });
   }
 
-  async getCurrency(code: string): Promise<Currency> {
-    const currency = await this.dataSource.getRepository(Currency).findOne({ where: { code } });
+  async getCurrency(code: string, manager?: EntityManager): Promise<Currency> {
+    const currency = await (manager ?? this.dataSource).getRepository(Currency).findOne({ where: { code } });
     if (!currency) throw new NotFoundException(`Currency "${code}" not found.`);
     return currency;
   }
 
-  async getBaseCurrency(): Promise<Currency | null> {
-    return this.dataSource.getRepository(Currency).findOne({ where: { isBaseCurrency: true } });
+  async getBaseCurrency(manager?: EntityManager): Promise<Currency | null> {
+    return (manager ?? this.dataSource).getRepository(Currency).findOne({ where: { isBaseCurrency: true } });
   }
 
   /**
@@ -87,8 +91,8 @@ export class CurrencyService {
    * consumption deserves its own deliberate pass, not one folded into
    * F01. Disclosed simplification, not a silent shortcut.
    */
-  async setBaseCurrency(code: string, actorUserId: string): Promise<Currency> {
-    return this.dataSource.transaction(async (manager) => {
+  async setBaseCurrency(code: string, actorUserId: string, manager?: EntityManager): Promise<Currency> {
+    return this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(Currency);
       const target = await repo.findOne({ where: { code } });
       if (!target) throw new NotFoundException(`Currency "${code}" not found.`);
@@ -137,13 +141,13 @@ export class CurrencyService {
     });
   }
 
-  async deactivateCurrency(code: string, actorUserId: string): Promise<Currency> {
-    const currency = await this.getCurrency(code);
+  async deactivateCurrency(code: string, actorUserId: string, manager?: EntityManager): Promise<Currency> {
+    const currency = await this.getCurrency(code, manager);
     if (currency.isBaseCurrency) {
       throw new ConflictException('The base/functional currency cannot be deactivated.');
     }
     currency.isActive = false;
-    const saved = await this.dataSource.getRepository(Currency).save(currency);
+    const saved = await this.em(manager).getRepository(Currency).save(currency);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -152,7 +156,7 @@ export class CurrencyService {
       resourceId: code,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
@@ -161,13 +165,12 @@ export class CurrencyService {
     rateDate: string,
     rate: string,
     rateSource: 'manual' | 'api',
-    actorUserId: string,
-  ): Promise<ExchangeRate> {
-    const currency = await this.getCurrency(currencyCode);
+    actorUserId: string, manager?: EntityManager): Promise<ExchangeRate> {
+    const currency = await this.getCurrency(currencyCode, manager);
     if (currency.isBaseCurrency) {
       throw new ConflictException('The base/functional currency has no exchange rate against itself.');
     }
-    const repo = this.dataSource.getRepository(ExchangeRate);
+    const repo = this.em(manager).getRepository(ExchangeRate);
     const saved = await repo.save(repo.create({ currencyCode, rateDate, rate, rateSource, createdByUserId: actorUserId }));
     await this.audit.record({
       actorUserId,
@@ -178,12 +181,12 @@ export class CurrencyService {
       result: 'success',
       correlationId: null,
       after: { currencyCode, rateDate, rate },
-    });
+    }, manager);
     return saved;
   }
 
-  async listExchangeRates(currencyCode: string): Promise<ExchangeRate[]> {
-    return this.dataSource.getRepository(ExchangeRate).find({ where: { currencyCode }, order: { rateDate: 'DESC' } });
+  async listExchangeRates(currencyCode: string, manager?: EntityManager): Promise<ExchangeRate[]> {
+    return this.em(manager).getRepository(ExchangeRate).find({ where: { currencyCode }, order: { rateDate: 'DESC' } });
   }
 
   /**
@@ -191,8 +194,8 @@ export class CurrencyService {
    * Fails closed: no rate found is a thrown error, never a silent 1.0
    * fallback.
    */
-  async getRateOnOrBefore(currencyCode: string, date: string): Promise<ExchangeRate> {
-    const rows = await this.dataSource
+  async getRateOnOrBefore(currencyCode: string, date: string, manager?: EntityManager): Promise<ExchangeRate> {
+    const rows = await (manager ?? this.dataSource)
       .getRepository(ExchangeRate)
       .find({ where: { currencyCode, rateDate: LessThanOrEqual(date) }, order: { rateDate: 'DESC' }, take: 1 });
     if (rows.length === 0) {

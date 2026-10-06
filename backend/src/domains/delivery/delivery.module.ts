@@ -16,6 +16,8 @@ import { AuthorizationModule } from '../../foundation/authorization/authorizatio
 import { PermissionModule } from '../../foundation/permission/permission.module';
 import { CustomerFinanceModule } from '../customer-finance/customer-finance.module';
 import { LOGISTICS_DELIVERY_CONTRACT } from '../../foundation/module-registry/contracts/logistics.contract';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -33,6 +35,12 @@ import { LOGISTICS_DELIVERY_CONTRACT } from '../../foundation/module-registry/co
     // Customer Financial Account / AR (CTO directive) — one-directional,
     // no cycle: CustomerFinanceModule never imports DeliveryModule.
     CustomerFinanceModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for
+    // `CompanyContextGuard`. `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [DeliveryController],
   providers: [DeliveryService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],

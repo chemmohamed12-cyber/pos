@@ -13,6 +13,8 @@ import { AuthorizationModule } from '../../foundation/authorization/authorizatio
 import { ExcelModule } from '../../foundation/excel/excel.module';
 import { SALES_CUSTOMERS_CONTRACT } from '../../foundation/module-registry/contracts/sales.contract';
 import { PermissionModule } from '../../foundation/permission/permission.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -25,6 +27,12 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
     AuthorizationModule,
     ExcelModule,
     PermissionModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard`; `DatabaseRegistryModule` alongside it, same
+    // required pairing discovered/documented during the
+    // `products.controller.ts` retrofit (`CommerceModule`).
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [CustomersController],
   providers: [CustomersService, { provide: SALES_CUSTOMERS_CONTRACT, useExisting: CustomersService }],

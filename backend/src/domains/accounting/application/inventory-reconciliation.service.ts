@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { InventoryReconciliationRun } from '../infrastructure/inventory-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
@@ -45,37 +45,41 @@ export class InventoryReconciliationService {
     @Optional() @Inject(MANUFACTURING_WIP_CONTRACT) private readonly manufacturingWip?: ManufacturingWipContract,
   ) {}
 
-  async listRuns(filter?: { status?: string; from?: string; to?: string }): Promise<InventoryReconciliationRun[]> {
-    const qb = this.dataSource.getRepository(InventoryReconciliationRun).createQueryBuilder('r');
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async listRuns(filter?: { status?: string; from?: string; to?: string }, manager?: EntityManager): Promise<InventoryReconciliationRun[]> {
+    const qb = this.em(manager).getRepository(InventoryReconciliationRun).createQueryBuilder('r');
     if (filter?.status) qb.andWhere('r.status = :s', { s: filter.status });
     if (filter?.from) qb.andWhere('r."asOfDate" >= :f', { f: filter.from });
     if (filter?.to) qb.andWhere('r."asOfDate" <= :t', { t: filter.to });
     return qb.orderBy('r."createdAt"', 'DESC').getMany();
   }
 
-  async getRun(id: string): Promise<InventoryReconciliationRun> {
-    const run = await this.dataSource.getRepository(InventoryReconciliationRun).findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
+    const run = await this.em(manager).getRepository(InventoryReconciliationRun).findOne({ where: { id } });
     if (!run) throw new NotFoundException(`Inventory reconciliation run "${id}" not found.`);
     return run;
   }
 
-  private async inventoryAccount(): Promise<GLAccount> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { controlFunction: 'inventory', isActive: true } });
+  private async inventoryAccount(manager?: EntityManager): Promise<GLAccount> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { controlFunction: 'inventory', isActive: true } });
     if (!acc) {
       throw new ConflictException('No active `inventory` control account in the chart of accounts — assign controlFunction "inventory" to an account first.');
     }
     return acc;
   }
 
-  async reconcile(input: InventoryReconcileInput, actorUserId: string): Promise<InventoryReconciliationRun> {
+  async reconcile(input: InventoryReconcileInput, actorUserId: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
     const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
-    const inv = await this.inventoryAccount();
+    const inv = await this.inventoryAccount(manager);
 
     // GL side — always computed
-    const gl = await this.ledger.getAccountLedger(inv.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined });
+    const gl = await this.ledger.getAccountLedger(inv.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
     const glBalanceBase = gl.closingBalanceBase;
 
-    const repo = this.dataSource.getRepository(InventoryReconciliationRun);
+    const repo = this.em(manager).getRepository(InventoryReconciliationRun);
 
     // --- No valuation source (ADR-040 D3/D10) --------------------------------
     if (!this.valuation) {
@@ -95,25 +99,25 @@ export class InventoryReconciliationService {
           glLineCount: gl.lines.length,
         },
         actorUserId,
-      });
-      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_valuation_source' });
+      }, manager);
+      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_valuation_source' }, manager);
       return saved;
     }
 
     // --- Valuation source present (future F08) -------------------------------
-    const rawValued = await this.valuation.getValuedOnHandTotal(asOfDate);
+    const rawValued = await this.valuation.getValuedOnHandTotal(asOfDate, manager);
     // Month-End dependency (independent review, Phase 1) — exclude every Manufacturing WIP
     // sub-warehouse from THIS reconciliation's own sum; `WipReconciliationService` covers that
     // slice against the `wip` GL account separately. See the constructor's `manufacturingWip`
     // doc comment for why this must be a split, never a combined/netted comparison.
     let valued = rawValued;
     if (this.manufacturingWip) {
-      const wip = await this.manufacturingWip.getAllWipBalances(asOfDate);
+      const wip = await this.manufacturingWip.getAllWipBalances(asOfDate, manager);
       const wipWarehouseIds = new Set(wip.balances.map((b) => b.wipWarehouseId));
       valued = rawValued.filter((w) => !wipWarehouseIds.has(w.warehouseId));
     }
     const subledgerTotalBase = valued.reduce((sum, w) => sum + Number(w.totalValueBase), 0).toFixed(4);
-    const [d] = (await this.dataSource.query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
+    const [d] = (await this.em(manager).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
       subledgerTotalBase,
       glBalanceBase,
     ])) as Array<{ drift: string }>;
@@ -139,17 +143,17 @@ export class InventoryReconciliationService {
       status: matched ? 'matched' : 'drift_found',
       driftBreakdown,
       actorUserId,
-    });
-    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status });
+    }, manager);
+    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status }, manager);
     return saved;
   }
 
-  async closeRun(id: string, actorUserId: string): Promise<InventoryReconciliationRun> {
-    const run = await this.getRun(id);
+  async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
+    const run = await this.getRun(id, manager);
     if (run.status === 'closed') return run;
     run.status = 'closed';
     run.closedAt = new Date();
-    const saved = await this.dataSource.getRepository(InventoryReconciliationRun).save(run);
+    const saved = await this.em(manager).getRepository(InventoryReconciliationRun).save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -158,7 +162,7 @@ export class InventoryReconciliationService {
       resourceId: id,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
@@ -175,8 +179,7 @@ export class InventoryReconciliationService {
       status: InventoryReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    },
-  ): Promise<InventoryReconciliationRun> {
+    }, manager?: EntityManager): Promise<InventoryReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({
@@ -201,7 +204,7 @@ export class InventoryReconciliationService {
     }
   }
 
-  private async recordAudit(actorUserId: string, saved: InventoryReconciliationRun, after: Record<string, unknown>): Promise<void> {
+  private async recordAudit(actorUserId: string, saved: InventoryReconciliationRun, after: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -211,6 +214,6 @@ export class InventoryReconciliationService {
       result: 'success',
       correlationId: null,
       after,
-    });
+    }, manager);
   }
 }

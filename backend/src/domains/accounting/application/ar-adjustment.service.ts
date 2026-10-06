@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import {
   AR_ADJUSTMENT_META,
   AR_ADJUSTMENT_POSTING,
@@ -49,7 +49,6 @@ export interface SubmitArAdjustmentInput {
 @Injectable()
 export class ArAdjustmentService implements OnModuleInit {
   constructor(
-    private readonly dataSource: DataSource,
     private readonly approvals: ApprovalEngineService,
     private readonly financialEvents: FinancialEventService,
     private readonly registry: FinancialEventHandlerRegistry,
@@ -80,16 +79,20 @@ export class ArAdjustmentService implements OnModuleInit {
         .catch(() => undefined); // idempotent-ish; a concurrent init is harmless
     }
     // subscribe once to FA-01's approval event — perform the approved AR action
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
   // Submit (maker)
   // ---------------------------------------------------------------------------
 
-  async submitAdjustment(input: SubmitArAdjustmentInput, actorUserId: string): Promise<{ mode: 'approval' | 'straight_through'; approvalRequestId?: string; financialEventId?: string }> {
+  async submitAdjustment(input: SubmitArAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<{ mode: 'approval' | 'straight_through'; approvalRequestId?: string; financialEventId?: string }> {
     if (!isArAdjustmentKind(input.kind)) throw new BadRequestException(`Unknown AR adjustment kind "${input.kind}".`);
     if (!isPositiveAmount(input.amount)) throw new BadRequestException('Amount must be a positive decimal.');
     if (!input.reason?.trim()) throw new BadRequestException('A reason is required.');
@@ -113,7 +116,7 @@ export class ArAdjustmentService implements OnModuleInit {
     };
 
     if (!gated) {
-      const financialEventId = await this.performApprovedAdjustment(payload, actorUserId);
+      const financialEventId = await this.performApprovedAdjustment(payload, actorUserId, undefined, manager);
       await this.audit.record({
         actorUserId,
         organizationId: null,
@@ -123,7 +126,7 @@ export class ArAdjustmentService implements OnModuleInit {
         result: 'success',
         correlationId: null,
         after: { kind: input.kind, amount: input.amount },
-      });
+      }, manager);
       return { mode: 'straight_through', financialEventId };
     }
 
@@ -135,7 +138,7 @@ export class ArAdjustmentService implements OnModuleInit {
       payload,
       makerUserId: actorUserId,
       orgUnitId: input.orgUnitId ?? null,
-    });
+    }, manager);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -145,7 +148,7 @@ export class ArAdjustmentService implements OnModuleInit {
       result: 'success',
       correlationId: input.customerId,
       after: { kind: input.kind, amount: input.amount, requestTypeCode: meta.requestTypeCode },
-    });
+    }, manager);
     return { mode: 'approval', approvalRequestId: request.id };
   }
 
@@ -153,18 +156,17 @@ export class ArAdjustmentService implements OnModuleInit {
   // FA-01 approval subscriber
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (!Object.values(AR_APPROVAL_REQUEST_TYPES).includes(requestTypeCode as never)) return; // not ours
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
-    await this.performApprovedAdjustment(inner, '00000000-0000-0000-0000-000000000000', String(payload.approvalRequestId ?? ''));
+    await this.performApprovedAdjustment(inner, '00000000-0000-0000-0000-000000000000', String(payload.approvalRequestId ?? ''), manager);
   }
 
   private async performApprovedAdjustment(
     p: Record<string, unknown>,
     actorUserId: string,
-    approvalRequestId = '',
-  ): Promise<string> {
+    approvalRequestId = '', manager?: EntityManager): Promise<string> {
     const kind = String(p.kind) as ArAdjustmentKind;
     const customerId = String(p.customerId);
     const amount = String(p.amount);
@@ -180,7 +182,7 @@ export class ArAdjustmentService implements OnModuleInit {
       amount,
       reason: `AR ${kind}: ${String(p.reason ?? '')}`.slice(0, 250),
       createdByUserId: actorUserId,
-    });
+    }, manager);
 
     // 2. GL via an internal FinancialEvent → F04 handler → F03 posting gate
     const result = await this.financialEvents.ingest(AR_INTERNAL_EVENT_TYPE, {
@@ -197,7 +199,7 @@ export class ArAdjustmentService implements OnModuleInit {
       reason: p.reason ?? '',
       contraAccountCode: p.contraAccountCode ?? null,
       direction,
-    });
+    }, manager);
 
     await this.audit.record({
       actorUserId,
@@ -208,7 +210,7 @@ export class ArAdjustmentService implements OnModuleInit {
       result: result.status === 'POSTED' ? 'success' : 'failure',
       correlationId: approvalRequestId || null,
       after: { kind, amount, financialEventId: result.financialEventId, status: result.status },
-    });
+    }, manager);
 
     if (result.status === 'REJECTED') {
       throw new ConflictException(`AR ${kind} GL posting was rejected — see financial event ${result.financialEventId}.`);
@@ -220,7 +222,7 @@ export class ArAdjustmentService implements OnModuleInit {
   // Checker
   // ---------------------------------------------------------------------------
 
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 }

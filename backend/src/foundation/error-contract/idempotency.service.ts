@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { IdempotencyRecord } from './idempotency-record.entity';
 
 /**
@@ -20,13 +19,19 @@ import { IdempotencyRecord } from './idempotency-record.entity';
  * guard (DAII_SECURITY_ARCHITECTURE.md §4) — belt-and-suspenders, since
  * the client-side guard alone was exactly what failed in xnexus-website's
  * one documented incident (Daii/_source-audits/xnexus-website/).
+ *
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27) — rewritten
+ * from `@InjectRepository(IdempotencyRecord)` (structurally incapable of
+ * Company-routing) to an injected `DataSource` + `manager?` on both
+ * methods, the same fix `ScopeService`/`OrganizationService` already
+ * received. `IdempotencyRecord` is genuinely Company-owned: without this
+ * fix, a duplicate `(scope, key)` pair from two DIFFERENT Companies would
+ * have collided against the same ambient table, incorrectly deduping one
+ * Company's request against another's.
  */
 @Injectable()
 export class IdempotencyService {
-  constructor(
-    @InjectRepository(IdempotencyRecord) private readonly records: Repository<IdempotencyRecord>,
-    private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   /**
    * Runs `operation` at most once per (scope, key). A missing key means
@@ -44,10 +49,11 @@ export class IdempotencyService {
    * specifically, that meant a second, independent Treasury cash-in leg
    * per retry (rows 33/34).
    */
-  async withIdempotency<T>(scope: string, key: string | undefined, operation: () => Promise<T>): Promise<T> {
+  async withIdempotency<T>(scope: string, key: string | undefined, operation: () => Promise<T>, manager?: EntityManager): Promise<T> {
     if (!key) return operation();
 
-    const existing = await this.records.findOne({ where: { scope, key } });
+    const records = (manager ?? this.dataSource).getRepository(IdempotencyRecord);
+    const existing = await records.findOne({ where: { scope, key } });
     if (existing) {
       return existing.responseBody as T;
     }
@@ -55,13 +61,13 @@ export class IdempotencyService {
     const result = await operation();
 
     try {
-      await this.records.save(this.records.create({ scope, key, statusCode: 200, responseBody: result as unknown }));
+      await records.save(records.create({ scope, key, statusCode: 200, responseBody: result as unknown }));
     } catch {
       // Unique-constraint race: another concurrent request with the same
       // key won the insert first. Return ITS cached result, not ours —
       // this is what makes the guarantee "exactly one winner" under
       // concurrency, not just "usually one winner."
-      const winner = await this.records.findOne({ where: { scope, key } });
+      const winner = await records.findOne({ where: { scope, key } });
       if (winner) return winner.responseBody as T;
       throw new Error(`Idempotency race for scope="${scope}" key="${key}" but no winning record found.`);
     }
@@ -84,17 +90,24 @@ export class IdempotencyService {
    * partway through `fn` leaves neither, so a retry with the same key
    * starts clean instead of re-running on top of a half-applied prior
    * attempt.
+   *
+   * Area 21: `manager?` added as the trailing parameter (the transaction's
+   * OWN manager is still `fn`'s first argument, unchanged) — when supplied
+   * (e.g. `req.companyContext.dataSource.manager`), the transaction opens
+   * against THAT Company's own connection instead of the ambient one,
+   * same `(manager ?? this.dataSource).transaction(...)` idiom used
+   * throughout this codebase.
    */
-  async withIdempotencyInTransaction<T>(scope: string, key: string | undefined, fn: (manager: EntityManager) => Promise<T>): Promise<T> {
-    return this.dataSource.transaction(async (manager) => {
-      if (!key) return fn(manager);
+  async withIdempotencyInTransaction<T>(scope: string, key: string | undefined, fn: (manager: EntityManager) => Promise<T>, manager?: EntityManager): Promise<T> {
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      if (!key) return fn(txManager);
 
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`idempotency:${scope}:${key}`]);
-      const records = manager.getRepository(IdempotencyRecord);
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`idempotency:${scope}:${key}`]);
+      const records = txManager.getRepository(IdempotencyRecord);
       const existing = await records.findOne({ where: { scope, key } });
       if (existing) return existing.responseBody as T;
 
-      const result = await fn(manager);
+      const result = await fn(txManager);
       await records.save(records.create({ scope, key, statusCode: 200, responseBody: result as unknown }));
       return result;
     });

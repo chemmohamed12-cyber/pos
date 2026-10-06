@@ -1,3 +1,5 @@
+import type { EntityManager } from 'typeorm';
+
 /**
  * F10 (ADR-043 D1). Public contract `accounting` exposes for Tax
  * Definition + Calculation — `accounting` owns TaxCode and the rate/type/
@@ -40,7 +42,7 @@ export interface TaxEngineContract {
    * `isInclusive = false` (the common case), or tax-INCLUSIVE (the amount
    * already contains the tax) when `isInclusive = true`.
    */
-  calculateForInvoice(baseAmount: string, explicitTaxCodeId?: string | null): Promise<TaxCalculationResult>;
+  calculateForInvoice(baseAmount: string, explicitTaxCodeId?: string | null, manager?: EntityManager): Promise<TaxCalculationResult>;
 
   /**
    * Post-time only (ADR-043 D5) — the CURRENT `accountMappingRef` for an
@@ -54,6 +56,6 @@ export interface TaxEngineContract {
    * existing `resolveControlAccount('tax_payable')` fallback (already
    * built, RBW §1.2) then applies unchanged.
    */
-  resolveTaxAccountCode(taxCodeId: string | null): Promise<string | null>;
+  resolveTaxAccountCode(taxCodeId: string | null, manager?: EntityManager): Promise<string | null>;
 }
 export const TAX_ENGINE_CONTRACT = Symbol('TAX_ENGINE_CONTRACT');

@@ -35,8 +35,8 @@ export interface WarehouseSnapshot {
 }
 
 export interface InventoryReservationContract {
-  /** Rejects (never resolves null) when the warehouse doesn't exist — callers that need a soft-fail already `.catch()` this themselves, unchanged from the pre-refactor direct-import behavior. */
-  getWarehouse(warehouseId: string): Promise<WarehouseSnapshot>;
+  /** Rejects (never resolves null) when the warehouse doesn't exist — callers that need a soft-fail already `.catch()` this themselves, unchanged from the pre-refactor direct-import behavior. Area 21 Operational Company Scoping Retrofit (2026-09-27) — `manager?` added, same additive shape as `releasePreliminaryHoldsForOrder` below. */
+  getWarehouse(warehouseId: string, manager?: EntityManager): Promise<WarehouseSnapshot>;
 
   reserveStockInTransaction(
     manager: EntityManager,
@@ -64,11 +64,14 @@ export interface InventoryReservationContract {
     actorUserId: string | null,
   ): Promise<void>;
 
-  confirmReservationsForOrder(salesOrderId: string, actorUserId: string | null): Promise<void>;
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27) — `manager?` added, same additive shape as `releasePreliminaryHoldsForOrder` below. */
+  confirmReservationsForOrder(salesOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void>;
 
-  releasePreliminaryHoldsForOrder(salesOrderId: string, actorUserId: string | null, reason: string): Promise<void>;
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (e.g. `PreliminaryHoldExpiryScheduler`, via `SalesOrdersService.expireHoldForOrder`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `DataSource` when omitted, unchanged for every existing caller. */
+  releasePreliminaryHoldsForOrder(salesOrderId: string, actorUserId: string | null, reason: string, manager?: EntityManager): Promise<void>;
 
-  findExpiredPreliminaryHoldOrderIds(olderThan: Date): Promise<string[]>;
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added, same reason as `releasePreliminaryHoldsForOrder` above. */
+  findExpiredPreliminaryHoldOrderIds(olderThan: Date, manager?: EntityManager): Promise<string[]>;
 }
 export const INVENTORY_RESERVATION_CONTRACT = Symbol('INVENTORY_RESERVATION_CONTRACT');
 
@@ -115,6 +118,16 @@ export interface StockReportRow {
   available: number;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+ * added to `createWarehouse`/`listWarehouses`/`getStockReport`/
+ * `getActiveReservationsForOrder` — the concrete `InventoryService`
+ * implementations gained it during `inventory.controller.ts`'s own
+ * retrofit (§21); this contract was never widened to match. Discovered
+ * while evaluating `shipment.controller.ts`/`returns.controller.ts`
+ * (§23/§26), both of which call `createWarehouse`/`findOperationalSubLocation`
+ * through this same contract.
+ */
 export interface InventoryLogisticsContract {
   createWarehouse(
     code: string,
@@ -123,13 +136,14 @@ export interface InventoryLogisticsContract {
     responsibleUserId: string | null,
     parentWarehouseId: string | null,
     kind: 'main' | 'operational',
+    manager?: EntityManager,
   ): Promise<{ id: string }>;
 
-  listWarehouses(): Promise<WarehouseView[]>;
+  listWarehouses(manager?: EntityManager): Promise<WarehouseView[]>;
 
-  getStockReport(warehouseId?: string): Promise<StockReportRow[]>;
+  getStockReport(warehouseId?: string, manager?: EntityManager): Promise<StockReportRow[]>;
 
-  getActiveReservationsForOrder(salesOrderId: string): Promise<ReservationView[]>;
+  getActiveReservationsForOrder(salesOrderId: string, manager?: EntityManager): Promise<ReservationView[]>;
 
   /** Gap Resolution Package 3 (2026-09-14, row 37) — `manager?` added so `ReturnsService.recordDisposition` can make this call part of its one atomic operation. */
   relocateReservedStock(
@@ -147,8 +161,26 @@ export interface InventoryLogisticsContract {
   /** P4 Tranche-2 (delivery domain). Gap Resolution Package 3 (2026-09-14, row 37) — `manager?` added. */
   fulfillReservationsForOrder(salesOrderId: string, currentWarehouseId: string, actorUserId: string | null, manager?: EntityManager): Promise<void>;
 
-  /** P4 Tranche-2 (returns domain) — only `.id` of the found sub-location is ever read. */
-  findOperationalSubLocation(parentWarehouseId: string, codePrefix: string): Promise<{ id: string } | null>;
+  /**
+   * D4 (2026-10-05) — the ORIGINAL cost of a sold product (Σ issue value ÷ Σ issue qty of the order's dispatches), or `null`
+   * when it cannot be determined deterministically (the caller fails closed). Pure read.
+   */
+  resolveOriginalSaleCost(salesOrderId: string, productId: string, manager?: EntityManager): Promise<{ unitCostBase: string; quantity: number } | null>;
+
+  /** D4 (2026-10-05) — returned stock back into the ledger at the ORIGINAL cost (valuation restored, `Dr Inventory / Cr COGS` event). */
+  recordSaleReturnIn(
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+    unitCostBase: string,
+    referenceType: 'sales_return' | 'shipment_return',
+    referenceId: string,
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<unknown>;
+
+  /** P4 Tranche-2 (returns domain) — only `.id` of the found sub-location is ever read. Area 21: `manager?` added — concrete `InventoryService.findOperationalSubLocation` gained it in the same pass (had none at all before, a genuine concrete gap, not just interface drift). */
+  findOperationalSubLocation(parentWarehouseId: string, codePrefix: string, manager?: EntityManager): Promise<{ id: string } | null>;
 
   /** P4 Tranche-2 (returns domain) — return value never read at any call site. Gap Resolution Package 3 (2026-09-14, row 37) — `manager?` added. */
   recordMovement(
@@ -179,9 +211,17 @@ export interface FulfillmentOrderView {
   warehouseId: string;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+ * added to both methods — the concrete `FulfillmentService` implementations
+ * gained it during `treasury.controller.ts`'s own retrofit pass (discovered
+ * as one of `shipment.controller.ts`'s STOP/ESCALATE blockers,
+ * AREA21-RETROFIT-MATRIX.md §26 — Fulfillment has no controller of its own
+ * in the 43, so this fix has no other "owning turn" to defer to).
+ */
 export interface FulfillmentContract {
-  getFulfillmentOrder(fulfillmentOrderId: string): Promise<FulfillmentOrderView>;
+  getFulfillmentOrder(fulfillmentOrderId: string, manager?: EntityManager): Promise<FulfillmentOrderView>;
   /** P4 Tranche-2 (reports domain) — only `.id` is ever read. */
-  getFulfillmentOrderBySalesOrderId(salesOrderId: string): Promise<{ id: string } | null>;
+  getFulfillmentOrderBySalesOrderId(salesOrderId: string, manager?: EntityManager): Promise<{ id: string } | null>;
 }
 export const FULFILLMENT_CONTRACT = Symbol('FULFILLMENT_CONTRACT');

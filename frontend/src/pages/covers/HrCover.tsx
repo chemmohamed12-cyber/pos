@@ -20,15 +20,19 @@ export function HrCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [employees, departments] = await Promise.all([
-        api.get<Employee[]>('/hr/employees'),
-        api.get<Department[]>('/hr/departments'),
-      ]);
-      setKpis({
-        total: employees.length,
-        active: employees.filter((e) => e.status === 'active').length,
-        departments: departments.length,
-      });
+      try {
+        const [employees, departments] = await Promise.all([
+          api.get<Employee[]>('/hr/employees'),
+          api.get<Department[]>('/hr/departments'),
+        ]);
+        setKpis({
+          total: employees.length,
+          active: employees.filter((e) => e.status === 'active').length,
+          departments: departments.length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

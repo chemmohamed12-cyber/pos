@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { SalesOrder } from '../infrastructure/sales-order.entity';
 import { SalesOrderLine } from '../infrastructure/sales-order-line.entity';
 import { ORDER_ACTION_REQUIRED_ROLES } from '../domain/order-action-roles';
@@ -114,8 +114,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
   }
 
   /** Looks up the order's snapshotted policy and resolves it to a Process Definition — the one place every method below goes through, never hardcoding `SALES_ORDER_APPROVAL_PROCESS` directly. */
-  private async getOrderAndDefinition(orderId: string): Promise<{ order: SalesOrder; definition: ProcessDefinition }> {
-    const order = await this.dataSource.getRepository(SalesOrder).findOne({ where: { id: orderId } });
+  private async getOrderAndDefinition(orderId: string, manager?: EntityManager): Promise<{ order: SalesOrder; definition: ProcessDefinition }> {
+    const order = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Sales order "${orderId}" not found.`);
     return { order, definition: PROCESS_BY_POLICY[order.workflowPolicy] ?? SALES_ORDER_APPROVAL_PROCESS };
   }
@@ -132,8 +132,9 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     line: CreateOrderLineInput,
     customerPriceListId: string | null,
     actorCanSetManagerPrice: boolean,
+    manager?: EntityManager,
   ): Promise<ResolvedLineInput> {
-    const snapshot = await this.products.getProductSnapshot(line.productId);
+    const snapshot = await this.products.getProductSnapshot(line.productId, manager);
     if (!snapshot || snapshot.status !== 'active') {
       throw new BadRequestException(`Product "${line.productId}" is not available for order.`);
     }
@@ -151,7 +152,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // `priceListAdjustedPrice` is just the starting point the
     // three-tier override chain below begins from.
     let priceListAdjustedPrice = snapshot.unitPrice;
-    const resolved = await this.priceLists.resolvePrice(customerPriceListId, snapshot.id);
+    const resolved = await this.priceLists.resolvePrice(customerPriceListId, snapshot.id, manager);
     if (resolved.price !== null) {
       priceListAdjustedPrice = resolved.price;
     }
@@ -215,6 +216,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     warehouseId: string,
     shippingMethod: ShippingMethod,
     skipDeposit = false,
+    manager?: EntityManager,
   ): Promise<SalesOrder> {
     if (lines.length === 0) {
       throw new BadRequestException('A Sales Order must have at least one line item.');
@@ -234,7 +236,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // were always forced to be the same person); a plain sales_rep may
     // only ever create their own orders, same as before this change.
     // (2) whether any line's `managerPrice` may be honored at all.
-    const actorRoles = actorUserId ? await this.authorization.getRoleKeysForUser(actorUserId) : [];
+    const actorRoles = actorUserId ? await this.authorization.getRoleKeysForUser(actorUserId, manager) : [];
     const actorCanSetManagerPrice = actorRoles.some((r) => MANAGER_PRICE_ROLES.includes(r));
     if (salesRepUserId !== actorUserId && !actorCanSetManagerPrice) {
       throw new ForbiddenException('Only a sales manager or admin may create an order under a different Sales Representative.');
@@ -258,17 +260,17 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // A sales rep may only create an order for a customer they're scoped to —
     // this is the enforcement point for blueprint §22's "must be technically
     // unable to retrieve/act on an unauthorized customer" rule.
-    await this.scope.assertAccess(salesRepUserId, 'customer', customerId);
+    await this.scope.assertAccess(salesRepUserId, 'customer', customerId, manager);
 
-    const orderNumber = await this.numbering.getNextNumber('sales_order');
+    const orderNumber = await this.numbering.getNextNumber('sales_order', manager);
 
     // Per-rep order sequence (CTO instruction) — a second, human-facing
     // number distinct from `orderNumber`'s global identity. Reuses the
     // Numbering Engine's own row-locked concurrency guarantee, keyed
     // per rep, rather than a COUNT-based scheme that could race.
     const repDocumentType = `sales_order_rep_${salesRepUserId}`;
-    await this.numbering.registerDocumentType(repDocumentType, 'REP', false); // idempotent
-    const repFormatted = await this.numbering.getNextNumber(repDocumentType);
+    await this.numbering.registerDocumentType(repDocumentType, 'REP', false, manager); // idempotent
+    const repFormatted = await this.numbering.getNextNumber(repDocumentType, manager);
     const repSequenceNumber = Number(repFormatted.replace(/^REP-/, ''));
 
     // Read CRM's published contract BEFORE opening our own write
@@ -277,12 +279,12 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // (DAII_DOMAIN_BOUNDARIES.md Cross-Domain Rule). Snapshotted onto the
     // order now, per Gap G-1, so a later change to the customer's policy
     // never retroactively alters an already-in-flight order's chain.
-    const workflowPolicy = await this.customers.getWorkflowPolicySnapshot(customerId);
+    const workflowPolicy = await this.customers.getWorkflowPolicySnapshot(customerId, manager);
     // Gap G-3 — which Price List (if any) this customer's lines should
     // resolve prices against. Same snapshot timing/discipline as
     // `workflowPolicy` above: read once, up front, never re-resolved
     // later if the customer's assignment changes after this order exists.
-    const customerPriceListId = await this.customers.getPriceListId(customerId);
+    const customerPriceListId = await this.customers.getPriceListId(customerId, manager);
 
     // Read Commerce's published contract BEFORE opening our own write
     // transaction — Sales Orders never touches Product's table directly
@@ -292,14 +294,14 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     let totalAmount = 0;
     const lineInputs: ResolvedLineInput[] = [];
     for (const line of lines) {
-      const resolved = await this.resolveLineInput(line, customerPriceListId, actorCanSetManagerPrice);
+      const resolved = await this.resolveLineInput(line, customerPriceListId, actorCanSetManagerPrice, manager);
       totalAmount += Number(resolved.lineTotal);
       lineInputs.push(resolved);
     }
 
-    const order = await this.dataSource.transaction(async (manager) => {
-      const lineRepo = manager.getRepository(SalesOrderLine);
-      const orderRepo = manager.getRepository(SalesOrder);
+    const order = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const lineRepo = txManager.getRepository(SalesOrderLine);
+      const orderRepo = txManager.getRepository(SalesOrder);
 
       const lineEntities = lineInputs.map((input) => lineRepo.create(input));
 
@@ -346,7 +348,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       const reservationStatus = workflowPolicy === 'open_account' ? 'active' : 'preliminary';
       for (const line of lineInputs) {
         await this.inventory.reserveStockInTransaction(
-          manager,
+          txManager,
           warehouseId,
           line.productId,
           line.quantity,
@@ -359,19 +361,22 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       return savedOrder;
     });
 
-    await this.processEngine.start(PROCESS_BY_POLICY[workflowPolicy], ENTITY_TYPE, order.id);
-    await this.scope.assign(salesRepUserId, ENTITY_TYPE, order.id);
+    await this.processEngine.start(PROCESS_BY_POLICY[workflowPolicy], ENTITY_TYPE, order.id, manager);
+    await this.scope.assign(salesRepUserId, ENTITY_TYPE, order.id, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'sales.order.created',
-      resource: 'sales_order',
-      resourceId: order.id,
-      result: 'success',
-      correlationId: null,
-      after: { orderNumber, customerId, totalAmount: order.totalAmount },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'sales.order.created',
+        resource: 'sales_order',
+        resourceId: order.id,
+        result: 'success',
+        correlationId: null,
+        after: { orderNumber, customerId, totalAmount: order.totalAmount },
+      },
+      manager,
+    );
 
     return order;
   }
@@ -386,8 +391,9 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * "qualified role, not per-resource assignment" boundary already
    * governing the review actions themselves.
    */
-  async listOrders(actorUserId: string): Promise<SalesOrder[]> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
+  async listOrders(actorUserId: string, manager?: EntityManager): Promise<SalesOrder[]> {
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     // REAL BUG FOUND LIVE (CTO directive — Fulfillment dashboard rework):
     // `warehouse_worker` was never in this "sees everything" set, so a
     // real fulfillment operator opening the Fulfillment screen's
@@ -397,7 +403,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // (`GET /sales-orders` with no rep filter); the server just never
     // actually granted it.
     const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker'].includes(r));
-    const repo = this.dataSource.getRepository(SalesOrder);
+    const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     if (isReviewerOrAdmin) {
       return repo.find({ order: { createdAt: 'DESC' } });
     }
@@ -415,10 +421,10 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * screen's own table specifically; same Scope-vs-Role visibility split
    * as `listOrders`.
    */
-  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number }): Promise<{ rows: SalesOrder[]; total: number }> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number }, manager?: EntityManager): Promise<{ rows: SalesOrder[]; total: number }> {
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker'].includes(r));
-    const repo = this.dataSource.getRepository(SalesOrder);
+    const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     const [rows, total] = await repo.findAndCount({
       where: isReviewerOrAdmin ? {} : { salesRepUserId: actorUserId },
       order: { createdAt: 'DESC' },
@@ -435,8 +441,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * `transitionOrder` directly, so this exact same gap sat latent until
    * the operational UI's order-detail screen needed it).
    */
-  async getOrder(orderId: string, requestingUserId: string): Promise<SalesOrder> {
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId);
+  async getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<SalesOrder> {
+    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
     // warehouse_worker included for the same reason as listOrders above —
     // a fulfillment operator needs to open an order's detail from the
     // Fulfillment dashboard even though Scope was only ever granted to
@@ -456,9 +462,9 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // (see `customers.service.ts`'s `REVIEWER_ROLES` comment for why).
     const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker', 'finance'].includes(r));
     if (!isReviewerOrAdmin) {
-      await this.scope.assertAccess(requestingUserId, ENTITY_TYPE, orderId);
+      await this.scope.assertAccess(requestingUserId, ENTITY_TYPE, orderId, manager);
     }
-    const order = await this.dataSource.getRepository(SalesOrder).findOne({ where: { id: orderId } });
+    const order = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Sales order "${orderId}" not found.`);
     return order;
   }
@@ -476,7 +482,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * contract (`CustomersService.getCustomerSnapshot`, `UsersService.
    * findById`) — never a direct query into CRM's or Identity's tables.
    */
-  async getOrderDetailView(orderId: string, requestingUserId: string): Promise<
+  async getOrderDetailView(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<
     SalesOrder & {
       customerName: string | null;
       customerPhone: string | null;
@@ -487,12 +493,12 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       warehouseName: string | null;
     }
   > {
-    const order = await this.getOrder(orderId, requestingUserId);
+    const order = await this.getOrder(orderId, requestingUserId, manager);
     const [customer, salesRep, createdBy, warehouse] = await Promise.all([
-      this.customers.getCustomerSnapshot(order.customerId),
+      this.customers.getCustomerSnapshot(order.customerId, manager),
       this.safeFindUser(order.salesRepUserId),
       this.safeFindUser(order.createdByUserId),
-      order.warehouseId ? this.inventory.getWarehouse(order.warehouseId).catch(() => null) : null,
+      order.warehouseId ? this.inventory.getWarehouse(order.warehouseId, manager).catch(() => null) : null,
     ]);
     return {
       ...order,
@@ -515,8 +521,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * remittance was never granted per-order Scope, same reason
    * `getCustomerSnapshot` is itself unscoped).
    */
-  async getOrderSnapshot(orderId: string): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null> {
-    const order = await this.dataSource.getRepository(SalesOrder).findOne({ where: { id: orderId } });
+  async getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null> {
+    const order = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     if (!order) return null;
     return {
       id: order.id,
@@ -527,18 +533,18 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     };
   }
 
-  async getOrderLines(orderId: string): Promise<SalesOrderLine[]> {
-    return this.dataSource.getRepository(SalesOrderLine).find({ where: { salesOrderId: orderId } });
+  async getOrderLines(orderId: string, manager?: EntityManager): Promise<SalesOrderLine[]> {
+    return (manager ?? this.dataSource).getRepository(SalesOrderLine).find({ where: { salesOrderId: orderId } });
   }
 
   /** Returns Engine cross-domain read (never a direct query into another domain's table) — a single line by id, needed to price a Return Credit off its own historical unitPrice/discountAmount, never the product's current price. */
-  async getOrderLineById(lineId: string): Promise<SalesOrderLine | null> {
-    return this.dataSource.getRepository(SalesOrderLine).findOne({ where: { id: lineId } });
+  async getOrderLineById(lineId: string, manager?: EntityManager): Promise<SalesOrderLine | null> {
+    return (manager ?? this.dataSource).getRepository(SalesOrderLine).findOne({ where: { id: lineId } });
   }
 
-  async getOrderStatus(orderId: string): Promise<string> {
-    const { definition } = await this.getOrderAndDefinition(orderId);
-    return this.processEngine.getState(definition, ENTITY_TYPE, orderId);
+  async getOrderStatus(orderId: string, manager?: EntityManager): Promise<string> {
+    const { definition } = await this.getOrderAndDefinition(orderId, manager);
+    return this.processEngine.getState(definition, ENTITY_TYPE, orderId, manager);
   }
 
   /**
@@ -554,6 +560,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     customerId: string,
     returnDate: Date,
     windowDays: number,
+    manager?: EntityManager,
   ): Promise<
     Array<{
       salesOrderId: string;
@@ -577,14 +584,14 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     const returnDateEnd = new Date(returnDate);
     returnDateEnd.setUTCHours(23, 59, 59, 999);
 
-    const orders = await this.dataSource.getRepository(SalesOrder).find({
+    const orders = await (manager ?? this.dataSource).getRepository(SalesOrder).find({
       where: { customerId },
     });
     const eligibleOrders = orders.filter((o) => o.createdAt >= windowStart && o.createdAt <= returnDateEnd);
     if (eligibleOrders.length === 0) return [];
 
     const orderById = new Map(eligibleOrders.map((o) => [o.id, o]));
-    const lines = await this.dataSource
+    const lines = await (manager ?? this.dataSource)
       .getRepository(SalesOrderLine)
       .find({ where: eligibleOrders.map((o) => ({ salesOrderId: o.id })) });
 
@@ -623,16 +630,16 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * isn't available, the entire edit is rejected and nothing changes,
    * including any OTHER line in the same request.
    */
-  async updateOrderLines(orderId: string, lineUpdates: UpdateOrderLineInput[], actorUserId: string, reason?: string | null): Promise<SalesOrder> {
+  async updateOrderLines(orderId: string, lineUpdates: UpdateOrderLineInput[], actorUserId: string, reason?: string | null, manager?: EntityManager): Promise<SalesOrder> {
     if (lineUpdates.length === 0) throw new BadRequestException('At least one line update is required.');
 
-    const { order } = await this.getOrderAndDefinition(orderId);
-    const currentState = await this.getOrderStatus(orderId);
+    const { order } = await this.getOrderAndDefinition(orderId, manager);
+    const currentState = await this.getOrderStatus(orderId, manager);
     const requiredRoles = STAGE_EDIT_ROLES[currentState];
     if (!requiredRoles) {
       throw new ConflictException(`This order cannot be edited while it is in status "${currentState}".`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAdmin = userRoles.includes('admin');
     if (!isAdmin && !requiredRoles.some((r) => userRoles.includes(r))) {
       throw new ForbiddenException(`Role required to edit an order in status "${currentState}": one of [${requiredRoles.join(', ')}].`);
@@ -643,7 +650,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     }
     const actorCanSetManagerPrice = userRoles.some((r) => MANAGER_PRICE_ROLES.includes(r));
 
-    const lineRepo = this.dataSource.getRepository(SalesOrderLine);
+    const lineRepo = (manager ?? this.dataSource).getRepository(SalesOrderLine);
     const existingLines = await lineRepo.find({ where: { salesOrderId: orderId } });
     const existingById = new Map(existingLines.map((l) => [l.id, l]));
     for (const update of lineUpdates) {
@@ -654,9 +661,9 @@ export class SalesOrdersService implements SalesOrdersReadContract {
 
     const auditChanges: Array<{ lineId: string; productId: string; changes: Record<string, { before: string | number | null; after: string | number | null }> }> = [];
 
-    await this.dataSource.transaction(async (manager) => {
-      const txLineRepo = manager.getRepository(SalesOrderLine);
-      const txOrderRepo = manager.getRepository(SalesOrder);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const txLineRepo = txManager.getRepository(SalesOrderLine);
+      const txOrderRepo = txManager.getRepository(SalesOrder);
 
       for (const update of lineUpdates) {
         const existingLine = existingById.get(update.lineId)!;
@@ -675,7 +682,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
 
         if (existingLine.quantity !== update.quantity) {
           await this.inventory.adjustReservationQuantityInTransaction(
-            manager,
+            txManager,
             order.warehouseId!,
             existingLine.productId,
             orderId,
@@ -711,28 +718,31 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     const auditAction = currentState === 'released' ? 'sales.order.post_release_edit' : 'sales.order.line_edited';
     for (const entry of auditChanges) {
       for (const [field, { before, after }] of Object.entries(entry.changes)) {
-        await this.audit.record({
-          actorUserId,
-          organizationId: null,
-          action: auditAction,
-          resource: 'sales_order_line',
-          resourceId: entry.lineId,
-          result: 'success',
-          correlationId: null,
-          before: { field, value: before },
-          after: {
-            field,
-            value: after,
-            salesOrderId: orderId,
-            productId: entry.productId,
-            editedDuringStatus: currentState,
-            ...(trimmedReason ? { reason: trimmedReason } : {}),
+        await this.audit.record(
+          {
+            actorUserId,
+            organizationId: null,
+            action: auditAction,
+            resource: 'sales_order_line',
+            resourceId: entry.lineId,
+            result: 'success',
+            correlationId: null,
+            before: { field, value: before },
+            after: {
+              field,
+              value: after,
+              salesOrderId: orderId,
+              productId: entry.productId,
+              editedDuringStatus: currentState,
+              ...(trimmedReason ? { reason: trimmedReason } : {}),
+            },
           },
-        });
+          manager,
+        );
       }
     }
 
-    const updated = await this.dataSource.getRepository(SalesOrder).findOne({ where: { id: orderId } });
+    const updated = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     return updated!;
   }
 
@@ -746,7 +756,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * is this feature's own read, kept local to the one domain that needs it
    * rather than growing `AuditService` into a general-purpose query API.
    */
-  async getOrderEditHistory(orderId: string): Promise<
+  async getOrderEditHistory(orderId: string, manager?: EntityManager): Promise<
     Array<{
       seq: number;
       timestamp: Date;
@@ -778,7 +788,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       before: AuditRowSnapshot | null;
       after: AuditRowSnapshot | null;
     }
-    const rows: AuditRow[] = await this.dataSource.query(
+    const rows: AuditRow[] = await (manager ?? this.dataSource).query(
       `SELECT seq, timestamp, "actorUserId", action, "resourceId", before, after
        FROM audit_records
        WHERE resource = 'sales_order_line' AND after ->> 'salesOrderId' = $1
@@ -876,15 +886,15 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * themselves — an insufficient-stock line on a newly-added item rolls
    * back the whole edit, same as order creation.
    */
-  async editDraftOrder(orderId: string, lines: DraftOrderLineInput[], actorUserId: string): Promise<SalesOrder> {
+  async editDraftOrder(orderId: string, lines: DraftOrderLineInput[], actorUserId: string, manager?: EntityManager): Promise<SalesOrder> {
     if (lines.length === 0) throw new BadRequestException('A Sales Order must have at least one line item.');
 
-    const { order } = await this.getOrderAndDefinition(orderId);
-    const currentState = await this.getOrderStatus(orderId);
+    const { order } = await this.getOrderAndDefinition(orderId, manager);
+    const currentState = await this.getOrderStatus(orderId, manager);
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be edited this way while it is in "draft" status (currently "${currentState}").`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAdmin = userRoles.includes('admin');
     if (!isAdmin && order.salesRepUserId !== actorUserId) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may edit it while in draft.");
@@ -894,7 +904,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       throw new ForbiddenException('Only a sales manager or admin may set a manager price on an order line.');
     }
 
-    const lineRepo = this.dataSource.getRepository(SalesOrderLine);
+    const lineRepo = (manager ?? this.dataSource).getRepository(SalesOrderLine);
     const existingLines = await lineRepo.find({ where: { salesOrderId: orderId } });
     const existingById = new Map(existingLines.map((l) => [l.id, l]));
     for (const input of lines) {
@@ -905,23 +915,23 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     const keptIds = new Set(lines.filter((l) => l.lineId).map((l) => l.lineId!));
     const removedLines = existingLines.filter((l) => !keptIds.has(l.id));
 
-    const customerPriceListId = await this.customers.getPriceListId(order.customerId);
+    const customerPriceListId = await this.customers.getPriceListId(order.customerId, manager);
     const reservationStatus = order.workflowPolicy === 'open_account' ? 'active' : 'preliminary';
 
     const addedProductIds: string[] = [];
     const removedProductIds = removedLines.map((l) => l.productId);
 
-    await this.dataSource.transaction(async (manager) => {
-      const txLineRepo = manager.getRepository(SalesOrderLine);
-      const txOrderRepo = manager.getRepository(SalesOrder);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const txLineRepo = txManager.getRepository(SalesOrderLine);
+      const txOrderRepo = txManager.getRepository(SalesOrder);
 
       for (const removed of removedLines) {
-        await this.inventory.releaseReservationForOrderProductInTransaction(manager, removed.productId, orderId, actorUserId);
+        await this.inventory.releaseReservationForOrderProductInTransaction(txManager, removed.productId, orderId, actorUserId);
         await txLineRepo.remove(removed);
       }
 
       for (const input of lines) {
-        const resolved = await this.resolveLineInput(input, customerPriceListId, actorCanSetManagerPrice);
+        const resolved = await this.resolveLineInput(input, customerPriceListId, actorCanSetManagerPrice, txManager);
         if (input.lineId) {
           const existing = existingById.get(input.lineId)!;
 
@@ -940,7 +950,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
           }
 
           if (existing.quantity !== resolved.quantity) {
-            await this.inventory.adjustReservationQuantityInTransaction(manager, order.warehouseId!, existing.productId, orderId, resolved.quantity, actorUserId);
+            await this.inventory.adjustReservationQuantityInTransaction(txManager, order.warehouseId!, existing.productId, orderId, resolved.quantity, actorUserId);
           }
           existing.quantity = resolved.quantity;
           existing.unitPrice = resolved.unitPrice;
@@ -953,7 +963,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
           existing.lineTotal = resolved.lineTotal;
           await txLineRepo.save(existing);
         } else {
-          await this.inventory.reserveStockInTransaction(manager, order.warehouseId!, resolved.productId, resolved.quantity, orderId, actorUserId, reservationStatus);
+          await this.inventory.reserveStockInTransaction(txManager, order.warehouseId!, resolved.productId, resolved.quantity, orderId, actorUserId, reservationStatus);
           const newLine = txLineRepo.create({ salesOrderId: orderId, ...resolved });
           await txLineRepo.save(newLine);
           addedProductIds.push(resolved.productId);
@@ -967,19 +977,22 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       await txOrderRepo.save(orderToSave!);
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'sales.order.draft_edited',
-      resource: 'sales_order',
-      resourceId: orderId,
-      result: 'success',
-      correlationId: null,
-      before: { lineCount: existingLines.length },
-      after: { lineCount: lines.length, addedProductIds, removedProductIds },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'sales.order.draft_edited',
+        resource: 'sales_order',
+        resourceId: orderId,
+        result: 'success',
+        correlationId: null,
+        before: { lineCount: existingLines.length },
+        after: { lineCount: lines.length, addedProductIds, removedProductIds },
+      },
+      manager,
+    );
 
-    const updated = await this.dataSource.getRepository(SalesOrder).findOne({ where: { id: orderId } });
+    const updated = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     return updated!;
   }
 
@@ -1007,28 +1020,28 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * database's own already-declared constraint keeps this a one-directional
    * dependency, same as everywhere else in this domain.
    */
-  async deleteDraftOrder(orderId: string, actorUserId: string): Promise<void> {
-    const { order } = await this.getOrderAndDefinition(orderId);
-    const currentState = await this.getOrderStatus(orderId);
+  async deleteDraftOrder(orderId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const { order } = await this.getOrderAndDefinition(orderId, manager);
+    const currentState = await this.getOrderStatus(orderId, manager);
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be deleted while it is in "draft" status (currently "${currentState}").`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAdmin = userRoles.includes('admin');
     if (!isAdmin && order.salesRepUserId !== actorUserId) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may delete it while in draft.");
     }
 
-    const lineRepo = this.dataSource.getRepository(SalesOrderLine);
+    const lineRepo = (manager ?? this.dataSource).getRepository(SalesOrderLine);
     const existingLines = await lineRepo.find({ where: { salesOrderId: orderId } });
 
     try {
-      await this.dataSource.transaction(async (manager) => {
-        const txLineRepo = manager.getRepository(SalesOrderLine);
-        const txOrderRepo = manager.getRepository(SalesOrder);
+      await (manager ?? this.dataSource).transaction(async (txManager) => {
+        const txLineRepo = txManager.getRepository(SalesOrderLine);
+        const txOrderRepo = txManager.getRepository(SalesOrder);
 
         for (const line of existingLines) {
-          await this.inventory.releaseReservationForOrderProductInTransaction(manager, line.productId, orderId, actorUserId);
+          await this.inventory.releaseReservationForOrderProductInTransaction(txManager, line.productId, orderId, actorUserId);
         }
         if (existingLines.length > 0) {
           await txLineRepo.remove(existingLines);
@@ -1043,8 +1056,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
         // (real gap found live during a release-readiness DB integrity sweep:
         // 3 such orphans, plus their matching orphaned `process_instances`
         // rows, existed in the dev database). Delete both here instead.
-        await manager.query('DELETE FROM stock_reservations WHERE "salesOrderId" = $1', [orderId]);
-        await manager.query('DELETE FROM process_instances WHERE "entityType" = $1 AND "entityId" = $2', ['sales_order', orderId]);
+        await txManager.query('DELETE FROM stock_reservations WHERE "salesOrderId" = $1', [orderId]);
+        await txManager.query('DELETE FROM process_instances WHERE "entityType" = $1 AND "entityId" = $2', ['sales_order', orderId]);
         await txOrderRepo.remove(order);
       });
     } catch (err) {
@@ -1054,17 +1067,20 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       throw err;
     }
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'sales.order.deleted',
-      resource: 'sales_order',
-      resourceId: orderId,
-      result: 'success',
-      correlationId: null,
-      before: { orderNumber: order.orderNumber, customerId: order.customerId, lineCount: existingLines.length },
-      after: null,
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'sales.order.deleted',
+        resource: 'sales_order',
+        resourceId: orderId,
+        result: 'success',
+        correlationId: null,
+        before: { orderNumber: order.orderNumber, customerId: order.customerId, lineCount: existingLines.length },
+        after: null,
+      },
+      manager,
+    );
   }
 
   /**
@@ -1077,7 +1093,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * client action, "Submit for Review"), or straight to 'released' for an
    * 'open_account' order (no review, no deposit gate).
    */
-  async transitionOrder(orderId: string, action: string, actorUserId: string): Promise<string> {
+  async transitionOrder(orderId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     // Scope is enforced only for the originating rep's own actions
     // (submit/resubmit) — NOT for supervisor/manager review actions.
     // REAL GAP FOUND DURING LIVE E2E VERIFICATION (not caught by unit
@@ -1111,18 +1127,18 @@ export class SalesOrdersService implements SalesOrdersReadContract {
 
     const REP_OWN_ACTIONS = new Set(['submit', 'resubmit']);
     if (REP_OWN_ACTIONS.has(action)) {
-      await this.scope.assertAccess(actorUserId, ENTITY_TYPE, orderId);
+      await this.scope.assertAccess(actorUserId, ENTITY_TYPE, orderId, manager);
     }
 
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     const isAdmin = userRoles.includes('admin');
     const hasRequiredRole = requiredRoles.some((r) => userRoles.includes(r));
     if (!isAdmin && !hasRequiredRole) {
       throw new ForbiddenException(`Role required for action "${action}": one of [${requiredRoles.join(', ')}].`);
     }
 
-    const { order, definition } = await this.getOrderAndDefinition(orderId);
-    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, action, actorUserId);
+    const { order, definition } = await this.getOrderAndDefinition(orderId, manager);
+    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, action, actorUserId, manager);
 
     if (action === 'submit') {
       // Auto-advance past the submitted state — this is a system
@@ -1134,7 +1150,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       // supervisor/manager/deposit review; an 'open_account' order
       // releases immediately.
       const autoAdvanceAction = order.workflowPolicy === 'open_account' ? 'auto_release' : 'start_review';
-      await this.processEngine.transition(definition, ENTITY_TYPE, orderId, autoAdvanceAction, actorUserId);
+      await this.processEngine.transition(definition, ENTITY_TYPE, orderId, autoAdvanceAction, actorUserId, manager);
     }
 
     // Hotfix 6 (post-v1.0.2, "Create Sales Order Without a Deposit") —
@@ -1149,22 +1165,25 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // this domain — so a no-deposit order is fulfillable exactly like any
     // other released order, not left stuck on a stale preliminary hold.
     if (action === 'manager_approve' && order.skipDeposit) {
-      await this.inventory.confirmReservationsForOrder(orderId, actorUserId);
-      await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'manager_approve_no_deposit', actorUserId);
+      await this.inventory.confirmReservationsForOrder(orderId, actorUserId, manager);
+      await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'manager_approve_no_deposit', actorUserId, manager);
     }
 
-    const newState = await this.getOrderStatus(orderId);
+    const newState = await this.getOrderStatus(orderId, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: `sales.order.${action}`,
-      resource: 'sales_order',
-      resourceId: orderId,
-      result: 'success',
-      correlationId: null,
-      after: { state: newState },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: `sales.order.${action}`,
+        resource: 'sales_order',
+        resourceId: orderId,
+        result: 'success',
+        correlationId: null,
+        after: { state: newState },
+      },
+      manager,
+    );
 
     return newState;
   }
@@ -1181,11 +1200,11 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * the Process Engine transition — the same validate-before-commit
    * ordering used throughout this directive's work.
    */
-  async releaseAfterDepositVerified(orderId: string, actorUserId: string | null): Promise<string> {
-    await this.inventory.confirmReservationsForOrder(orderId, actorUserId);
-    const { definition } = await this.getOrderAndDefinition(orderId);
-    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'verify_deposit', actorUserId);
-    return this.getOrderStatus(orderId);
+  async releaseAfterDepositVerified(orderId: string, actorUserId: string | null, manager?: EntityManager): Promise<string> {
+    await this.inventory.confirmReservationsForOrder(orderId, actorUserId, manager);
+    const { definition } = await this.getOrderAndDefinition(orderId, manager);
+    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'verify_deposit', actorUserId, manager);
+    return this.getOrderStatus(orderId, manager);
   }
 
   /**
@@ -1202,26 +1221,35 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * `expire_hold` transition simply won't be valid from its current
    * state and is skipped — never forces an already-advanced order backward.
    */
-  async expireHoldForOrder(orderId: string, actorUserId: string | null): Promise<void> {
-    await this.inventory.releasePreliminaryHoldsForOrder(orderId, actorUserId, 'Preliminary hold expired after 24 hours with no deposit approval.');
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so `PreliminaryHoldExpiryScheduler` can run this against a Company's own connection instead of the ambient one; forwarded to every DB touchpoint below. Omitted, this is unchanged for every existing (ambient) caller. */
+  async expireHoldForOrder(orderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    await this.inventory.releasePreliminaryHoldsForOrder(
+      orderId,
+      actorUserId,
+      'Preliminary hold expired after 24 hours with no deposit approval.',
+      manager,
+    );
 
-    const { definition } = await this.getOrderAndDefinition(orderId);
-    const currentState = await this.getOrderStatus(orderId);
+    const { definition } = await this.getOrderAndDefinition(orderId, manager);
+    const currentState = await this.getOrderStatus(orderId, manager);
     const canExpire = definition.transitions.some((t) => t.from === currentState && t.action === 'expire_hold');
     if (!canExpire) return; // already released or otherwise past the point where a hold timeout still applies
 
-    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'expire_hold', actorUserId);
+    await this.processEngine.transition(definition, ENTITY_TYPE, orderId, 'expire_hold', actorUserId, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'sales.order.hold_expired',
-      resource: 'sales_order',
-      resourceId: orderId,
-      result: 'success',
-      correlationId: null,
-      before: { status: currentState },
-      after: { status: 'draft' },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'sales.order.hold_expired',
+        resource: 'sales_order',
+        resourceId: orderId,
+        result: 'success',
+        correlationId: null,
+        before: { status: currentState },
+        after: { status: 'draft' },
+      },
+      manager,
+    );
   }
 }

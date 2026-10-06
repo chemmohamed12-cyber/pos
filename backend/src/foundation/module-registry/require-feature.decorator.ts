@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, NotFoundException, Optional, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ENTITLEMENT_RESOLVER, EntitlementResolver } from './entitlement-resolver.token';
+import { COMPANY_ENTITLEMENT_RESOLVER, CompanyEntitlementResolver, ENTITLEMENT_RESOLVER, EntitlementResolver } from './entitlement-resolver.token';
 
 /**
  * ERP Foundation — Feature-entitlement guard.
@@ -20,15 +20,22 @@ export class RequireFeatureGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Optional() @Inject(ENTITLEMENT_RESOLVER) private readonly entitlement?: EntitlementResolver,
+    @Optional() @Inject(COMPANY_ENTITLEMENT_RESOLVER) private readonly companyEntitlement?: CompanyEntitlementResolver,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     if (!this.entitlement) return true;
     const code =
       this.reflector.get<string>(REQUIRE_FEATURE_METADATA_KEY, context.getHandler()) ??
       this.reflector.get<string>(REQUIRE_FEATURE_METADATA_KEY, context.getClass());
     if (!code) return true;
-    if (!this.entitlement.isFeatureEntitled(code)) throw new NotFoundException();
+    // See RequireModuleGuard: only the Membership-validated `request.companyContext` id selects a Company.
+    const companyId = context.switchToHttp().getRequest<{ companyContext?: { companyId?: string } }>().companyContext?.companyId;
+    const entitled =
+      companyId && this.companyEntitlement
+        ? await this.companyEntitlement.isFeatureEntitled(companyId, code)
+        : this.entitlement.isFeatureEntitled(code);
+    if (!entitled) throw new NotFoundException();
     return true;
   }
 }

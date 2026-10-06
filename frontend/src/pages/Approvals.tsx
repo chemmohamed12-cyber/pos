@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 interface RequestType {
@@ -46,6 +48,27 @@ interface ApprovalRequest {
   makerUserId: string;
   createdAt: string;
   decidedAt: string | null;
+  /** D6 — the rule that applies to THIS request (already resolved by the engine). */
+  resolvedRequiredNode?: string;
+  resolvedMinApprovers?: number;
+  payload?: Record<string, unknown>;
+}
+
+/** D6 — a short, human summary of what the request is about, for the request types whose payload we know. */
+function requestSummary(r: ApprovalRequest, supplierName: (id: string) => string): string {
+  const p = r.payload ?? {};
+  if (r.requestTypeCode === 'procurement.rfq_award') {
+    const lines = Array.isArray(p.lines) ? (p.lines as Array<{ quantity: string; unitCostBase: string }>) : [];
+    const total = lines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.unitCostBase), 0);
+    return `${supplierName(String(p.supplierId ?? ''))} · ${total.toFixed(2)}`;
+  }
+  return '';
+}
+
+/** D6 — where the underlying resource is opened, for the resource types we know. */
+function resourceLink(r: ApprovalRequest): string | null {
+  if (r.resourceType === 'rfq') return `/rfqs?id=${r.resourceId}`;
+  return null;
 }
 
 const PRELOAD = [
@@ -67,6 +90,11 @@ const PRELOAD = [
   'action.approval_escalate',
   'action.save',
   'panel.no_approval_requests_pending',
+  'field.submitted_by',
+  'field.you',
+  'field.approval_request_id',
+  'panel.maker_cannot_decide',
+  'action.open_resource',
   'panel.no_matrix_rules_yet',
 ];
 
@@ -83,7 +111,10 @@ const PRELOAD = [
  */
 export function Approvals() {
   const { t, preload } = useLanguage();
+  const { user } = useAuth();
   preload(PRELOAD);
+  const [supplierNames, setSupplierNames] = useState<Record<string, string>>({});
+  const supplierName = (id: string) => supplierNames[id] ?? id.slice(0, 8);
 
   const [requestTypes, setRequestTypes] = useState<RequestType[] | null>(null);
   const [rules, setRules] = useState<MatrixRule[] | null>(null);
@@ -124,6 +155,11 @@ export function Approvals() {
     loadRequestTypes();
     loadRules();
     loadRequests();
+    // names for the supplier shown in an award request's summary — best-effort, the queue works without it
+    api
+      .get<Array<{ id: string; legalName: string }>>('/procurement/suppliers/all')
+      .then((list) => setSupplierNames(Object.fromEntries(list.map((s) => [s.id, s.legalName]))))
+      .catch(() => undefined);
   }, []);
 
   async function upsertRule(e: FormEvent) {
@@ -267,8 +303,10 @@ export function Approvals() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('field.request_type_code')}</th>
-                <th>{t('field.actions')}</th>
+                <th>{t('field.request_type')}</th>
+                <th></th>
+                <th>{t('field.submitted_by')}</th>
+                <th>{t('field.required_permission_node')}</th>
                 <th>{t('field.reason')}</th>
                 <th></th>
               </tr>
@@ -276,8 +314,19 @@ export function Approvals() {
             <tbody>
               {requests.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ fontFamily: 'monospace' }}>{r.requestTypeCode}</td>
-                  <td>{r.requestedAction}</td>
+                  <td>
+                    <div>{(() => { const rt = (requestTypes ?? []).find((x) => x.requestTypeCode === r.requestTypeCode); return rt ? t(rt.titleCode) : r.requestTypeCode; })()}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', opacity: 0.7 }}>{r.requestTypeCode} · {r.requestedAction}</div>
+                    <div style={{ fontSize: '0.8rem' }}>{requestSummary(r, supplierName)}</div>
+                  </td>
+                  <td>
+                    {resourceLink(r) && <Link to={resourceLink(r)!}>{t('action.open_resource')}</Link>}
+                    <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', opacity: 0.6 }}>{r.id.slice(0, 8)}</div>
+                  </td>
+                  <td>{user && r.makerUserId === user.id ? t('field.you') : r.makerUserId.slice(0, 8)}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                    {r.resolvedRequiredNode ?? '—'} × {r.resolvedMinApprovers ?? 1}
+                  </td>
                   <td>
                     <input
                       placeholder={t('field.reason')}
@@ -287,12 +336,18 @@ export function Approvals() {
                     />
                   </td>
                   <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button className="btn btn-primary" disabled={busy === r.id} onClick={() => decide(r.id, 'approved')}>
-                      {t('value.approval_decision.approved')}
-                    </button>
-                    <button className="btn btn-danger" disabled={busy === r.id} onClick={() => decide(r.id, 'rejected')}>
-                      {t('value.approval_decision.rejected')}
-                    </button>
+                    {user && r.makerUserId === user.id ? (
+                      <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{t('panel.maker_cannot_decide')}</span>
+                    ) : (
+                      <>
+                        <button className="btn btn-primary" disabled={busy === r.id} onClick={() => decide(r.id, 'approved')}>
+                          {t('value.approval_decision.approved')}
+                        </button>
+                        <button className="btn btn-danger" disabled={busy === r.id} onClick={() => decide(r.id, 'rejected')}>
+                          {t('value.approval_decision.rejected')}
+                        </button>
+                      </>
+                    )}
                     <button className="btn btn-secondary" disabled={busy === r.id} onClick={() => withdraw(r.id)}>
                       {t('action.approval_withdraw')}
                     </button>

@@ -165,7 +165,14 @@ export const accountingManifest: ModuleManifest = {
   //          new table (`accounting_wip_reconciliation_runs`), no existing table altered. `admin`'s
   //          existing blanket `accounting: editable` grant already covers the 2 new nodes (same
   //          precedent as 1.13.0 — no corrective admin-grant migration needed).
-  manifest_version: '1.14.0',
+  // 1.18.0 — D5 (PPV + Input VAT, 2026-10-05): +1 config key (`accounting.purchase_price_variance_account_code`, default '' = fail-closed).
+  // 1.17.0 — D4 (returns accounting, 2026-10-05): +1 config key (`accounting.sales_returns_account_code`, default '' = fail-closed).
+  // 1.16.0 — D3-B (manual receipt policy, 2026-10-04): +1 json config key
+  //          (`accounting.inventory_manual_receipt_reason_accounts`, default `{}` = fail-closed).
+  // 1.15.0 — D3 (inventory posting policy, 2026-10-04): +3 config keys
+  //          (`accounting.inventory_{opening_balance,adjustment_gain,adjustment_loss}_account_code`), all
+  //          default '' = fail-closed. No new table, no new permission node, no migration.
+  manifest_version: '1.18.0',
   title_code: 'module.accounting',
   business_domains: ['accounting'],
   depends_on: ['finance'],
@@ -474,6 +481,28 @@ export const accountingManifest: ModuleManifest = {
     // GL event is REJECTED (`no_valuation_source`/account-resolution reasons) —
     // no hard-coded fallback, ever.
     { key: 'accounting.inventory_cogs_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // D3 (2026-10-04, CTO-approved inventory posting policy) — the counter accounts for opening stock and stock
+    // adjustments. '' (unset) is fail-closed exactly like the COGS key: the GL event is REJECTED, no fallback, no
+    // auto-picked account. Resolved via `resolveConfiguredPostableAccount` (must exist, be active, postable, and carry NO
+    // control function).
+    { key: 'accounting.inventory_opening_balance_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.inventory_adjustment_gain_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.inventory_adjustment_loss_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // D3-B (2026-10-04) — manual-receipt Reason Code → Offset GL account, as a JSON map `{ "<reasonCode>": "<glAccountCode>" }`.
+    // The set of allowed reasons IS this map (nothing is hard-coded, no speculative catalog): default `{}` = no reason is
+    // allowed yet = every manual receipt is rejected before mutation. Each target account must exist, be active, postable
+    // and carry no control function — no fallback account.
+    // D4 (2026-10-05) — the contra-revenue account a completed Sales Return / Shipment Return of an INVOICED sale debits
+    // (Dr Sales Returns / Cr AR). Configuration, never defaulted or guessed: '' (unset) is fail-closed — such a return is
+    // rejected BEFORE any mutation. Resolved via `resolveConfiguredPostableAccount` (exists, active, postable, non-control).
+    // D5 (2026-10-05) — the Purchase Price Variance account a supplier invoice posts its net price difference to
+    // (Dr when the invoice is higher than the receipt value, Cr when lower). Configuration, never defaulted or guessed:
+    // '' (unset) is fail-closed — an invoice WITH a variance is rejected BEFORE any mutation. Resolved via
+    // `resolveConfiguredPostableAccount` (exists, active, postable, non-control). Input VAT uses the existing
+    // `tax_receivable` control account (exactly one active postable) — no new key.
+    { key: 'accounting.purchase_price_variance_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.sales_returns_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.inventory_manual_receipt_reason_accounts', type: 'json', default: {}, scope_levels: ['platform', 'edition', 'installation'] },
     // F12 — Fixed Assets (ADR-045 D10). Resolved via the existing
     // `resolveConfiguredPostableAccount` mechanism at DISPOSAL POSTING TIME (never at
     // submission) — unset/unresolvable → the disposal is REJECTED, fail-closed. No

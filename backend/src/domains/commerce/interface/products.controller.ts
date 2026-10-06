@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { IsIn, IsNumberString, IsOptional, IsString, MinLength } from 'class-validator';
 import { ProductsService } from '../application/products.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -67,12 +68,20 @@ const EXPORT_COLUMNS: ColumnSpec[] = [
 /**
  * P4 Tranche-2 ("remaining 9 domains" pass, 2026-09-06) — deliberately NO
  * class-level guard here (unlike every sibling controller in this
- * Blueprint). `list()`/`get(:id)` are genuinely, currently unauthenticated
- * (no `@UseGuards` at all — confirmed by direct read before any edit);
- * adding a class-level `JwtAuthGuard`/`RequireModuleGuard` would newly
- * require authentication on those 2 routes — a real functional behavior
- * change, explicitly out of scope for this Blueprint. Every gated route
- * below carries its OWN full guard set instead.
+ * Blueprint); every route carries its OWN full guard set instead (this
+ * predates and is unrelated to the note below).
+ *
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27, CTO-authorized).
+ * `CompanyContextGuard` added to EVERY route below. This is NOT a new
+ * authentication requirement — every route already carried `JwtAuthGuard`
+ * individually (confirmed by direct read; the class's own older doc
+ * comment describing `list()`/`get(:id)` as "currently unauthenticated"
+ * was stale — a prior fix, Track S3 2026-09-08, already added
+ * `JwtAuthGuard` to both). Adding `CompanyContextGuard` on top of an
+ * already-mandatory JWT only adds "and you must have selected a Company"
+ * — the correct, minimal consequence of `Product`/`PriceList`/
+ * `PriceListItem` becoming genuinely Company-owned data (Area 21,
+ * `sales-orders.controller.ts`'s own retrofit already required this).
  */
 @Controller('products')
 export class ProductsController {
@@ -91,19 +100,21 @@ export class ProductsController {
    * access. Closing the inconsistency, not narrowing the read policy: any
    * authenticated user could already see this via `/products/all`.
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get()
-  async list() {
-    return this.products.listActiveProducts();
+  async list(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.products.listActiveProducts(req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get('all')
-  async listAll() {
-    return this.products.listAllProducts();
+  async listAll(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.products.listAllProducts(req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.create', 'editable')
   @Get('import-template')
@@ -128,12 +139,13 @@ export class ProductsController {
   // heavy export generation — narrowed the same way `AuthController`
   // already narrows its own sensitive routes.
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get('export')
-  async export(@Res() res: Response) {
+  async export(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.companyContext) throw new UnauthorizedException();
     // Product catalog reads are broadly available (same policy as GET /products/all) —
     // no customer/order/scope-restricted data is ever in this export.
-    const all = await this.products.listAllProducts();
+    const all = await this.products.listAllProducts(req.companyContext.dataSource.manager);
     const buffer = await this.excel.buildExport(
       'Products',
       EXPORT_COLUMNS,
@@ -147,12 +159,13 @@ export class ProductsController {
       .send(buffer);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.create', 'editable')
   @Post('import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
-  async import(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+  async import(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const { rows, headerErrors } = await this.excel.parseWorkbook(file.buffer, IMPORT_COLUMNS);
     if (headerErrors.length > 0) {
       return { totalRows: 0, succeededCount: 0, rejected: [], headerErrors };
@@ -160,6 +173,7 @@ export class ProductsController {
     const { succeeded, rejected } = await this.products.importRows(
       rows as Array<{ sku: string; name: string; unitPrice: string; status: string }>,
       req.user.id,
+      req.companyContext.dataSource.manager,
     );
     return {
       totalRows: rows.length,
@@ -171,10 +185,11 @@ export class ProductsController {
   }
 
   /** Same finding/fix as `list()` above — was unauthenticated, and unlike `list()` this one didn't even filter to `status: 'active'`, so a draft/discontinued product was also disclosable by guessing its id. */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.products.getProduct(id);
+  async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.products.getProduct(id, req.companyContext.dataSource.manager);
   }
 
   // V1 Release Audit HIGH fix — these four writes were guarded only by
@@ -185,43 +200,48 @@ export class ProductsController {
   // manager override (sales-orders.service.ts), so this was a real
   // financial-integrity gap, not just an inconsistency. Matches the
   // frontend, which already gates all of this UI to admin (Products.tsx).
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.create', 'editable')
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateProductDto) {
-    return this.products.createProduct(dto.sku, dto.name, dto.unitPrice, req.user.id, dto.unit ?? null);
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateProductDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.products.createProduct(dto.sku, dto.name, dto.unitPrice, req.user.id, dto.unit ?? null, req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.edit', 'editable')
   @Post(':id/unit')
-  async updateUnit(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateUnitDto) {
-    return this.products.updateUnit(id, dto.unit || null, req.user.id);
+  async updateUnit(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateUnitDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.products.updateUnit(id, dto.unit || null, req.user.id, req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.edit', 'editable')
   @Post(':id/status')
-  async setStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: SetStatusDto) {
-    return this.products.setStatus(id, dto.status, req.user.id);
+  async setStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetStatusDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.products.setStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.edit', 'editable')
   @Post(':id/price')
-  async updatePrice(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdatePriceDto) {
-    return this.products.updatePrice(id, dto.unitPrice, req.user.id);
+  async updatePrice(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdatePriceDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.products.updatePrice(id, dto.unitPrice, req.user.id, req.companyContext.dataSource.manager);
   }
 
-  @UseGuards(JwtAuthGuard, RequireModuleGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
   @RequireModule('sales')
   @RequirePermission('sales.catalog.edit', 'editable')
   @Post(':id/name')
-  async updateName(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateNameDto) {
-    return this.products.updateName(id, dto.name, req.user.id);
+  async updateName(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateNameDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.products.updateName(id, dto.name, req.user.id, req.companyContext.dataSource.manager);
   }
 }

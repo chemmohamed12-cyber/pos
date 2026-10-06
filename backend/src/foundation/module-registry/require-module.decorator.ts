@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, NotFoundException, Optional, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ENTITLEMENT_RESOLVER, EntitlementResolver } from './entitlement-resolver.token';
+import { COMPANY_ENTITLEMENT_RESOLVER, CompanyEntitlementResolver, ENTITLEMENT_RESOLVER, EntitlementResolver } from './entitlement-resolver.token';
 import { AuthoredModuleCode } from './module-manifest.type';
 
 /**
@@ -26,15 +26,24 @@ export class RequireModuleGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Optional() @Inject(ENTITLEMENT_RESOLVER) private readonly entitlement?: EntitlementResolver,
+    @Optional() @Inject(COMPANY_ENTITLEMENT_RESOLVER) private readonly companyEntitlement?: CompanyEntitlementResolver,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     if (!this.entitlement) return true; // P1/P2 state — unchanged
     const code =
       this.reflector.get<AuthoredModuleCode>(REQUIRE_MODULE_METADATA_KEY, context.getHandler()) ??
       this.reflector.get<AuthoredModuleCode>(REQUIRE_MODULE_METADATA_KEY, context.getClass());
     if (!code) return true;
-    if (!this.entitlement.isModuleEntitled(code)) throw new NotFoundException();
+    // Company Plans / Packages: on a Company-scoped route `CompanyContextGuard` has already validated the
+    // Membership and set `request.companyContext` (it runs before this guard). Only THAT id is ever used —
+    // never the raw JWT claim. A route without a validated Company context keeps the installation-wide check.
+    const companyId = context.switchToHttp().getRequest<{ companyContext?: { companyId?: string } }>().companyContext?.companyId;
+    const entitled =
+      companyId && this.companyEntitlement
+        ? await this.companyEntitlement.isModuleEntitled(companyId, code)
+        : this.entitlement.isModuleEntitled(code);
+    if (!entitled) throw new NotFoundException();
     return true;
   }
 }

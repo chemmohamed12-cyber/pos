@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { NavGroup, NAVIGATION_REGISTRY } from './navigation-registry';
 import { EntitlementService } from '../entitlement/entitlement.service';
 import { PermissionService } from '../permission/permission.service';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { CompanyEntitlementService } from '../plans/company-entitlement.service';
 
 export interface NavItemView {
   to: string;
@@ -27,12 +29,20 @@ export class NavigationService {
     private readonly entitlement: EntitlementService,
     private readonly permission: PermissionService,
     private readonly authorization: AuthorizationService,
+    @Optional() private readonly companyEntitlement?: CompanyEntitlementService,
   ) {}
 
   /** `registry` defaults to the real `NAVIGATION_REGISTRY` — overridable only so tests can exercise each gate type in isolation with a small synthetic registry; every real caller uses the default. */
-  async resolveFor(userId: string, registry: readonly NavGroup[] = NAVIGATION_REGISTRY): Promise<NavGroupView[]> {
-    const resolved = this.entitlement.resolve();
-    const userRoles = await this.authorization.getRoleKeysForUser(userId);
+  async resolveFor(
+    userId: string,
+    registry: readonly NavGroup[] = NAVIGATION_REGISTRY,
+    /** A Membership-VALIDATED Company (see `CompanyViewContextService`) — when present, entitlement is the Company's package and roles/permissions come from the Company's own database. */
+    company?: { companyId: string; manager: EntityManager } | null,
+  ): Promise<NavGroupView[]> {
+    const resolved =
+      company && this.companyEntitlement ? await this.companyEntitlement.resolve(company.companyId) : this.entitlement.resolve();
+    const manager = company?.manager;
+    const userRoles = await this.authorization.getRoleKeysForUser(userId, manager);
 
     const groups: NavGroupView[] = [];
     for (const group of registry) {
@@ -40,7 +50,7 @@ export class NavigationService {
       for (const item of group.items) {
         if (item.module && !resolved.modules.has(item.module)) continue;
         if (item.feature && !resolved.features.has(item.feature)) continue;
-        if (item.permissionNode && !(await this.permission.hasAtLeast(userId, item.permissionNode, 'read-only'))) continue;
+        if (item.permissionNode && !(await this.permission.hasAtLeast(userId, item.permissionNode, 'read-only', manager))) continue;
         if (item.roles && !item.roles.some((r) => userRoles.includes(r))) continue;
         items.push({ to: item.to, code: item.code });
       }

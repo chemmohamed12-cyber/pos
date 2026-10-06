@@ -1,6 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Target } from '../infrastructure/target.entity';
 import { TARGET_PROCESS_KEY } from '../domain/target-status';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -43,7 +42,6 @@ export interface CreateTargetInput {
 @Injectable()
 export class TargetService implements OnModuleInit {
   constructor(
-    @InjectRepository(Target) private readonly targets: Repository<Target>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
@@ -52,27 +50,41 @@ export class TargetService implements OnModuleInit {
     private readonly hr: HrService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async onModuleInit(): Promise<void> {
     await this.approvals.registerRequestType(APPROVAL_TYPE, 'action.targets_submit_approval');
     await this.approvals
       .upsertMatrixRule({ requestTypeCode: APPROVAL_TYPE, minApprovers: 1, requiredPermissionNode: APPROVER_NODE, valueThreshold: null, orgUnitId: null }, SYSTEM_ACTOR_ID)
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload as Record<string, unknown>);
-    });
-    this.events.subscribe('approval.request.rejected', async (payload) => {
-      await this.onApprovalRejected(payload as Record<string, unknown>);
-    });
+    // Company scope (ADR-075): runs for the Company outbox the event was published in (ctx.manager); unchanged for the ambient one.
+    this.events.subscribe(
+      'approval.request.approved',
+      async (payload, ctx) => {
+        await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
+    this.events.subscribe(
+      'approval.request.rejected',
+      async (payload, ctx) => {
+        await this.onApprovalRejected(payload as Record<string, unknown>, ctx.manager ?? undefined);
+      },
+      { scope: 'company' },
+    );
   }
 
-  async create(input: CreateTargetInput, actorUserId: string): Promise<Target> {
-    await this.hr.getEmployee(input.employeeId); // throws NotFoundException if the employee does not exist
+  async create(input: CreateTargetInput, actorUserId: string, manager?: EntityManager): Promise<Target> {
+    await this.hr.getEmployee(input.employeeId, manager); // throws NotFoundException if the employee does not exist
     if (input.periodStart > input.periodEnd) throw new ConflictException('periodStart must be on or before periodEnd.');
     if (!(Number(input.targetValue) > 0)) throw new ConflictException('targetValue must be positive.');
 
-    const saved = await this.targets.save(
-      this.targets.create({
+    const repo = this.em(manager).getRepository(Target);
+    const saved = await repo.save(
+      repo.create({
         employeeId: input.employeeId,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
@@ -82,69 +94,79 @@ export class TargetService implements OnModuleInit {
         createdByUserId: actorUserId,
       }),
     );
-    await this.processEngine.start(TARGET_PROCESS, ENTITY_TYPE, saved.id);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'targets.target.created',
-      resource: 'target',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { employeeId: input.employeeId, periodStart: input.periodStart, periodEnd: input.periodEnd, targetValue: input.targetValue },
-    });
+    await this.processEngine.start(TARGET_PROCESS, ENTITY_TYPE, saved.id, manager);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'targets.target.created',
+        resource: 'target',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { employeeId: input.employeeId, periodStart: input.periodStart, periodEnd: input.periodEnd, targetValue: input.targetValue },
+      },
+      manager,
+    );
     return saved;
   }
 
-  async listTargets(employeeId?: string): Promise<Target[]> {
-    return this.targets.find({ where: employeeId ? { employeeId } : {}, order: { periodStart: 'DESC' } });
+  async listTargets(employeeId?: string, manager?: EntityManager): Promise<Target[]> {
+    return this.em(manager).getRepository(Target).find({ where: employeeId ? { employeeId } : {}, order: { periodStart: 'DESC' } });
   }
 
   /** The one read Commission's Resolution Engine needs (ADR-071 §9) — the Approved Target covering a given date, if any. */
-  async getApprovedTargetForDate(employeeId: string, date: string): Promise<Target | null> {
-    const targets = await this.targets.find({ where: { employeeId, status: 'approved' } });
+  async getApprovedTargetForDate(employeeId: string, date: string, manager?: EntityManager): Promise<Target | null> {
+    const targets = await this.em(manager).getRepository(Target).find({ where: { employeeId, status: 'approved' } });
     return targets.find((t) => t.periodStart <= date && t.periodEnd >= date) ?? null;
   }
 
-  async submitForApproval(targetId: string, actorUserId: string): Promise<Target> {
-    const target = await this.targets.findOne({ where: { id: targetId } });
+  async submitForApproval(targetId: string, actorUserId: string, manager?: EntityManager): Promise<Target> {
+    const repo = this.em(manager).getRepository(Target);
+    const target = await repo.findOne({ where: { id: targetId } });
     if (!target) throw new NotFoundException(`Target "${targetId}" not found.`);
 
-    const approvalRequest = await this.approvals.submit({
-      requestTypeCode: APPROVAL_TYPE,
-      resourceType: ENTITY_TYPE,
-      resourceId: targetId,
-      requestedAction: 'approve',
-      payload: { employeeId: target.employeeId, periodStart: target.periodStart, periodEnd: target.periodEnd, targetValue: target.targetValue },
-      makerUserId: actorUserId,
-    });
+    const approvalRequest = await this.approvals.submit(
+      {
+        requestTypeCode: APPROVAL_TYPE,
+        resourceType: ENTITY_TYPE,
+        resourceId: targetId,
+        requestedAction: 'approve',
+        payload: { employeeId: target.employeeId, periodStart: target.periodStart, periodEnd: target.periodEnd, targetValue: target.targetValue },
+        makerUserId: actorUserId,
+      },
+      manager,
+    );
 
-    await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, targetId, 'submit', actorUserId);
+    await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, targetId, 'submit', actorUserId, manager);
     target.status = 'pending_approval';
     target.approvalRequestId = approvalRequest.id;
-    const saved = await this.targets.save(target);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'targets.target.submitted',
-      resource: 'target',
-      resourceId: targetId,
-      result: 'success',
-      correlationId: approvalRequest.id,
-    });
+    const saved = await repo.save(target);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'targets.target.submitted',
+        resource: 'target',
+        resourceId: targetId,
+        result: 'success',
+        correlationId: approvalRequest.id,
+      },
+      manager,
+    );
     return saved;
   }
 
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide`. */
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const target = await this.targets.findOne({ where: { id: resourceId } });
+    const target = await this.em(manager).getRepository(Target).findOne({ where: { id: resourceId } });
     if (!target || target.status === 'approved') return; // not found, or already applied — benign no-op
 
     // Same decoupling risk the CTO caught in Payroll's own P0 review: without a shared
@@ -152,34 +174,37 @@ export class TargetService implements OnModuleInit {
     // constraint) would leave ProcessEngine's own state at 'approved' while Target.status stayed
     // behind — a state desync, not merely a failed write. Atomic, matching PayrollService's own
     // proven `onApprovalApproved` shape.
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, target.id, 'approve', SYSTEM_ACTOR_ID, manager);
+    await this.em(manager).transaction(async (tx) => {
+      await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, target.id, 'approve', SYSTEM_ACTOR_ID, tx);
       target.status = 'approved';
       target.approvedAt = new Date();
-      await manager.getRepository(Target).save(target);
+      await tx.getRepository(Target).save(target);
     });
-    await this.audit.record({
-      actorUserId: SYSTEM_ACTOR_ID,
-      organizationId: null,
-      action: 'targets.target.approved',
-      resource: 'target',
-      resourceId: target.id,
-      result: 'success',
-      correlationId: String(payload.approvalRequestId ?? ''),
-    });
+    await this.audit.record(
+      {
+        actorUserId: SYSTEM_ACTOR_ID,
+        organizationId: null,
+        action: 'targets.target.approved',
+        resource: 'target',
+        resourceId: target.id,
+        result: 'success',
+        correlationId: String(payload.approvalRequestId ?? ''),
+      },
+      manager,
+    );
   }
 
-  private async onApprovalRejected(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalRejected(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const target = await this.targets.findOne({ where: { id: resourceId } });
+    const target = await this.em(manager).getRepository(Target).findOne({ where: { id: resourceId } });
     if (!target || target.status === 'rejected') return;
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, target.id, 'reject', SYSTEM_ACTOR_ID, manager);
+    await this.em(manager).transaction(async (tx) => {
+      await this.processEngine.transition(TARGET_PROCESS, ENTITY_TYPE, target.id, 'reject', SYSTEM_ACTOR_ID, tx);
       target.status = 'rejected';
-      await manager.getRepository(Target).save(target);
+      await tx.getRepository(Target).save(target);
     });
   }
 }

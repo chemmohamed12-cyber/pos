@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ArrayMinSize, IsArray, IsInt, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BomService } from '../application/bom.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -32,20 +33,27 @@ class DefineBomDto {
  * (distinct from Price Lists' admin+sales_manager tier, which is a
  * commercial-policy decision — this is a technical one).
  */
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized,
+ * controller #15). `CompanyContextGuard` added at the class level — every
+ * route threads `req.companyContext.dataSource.manager` into `BomService`.
+ */
 @Controller('bom')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('sales')
 export class BomController {
   constructor(private readonly bom: BomService) {}
 
   @Get()
-  async list() {
-    return this.bom.listBoms();
+  async list(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.bom.listBoms(req.companyContext.dataSource.manager);
   }
 
   @Get(':productId')
-  async get(@Param('productId') productId: string) {
-    const bom = await this.bom.getBom(productId);
+  async get(@Req() req: CompanyScopedRequest, @Param('productId') productId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const bom = await this.bom.getBom(productId, req.companyContext.dataSource.manager);
     if (!bom) throw new NotFoundException(`No Bill of Materials defined for product "${productId}".`);
     return bom;
   }
@@ -62,15 +70,17 @@ export class BomController {
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.catalog.edit', 'editable')
   @Post(':productId')
-  async define(@Req() req: AuthenticatedRequest, @Param('productId') productId: string, @Body() dto: DefineBomDto) {
-    return this.bom.defineBom(productId, dto.components, req.user.id);
+  async define(@Req() req: CompanyScopedRequest, @Param('productId') productId: string, @Body() dto: DefineBomDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.bom.defineBom(productId, dto.components, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.catalog.edit', 'editable')
   @Delete(':productId')
-  async remove(@Req() req: AuthenticatedRequest, @Param('productId') productId: string) {
-    await this.bom.deleteBom(productId, req.user.id);
+  async remove(@Req() req: CompanyScopedRequest, @Param('productId') productId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.bom.deleteBom(productId, req.user.id, req.companyContext.dataSource.manager);
     return { removed: true };
   }
 }

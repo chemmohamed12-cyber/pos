@@ -2,7 +2,8 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuard
 import { ArrayMinSize, IsArray, IsIn, IsISO8601, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CommissionService } from '../application/commission.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -82,7 +83,7 @@ class CreateAdjustmentDto {
 
 /** ADR-071 — `commission`'s composition-root controller. No manual "calculate" route exists — the Resolution Engine is event-driven off `finance.invoice.posted`/`collection.remitted`, never a human-invoked action (ADR-068 §C). */
 @Controller('commission')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('commission')
 export class CommissionController {
   constructor(private readonly commission: CommissionService) {}
@@ -90,78 +91,74 @@ export class CommissionController {
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.policy.create', 'editable')
   @Post('policies')
-  async createPolicy(@Body() dto: CreatePolicyDto, @Req() req: AuthenticatedRequest) {
-    return this.commission.createPolicy(
-      { ...dto, flatRate: dto.flatRate ?? null, tiers: dto.tiers?.map((t) => ({ ...t, toPercent: t.toPercent ?? null })) },
-      req.user.id,
-    );
+  async createPolicy(@Body() dto: CreatePolicyDto, @Req() req: CompanyScopedRequest) {
+    return this.commission.createPolicy({ ...dto, flatRate: dto.flatRate ?? null, tiers: dto.tiers?.map((t) => ({ ...t, toPercent: t.toPercent ?? null })) },
+      req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.policy.view', 'read-only')
   @Get('policies')
-  async listPolicies() {
-    return this.commission.listPolicies();
+  async listPolicies(@Req() req: CompanyScopedRequest) {
+    return this.commission.listPolicies(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.policy.view', 'read-only')
   @Get('policies/:id/tiers')
-  async listTiers(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commission.listTiers(id);
+  async listTiers(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.commission.listTiers(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.result.view', 'read-only')
   @Get('results')
-  async listResults(@Query('employeeId') employeeId?: string) {
-    return this.commission.listResults(employeeId);
+  async listResults(@Req() req: CompanyScopedRequest, @Query('employeeId') employeeId?: string) {
+    return this.commission.listResults(employeeId, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.result.view', 'read-only')
   @Get('results/approved')
-  async listApprovedCommissionResults(
-    @Query('employeeId', ParseUUIDPipe) employeeId: string,
+  async listApprovedCommissionResults(@Query('employeeId', ParseUUIDPipe) employeeId: string,
     @Query('periodStart') periodStart: string,
-    @Query('periodEnd') periodEnd: string,
-  ) {
-    return this.commission.listApprovedCommissionResults(employeeId, periodStart, periodEnd);
+    @Query('periodEnd') periodEnd: string, @Req() req: CompanyScopedRequest) {
+    return this.commission.listApprovedCommissionResults(employeeId, periodStart, periodEnd, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.batch.submit', 'editable')
   @Post('batches/submit')
-  async submitApprovalBatch(@Body() dto: SubmitBatchDto, @Req() req: AuthenticatedRequest) {
-    return this.commission.submitApprovalBatch(dto.periodStart, dto.periodEnd, req.user.id);
+  async submitApprovalBatch(@Body() dto: SubmitBatchDto, @Req() req: CompanyScopedRequest) {
+    return this.commission.submitApprovalBatch(dto.periodStart, dto.periodEnd, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.batch.submit', 'read-only')
   @Get('batches')
-  async listApprovalBatches() {
-    return this.commission.listApprovalBatches();
+  async listApprovalBatches(@Req() req: CompanyScopedRequest) {
+    return this.commission.listApprovalBatches(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.adjustment.create', 'editable')
   @Post('adjustments')
-  async createAdjustment(@Body() dto: CreateAdjustmentDto, @Req() req: AuthenticatedRequest) {
-    return this.commission.createAdjustment(dto, req.user.id);
+  async createAdjustment(@Body() dto: CreateAdjustmentDto, @Req() req: CompanyScopedRequest) {
+    return this.commission.createAdjustment(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.result.view', 'read-only')
   @Get('adjustments')
-  async listAdjustments(@Query('originalCommissionResultId') originalCommissionResultId?: string) {
-    return this.commission.listAdjustments(originalCommissionResultId);
+  async listAdjustments(@Req() req: CompanyScopedRequest, @Query('originalCommissionResultId') originalCommissionResultId?: string) {
+    return this.commission.listAdjustments(originalCommissionResultId, req.companyContext!.dataSource.manager);
   }
 
   /** Same generic decide route shape every other FA-01 consumer in this codebase uses. */
   @UseGuards(PermissionGuard)
   @RequirePermission('commission.batch.approve', 'editable')
   @Post('approvals/:requestId/decide')
-  async decide(@Param('requestId', ParseUUIDPipe) requestId: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.commission.decide(requestId, req.user.id, dto.decision, dto.note);
+  async decide(@Param('requestId', ParseUUIDPipe) requestId: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.commission.decide(requestId, req.user.id, dto.decision, dto.note, req.companyContext!.dataSource.manager);
   }
 }

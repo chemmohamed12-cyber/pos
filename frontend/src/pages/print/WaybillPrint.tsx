@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Shipment {
   waybillNumber: string;
@@ -51,6 +52,7 @@ export function WaybillPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<WaybillPrintData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'document.waybill_title', 'field.rsh_number', 'field.sales_order', 'field.customer', 'field.warehouse',
@@ -60,26 +62,32 @@ export function WaybillPrint() {
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const shipment = await api.get<Shipment>(`/shipments/${id}`);
-      const fulfillmentOrder = await api.get<FulfillmentOrder>(`/fulfillment/orders/${shipment.fulfillmentOrderId}`);
-      const [order, warehouses, customers, users, companies, vehicles] = await Promise.all([
-        api.get<Order>(`/sales-orders/${fulfillmentOrder.salesOrderId}`),
-        api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
-        api.get<Array<{ id: string; name: string }>>('/customers'),
-        api.get<Array<{ id: string; fullName: string }>>('/admin/users').catch(() => []),
-        api.get<ShippingCompany[]>('/shipments/shipping-companies').catch(() => []),
-        api.get<Vehicle[]>('/shipments/vehicles').catch(() => []),
-      ]);
-      const warehouse = warehouses.find((w) => w.id === fulfillmentOrder.warehouseId);
-      const customer = customers.find((c) => c.id === order.customerId);
-      const driver = users.find((u) => u.id === shipment.driverUserId);
-      const company = shipment.shippingCompanyId ? (companies.find((c) => c.id === shipment.shippingCompanyId) ?? null) : null;
-      const vehicle = shipment.vehicleId ? (vehicles.find((v) => v.id === shipment.vehicleId) ?? null) : null;
+      try {
+        const shipment = await api.get<Shipment>(`/shipments/${id}`);
+        const fulfillmentOrder = await api.get<FulfillmentOrder>(`/fulfillment/orders/${shipment.fulfillmentOrderId}`);
+        const [order, warehouses, customers, users, companies, vehicles] = await Promise.all([
+          api.get<Order>(`/sales-orders/${fulfillmentOrder.salesOrderId}`),
+          api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
+          api.get<Array<{ id: string; name: string }>>('/customers'),
+          api.get<Array<{ id: string; fullName: string }>>('/admin/users').catch(() => []),
+          api.get<ShippingCompany[]>('/shipments/shipping-companies').catch(() => []),
+          api.get<Vehicle[]>('/shipments/vehicles').catch(() => []),
+        ]);
+        const warehouse = warehouses.find((w) => w.id === fulfillmentOrder.warehouseId);
+        const customer = customers.find((c) => c.id === order.customerId);
+        const driver = users.find((u) => u.id === shipment.driverUserId);
+        const company = shipment.shippingCompanyId ? (companies.find((c) => c.id === shipment.shippingCompanyId) ?? null) : null;
+        const vehicle = shipment.vehicleId ? (vehicles.find((v) => v.id === shipment.vehicleId) ?? null) : null;
 
-      setData({ shipment, order, warehouse, fulfillmentOrder, customer, driver, company, vehicle });
+        setData({ shipment, order, warehouse, fulfillmentOrder, customer, driver, company, vehicle });
+      } catch (err) {
+        // Foundation fix: the primary calls here had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { shipment, order, warehouse, fulfillmentOrder, customer, driver, company, vehicle } = data;
 

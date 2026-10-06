@@ -1,7 +1,8 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Query, Body, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsISO8601, IsOptional, IsUUID } from 'class-validator';
 import { GrniReconciliationService } from '../application/grni-reconciliation.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -30,7 +31,7 @@ class RunGrniReconciliationDto {
  * the placeholder ADR-056 says not to build.
  */
 @Controller('accounting/grni')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('accounting')
 export class GrniController {
   constructor(private readonly reconciliation: GrniReconciliationService) {}
@@ -38,28 +39,32 @@ export class GrniController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.grni.view', 'read-only')
   @Get('reconciliations')
-  async listReconciliations(@Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.reconciliation.listRuns({ status, from, to });
+  async listReconciliations(@Req() req: CompanyScopedRequest, @Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.reconciliation.listRuns({ status, from, to }, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.grni.view', 'read-only')
   @Get('reconciliations/:id')
-  async getReconciliation(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reconciliation.getRun(id);
+  async getReconciliation(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.reconciliation.getRun(id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.grni.create', 'editable')
   @Post('reconciliations')
-  async runReconciliation(@Body() dto: RunGrniReconciliationDto, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.reconcile(dto, req.user.id);
+  async runReconciliation(@Body() dto: RunGrniReconciliationDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.reconciliation.reconcile(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.grni.create', 'editable')
   @Post('reconciliations/:id/close')
-  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.closeRun(id, req.user.id);
+  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.reconciliation.closeRun(id, req.user.id, req.companyContext.dataSource.manager);
   }
 }

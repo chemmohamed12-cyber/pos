@@ -1,3 +1,5 @@
+import { EntityManager } from 'typeorm';
+
 /**
  * F05 — Accounts Payable (ADR-037 D1/D4, Blueprint §4/§8). The AP
  * integration boundary a **future operational supplier-finance domain**
@@ -83,6 +85,8 @@ export interface SupplierPaymentRecordedEvent extends ApEventBase {
   amount: string;
   method: string;
   treasuryAccountId: string;
+  /** D2: the paying Treasury account's own mapped GL account code — the ONLY source of the bank leg (no control-account fallback). */
+  glAccountCode: string;
   bankAccountCode?: string | null;
 }
 
@@ -124,10 +128,10 @@ export const AP_ADJUSTMENT_APPROVED_EVENT = 'accounting.ap.adjustment.approved';
  * domain folder (`no-restricted-imports`), exactly like `finance.contract.ts`.
  */
 export interface SupplierLedgerContract {
-  /** Σ of every supplier's balance as of the date (inclusive of the whole calendar day), SQL NUMERIC. */
-  getAllSupplierBalances(asOfDate?: string): Promise<{ balances: Array<{ supplierId: string; balance: string }>; total: string }>;
+  /** Σ of every supplier's balance as of the date (inclusive of the whole calendar day), SQL NUMERIC. Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient connection when omitted, unchanged for every existing caller. */
+  getAllSupplierBalances(asOfDate?: string, manager?: EntityManager): Promise<{ balances: Array<{ supplierId: string; balance: string }>; total: string }>;
   /** One supplier's ledger rows. */
-  listLedger(supplierId: string, filter?: { from?: string; to?: string }): Promise<unknown[]>;
+  listLedger(supplierId: string, filter?: { from?: string; to?: string }, manager?: EntityManager): Promise<unknown[]>;
   /** Post one operational supplier-ledger movement (the sanctioned write route — never a raw table write). */
   postEntry(input: {
     supplierId: string;
@@ -136,7 +140,7 @@ export interface SupplierLedgerContract {
     amount: string;
     reason: string;
     createdByUserId: string;
-  }): Promise<unknown>;
+  }, manager?: EntityManager): Promise<unknown>;
 }
 
 export const SUPPLIER_LEDGER_CONTRACT = Symbol('SUPPLIER_LEDGER_CONTRACT');

@@ -9,7 +9,7 @@ interface PaymentRow {
   customerId: string;
   customerCode: string;
   customerName: string;
-  invoiceId: string;
+  invoiceId: string | null; // null = on-account / advance payment (CUS-01)
   invoiceNumber: string | null;
   amount: string;
   method: string;
@@ -45,6 +45,7 @@ export function Payments() {
     'field.actions',
     'action.print',
     'panel.no_payments_yet',
+    'panel.customer_advance_unapplied',
   ]);
 
   useEffect(() => {
@@ -96,14 +97,14 @@ export function Payments() {
           </thead>
           <tbody>
             {filtered!.map((r) => (
-              <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/invoices/${r.invoiceId}`)}>
+              <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(r.invoiceId ? `/invoices/${r.invoiceId}` : `/customers/${r.customerId}/account`)}>
                 <td>{r.paymentNumber}</td>
                 <td>
                   <a onClick={(e) => { e.stopPropagation(); navigate(`/customers/${r.customerId}/account`); }} style={{ cursor: 'pointer' }}>
                     {r.customerCode} — {r.customerName}
                   </a>
                 </td>
-                <td>{r.invoiceNumber ?? '—'}</td>
+                <td>{r.invoiceId ? (r.invoiceNumber ?? '—') : t('panel.customer_advance_unapplied')}</td>
                 <td>{r.amount}</td>
                 <td>{r.method}</td>
                 <td>{new Date(r.occurredAt).toLocaleString()}</td>

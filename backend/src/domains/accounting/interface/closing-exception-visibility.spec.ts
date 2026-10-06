@@ -41,7 +41,8 @@ describe('AccountingController.listClosingExceptions — HISTORICAL_TEST_ARTIFAC
   });
 
   function fakeReq(userId: string) {
-    return { user: { id: userId } } as never;
+    // Area 21: the handler reads the Company context. This suite runs on the disposable seeded database, so its "Company" connection is that same database.
+    return { user: { id: userId }, companyContext: { companyId: 'visibility-spec', dataSource } } as never;
   }
 
   it('hides HISTORICAL_TEST_ARTIFACT from a viewer without annotate_test_artifact, shows it to admin, and never mutates the category', async () => {

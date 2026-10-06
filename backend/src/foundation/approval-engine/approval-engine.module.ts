@@ -13,6 +13,8 @@ import { ProcessEngineModule } from '../process-engine/process-engine.module';
 import { AuditModule } from '../audit/audit.module';
 import { EventsModule } from '../events/events.module';
 import { PermissionModule } from '../permission/permission.module';
+import { DatabaseRegistryModule } from '../database-registry/database-registry.module';
+import { CompanyModule } from '../company/company.module';
 
 /**
  * FA-01 — Generic Approval / Maker-Checker Foundation
@@ -21,8 +23,9 @@ import { PermissionModule } from '../permission/permission.module';
  * `numbering` / `audit`).
  *
  * Imports only other Platform-Core foundation modules
- * (`ProcessEngine`, `Audit`, `Events`, `Permission`; `ConfigurationEngine`
- * is `@Global()`). **Zero import from `src/domains/*`** — enforced by
+ * (`ProcessEngine`, `Audit`, `Events`, `Permission`, `DatabaseRegistry`
+ * (Area 9 company-connection routing); `ConfigurationEngine` is
+ * `@Global()`). **Zero import from `src/domains/*`** — enforced by
  * `approval-engine.genericity.spec.ts` (contract §10).
  */
 @Module({
@@ -34,6 +37,8 @@ import { PermissionModule } from '../permission/permission.module';
     AuditModule,
     EventsModule,
     PermissionModule,
+    DatabaseRegistryModule,
+    CompanyModule, // CompanyContextGuard on ApprovalController (Area 21)
   ],
   controllers: [ApprovalController],
   providers: [ApprovalEngineService, ApprovalExpiryScheduler],

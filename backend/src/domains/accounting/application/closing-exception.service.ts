@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ClosingException } from '../infrastructure/closing-exception.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
 
@@ -29,24 +29,28 @@ export class ClosingExceptionService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(fiscalPeriodId: string): Promise<ClosingException[]> {
-    return this.dataSource.getRepository(ClosingException).find({ where: { fiscalPeriodId }, order: { createdAt: 'DESC' } });
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
   }
 
-  async get(id: string): Promise<ClosingException> {
-    const found = await this.dataSource.getRepository(ClosingException).findOne({ where: { id } });
+  async list(fiscalPeriodId: string, manager?: EntityManager): Promise<ClosingException[]> {
+    return this.em(manager).getRepository(ClosingException).find({ where: { fiscalPeriodId }, order: { createdAt: 'DESC' } });
+  }
+
+  async get(id: string, manager?: EntityManager): Promise<ClosingException> {
+    const found = await this.em(manager).getRepository(ClosingException).findOne({ where: { id } });
     if (!found) throw new NotFoundException(`Closing exception "${id}" not found.`);
     return found;
   }
 
-  async acknowledge(id: string, actorUserId: string, note: string): Promise<ClosingException> {
-    const exception = await this.get(id);
+  async acknowledge(id: string, actorUserId: string, note: string, manager?: EntityManager): Promise<ClosingException> {
+    const exception = await this.get(id, manager);
     if (exception.status !== 'open') {
       throw new ConflictException(`Closing exception "${id}" is "${exception.status}" — only an "open" exception can be acknowledged.`);
     }
     exception.status = 'acknowledged';
     exception.resolutionNote = note;
-    const saved = await this.dataSource.getRepository(ClosingException).save(exception);
+    const saved = await this.em(manager).getRepository(ClosingException).save(exception);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -56,7 +60,7 @@ export class ClosingExceptionService {
       result: 'success',
       correlationId: null,
       after: { note },
-    });
+    }, manager);
     return saved;
   }
 
@@ -70,8 +74,8 @@ export class ClosingExceptionService {
    * environment gate is an operational decision outside this service's
    * own scope.
    */
-  async annotateTestArtifact(id: string, actorUserId: string, reason: string): Promise<ClosingException> {
-    const exception = await this.get(id);
+  async annotateTestArtifact(id: string, actorUserId: string, reason: string, manager?: EntityManager): Promise<ClosingException> {
+    const exception = await this.get(id, manager);
     if (exception.module !== 'financial_events') {
       throw new ConflictException(
         `Closing exception "${id}" is a "${exception.module}" reconciliation finding — HISTORICAL_TEST_ARTIFACT only applies to a rejected-financial-event finding.`,
@@ -83,7 +87,7 @@ export class ClosingExceptionService {
     exception.category = 'HISTORICAL_TEST_ARTIFACT';
     exception.severity = 'informational';
     exception.annotation = { byUserId: actorUserId, at: new Date().toISOString(), reason };
-    const saved = await this.dataSource.getRepository(ClosingException).save(exception);
+    const saved = await this.em(manager).getRepository(ClosingException).save(exception);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -93,7 +97,7 @@ export class ClosingExceptionService {
       result: 'success',
       correlationId: null,
       after: { reason },
-    });
+    }, manager);
     return saved;
   }
 }

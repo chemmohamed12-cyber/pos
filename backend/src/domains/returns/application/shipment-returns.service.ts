@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ShipmentReturn } from '../infrastructure/shipment-return.entity';
 import { ShipmentReturnLine } from '../infrastructure/shipment-return-line.entity';
 import { SHIPMENT_RETURN_PROCESS } from '../domain/shipment-return-process';
@@ -10,6 +10,8 @@ import { INVENTORY_LOGISTICS_CONTRACT, InventoryLogisticsContract } from '../../
 import { SALES_ORDERS_READ_CONTRACT, SalesOrdersReadContract, SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { OrderLineReturnCapacityService, OrderLineReturnCapacity } from './order-line-return-capacity.service';
+import { ReturnFinancialsService } from './return-financials.service';
+import { EventBusService } from '../../../foundation/events/event-bus.service';
 
 const ENTITY_TYPE = 'shipment_return';
 
@@ -43,6 +45,9 @@ export class ShipmentReturnsService {
     @Inject(SALES_CUSTOMERS_CONTRACT) private readonly customers: SalesCustomersContract,
     private readonly shipments: ShipmentService,
     private readonly capacity: OrderLineReturnCapacityService,
+    // D4 (2026-10-05) — the shared financial policy of both return types, and the Company event bus (post-commit flush).
+    private readonly financials: ReturnFinancialsService,
+    private readonly events: EventBusService,
   ) {}
 
   /**
@@ -59,6 +64,7 @@ export class ShipmentReturnsService {
     lines: ShipmentReturnLineInput[],
     reason: string | null,
     requestedByUserId: string,
+    manager?: EntityManager,
   ): Promise<ShipmentReturn> {
     if (lines.length === 0) throw new BadRequestException('At least one return line is required.');
     for (const line of lines) {
@@ -68,12 +74,12 @@ export class ShipmentReturnsService {
       if (Number(line.returnPrice) < 0) throw new BadRequestException('Return price cannot be negative.');
     }
 
-    const shipmentSnapshot = await this.shipments.getShipmentLinesSnapshot(shipmentId);
+    const shipmentSnapshot = await this.shipments.getShipmentLinesSnapshot(shipmentId, manager);
     if (!shipmentSnapshot) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
     if (!shipmentSnapshot.salesOrderId) {
       throw new BadRequestException(`Shipment "${shipmentId}" has no linked Sales Order — cannot determine the customer for a Shipment Return.`);
     }
-    const orderSnapshot = await this.salesOrders.getOrderSnapshot(shipmentSnapshot.salesOrderId);
+    const orderSnapshot = await this.salesOrders.getOrderSnapshot(shipmentSnapshot.salesOrderId, manager);
     if (!orderSnapshot) throw new NotFoundException(`Sales order "${shipmentSnapshot.salesOrderId}" not found.`);
 
     const shipmentLineById = new Map(shipmentSnapshot.lines.map((l) => [l.id, l]));
@@ -83,10 +89,10 @@ export class ShipmentReturnsService {
       }
     }
 
-    await this.numbering.registerDocumentType('shipment_return', 'SRT');
-    const returnNumber = await this.numbering.getNextNumber('shipment_return');
+    await this.numbering.registerDocumentType('shipment_return', 'SRT', true, manager);
+    const returnNumber = await this.numbering.getNextNumber('shipment_return', manager);
 
-    const header = await this.dataSource.transaction(async (manager) => {
+    const header = await (manager ?? this.dataSource).transaction(async (txManager) => {
       // Cross-Return Data Integrity (CTO-approved Option 1, 2026-09-16). The shared
       // serialization boundary is the underlying SalesOrderLine, not shipment_lines —
       // ShipmentLine.quantity is immutable after creation, so only the cumulative-returned
@@ -96,7 +102,7 @@ export class ShipmentReturnsService {
       const orderLineIds = [...new Set(lines.map((l) => shipmentLineById.get(l.shipmentLineId)!.salesOrderLineId))].sort();
       const capacityByOrderLine = new Map<string, OrderLineReturnCapacity>();
       for (const orderLineId of orderLineIds) {
-        capacityByOrderLine.set(orderLineId, await this.capacity.getLockedCapacity(manager, orderLineId));
+        capacityByOrderLine.set(orderLineId, await this.capacity.getLockedCapacity(txManager, orderLineId));
       }
 
       // Aggregate requested quantity per underlying order line first — a request could touch
@@ -122,7 +128,7 @@ export class ShipmentReturnsService {
       // entirely from data whose writers all first acquire the shared order-line lock above.
       for (const line of lines) {
         const shipmentLine = shipmentLineById.get(line.shipmentLineId)!;
-        const priorRows: Array<{ sum: string | null }> = await manager.query(
+        const priorRows: Array<{ sum: string | null }> = await txManager.query(
           `SELECT SUM(srl."returnQuantity")::text as sum FROM "shipment_return_lines" srl WHERE srl."shipmentLineId" = $1::uuid`,
           [line.shipmentLineId],
         );
@@ -140,7 +146,7 @@ export class ShipmentReturnsService {
         }
       }
 
-      const headerRepo = manager.getRepository(ShipmentReturn);
+      const headerRepo = txManager.getRepository(ShipmentReturn);
       const saved = await headerRepo.save(
         headerRepo.create({
           returnNumber,
@@ -153,7 +159,7 @@ export class ShipmentReturnsService {
         }),
       );
 
-      const lineRepo = manager.getRepository(ShipmentReturnLine);
+      const lineRepo = txManager.getRepository(ShipmentReturnLine);
       for (const line of lines) {
         const shipmentLine = shipmentLineById.get(line.shipmentLineId)!;
         const lineTotal = (Number(line.returnPrice) * line.returnQuantity).toFixed(2);
@@ -169,67 +175,74 @@ export class ShipmentReturnsService {
         );
       }
 
-      await this.processEngine.start(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, saved.id, manager);
+      await this.processEngine.start(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, saved.id, txManager);
       return saved;
     });
 
-    await this.audit.record({
-      actorUserId: requestedByUserId,
-      organizationId: null,
-      action: 'shipment_return.requested',
-      resource: 'shipment_return',
-      resourceId: header.id,
-      result: 'success',
-      correlationId: null,
-      after: { shipmentId, returnMode, returnNumber, lineCount: lines.length },
-    });
+    await this.audit.record(
+      {
+        actorUserId: requestedByUserId,
+        organizationId: null,
+        action: 'shipment_return.requested',
+        resource: 'shipment_return',
+        resourceId: header.id,
+        result: 'success',
+        correlationId: null,
+        after: { shipmentId, returnMode, returnNumber, lineCount: lines.length },
+      },
+      manager,
+    );
 
     return header;
   }
 
   /** The warehouse-facing step: posts the actual `return_in` inventory movement(s) for every committed line, into the order's own warehouse (same destination `ReturnRequest`'s `restock` disposition uses). */
-  async completeShipmentReturn(shipmentReturnId: string, actorUserId: string): Promise<string> {
-    const header = await this.dataSource.getRepository(ShipmentReturn).findOne({ where: { id: shipmentReturnId } });
+  async completeShipmentReturn(shipmentReturnId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    const header = await (manager ?? this.dataSource).getRepository(ShipmentReturn).findOne({ where: { id: shipmentReturnId } });
     if (!header) throw new NotFoundException(`Shipment return "${shipmentReturnId}" not found.`);
 
-    const currentState = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId);
+    const currentState = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId, manager);
     if (currentState !== 'requested') {
       throw new ConflictException(`Cannot complete a shipment return in state "${currentState}".`);
     }
 
-    const order = await this.salesOrders.getOrder(header.salesOrderId, actorUserId);
-    if (!order.warehouseId) throw new BadRequestException(`Sales order "${header.salesOrderId}" has no warehouse to return stock into.`);
+    const returnLines = await (manager ?? this.dataSource).getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId } });
+    const shipmentSnapshot = await this.shipments.getShipmentLinesSnapshot(header.shipmentId, manager);
+    if (!shipmentSnapshot) throw new NotFoundException(`Shipment "${header.shipmentId}" not found.`);
+    const orderLineByShipmentLine = new Map(shipmentSnapshot.lines.map((l) => [l.id, l.salesOrderLineId]));
 
-    const returnLines = await this.dataSource.getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId } });
-
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId, 'complete', actorUserId, manager);
-      for (const line of returnLines) {
-        await this.inventory.recordMovement(
-          order.warehouseId!,
-          line.productId,
-          line.returnQuantity,
-          'return_in',
-          'shipment_return',
-          shipmentReturnId,
-          actorUserId,
-          manager,
-        );
-      }
+    // D4 (2026-10-05): the same financial policy as a Sales Return — an un-invoiced sale gets Dr Inventory / Cr COGS only
+    // (at the original exit cost); an invoiced one gets the full Revenue/AR/tax reversal. One transaction, plan() before any write.
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const plan = await this.financials.plan(
+        returnLines.map((l) => {
+          const salesOrderLineId = orderLineByShipmentLine.get(l.shipmentLineId);
+          if (!salesOrderLineId) throw new BadRequestException(`Shipment line "${l.shipmentLineId}" no longer resolves to a sales order line.`);
+          return { lineId: l.id, salesOrderId: header.salesOrderId, salesOrderLineId, productId: l.productId, quantity: l.returnQuantity };
+        }),
+        actorUserId,
+        txManager,
+      );
+      await this.processEngine.transition(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId, 'complete', actorUserId, txManager);
+      await this.financials.apply('shipment_return', { id: shipmentReturnId, number: header.returnNumber, customerId: header.customerId }, plan, actorUserId, txManager);
     });
+    await this.events.dispatchAfterCommit(manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'shipment_return.completed',
-      resource: 'shipment_return',
-      resourceId: shipmentReturnId,
-      result: 'success',
-      correlationId: null,
-      after: { lineCount: returnLines.length },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'shipment_return.completed',
+        resource: 'shipment_return',
+        resourceId: shipmentReturnId,
+        result: 'success',
+        correlationId: null,
+        after: { lineCount: returnLines.length },
+      },
+      manager,
+    );
 
-    return this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId);
+    return this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId, manager);
   }
 
   /**
@@ -247,8 +260,11 @@ export class ShipmentReturnsService {
    * field in this codebase. Read-only, no transaction, no lock — display
    * guidance only.
    */
-  async getReturnableLines(shipmentId: string): Promise<Array<{ shipmentLineId: string; productId: string; shippedQuantity: number; unitPrice: string; previouslyReturned: number; remaining: number }>> {
-    const snapshot = await this.shipments.getShipmentLinesSnapshot(shipmentId);
+  async getReturnableLines(
+    shipmentId: string,
+    manager?: EntityManager,
+  ): Promise<Array<{ shipmentLineId: string; productId: string; shippedQuantity: number; unitPrice: string; previouslyReturned: number; remaining: number }>> {
+    const snapshot = await this.shipments.getShipmentLinesSnapshot(shipmentId, manager);
     if (!snapshot) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
     return Promise.all(
       snapshot.lines.map(async (line) => {
@@ -256,7 +272,7 @@ export class ShipmentReturnsService {
         // itself runs (that one has no `rejected`-exclusion either; `reject` has no route exposed
         // anywhere in this controller today, so the two queries are equivalent in practice, and
         // this one must keep tracking whichever query is authoritative rather than diverge from it).
-        const priorRows: Array<{ sum: string | null }> = await this.dataSource.query(
+        const priorRows: Array<{ sum: string | null }> = await (manager ?? this.dataSource).query(
           `SELECT SUM(srl."returnQuantity")::text as sum FROM "shipment_return_lines" srl WHERE srl."shipmentLineId" = $1::uuid`,
           [line.id],
         );
@@ -274,14 +290,14 @@ export class ShipmentReturnsService {
   }
 
   /** List-screen fields per CTO directive §9-equivalent for shipments: customer name + amount must be visible without a detail fetch. */
-  async listShipmentReturns(): Promise<Array<ShipmentReturn & { state: string; totalAmount: string; customerName: string | null }>> {
-    const headers = await this.dataSource.getRepository(ShipmentReturn).find({ order: { createdAt: 'DESC' } });
+  async listShipmentReturns(manager?: EntityManager): Promise<Array<ShipmentReturn & { state: string; totalAmount: string; customerName: string | null }>> {
+    const headers = await (manager ?? this.dataSource).getRepository(ShipmentReturn).find({ order: { createdAt: 'DESC' } });
     return Promise.all(
       headers.map(async (h) => {
-        const state = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, h.id);
-        const lines = await this.dataSource.getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId: h.id } });
+        const state = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, h.id, manager);
+        const lines = await (manager ?? this.dataSource).getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId: h.id } });
         const totalAmount = lines.reduce((sum, l) => sum + Number(l.lineTotal), 0).toFixed(2);
-        const customer = await this.customers.getCustomerSnapshot(h.customerId);
+        const customer = await this.customers.getCustomerSnapshot(h.customerId, manager);
         return { ...h, state, totalAmount, customerName: customer?.name ?? null };
       }),
     );
@@ -289,13 +305,14 @@ export class ShipmentReturnsService {
 
   async getShipmentReturnDetail(
     shipmentReturnId: string,
+    manager?: EntityManager,
   ): Promise<{ header: ShipmentReturn; state: string; lines: ShipmentReturnLine[]; totalAmount: string; customerName: string | null }> {
-    const header = await this.dataSource.getRepository(ShipmentReturn).findOne({ where: { id: shipmentReturnId } });
+    const header = await (manager ?? this.dataSource).getRepository(ShipmentReturn).findOne({ where: { id: shipmentReturnId } });
     if (!header) throw new NotFoundException(`Shipment return "${shipmentReturnId}" not found.`);
-    const state = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId);
-    const lines = await this.dataSource.getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId } });
+    const state = await this.processEngine.getState(SHIPMENT_RETURN_PROCESS, ENTITY_TYPE, shipmentReturnId, manager);
+    const lines = await (manager ?? this.dataSource).getRepository(ShipmentReturnLine).find({ where: { shipmentReturnId } });
     const totalAmount = lines.reduce((sum, l) => sum + Number(l.lineTotal), 0).toFixed(2);
-    const customer = await this.customers.getCustomerSnapshot(header.customerId);
+    const customer = await this.customers.getCustomerSnapshot(header.customerId, manager);
     return { header, state, lines, totalAmount, customerName: customer?.name ?? null };
   }
 }

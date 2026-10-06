@@ -81,7 +81,12 @@ export function AttendanceDays() {
   ]);
 
   async function loadEmployees() {
-    setEmployees(await api.get<Employee[]>('/hr/employees'));
+    try {
+      setEmployees(await api.get<Employee[]>('/hr/employees'));
+    } catch (err) {
+      // Foundation fix: no error handling — the employee-label lookups silently stayed empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load employees.');
+    }
   }
   async function loadDays() {
     try {

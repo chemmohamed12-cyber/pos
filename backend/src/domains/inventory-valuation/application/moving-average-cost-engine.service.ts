@@ -51,6 +51,19 @@ export class MovingAverageCostEngine implements CostEngine {
     return { unitCostBase: state.averageCostBase };
   }
 
+  /** D4 — pure read of the history rows of `issue` kind for the given idempotency keys (positive quantity / value). */
+  async getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>> {
+    if (idempotencyKeys.length === 0) return [];
+    const runner = manager ?? this.dataSource;
+    const rows: Array<{ idempotencyKey: string; quantity: number; value: string }> = await runner.query(
+      `SELECT "idempotencyKey", ABS("quantity")::int AS quantity, ABS("valueDeltaBase")::text AS value
+         FROM "inventory_valuation_movements"
+        WHERE kind = 'issue' AND "idempotencyKey" = ANY($1::text[])`,
+      [idempotencyKeys],
+    );
+    return rows.map((r) => ({ idempotencyKey: r.idempotencyKey, quantity: Number(r.quantity), valueBase: r.value }));
+  }
+
   async applyIssue(
     productId: string,
     warehouseId: string,

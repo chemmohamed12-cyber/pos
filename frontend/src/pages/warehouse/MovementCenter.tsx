@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Transaction {
   id: string;
@@ -41,12 +42,13 @@ export function MovementCenter() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const { t, preload } = useLanguage();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const [assembleOpen, setAssembleOpen] = useState(false);
   const [assembleWarehouseId, setAssembleWarehouseId] = useState('');
@@ -78,18 +80,26 @@ export function MovementCenter() {
   ]);
 
   async function load() {
-    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
-    if (typeFilter) params.set('type', typeFilter);
-    const [txnsPage, wh, prod] = await Promise.all([
-      api.get<TransactionsPage>(`/warehouse-transactions?${params.toString()}`),
-      api.get<Warehouse[]>('/inventory/warehouses'),
-      api.get<Product[]>('/products/all'),
-    ]);
-    setTransactions(txnsPage.rows);
-    setTotal(txnsPage.total);
-    setWarehouses(wh);
-    setProducts(prod);
-    if (wh[0] && !assembleWarehouseId) setAssembleWarehouseId(wh[0].id);
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+      if (typeFilter) params.set('type', typeFilter);
+      const [txnsPage, wh, prod] = await Promise.all([
+        api.get<TransactionsPage>(`/warehouse-transactions?${params.toString()}`),
+        api.get<Warehouse[]>('/inventory/warehouses'),
+        api.get<Product[]>('/products/all'),
+      ]);
+      setTransactions(txnsPage.rows);
+      setTotal(txnsPage.total);
+      setWarehouses(wh);
+      setProducts(prod);
+      if (wh[0] && !assembleWarehouseId) setAssembleWarehouseId(wh[0].id);
+    } catch (err) {
+      // Foundation fix: this had no error handling — a failed load left
+      // `transactions` at its initial `[]`, rendering as a false "no
+      // transactions yet" empty state instead of a real failure.
+      setLoadError(err);
+    }
   }
 
   useEffect(() => {
@@ -204,7 +214,11 @@ export function MovementCenter() {
         </select>
       </div>
 
-      {transactions.length === 0 ? (
+      {loadError ? (
+        <ErrorState error={loadError} onRetry={load} />
+      ) : transactions === null ? (
+        <div className="empty-state">Loading…</div>
+      ) : transactions.length === 0 ? (
         <div className="empty-state">{t('panel.no_transactions_yet')}</div>
       ) : (
         <>

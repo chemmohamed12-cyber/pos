@@ -37,6 +37,21 @@ export interface HandlerContext {
     configKey: string,
   ): Promise<{ ok: true; id: string } | { ok: false; reason: 'unset' | 'not_found' | 'inactive' | 'not_postable' | 'is_control_account' }>;
   /**
+   * D5 (2026-10-05) — the control account of a function, but ONLY when exactly one active postable account carries it
+   * (e.g. Input VAT = `tax_receivable`). `'none'` / `'ambiguous'` are typed reasons a handler turns into a `rejected`
+   * result — never "the first one".
+   */
+  resolveUniqueControlAccount(fn: ControlFunction): Promise<{ ok: true; id: string } | { ok: false; reason: 'none' | 'ambiguous' }>;
+  /**
+   * D3-B (2026-10-04) — like `resolveConfiguredPostableAccount`, but the configured value is a JSON map
+   * `{ [mapKey]: glAccountCode }` (e.g. manual-receipt Reason Code → Offset GL account). Same fail-closed
+   * validation of the resolved account; `'unset'` also covers an absent/blank map entry. No fallback.
+   */
+  resolveConfiguredMappedAccount(
+    configKey: string,
+    mapKey: string,
+  ): Promise<{ ok: true; id: string } | { ok: false; reason: 'unset' | 'not_found' | 'inactive' | 'not_postable' | 'is_control_account' }>;
+  /**
    * F11 (ADR-044 D4) — the generic FinancialEvent-payload dimension-tagging
    * convention: a handler that wants to tag its `JournalDraftLine` with a
    * dimension calls this with the payload's own `{typeCode, valueCode}`
@@ -111,6 +126,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   'collection.recorded',
   // F09 (ADR-042 D3) — real handler; the SOLE GL trigger for a COD collection
   'collection.remitted',
+  // D4 (2026-10-05) — a completed return of an invoiced sale: Dr Sales Returns [+ Dr tax] / Cr AR
+  'returns.sale_return.credited',
   // V1 subscribed-but-IGNORED (no publisher exists yet / out of Financial Core's scope)
   'return.completed',
   'customer.refund.adjusted',

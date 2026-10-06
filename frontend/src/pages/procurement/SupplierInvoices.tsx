@@ -29,6 +29,8 @@ interface SupplierInvoiceRow {
   supplierId: string;
   purchaseOrderId: string;
   totalAmount: string;
+  /** D5 — the explicit VAT stated by the supplier's invoice (totalAmount is NET). */
+  taxAmount?: string;
   dueDate: string | null;
   priceVarianceAmount: string;
   state: string;
@@ -74,6 +76,7 @@ export function SupplierInvoices() {
 
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [supplierReference, setSupplierReference] = useState('');
+  const [taxAmount, setTaxAmount] = useState('');
   const [poLines, setPoLines] = useState<PurchaseOrderLine[]>([]);
   const [invoiceQty, setInvoiceQty] = useState<Record<string, string>>({});
   const [invoiceCost, setInvoiceCost] = useState<Record<string, string>>({});
@@ -94,6 +97,7 @@ export function SupplierInvoices() {
     'field.invoice_number',
     'field.supplier_reference',
     'field.total_amount',
+    'field.vat_amount',
     'field.due_date',
     'field.price_variance',
     'field.status',
@@ -147,27 +151,38 @@ export function SupplierInvoices() {
       setPoLines([]);
       return;
     }
-    api.get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${purchaseOrderId}`).then((d) => {
-      setPoLines(d.lines);
-      const qty: Record<string, string> = {};
-      const cost: Record<string, string> = {};
-      for (const l of d.lines) {
-        const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
-        if (remaining > 0) {
-          qty[l.id] = String(remaining);
-          cost[l.id] = l.unitCostBase;
+    api
+      .get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${purchaseOrderId}`)
+      .then((d) => {
+        setPoLines(d.lines);
+        const qty: Record<string, string> = {};
+        const cost: Record<string, string> = {};
+        for (const l of d.lines) {
+          const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
+          if (remaining > 0) {
+            qty[l.id] = String(remaining);
+            cost[l.id] = l.unitCostBase;
+          }
         }
-      }
-      setInvoiceQty(qty);
-      setInvoiceCost(cost);
-    });
+        setInvoiceQty(qty);
+        setInvoiceCost(cost);
+      })
+      .catch((err) => {
+        // Foundation fix: no error handling — a failure silently left the PO-lines picker empty.
+        setError(err instanceof ApiError ? err.message : 'Failed to load purchase order lines.');
+      });
   }, [purchaseOrderId]);
 
   async function loadDetail(id: string) {
     setSelectedId(id);
-    const d = await api.get<SupplierInvoiceRow & { lines: SupplierInvoiceLine[] }>(`/procurement/supplier-invoices/${id}`);
-    setDetail(d);
-    setPaymentAmount(d.remaining);
+    try {
+      const d = await api.get<SupplierInvoiceRow & { lines: SupplierInvoiceLine[] }>(`/procurement/supplier-invoices/${id}`);
+      setDetail(d);
+      setPaymentAmount(d.remaining);
+    } catch (err) {
+      // Foundation fix: called directly from a row onClick with no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load supplier invoice detail.');
+    }
   }
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
@@ -183,7 +198,7 @@ export function SupplierInvoices() {
     setCreating(true);
     setError(null);
     try {
-      await api.post('/procurement/supplier-invoices', { purchaseOrderId, supplierReference: supplierReference || undefined, lines });
+      await api.post('/procurement/supplier-invoices', { purchaseOrderId, supplierReference: supplierReference || undefined, taxAmount: taxAmount || undefined, lines });
       setPurchaseOrderId('');
       setSupplierReference('');
       setPoLines([]);
@@ -261,6 +276,10 @@ export function SupplierInvoices() {
                 <label>{t('field.supplier_reference')}</label>
                 <input value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
               </div>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{t('field.vat_amount')}</label>
+                <input type="number" min={0} step="0.01" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} placeholder="0.00" />
+              </div>
             </div>
 
             {poLines.length > 0 && (
@@ -332,6 +351,7 @@ export function SupplierInvoices() {
                   <th>{t('field.supplier')}</th>
                   <th>{t('field.po_number')}</th>
                   <th>{t('field.total_amount')}</th>
+                  <th>{t('field.vat_amount')}</th>
                   <th>{t('field.remaining')}</th>
                   <th>{t('field.price_variance')}</th>
                   <th>{t('field.status')}</th>
@@ -344,6 +364,7 @@ export function SupplierInvoices() {
                     <td>{supplierName(inv.supplierId)}</td>
                     <td>{poNumber(inv.purchaseOrderId)}</td>
                     <td>{inv.totalAmount}</td>
+                    <td>{inv.taxAmount ?? '0.00'}</td>
                     <td>{inv.remaining}</td>
                     <td style={{ color: Number(inv.priceVarianceAmount) > 0 ? '#b45309' : undefined }}>{inv.priceVarianceAmount}</td>
                     <td>

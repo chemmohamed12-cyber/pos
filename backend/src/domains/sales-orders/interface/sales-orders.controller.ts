@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumberString, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SalesOrdersService } from '../application/sales-orders.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { SHIPPING_METHODS, ShippingMethod } from '../domain/shipping-method';
+import { RequireModule, RequireModuleGuard } from '../../../foundation/module-registry/require-module.decorator';
 
 class OrderLineDto {
   @IsString()
@@ -145,13 +147,27 @@ class EditDraftOrderDto {
   lines!: DraftOrderLineDto[];
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27, CTO-authorized).
+ * `CompanyContextGuard` added — this is the controller whose live bug
+ * (a new Company's Dashboard/Sales showing legacy figures) triggered the
+ * whole workstream. Every service call below threads
+ * `req.companyContext.dataSource.manager`, per the approved mechanism
+ * (`CompanyContextGuard` → `EntityManager` → `service(manager?)` →
+ * `manager ?? this.dataSource` → repository) — guard-only would 401/permit
+ * correctly but silently keep reading the ambient DB, exactly the bug
+ * already found.
+ */
 @Controller('sales-orders')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+@RequireModule('sales')
 export class SalesOrdersController {
   constructor(private readonly salesOrders: SalesOrdersService) {}
 
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateOrderDto) {
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateOrderDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
     const order = await this.salesOrders.createOrder(
       dto.customerId,
       dto.salesRepUserId ?? req.user.id,
@@ -160,8 +176,9 @@ export class SalesOrdersController {
       dto.warehouseId,
       dto.shippingMethod,
       dto.skipDeposit ?? false,
+      manager,
     );
-    return { ...order, status: await this.salesOrders.getOrderStatus(order.id) };
+    return { ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) };
   }
 
   /**
@@ -175,61 +192,72 @@ export class SalesOrdersController {
    * `InventoryController.warehouseInventory`.
    */
   @Get()
-  async list(@Req() req: AuthenticatedRequest, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+  async list(@Req() req: CompanyScopedRequest, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
     if (!page && !pageSize) {
-      const orders = await this.salesOrders.listOrders(req.user.id);
+      const orders = await this.salesOrders.listOrders(req.user.id, manager);
       return Promise.all(
-        orders.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id) })),
+        orders.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
       );
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize });
+    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize }, manager);
     const enriched = await Promise.all(
-      rows.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id) })),
+      rows.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
     );
     return { rows: enriched, total };
   }
 
   @Get(':id')
-  async get(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    const order = await this.salesOrders.getOrderDetailView(id, req.user.id);
-    const lines = await this.salesOrders.getOrderLines(id);
-    return { ...order, status: await this.salesOrders.getOrderStatus(id), lines };
+  async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const order = await this.salesOrders.getOrderDetailView(id, req.user.id, manager);
+    const lines = await this.salesOrders.getOrderLines(id, manager);
+    return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
 
   @Post(':id/transition')
-  async transition(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
-    const status = await this.salesOrders.transitionOrder(id, dto.action, req.user.id);
+  async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const status = await this.salesOrders.transitionOrder(id, dto.action, req.user.id, req.companyContext.dataSource.manager);
     return { orderId: id, status };
   }
 
   /** Order Edit During Review (CTO directive §1) — role/stage gating lives in SalesOrdersService.updateOrderLines, not here (same "no business logic in the UI/interface layer" discipline as everywhere else in this controller). */
   @Post(':id/lines')
-  async updateLines(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateOrderLinesDto) {
-    const order = await this.salesOrders.updateOrderLines(id, dto.lines, req.user.id, dto.reason);
-    const lines = await this.salesOrders.getOrderLines(id);
-    return { ...order, status: await this.salesOrders.getOrderStatus(id), lines };
+  async updateLines(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateOrderLinesDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const order = await this.salesOrders.updateOrderLines(id, dto.lines, req.user.id, dto.reason, manager);
+    const lines = await this.salesOrders.getOrderLines(id, manager);
+    return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
 
   /** Order Edit History (CTO directive §1) — read-only trail of every field-level edit on this order's lines, including post-release admin/finance edits and their reason. */
   @Get(':id/edit-history')
-  async editHistory(@Param('id') id: string) {
-    return this.salesOrders.getOrderEditHistory(id);
+  async editHistory(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.salesOrders.getOrderEditHistory(id, req.companyContext.dataSource.manager);
   }
 
   /** Order Edit at Draft — full add/remove/change, ownership-gated in SalesOrdersService.editDraftOrder. */
   @Post(':id/draft-lines')
-  async editDraft(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: EditDraftOrderDto) {
-    const order = await this.salesOrders.editDraftOrder(id, dto.lines, req.user.id);
-    const lines = await this.salesOrders.getOrderLines(id);
-    return { ...order, status: await this.salesOrders.getOrderStatus(id), lines };
+  async editDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: EditDraftOrderDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const order = await this.salesOrders.editDraftOrder(id, dto.lines, req.user.id, manager);
+    const lines = await this.salesOrders.getOrderLines(id, manager);
+    return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
 
   /** Draft Order Deletion (CTO directive §2) — ownership/status gating lives in SalesOrdersService.deleteDraftOrder. POST-action style, matching this controller's own convention, rather than the only @Delete() verb in this file. */
   @Post(':id/delete')
-  async deleteDraft(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    await this.salesOrders.deleteDraftOrder(id, req.user.id);
+  async deleteDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.salesOrders.deleteDraftOrder(id, req.user.id, req.companyContext.dataSource.manager);
     return { orderId: id, deleted: true };
   }
 }

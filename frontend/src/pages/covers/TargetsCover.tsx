@@ -17,11 +17,15 @@ export function TargetsCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const targets = await api.get<Target[]>('/targets/targets');
-      setKpis({
-        pendingApproval: targets.filter((t) => t.status === 'pending_approval').length,
-        approved: targets.filter((t) => t.status === 'approved').length,
-      });
+      try {
+        const targets = await api.get<Target[]>('/targets/targets');
+        setKpis({
+          pendingApproval: targets.filter((t) => t.status === 'pending_approval').length,
+          approved: targets.filter((t) => t.status === 'approved').length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

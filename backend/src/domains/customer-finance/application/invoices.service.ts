@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { SalesInvoice } from '../infrastructure/sales-invoice.entity';
 import { SalesInvoiceLine } from '../infrastructure/sales-invoice-line.entity';
@@ -10,7 +10,7 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { SALES_ORDERS_READ_CONTRACT, SalesOrdersReadContract, SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
-import { FinanceInvoiceContract } from '../../../foundation/module-registry/contracts/finance.contract';
+import { FinanceInvoiceContract, InvoiceReturnBasis } from '../../../foundation/module-registry/contracts/finance.contract';
 import { AR_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ar-events.contract';
 import { TAX_ENGINE_CONTRACT, TaxEngineContract } from '../../../foundation/module-registry/contracts/tax-engine.contract';
 
@@ -52,6 +52,10 @@ export class InvoiceService implements FinanceInvoiceContract {
     private readonly events: EventBusService,
     @Inject(TAX_ENGINE_CONTRACT) private readonly taxEngine: TaxEngineContract,
   ) {}
+
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
 
   /**
    * F04 / handoff F04-H1 (ADR-036 D3), F10-H4 (ADR-043 D4/D5) —
@@ -120,33 +124,65 @@ export class InvoiceService implements FinanceInvoiceContract {
     return (Number(invoice.totalAmount) + Number(invoice.taxAmount)).toFixed(2);
   }
 
+  /**
+   * D4 (2026-10-05) — the original invoice value a return of this order reverses, read ONLY through the caller's manager
+   * (Company context; no ambient DataSource, no tax engine). `createDraftInvoice` guarantees at most one non-void invoice per
+   * order; only one that reached `posted`/`partially_paid`/`paid` created Revenue/AR.
+   */
+  async getReturnBasis(salesOrderId: string, manager?: EntityManager): Promise<InvoiceReturnBasis | null> {
+    const runner = manager ?? this.dataSource;
+    const invoices = await runner.getRepository(SalesInvoice).find({ where: { salesOrderId }, order: { createdAt: 'DESC' } });
+    for (const invoice of invoices) {
+      const state = await this.getStatus(invoice.id, manager);
+      if (state !== 'posted' && state !== 'partially_paid' && state !== 'paid') continue;
+      const lines = await runner.getRepository(SalesInvoiceLine).find({ where: { salesInvoiceId: invoice.id } });
+      return {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        customerId: invoice.customerId,
+        salesOrderId: invoice.salesOrderId,
+        state,
+        totalNet: invoice.totalAmount,
+        taxAmount: invoice.taxAmount,
+        lines: lines.map((l) => ({ salesOrderLineId: l.salesOrderLineId, quantity: l.quantity, lineTotal: l.lineTotal })),
+      };
+    }
+    return null;
+  }
+
+  /** CUS-01 — an on-account payment may be earmarked for a sales order only when that order belongs to the same customer (and the caller's Scope allows it). */
+  async assertSalesOrderOfCustomer(salesOrderId: string, customerId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const order = await this.salesOrders.getOrder(salesOrderId, actorUserId, manager);
+    if (order.customerId !== customerId) throw new ForbiddenException('This sales order belongs to a different customer.');
+  }
+
   async getStatus(invoiceId: string, manager?: EntityManager): Promise<string> {
     return this.processEngine.getState(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, manager);
   }
 
   /** Any invoice for this order that isn't `void` — the "does this order already have a live invoice" check `createDraftInvoice` uses to reject a duplicate. */
-  async findOpenInvoiceForOrder(salesOrderId: string): Promise<SalesInvoice | null> {
-    const invoices = await this.dataSource.getRepository(SalesInvoice).find({ where: { salesOrderId }, order: { createdAt: 'DESC' } });
+  async findOpenInvoiceForOrder(salesOrderId: string, manager?: EntityManager): Promise<SalesInvoice | null> {
+    const invoices = await (manager ?? this.dataSource).getRepository(SalesInvoice).find({ where: { salesOrderId }, order: { createdAt: 'DESC' } });
     for (const invoice of invoices) {
-      const state = await this.getStatus(invoice.id);
+      const state = await this.getStatus(invoice.id, manager);
       if (state !== 'void') return invoice;
     }
     return null;
   }
 
-  async createDraftInvoice(salesOrderId: string, actorUserId: string, taxCodeId: string | null = null): Promise<SalesInvoice> {
-    const order = await this.salesOrders.getOrder(salesOrderId, actorUserId);
-    const existing = await this.findOpenInvoiceForOrder(salesOrderId);
+  async createDraftInvoice(salesOrderId: string, actorUserId: string, taxCodeId: string | null = null, manager?: EntityManager): Promise<SalesInvoice> {
+    const order = await this.salesOrders.getOrder(salesOrderId, actorUserId, manager);
+    const existing = await this.findOpenInvoiceForOrder(salesOrderId, manager);
     if (existing) {
       throw new ConflictException(`Sales order "${salesOrderId}" already has an invoice (${existing.invoiceNumber}).`);
     }
 
-    const lines = await this.salesOrders.getOrderLines(salesOrderId);
+    const lines = await this.salesOrders.getOrderLines(salesOrderId, manager);
     if (lines.length === 0) {
       throw new BadRequestException(`Sales order "${salesOrderId}" has no lines to invoice.`);
     }
 
-    const customer = await this.customers.getCustomer(order.customerId, actorUserId);
+    const customer = await this.customers.getCustomer(order.customerId, actorUserId, manager);
     const dueDate = customer.paymentTermsDays != null ? new Date(Date.now() + customer.paymentTermsDays * 86400000) : null;
 
     const subtotal = lines.reduce((sum, l) => sum + Number(l.unitPrice) * l.quantity, 0);
@@ -156,12 +192,12 @@ export class InvoiceService implements FinanceInvoiceContract {
     // F10-H3 (ADR-043 D3, Blueprint §0 amendment) — invoice-level tax, calculated ONCE here
     // and frozen onto the row. `postInvoice` NEVER recalculates (D3's CTO-mandated guarantee) —
     // it only reads the stored `taxAmount`/`taxCodeId` below.
-    const taxResult = await this.taxEngine.calculateForInvoice(totalAmount.toFixed(2), taxCodeId);
+    const taxResult = await this.taxEngine.calculateForInvoice(totalAmount.toFixed(2), taxCodeId, manager);
 
-    await this.numbering.registerDocumentType(INVOICE_DOCUMENT_TYPE, INVOICE_PREFIX); // idempotent
-    const invoiceNumber = await this.numbering.getNextNumber(INVOICE_DOCUMENT_TYPE);
+    await this.numbering.registerDocumentType(INVOICE_DOCUMENT_TYPE, INVOICE_PREFIX, undefined, manager); // idempotent
+    const invoiceNumber = await this.numbering.getNextNumber(INVOICE_DOCUMENT_TYPE, manager);
 
-    const invoice = await this.dataSource.transaction(async (manager) => {
+    const invoice = await this.em(manager).transaction(async (manager) => {
       const invoiceRepo = manager.getRepository(SalesInvoice);
       const lineRepo = manager.getRepository(SalesInvoiceLine);
       const savedInvoice = await invoiceRepo.save(
@@ -196,7 +232,7 @@ export class InvoiceService implements FinanceInvoiceContract {
       return savedInvoice;
     });
 
-    await this.processEngine.start(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoice.id);
+    await this.processEngine.start(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoice.id, manager);
 
     await this.audit.record({
       actorUserId,
@@ -207,7 +243,7 @@ export class InvoiceService implements FinanceInvoiceContract {
       result: 'success',
       correlationId: null,
       after: { customerId: order.customerId, salesOrderId, totalAmount: invoice.totalAmount, dueDate },
-    });
+    }, manager);
 
     return invoice;
   }
@@ -238,15 +274,15 @@ export class InvoiceService implements FinanceInvoiceContract {
    * in this package for the same reason.
    */
   async postInvoice(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<SalesInvoice> {
-    const invoice = await this.dataSource.getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
+    const invoice = await this.em(manager).getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
-    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId); // AUDIT-SEC-03 remediation: was a raw id lookup with no Scope check on a write path — any finance.invoice.post holder could post ANY invoice
-    const state = await this.getStatus(invoiceId);
+    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId, manager); // AUDIT-SEC-03 remediation: was a raw id lookup with no Scope check on a write path — any finance.invoice.post holder could post ANY invoice
+    const state = await this.getStatus(invoiceId, manager);
     if (state !== 'draft') throw new ConflictException(`Cannot post an invoice in state "${state}".`);
 
     // F10-H4 (ADR-043 D5) — post-time-only account-code lookup, never a tax-amount
     // recalculation (D3): the invoice's `taxCodeId` was already frozen at draft time.
-    const taxAccountCode = await this.taxEngine.resolveTaxAccountCode(invoice.taxCodeId);
+    const taxAccountCode = await this.taxEngine.resolveTaxAccountCode(invoice.taxCodeId, manager);
 
     const run = async (m: EntityManager): Promise<SalesInvoice> => {
       await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'post', actorUserId, m);
@@ -289,46 +325,48 @@ export class InvoiceService implements FinanceInvoiceContract {
       return savedInvoice;
     };
 
-    const saved = manager ? await run(manager) : await this.dataSource.transaction(run);
-    if (!manager) await this.events.dispatchPending(); // same "only the transaction owner dispatches" convention as `recordPayment`/`TreasuryService.cashInCore`
+    // Area 21: a Company root `manager` (the controller's) is not a transaction — only a caller-supplied ACTIVE transaction is joined.
+    const ownsTransaction = !manager?.queryRunner?.isTransactionActive;
+    const saved = ownsTransaction ? await this.em(manager).transaction(run) : await run(manager!);
+    if (ownsTransaction) await this.events.dispatchAfterCommit(manager); // same "only the transaction owner dispatches" convention as `recordPayment`/`TreasuryService.cashInCore`
     return saved;
   }
 
   /** Guards: nothing paid/credited yet. A `draft` invoice cancels cleanly (nothing was ever posted); a `posted` invoice with zero applied entries reverses its own debit first (never leaves an orphaned Customer Ledger row). */
-  async voidInvoice(invoiceId: string, reason: string, actorUserId: string): Promise<SalesInvoice> {
-    const repo = this.dataSource.getRepository(SalesInvoice);
+  async voidInvoice(invoiceId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<SalesInvoice> {
+    const repo = this.em(manager).getRepository(SalesInvoice);
     const invoice = await repo.findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
-    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId); // AUDIT-SEC-03 remediation: same write-path gap as postInvoice above
-    const state = await this.getStatus(invoiceId);
+    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId, manager); // AUDIT-SEC-03 remediation: same write-path gap as postInvoice above
+    const state = await this.getStatus(invoiceId, manager);
     if (state === 'void') throw new ConflictException(`Invoice "${invoiceId}" is already void.`);
     if (state === 'paid' || state === 'partially_paid') {
       throw new ConflictException(`Cannot void invoice "${invoiceId}" — it already has a payment or credit applied.`);
     }
 
     if (state === 'posted') {
-      const entries = await this.dataSource
+      const entries = await this.em(manager)
         .getRepository(CustomerLedgerEntry)
         .find({ where: { invoiceId, entryType: 'sales_invoice', status: 'posted' } });
       for (const entry of entries) {
-        await this.ledger.reverseEntry(entry.id, `Invoice voided: ${reason}`, actorUserId);
+        await this.ledger.reverseEntry(entry.id, `Invoice voided: ${reason}`, actorUserId, manager);
       }
-      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'void', actorUserId);
+      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'void', actorUserId, manager);
       // F10-H4 (ADR-043 D5) — same post-time-only lookup as postInvoice; reproduces the
       // IDENTICAL lines handleInvoicePosted originally drafted, so handleInvoiceVoided's
       // generic mirror flips exactly what was posted (D7).
-      const taxAccountCode = await this.taxEngine.resolveTaxAccountCode(invoice.taxCodeId);
+      const taxAccountCode = await this.taxEngine.resolveTaxAccountCode(invoice.taxCodeId, manager);
       // F04-H1: the accounting event for a posted-state void (the GL reversal happens in accounting).
-      await this.dataSource.transaction(async (manager) => {
+      await this.em(manager).transaction(async (manager) => {
         await this.events.publish(
           manager,
           AR_EVENT_TOPICS.invoiceVoided,
           this.arInvoiceEventPayload(invoice, taxAccountCode, 'voided', { voidReason: reason }),
         );
       });
-      await this.events.dispatchPending();
+      await this.events.dispatchAfterCommit(manager);
     } else {
-      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId);
+      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId, manager);
     }
 
     invoice.voidedReason = reason;
@@ -343,7 +381,7 @@ export class InvoiceService implements FinanceInvoiceContract {
       result: 'success',
       correlationId: null,
       after: { reason, fromState: state },
-    });
+    }, manager);
 
     return saved;
   }
@@ -394,35 +432,35 @@ export class InvoiceService implements FinanceInvoiceContract {
     return this.getStatus(invoiceId, manager);
   }
 
-  async getInvoice(invoiceId: string, actorUserId: string): Promise<SalesInvoice & { state: string; remaining: string; lines: SalesInvoiceLine[] }> {
-    const invoice = await this.dataSource.getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
+  async getInvoice(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<SalesInvoice & { state: string; remaining: string; lines: SalesInvoiceLine[] }> {
+    const invoice = await this.em(manager).getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
-    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId); // reuses the order's own Scope check
+    await this.salesOrders.getOrder(invoice.salesOrderId, actorUserId, manager); // reuses the order's own Scope check
     const [lines, state, remaining] = await Promise.all([
-      this.dataSource.getRepository(SalesInvoiceLine).find({ where: { salesInvoiceId: invoiceId } }),
-      this.getStatus(invoiceId),
-      this.getInvoiceRemaining(invoiceId),
+      this.em(manager).getRepository(SalesInvoiceLine).find({ where: { salesInvoiceId: invoiceId } }),
+      this.getStatus(invoiceId, manager),
+      this.getInvoiceRemaining(invoiceId, manager),
     ]);
     return { ...invoice, state, remaining, lines };
   }
 
-  async listInvoicesForCustomer(customerId: string, actorUserId: string): Promise<Array<SalesInvoice & { state: string; remaining: string }>> {
-    await this.customers.getCustomer(customerId, actorUserId); // Scope-checked, same as CustomerAccountsService
-    const invoices = await this.dataSource.getRepository(SalesInvoice).find({ where: { customerId }, order: { createdAt: 'DESC' } });
+  async listInvoicesForCustomer(customerId: string, actorUserId: string, manager?: EntityManager): Promise<Array<SalesInvoice & { state: string; remaining: string }>> {
+    await this.customers.getCustomer(customerId, actorUserId, manager); // Scope-checked, same as CustomerAccountsService
+    const invoices = await this.em(manager).getRepository(SalesInvoice).find({ where: { customerId }, order: { createdAt: 'DESC' } });
     return Promise.all(
       invoices.map(async (invoice) => ({
         ...invoice,
-        state: await this.getStatus(invoice.id),
-        remaining: await this.getInvoiceRemaining(invoice.id),
+        state: await this.getStatus(invoice.id, manager),
+        remaining: await this.getInvoiceRemaining(invoice.id, manager),
       })),
     );
   }
 
   /** The shared per-invoice aging computation — used by both the single-customer and the all-customers variants below, so a bucket/remaining figure can never drift between the two (directive's own explicit "لا تعمل حسابات مستقلة قد تختلف عن Customer Account" instruction). Returns `null` when the invoice isn't a real AR line (draft/void/fully settled). */
-  private async computeAgingRow(invoice: SalesInvoice): Promise<ArAgingRow | null> {
-    const state = await this.getStatus(invoice.id);
+  private async computeAgingRow(invoice: SalesInvoice, manager?: EntityManager): Promise<ArAgingRow | null> {
+    const state = await this.getStatus(invoice.id, manager);
     if (state === 'void' || state === 'draft') return null;
-    const remaining = Number(await this.getInvoiceRemaining(invoice.id));
+    const remaining = Number(await this.getInvoiceRemaining(invoice.id, manager));
     if (remaining <= 0) return null;
 
     const daysOverdue = invoice.dueDate ? Math.max(0, Math.floor((Date.now() - invoice.dueDate.getTime()) / 86400000)) : 0;
@@ -446,12 +484,12 @@ export class InvoiceService implements FinanceInvoiceContract {
   }
 
   /** AR Aging (CTO directive §9) — Current/1-30/31-60/61-90/90+, only invoices with real remaining balance. */
-  async getArAging(customerId: string, actorUserId: string): Promise<ArAgingRow[]> {
-    await this.customers.getCustomer(customerId, actorUserId);
-    const invoices = await this.dataSource.getRepository(SalesInvoice).find({ where: { customerId }, order: { createdAt: 'ASC' } });
+  async getArAging(customerId: string, actorUserId: string, manager?: EntityManager): Promise<ArAgingRow[]> {
+    await this.customers.getCustomer(customerId, actorUserId, manager);
+    const invoices = await this.em(manager).getRepository(SalesInvoice).find({ where: { customerId }, order: { createdAt: 'ASC' } });
     const rows: ArAgingRow[] = [];
     for (const invoice of invoices) {
-      const row = await this.computeAgingRow(invoice);
+      const row = await this.computeAgingRow(invoice, manager);
       if (row) rows.push(row);
     }
     return rows;
@@ -463,20 +501,20 @@ export class InvoiceService implements FinanceInvoiceContract {
    * (a plain rep sees only their own customers' invoices, a reviewer role
    * sees all) — never a second, independently-derived visibility rule.
    */
-  async listAllInvoices(actorUserId: string): Promise<Array<SalesInvoice & { state: string; remaining: string; customerCode: string; customerName: string }>> {
-    const customers = await this.customers.listCustomers(actorUserId);
+  async listAllInvoices(actorUserId: string, manager?: EntityManager): Promise<Array<SalesInvoice & { state: string; remaining: string; customerCode: string; customerName: string }>> {
+    const customers = await this.customers.listCustomers(actorUserId, manager);
     const customerById = new Map(customers.map((c) => [c.id, c]));
     if (customerById.size === 0) return [];
 
-    const invoices = await this.dataSource
+    const invoices = await this.em(manager)
       .getRepository(SalesInvoice)
       .find({ where: { customerId: In([...customerById.keys()]) }, order: { createdAt: 'DESC' } });
 
     return Promise.all(
       invoices.map(async (invoice) => ({
         ...invoice,
-        state: await this.getStatus(invoice.id),
-        remaining: await this.getInvoiceRemaining(invoice.id),
+        state: await this.getStatus(invoice.id, manager),
+        remaining: await this.getInvoiceRemaining(invoice.id, manager),
         customerCode: customerById.get(invoice.customerId)?.code ?? '',
         customerName: customerById.get(invoice.customerId)?.name ?? '',
       })),
@@ -484,18 +522,18 @@ export class InvoiceService implements FinanceInvoiceContract {
   }
 
   /** ERP UI Integration — "أعمار الديون" (all customers) list screen backing read. Same Scope-filtering and the SAME `computeAgingRow` formula as the single-customer `getArAging` — never a second independent calculation. */
-  async getArAgingForAllCustomers(actorUserId: string): Promise<Array<ArAgingRow & { customerId: string; customerCode: string; customerName: string }>> {
-    const customers = await this.customers.listCustomers(actorUserId);
+  async getArAgingForAllCustomers(actorUserId: string, manager?: EntityManager): Promise<Array<ArAgingRow & { customerId: string; customerCode: string; customerName: string }>> {
+    const customers = await this.customers.listCustomers(actorUserId, manager);
     const customerById = new Map(customers.map((c) => [c.id, c]));
     if (customerById.size === 0) return [];
 
-    const invoices = await this.dataSource
+    const invoices = await this.em(manager)
       .getRepository(SalesInvoice)
       .find({ where: { customerId: In([...customerById.keys()]) }, order: { createdAt: 'ASC' } });
 
     const rows: Array<ArAgingRow & { customerId: string; customerCode: string; customerName: string }> = [];
     for (const invoice of invoices) {
-      const row = await this.computeAgingRow(invoice);
+      const row = await this.computeAgingRow(invoice, manager);
       if (row) {
         const customer = customerById.get(invoice.customerId);
         rows.push({ ...row, customerId: invoice.customerId, customerCode: customer?.code ?? '', customerName: customer?.name ?? '' });
@@ -505,10 +543,10 @@ export class InvoiceService implements FinanceInvoiceContract {
   }
 
   /** ERP UI Integration — the Sales Order → Invoice cross-link (§8): "does this order have a live invoice, and what's its current state." Same Scope check `getOrderLineById`'s callers already rely on. */
-  async getInvoiceForSalesOrder(salesOrderId: string, actorUserId: string): Promise<(SalesInvoice & { state: string; remaining: string }) | null> {
-    await this.salesOrders.getOrder(salesOrderId, actorUserId); // Scope-checked
-    const invoice = await this.findOpenInvoiceForOrder(salesOrderId);
+  async getInvoiceForSalesOrder(salesOrderId: string, actorUserId: string, manager?: EntityManager): Promise<(SalesInvoice & { state: string; remaining: string }) | null> {
+    await this.salesOrders.getOrder(salesOrderId, actorUserId, manager); // Scope-checked
+    const invoice = await this.findOpenInvoiceForOrder(salesOrderId, manager);
     if (!invoice) return null;
-    return { ...invoice, state: await this.getStatus(invoice.id), remaining: await this.getInvoiceRemaining(invoice.id) };
+    return { ...invoice, state: await this.getStatus(invoice.id, manager), remaining: await this.getInvoiceRemaining(invoice.id, manager) };
   }
 }

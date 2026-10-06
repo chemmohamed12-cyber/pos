@@ -90,16 +90,21 @@ export function Returns() {
   const [error, setError] = useState<string | null>(null);
 
   async function loadAll() {
-    const [returnsData, ordersData, productsData, customersData] = await Promise.all([
-      api.get<ReturnRequest[]>('/returns'),
-      api.get<SalesOrder[]>('/sales-orders'),
-      api.get<Product[]>('/products'),
-      api.get<Customer[]>('/customers'),
-    ]);
-    setReturns(returnsData);
-    setOrders(ordersData);
-    setProducts(productsData);
-    setCustomers(customersData);
+    try {
+      const [returnsData, ordersData, productsData, customersData] = await Promise.all([
+        api.get<ReturnRequest[]>('/returns'),
+        api.get<SalesOrder[]>('/sales-orders'),
+        api.get<Product[]>('/products'),
+        api.get<Customer[]>('/customers'),
+      ]);
+      setReturns(returnsData);
+      setOrders(ordersData);
+      setProducts(productsData);
+      setCustomers(customersData);
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load returns.');
+    }
   }
 
   useEffect(() => {

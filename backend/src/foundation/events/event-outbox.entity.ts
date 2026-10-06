@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type OutboxStatus = 'pending' | 'dispatched' | 'failed';
+/** `processing` = a Company-outbox row currently leased by a dispatcher; `skipped` = Company-outbox row whose topic has only ambient-scope subscribers (ADR-075). */
+export type OutboxStatus = 'pending' | 'processing' | 'dispatched' | 'failed' | 'skipped';
 
 /**
  * Events — Stage 2 build-order item 12.

@@ -29,6 +29,9 @@ export function Products() {
   const [unitPrice, setUnitPrice] = useState('');
   const [unit, setUnit] = useState('');
   const [creating, setCreating] = useState(false);
+  // D1 — the item's initial / default (origin) warehouse; optional. It does NOT restrict the item to it: stock location is the movements.
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [defaultWarehouseId, setDefaultWarehouseId] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +47,7 @@ export function Products() {
     'field.name',
     'field.unit_price',
     'field.unit',
+    'field.default_warehouse',
     'field.status',
     'field.actions',
     'action.create',
@@ -74,6 +78,10 @@ export function Products() {
 
   useEffect(() => {
     load();
+    api
+      .get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses')
+      .then(setWarehouses)
+      .catch(() => undefined); // optional field — the form works without it
   }, []);
 
   async function onCreate(e: FormEvent) {
@@ -81,7 +89,15 @@ export function Products() {
     setCreating(true);
     setError(null);
     try {
-      await api.post('/products', { sku, name, unitPrice, unit: unit || undefined });
+      const created = await api.post<{ id: string }>('/products', { sku, name, unitPrice, unit: unit || undefined });
+      if (defaultWarehouseId && created?.id) {
+        try {
+          await api.post(`/inventory/warehouses/${defaultWarehouseId}/items`, { productIds: [created.id] });
+        } catch (err) {
+          setError(`${err instanceof ApiError ? err.message : 'Could not set the default warehouse.'} (the item itself was created)`);
+        }
+      }
+      setDefaultWarehouseId('');
       setSku('');
       setName('');
       setUnitPrice('');
@@ -180,6 +196,19 @@ export function Products() {
               <label>{t('field.unit')}</label>
               <input value={unit} onChange={(e) => setUnit(e.target.value)} />
             </div>
+            {warehouses.length > 0 && (
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{t('field.default_warehouse')}</label>
+                <select value={defaultWarehouseId} onChange={(e) => setDefaultWarehouseId(e.target.value)}>
+                  <option value="">—</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.code} — {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button className="btn btn-primary" type="submit" disabled={creating}>
               {t('action.create')}
             </button>

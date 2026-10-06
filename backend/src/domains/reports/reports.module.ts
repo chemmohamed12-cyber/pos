@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ReportsService } from './application/reports.service';
 import { CustomerAccountsService } from './application/customer-accounts.service';
 import { ReportsController } from './interface/reports.controller';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
 import { CrmModule } from '../crm/crm.module';
 import { DepositControlModule } from '../deposit-control/deposit-control.module';
@@ -40,6 +42,9 @@ import { CustomerFinanceModule } from '../customer-finance/customer-finance.modu
     PermissionModule,
     ExcelModule,
     CustomerFinanceModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for `CompanyContextGuard`.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [ReportsController],
   providers: [ReportsService, CustomerAccountsService],

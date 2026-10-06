@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { FulfillmentOrder } from '../infrastructure/fulfillment-order.entity';
 import { PickTask } from '../infrastructure/pick-task.entity';
 import { PackTask } from '../infrastructure/pack-task.entity';
@@ -46,8 +46,9 @@ export class FulfillmentService implements FulfillmentContract {
   async createFulfillmentOrder(
     salesOrderId: string,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ fulfillmentOrder: FulfillmentOrder; pickTask: PickTask }> {
-    const reservations = await this.inventory.getActiveReservationsForOrder(salesOrderId);
+    const reservations = await this.inventory.getActiveReservationsForOrder(salesOrderId, manager);
     if (reservations.length === 0) {
       throw new BadRequestException(
         `No active stock reservations found for sales order "${salesOrderId}" — reserve stock for every line before creating a fulfillment order.`,
@@ -64,12 +65,12 @@ export class FulfillmentService implements FulfillmentContract {
     // vs SO-2026-000001, see CreateNumberingSequences1755841200000 /
     // AddFulfillmentOrderNumber1755850300000) — issued before the
     // transaction, same ordering `SalesOrdersService.createOrder` uses.
-    const orderNumber = await this.numbering.getNextNumber('fulfillment_order');
+    const orderNumber = await this.numbering.getNextNumber('fulfillment_order', manager);
 
-    const { fulfillmentOrder, pickTask } = await this.dataSource.transaction(async (manager) => {
-      const foRepo = manager.getRepository(FulfillmentOrder);
-      const pickRepo = manager.getRepository(PickTask);
-      const lineRepo = manager.getRepository(PickTaskLine);
+    const { fulfillmentOrder, pickTask } = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const foRepo = txManager.getRepository(FulfillmentOrder);
+      const pickRepo = txManager.getRepository(PickTask);
+      const lineRepo = txManager.getRepository(PickTaskLine);
 
       const fo = await foRepo.save(foRepo.create({ salesOrderId, warehouseId, orderNumber }));
       const pick = await pickRepo.save(pickRepo.create({ fulfillmentOrderId: fo.id, assignedToUserId: null }));
@@ -88,50 +89,54 @@ export class FulfillmentService implements FulfillmentContract {
       );
       await lineRepo.save(lineEntities);
 
-      await this.events.publish(manager, 'fulfillment.created', { fulfillmentOrderId: fo.id, salesOrderId });
+      await this.events.publish(txManager, 'fulfillment.created', { fulfillmentOrderId: fo.id, salesOrderId });
 
       return { fulfillmentOrder: fo, pickTask: pick };
     });
 
-    await this.processEngine.start(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTask.id);
+    await this.processEngine.start(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTask.id, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'fulfillment.created',
-      resource: 'fulfillment_order',
-      resourceId: fulfillmentOrder.id,
-      result: 'success',
-      correlationId: null,
-      after: { salesOrderId, warehouseId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'fulfillment.created',
+        resource: 'fulfillment_order',
+        resourceId: fulfillmentOrder.id,
+        result: 'success',
+        correlationId: null,
+        after: { salesOrderId, warehouseId },
+      },
+      manager,
+    );
 
     return { fulfillmentOrder, pickTask };
   }
 
   /** Backs the Fulfillment operational screen's pick-task queue — any warehouse_worker/admin may act on any open task (same "qualified role, not per-resource assignment" pattern as Sales Order review, §5.1). */
-  async listPickTasks(): Promise<Array<PickTask & { state: string }>> {
-    const tasks = await this.dataSource.getRepository(PickTask).find({ order: { createdAt: 'DESC' } });
+  async listPickTasks(manager?: EntityManager): Promise<Array<PickTask & { state: string }>> {
+    const tasks = await (manager ?? this.dataSource).getRepository(PickTask).find({ order: { createdAt: 'DESC' } });
     return Promise.all(
       tasks.map(async (task) => ({
         ...task,
-        state: await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', task.id),
+        state: await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', task.id, manager),
       })),
     );
   }
 
-  async listPackTasks(): Promise<Array<PackTask & { state: string }>> {
-    const tasks = await this.dataSource.getRepository(PackTask).find({ order: { createdAt: 'DESC' } });
+  async listPackTasks(manager?: EntityManager): Promise<Array<PackTask & { state: string }>> {
+    const tasks = await (manager ?? this.dataSource).getRepository(PackTask).find({ order: { createdAt: 'DESC' } });
     return Promise.all(
       tasks.map(async (task) => ({
         ...task,
-        state: await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', task.id),
+        state: await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', task.id, manager),
       })),
     );
   }
 
-  async getFulfillmentOrderBySalesOrderId(salesOrderId: string): Promise<FulfillmentOrder | null> {
-    return this.dataSource.getRepository(FulfillmentOrder).findOne({ where: { salesOrderId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — `FulfillmentOrder` is Company-owned, called cross-domain from `ShipmentService.createShipment` via `FulfillmentContract`. */
+  async getFulfillmentOrderBySalesOrderId(salesOrderId: string, manager?: EntityManager): Promise<FulfillmentOrder | null> {
+    return (manager ?? this.dataSource).getRepository(FulfillmentOrder).findOne({ where: { salesOrderId } });
   }
 
   /**
@@ -142,57 +147,61 @@ export class FulfillmentService implements FulfillmentContract {
    * released Sales Order, whether a Fulfillment Order already exists for
    * it at all, which this makes a single query instead of N.
    */
-  async listFulfillmentOrders(): Promise<FulfillmentOrder[]> {
-    return this.dataSource.getRepository(FulfillmentOrder).find({ order: { createdAt: 'DESC' } });
+  async listFulfillmentOrders(manager?: EntityManager): Promise<FulfillmentOrder[]> {
+    return (manager ?? this.dataSource).getRepository(FulfillmentOrder).find({ order: { createdAt: 'DESC' } });
   }
 
   /** Backs the Picking/Packing print documents — single-task reads, didn't exist before (only list existed). */
-  async getPickTask(pickTaskId: string): Promise<PickTask & { state: string }> {
-    const task = await this.dataSource.getRepository(PickTask).findOne({ where: { id: pickTaskId } });
+  async getPickTask(pickTaskId: string, manager?: EntityManager): Promise<PickTask & { state: string }> {
+    const task = await (manager ?? this.dataSource).getRepository(PickTask).findOne({ where: { id: pickTaskId } });
     if (!task) throw new NotFoundException(`Pick task "${pickTaskId}" not found.`);
-    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId);
+    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, manager);
     return { ...task, state };
   }
 
-  async getPackTask(packTaskId: string): Promise<PackTask & { state: string }> {
-    const task = await this.dataSource.getRepository(PackTask).findOne({ where: { id: packTaskId } });
+  async getPackTask(packTaskId: string, manager?: EntityManager): Promise<PackTask & { state: string }> {
+    const task = await (manager ?? this.dataSource).getRepository(PackTask).findOne({ where: { id: packTaskId } });
     if (!task) throw new NotFoundException(`Pack task "${packTaskId}" not found.`);
-    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId);
+    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId, manager);
     return { ...task, state };
   }
 
-  async getFulfillmentOrder(fulfillmentOrderId: string): Promise<FulfillmentOrder> {
-    const order = await this.dataSource.getRepository(FulfillmentOrder).findOne({ where: { id: fulfillmentOrderId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — called cross-domain from `ShipmentService`/`ReturnsService` via `FulfillmentContract`. */
+  async getFulfillmentOrder(fulfillmentOrderId: string, manager?: EntityManager): Promise<FulfillmentOrder> {
+    const order = await (manager ?? this.dataSource).getRepository(FulfillmentOrder).findOne({ where: { id: fulfillmentOrderId } });
     if (!order) throw new NotFoundException(`Fulfillment order "${fulfillmentOrderId}" not found.`);
     return order;
   }
 
-  async assignPickTask(pickTaskId: string, userId: string, actorUserId: string | null): Promise<PickTask> {
+  async assignPickTask(pickTaskId: string, userId: string, actorUserId: string | null, manager?: EntityManager): Promise<PickTask> {
     // AUDIT-SEC-03 sweep finding (not a Scope gap — Fulfillment's pick/pack queue is deliberately
     // warehouse-wide, every worker needs to see every task): every sibling mutation on this task
     // (transitionPickTask, markPickTaskLineDone, ...) requires warehouse_worker/admin — this write
     // had no gate at all, so any authenticated user of any role could reassign any task.
-    if (actorUserId) await this.requireWorkerRole(actorUserId);
-    const repo = this.dataSource.getRepository(PickTask);
+    if (actorUserId) await this.requireWorkerRole(actorUserId, manager);
+    const repo = (manager ?? this.dataSource).getRepository(PickTask);
     const task = await repo.findOne({ where: { id: pickTaskId } });
     if (!task) throw new NotFoundException(`Pick task "${pickTaskId}" not found.`);
     task.assignedToUserId = userId;
     const saved = await repo.save(task);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'fulfillment.pick_task.assigned',
-      resource: 'pick_task',
-      resourceId: pickTaskId,
-      result: 'success',
-      correlationId: null,
-      after: { userId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'fulfillment.pick_task.assigned',
+        resource: 'pick_task',
+        resourceId: pickTaskId,
+        result: 'success',
+        correlationId: null,
+        after: { userId },
+      },
+      manager,
+    );
     return saved;
   }
 
-  private async requireWorkerRole(actorUserId: string): Promise<void> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId);
+  private async requireWorkerRole(actorUserId: string, manager?: EntityManager): Promise<void> {
+    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     if (!roles.includes(WORKER_ROLE) && !roles.includes('admin')) {
       throw new ForbiddenException(`Role required: ${WORKER_ROLE} (or admin).`);
     }
@@ -211,9 +220,9 @@ export class FulfillmentService implements FulfillmentContract {
    * state (not a partial/corrupt one), and the worker can retry `start`
    * from there via the normal per-state actions.
    */
-  async receiveAndStartPickTask(pickTaskId: string, actorUserId: string): Promise<{ state: string }> {
-    await this.transitionPickTask(pickTaskId, 'accept', actorUserId);
-    const { state } = await this.transitionPickTask(pickTaskId, 'start', actorUserId);
+  async receiveAndStartPickTask(pickTaskId: string, actorUserId: string, manager?: EntityManager): Promise<{ state: string }> {
+    await this.transitionPickTask(pickTaskId, 'accept', actorUserId, manager);
+    const { state } = await this.transitionPickTask(pickTaskId, 'start', actorUserId, manager);
     return { state };
   }
 
@@ -221,27 +230,28 @@ export class FulfillmentService implements FulfillmentContract {
     pickTaskId: string,
     action: string,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<{ state: string; packTaskId: string | null }> {
-    await this.requireWorkerRole(actorUserId);
-    await this.processEngine.transition(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, action, actorUserId);
-    const newState = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId);
+    await this.requireWorkerRole(actorUserId, manager);
+    await this.processEngine.transition(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, action, actorUserId, manager);
+    const newState = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, manager);
 
     let packTaskId: string | null = null;
     if (newState === 'closed') {
       // Pick verified closed -> auto-create the Pack Task (blueprint §24).
-      const pickTask = await this.dataSource.getRepository(PickTask).findOne({ where: { id: pickTaskId } });
-      const packTask = await this.dataSource.transaction(async (manager) => {
-        const packRepo = manager.getRepository(PackTask);
+      const pickTask = await (manager ?? this.dataSource).getRepository(PickTask).findOne({ where: { id: pickTaskId } });
+      const packTask = await (manager ?? this.dataSource).transaction(async (txManager) => {
+        const packRepo = txManager.getRepository(PackTask);
         const created = await packRepo.save(
           packRepo.create({ fulfillmentOrderId: pickTask!.fulfillmentOrderId, assignedToUserId: null }),
         );
-        await this.events.publish(manager, 'fulfillment.pick.completed', {
+        await this.events.publish(txManager, 'fulfillment.pick.completed', {
           pickTaskId,
           fulfillmentOrderId: pickTask!.fulfillmentOrderId,
         });
         return created;
       });
-      await this.processEngine.start(FULFILLMENT_TASK_PROCESS, 'pack_task', packTask.id);
+      await this.processEngine.start(FULFILLMENT_TASK_PROCESS, 'pack_task', packTask.id, manager);
       packTaskId = packTask.id;
     }
 
@@ -250,8 +260,8 @@ export class FulfillmentService implements FulfillmentContract {
 
   // ---- Item Preparation (CTO directive — "PRIORITY: ITEM PREPARATION") ----
 
-  async listPickTaskLines(pickTaskId: string): Promise<PickTaskLine[]> {
-    return this.dataSource.getRepository(PickTaskLine).find({ where: { pickTaskId }, order: { createdAt: 'ASC' } });
+  async listPickTaskLines(pickTaskId: string, manager?: EntityManager): Promise<PickTaskLine[]> {
+    return (manager ?? this.dataSource).getRepository(PickTaskLine).find({ where: { pickTaskId }, order: { createdAt: 'ASC' } });
   }
 
   /**
@@ -264,13 +274,13 @@ export class FulfillmentService implements FulfillmentContract {
    * `ShipmentService`'s own precedent of no extra locking around this
    * rare, effectively-once-per-warehouse provisioning step.
    */
-  private async getOrCreatePreparationWarehouse(parentWarehouseId: string): Promise<string> {
-    const existing = await this.inventory.findOperationalSubLocation(parentWarehouseId, `${PREPARATION_WAREHOUSE_CODE_PREFIX}-`);
+  private async getOrCreatePreparationWarehouse(parentWarehouseId: string, manager?: EntityManager): Promise<string> {
+    const existing = await this.inventory.findOperationalSubLocation(parentWarehouseId, `${PREPARATION_WAREHOUSE_CODE_PREFIX}-`, manager);
     if (existing) return existing.id;
 
-    await this.numbering.registerDocumentType(PREPARATION_WAREHOUSE_DOCUMENT_TYPE, PREPARATION_WAREHOUSE_CODE_PREFIX, false);
-    const code = await this.numbering.getNextNumber(PREPARATION_WAREHOUSE_DOCUMENT_TYPE);
-    const warehouse = await this.inventory.createWarehouse(code, 'تحت التجهيز', null, null, parentWarehouseId, 'operational');
+    await this.numbering.registerDocumentType(PREPARATION_WAREHOUSE_DOCUMENT_TYPE, PREPARATION_WAREHOUSE_CODE_PREFIX, false, manager);
+    const code = await this.numbering.getNextNumber(PREPARATION_WAREHOUSE_DOCUMENT_TYPE, manager);
+    const warehouse = await this.inventory.createWarehouse(code, 'تحت التجهيز', null, null, parentWarehouseId, 'operational', manager);
     return warehouse.id;
   }
 
@@ -292,15 +302,16 @@ export class FulfillmentService implements FulfillmentContract {
     lineId: string,
     quantity: number,
     actorUserId: string,
+    manager?: EntityManager,
   ): Promise<PickTaskLine> {
-    await this.requireWorkerRole(actorUserId);
+    await this.requireWorkerRole(actorUserId, manager);
 
-    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId);
+    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, manager);
     if (state !== 'in_progress') {
       throw new ConflictException(`Cannot prepare items while the pick task is in state "${state}" — start preparation first.`);
     }
 
-    const lineRepo = this.dataSource.getRepository(PickTaskLine);
+    const lineRepo = (manager ?? this.dataSource).getRepository(PickTaskLine);
     const line = await lineRepo.findOne({ where: { id: lineId, pickTaskId } });
     if (!line) throw new NotFoundException(`Pick task line "${lineId}" not found on this task.`);
     if (line.status === 'prepared') {
@@ -314,9 +325,9 @@ export class FulfillmentService implements FulfillmentContract {
       throw new BadRequestException(`Cannot prepare ${quantity} — only ${remaining} remain for this item.`);
     }
 
-    const pickTask = await this.dataSource.getRepository(PickTask).findOne({ where: { id: pickTaskId } });
-    const fulfillmentOrder = await this.getFulfillmentOrder(pickTask!.fulfillmentOrderId);
-    const preparationWarehouseId = await this.getOrCreatePreparationWarehouse(fulfillmentOrder.warehouseId);
+    const pickTask = await (manager ?? this.dataSource).getRepository(PickTask).findOne({ where: { id: pickTaskId } });
+    const fulfillmentOrder = await this.getFulfillmentOrder(pickTask!.fulfillmentOrderId, manager);
+    const preparationWarehouseId = await this.getOrCreatePreparationWarehouse(fulfillmentOrder.warehouseId, manager);
 
     const before = { preparedQuantity: line.preparedQuantity, status: line.status };
 
@@ -329,6 +340,7 @@ export class FulfillmentService implements FulfillmentContract {
       'pick_task_line',
       line.id,
       actorUserId,
+      manager,
     );
 
     line.preparedQuantity += quantity;
@@ -340,40 +352,43 @@ export class FulfillmentService implements FulfillmentContract {
     // Audit fields per the directive's own list: user (actorUserId, via
     // AuditService), date/time (automatic), order, item, quantity,
     // previous status, new status.
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'fulfillment.pick_task_line.prepared',
-      resource: 'pick_task_line',
-      resourceId: line.id,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: {
-        preparedQuantity: line.preparedQuantity,
-        status: line.status,
-        quantityJustPrepared: quantity,
-        salesOrderId: fulfillmentOrder.salesOrderId,
-        productId: line.productId,
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'fulfillment.pick_task_line.prepared',
+        resource: 'pick_task_line',
+        resourceId: line.id,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: {
+          preparedQuantity: line.preparedQuantity,
+          status: line.status,
+          quantityJustPrepared: quantity,
+          salesOrderId: fulfillmentOrder.salesOrderId,
+          productId: line.productId,
+        },
       },
-    });
+      manager,
+    );
 
     const allLines = await lineRepo.find({ where: { pickTaskId } });
     if (allLines.every((l) => l.status === 'prepared')) {
-      await this.transitionPickTask(pickTaskId, 'complete', actorUserId);
+      await this.transitionPickTask(pickTaskId, 'complete', actorUserId, manager);
     }
 
     return saved;
   }
 
   /** The "تم للجميع" bulk action — marks every remaining line fully done, one `markPickTaskLineDone` call per line so no second code path exists for the same business rule. */
-  async markAllPickTaskLinesDone(pickTaskId: string, actorUserId: string): Promise<PickTaskLine[]> {
-    await this.requireWorkerRole(actorUserId);
-    const lines = await this.listPickTaskLines(pickTaskId);
+  async markAllPickTaskLinesDone(pickTaskId: string, actorUserId: string, manager?: EntityManager): Promise<PickTaskLine[]> {
+    await this.requireWorkerRole(actorUserId, manager);
+    const lines = await this.listPickTaskLines(pickTaskId, manager);
     const results: PickTaskLine[] = [];
     for (const line of lines) {
       const remaining = line.requestedQuantity - line.preparedQuantity;
-      results.push(remaining > 0 ? await this.markPickTaskLineDone(pickTaskId, line.id, remaining, actorUserId) : line);
+      results.push(remaining > 0 ? await this.markPickTaskLineDone(pickTaskId, line.id, remaining, actorUserId, manager) : line);
     }
     return results;
   }
@@ -391,31 +406,35 @@ export class FulfillmentService implements FulfillmentContract {
    * (and still auditable) via `transitionPickTask`/`transitionPackTask`
    * for anyone who needs the granular per-stage screen instead.
    */
-  async finishPreparationAndReadyForShipping(pickTaskId: string, actorUserId: string): Promise<{ packTaskId: string; state: string }> {
-    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId);
+  async finishPreparationAndReadyForShipping(
+    pickTaskId: string,
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<{ packTaskId: string; state: string }> {
+    const state = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pick_task', pickTaskId, manager);
     if (state !== 'pending_verification') {
       throw new ConflictException(
         `Cannot finish packing while the pick task is in state "${state}" — every item must be prepared first.`,
       );
     }
 
-    const { packTaskId } = await this.transitionPickTask(pickTaskId, 'verify', actorUserId);
+    const { packTaskId } = await this.transitionPickTask(pickTaskId, 'verify', actorUserId, manager);
     if (!packTaskId) {
       throw new ConflictException('Preparation review did not produce a pack task — cannot continue to packing.');
     }
 
-    await this.transitionPackTask(packTaskId, 'accept', actorUserId);
-    await this.transitionPackTask(packTaskId, 'start', actorUserId);
-    await this.transitionPackTask(packTaskId, 'complete', actorUserId);
-    const finalState = await this.transitionPackTask(packTaskId, 'verify', actorUserId);
+    await this.transitionPackTask(packTaskId, 'accept', actorUserId, manager);
+    await this.transitionPackTask(packTaskId, 'start', actorUserId, manager);
+    await this.transitionPackTask(packTaskId, 'complete', actorUserId, manager);
+    const finalState = await this.transitionPackTask(packTaskId, 'verify', actorUserId, manager);
 
     return { packTaskId, state: finalState };
   }
 
-  async transitionPackTask(packTaskId: string, action: string, actorUserId: string): Promise<string> {
-    await this.requireWorkerRole(actorUserId);
-    await this.processEngine.transition(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId, action, actorUserId);
-    const newState = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId);
+  async transitionPackTask(packTaskId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    await this.requireWorkerRole(actorUserId, manager);
+    await this.processEngine.transition(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId, action, actorUserId, manager);
+    const newState = await this.processEngine.getState(FULFILLMENT_TASK_PROCESS, 'pack_task', packTaskId, manager);
 
     if (newState === 'closed') {
       // Pack verified closed -> ready to hand off to Shipping. Deliberately
@@ -435,13 +454,13 @@ export class FulfillmentService implements FulfillmentContract {
       // fulfillReservationsForOrder`), matching the Warehouse/Sales Order
       // Ownership directive's own principle: "financial completion only
       // happens at actual Delivery."
-      const packTask = await this.dataSource.getRepository(PackTask).findOne({ where: { id: packTaskId } });
-      const fulfillmentOrder = await this.dataSource
+      const packTask = await (manager ?? this.dataSource).getRepository(PackTask).findOne({ where: { id: packTaskId } });
+      const fulfillmentOrder = await (manager ?? this.dataSource)
         .getRepository(FulfillmentOrder)
         .findOne({ where: { id: packTask!.fulfillmentOrderId } });
 
-      await this.dataSource.transaction(async (manager) => {
-        await this.events.publish(manager, 'fulfillment.ready-for-dispatch', {
+      await (manager ?? this.dataSource).transaction(async (txManager) => {
+        await this.events.publish(txManager, 'fulfillment.ready-for-dispatch', {
           fulfillmentOrderId: fulfillmentOrder!.id,
           salesOrderId: fulfillmentOrder!.salesOrderId,
         });
@@ -451,8 +470,11 @@ export class FulfillmentService implements FulfillmentContract {
       // calls. Without this, the event above is written but never
       // delivered to ShipmentService's subscriber (confirmed: this call
       // was previously missing entirely, leaving the event permanently
-      // undispatched).
-      await this.events.dispatchPending();
+      // undispatched). Gated: skip when we're inside a caller-supplied
+      // transaction (Area 21 manager-threading) — the caller owns the
+      // dispatch boundary in that case, same convention as every other
+      // service this session.
+      await this.events.dispatchAfterCommit(manager);
     }
 
     return newState;

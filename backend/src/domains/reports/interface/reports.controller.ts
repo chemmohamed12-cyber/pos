@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ReportsService } from '../application/reports.service';
 import { CustomerAccountsService } from '../application/customer-accounts.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -59,7 +60,7 @@ const CUSTODY_COD_COLUMNS: ColumnSpec[] = [
  * automatically — no separate role/scope gate needed here.
  */
 @Controller('reports')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('reporting')
 export class ReportsController {
   constructor(
@@ -70,19 +71,25 @@ export class ReportsController {
 
   /** Customer Financial Account / AR (CTO directive) — the primary statement, sourced from the real Customer Ledger, never a stored/cached balance. */
   @Get('customer-accounts/:customerId')
-  async customerAccount(@Req() req: AuthenticatedRequest, @Param('customerId') customerId: string) {
-    return this.customerAccounts.getCustomerAccountStatement(customerId, req.user.id);
+  async customerAccount(@Req() req: CompanyScopedRequest, @Param('customerId') customerId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.customerAccounts.getCustomerAccountStatement(customerId, req.user.id, manager);
   }
 
   /** Cross-check against the ORIGINAL live-composition statement (pre-Customer-Ledger) — useful for historical orders with no ledger rows yet. Declared AFTER the ':customerId' route above is fine (this is a nested static suffix, not a sibling wildcard). */
   @Get('customer-accounts/:customerId/reconcile')
-  async customerAccountReconcile(@Req() req: AuthenticatedRequest, @Param('customerId') customerId: string) {
-    return this.customerAccounts.getCustomerAccountReconciliation(customerId, req.user.id);
+  async customerAccountReconcile(@Req() req: CompanyScopedRequest, @Param('customerId') customerId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.customerAccounts.getCustomerAccountReconciliation(customerId, req.user.id, manager);
   }
 
   @Get('sales-orders')
-  async salesOrders(@Req() req: AuthenticatedRequest) {
-    return this.reports.getSalesOrdersReport(req.user.id);
+  async salesOrders(@Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reports.getSalesOrdersReport(req.user.id, manager);
   }
 
   // Security Assurance Gate — Track S7 (Resource Exhaustion): every export
@@ -95,8 +102,10 @@ export class ReportsController {
   // `AuthController` already narrows its own sensitive routes.
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('sales-orders/export')
-  async salesOrdersExport(@Req() req: AuthenticatedRequest, @Res() res: Response) {
-    const rows = await this.reports.getSalesOrdersReport(req.user.id);
+  async salesOrdersExport(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const rows = await this.reports.getSalesOrdersReport(req.user.id, manager);
     const buffer = await this.excel.buildExport('Sales Orders Report', SALES_ORDERS_COLUMNS, rows.map((r) => ({ ...r })));
     res
       .set({
@@ -107,14 +116,18 @@ export class ReportsController {
   }
 
   @Get('sales-by-period')
-  async salesByPeriod(@Req() req: AuthenticatedRequest, @Query('groupBy') groupBy?: 'day' | 'month') {
-    return this.reports.getSalesByPeriod(req.user.id, groupBy === 'month' ? 'month' : 'day');
+  async salesByPeriod(@Req() req: CompanyScopedRequest, @Query('groupBy') groupBy?: 'day' | 'month') {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reports.getSalesByPeriod(req.user.id, groupBy === 'month' ? 'month' : 'day', manager);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see salesOrdersExport's own comment
   @Get('sales-by-period/export')
-  async salesByPeriodExport(@Req() req: AuthenticatedRequest, @Res() res: Response, @Query('groupBy') groupBy?: 'day' | 'month') {
-    const rows = await this.reports.getSalesByPeriod(req.user.id, groupBy === 'month' ? 'month' : 'day');
+  async salesByPeriodExport(@Req() req: CompanyScopedRequest, @Res() res: Response, @Query('groupBy') groupBy?: 'day' | 'month') {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const rows = await this.reports.getSalesByPeriod(req.user.id, groupBy === 'month' ? 'month' : 'day', manager);
     const buffer = await this.excel.buildExport('Sales by Period', SALES_BY_PERIOD_COLUMNS, rows.map((r) => ({ ...r })));
     res
       .set({
@@ -125,14 +138,18 @@ export class ReportsController {
   }
 
   @Get('sales-by-customer')
-  async salesByCustomer(@Req() req: AuthenticatedRequest) {
-    return this.reports.getSalesByCustomer(req.user.id);
+  async salesByCustomer(@Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reports.getSalesByCustomer(req.user.id, manager);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see salesOrdersExport's own comment
   @Get('sales-by-customer/export')
-  async salesByCustomerExport(@Req() req: AuthenticatedRequest, @Res() res: Response) {
-    const rows = await this.reports.getSalesByCustomer(req.user.id);
+  async salesByCustomerExport(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const rows = await this.reports.getSalesByCustomer(req.user.id, manager);
     const buffer = await this.excel.buildExport('Sales by Customer', SALES_BY_CUSTOMER_COLUMNS, rows.map((r) => ({ ...r })));
     res
       .set({
@@ -143,14 +160,18 @@ export class ReportsController {
   }
 
   @Get('sales-by-rep')
-  async salesByRep(@Req() req: AuthenticatedRequest) {
-    return this.reports.getSalesByRep(req.user.id);
+  async salesByRep(@Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reports.getSalesByRep(req.user.id, manager);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see salesOrdersExport's own comment
   @Get('sales-by-rep/export')
-  async salesByRepExport(@Req() req: AuthenticatedRequest, @Res() res: Response) {
-    const rows = await this.reports.getSalesByRep(req.user.id);
+  async salesByRepExport(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const rows = await this.reports.getSalesByRep(req.user.id, manager);
     const buffer = await this.excel.buildExport('Sales by Sales Representative', SALES_BY_REP_COLUMNS, rows.map((r) => ({ ...r })));
     res
       .set({
@@ -164,16 +185,18 @@ export class ReportsController {
   @UseGuards(PermissionGuard)
   @RequirePermission('reporting.finance.view', 'read-only')
   @Get('custody-cod')
-  async custodyCod() {
-    return this.reports.getCustodyCodReport();
+  async custodyCod(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.reports.getCustodyCodReport(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('reporting.finance.export', 'read-only')
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see salesOrdersExport's own comment
   @Get('custody-cod/export')
-  async custodyCodExport(@Res() res: Response) {
-    const report = await this.reports.getCustodyCodReport();
+  async custodyCodExport(@Req() req: CompanyScopedRequest, @Res() res: Response) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const report = await this.reports.getCustodyCodReport(req.companyContext.dataSource.manager);
     const buffer = await this.excel.buildExport('Custody & COD Report', CUSTODY_COD_COLUMNS, report.rows.map((r) => ({ ...r })));
     res
       .set({

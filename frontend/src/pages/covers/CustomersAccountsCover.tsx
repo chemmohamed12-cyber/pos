@@ -47,32 +47,36 @@ export function CustomersAccountsCover() {
 
   useEffect(() => {
     (async () => {
-      const [customers, balances, invoices, arAging, payments, credits] = await Promise.all([
-        api.get<CustomerRow[]>('/customers'),
-        api.get<BalanceRow[]>('/customer-finance/balances'),
-        api.get<InvoiceRow[]>('/invoices'),
-        api.get<ArAgingRow[]>('/ar-aging'),
-        api.get<PaymentRow[]>('/payments'),
-        api.get<CreditRow[]>('/returns/credits'),
-      ]);
+      try {
+        const [customers, balances, invoices, arAging, payments, credits] = await Promise.all([
+          api.get<CustomerRow[]>('/customers'),
+          api.get<BalanceRow[]>('/customer-finance/balances'),
+          api.get<InvoiceRow[]>('/invoices'),
+          api.get<ArAgingRow[]>('/ar-aging'),
+          api.get<PaymentRow[]>('/payments'),
+          api.get<CreditRow[]>('/returns/credits'),
+        ]);
 
-      const totalBalances = balances.reduce((sum, b) => sum + Number(b.balance), 0);
-      const openInvoices = invoices.filter((i) => i.state !== 'draft' && i.state !== 'void' && i.state !== 'paid');
-      const totalOutstanding = openInvoices.reduce((sum, i) => sum + Number(i.remaining), 0);
-      const totalOverdue = arAging.reduce((sum, r) => (r.bucket === 'current' ? sum : sum + Number(r.remaining)), 0);
-      const overdueInvoices = arAging.filter((r) => r.bucket !== 'current').length;
-      const availableCredits = credits.reduce((sum, c) => sum + Number(c.remainingAmount), 0);
+        const totalBalances = balances.reduce((sum, b) => sum + Number(b.balance), 0);
+        const openInvoices = invoices.filter((i) => i.state !== 'draft' && i.state !== 'void' && i.state !== 'paid');
+        const totalOutstanding = openInvoices.reduce((sum, i) => sum + Number(i.remaining), 0);
+        const totalOverdue = arAging.reduce((sum, r) => (r.bucket === 'current' ? sum : sum + Number(r.remaining)), 0);
+        const overdueInvoices = arAging.filter((r) => r.bucket !== 'current').length;
+        const availableCredits = credits.reduce((sum, c) => sum + Number(c.remainingAmount), 0);
 
-      setKpis({
-        totalCustomers: customers.length,
-        totalBalances: totalBalances.toFixed(2),
-        totalOutstanding: totalOutstanding.toFixed(2),
-        totalOverdue: totalOverdue.toFixed(2),
-        openInvoices: openInvoices.length,
-        collectionsCount: payments.length,
-        overdueInvoices,
-        availableCredits: availableCredits.toFixed(2),
-      });
+        setKpis({
+          totalCustomers: customers.length,
+          totalBalances: totalBalances.toFixed(2),
+          totalOutstanding: totalOutstanding.toFixed(2),
+          totalOverdue: totalOverdue.toFixed(2),
+          openInvoices: openInvoices.length,
+          collectionsCount: payments.length,
+          overdueInvoices,
+          availableCredits: availableCredits.toFixed(2),
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, []);
 

@@ -71,12 +71,22 @@ export function TreasuryLedger() {
   ]);
 
   async function loadAccounts() {
-    setAccounts(await api.get<TreasuryAccount[]>('/treasury/accounts'));
+    try {
+      setAccounts(await api.get<TreasuryAccount[]>('/treasury/accounts'));
+    } catch (err) {
+      // Foundation fix: no error handling — the account filter was silently left empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load treasury accounts.');
+    }
   }
 
   async function loadLedger() {
-    const qs = filterAccountId ? `?accountId=${filterAccountId}` : '';
-    setTransactions(await api.get<TreasuryTransaction[]>(`/treasury/ledger${qs}`));
+    try {
+      const qs = filterAccountId ? `?accountId=${filterAccountId}` : '';
+      setTransactions(await api.get<TreasuryTransaction[]>(`/treasury/ledger${qs}`));
+    } catch (err) {
+      // Foundation fix: no error handling — the page was stuck on "Loading…" forever on failure.
+      setError(err instanceof ApiError ? err.message : 'Failed to load the treasury ledger.');
+    }
   }
 
   useEffect(() => {

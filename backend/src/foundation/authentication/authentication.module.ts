@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { Credential } from './credential.entity';
@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { IdentityModule } from '../identity/identity.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { CompanyModule } from '../company/company.module';
 
 @Module({
   imports: [
@@ -15,6 +16,12 @@ import { AuthorizationModule } from '../authorization/authorization.module';
     JwtModule.register({}),
     IdentityModule,
     AuthorizationModule,
+    // Multi-Company Area 5 (2026-09-23) — for MembershipService, so
+    // AuthService.selectCompany can validate a Company claim before ever
+    // issuing a token that carries it. `forwardRef` — Membership HTTP
+    // Management (2026-09-24) made this circular: CompanyModule's own
+    // controllers now need JwtAuthGuard from THIS module.
+    forwardRef(() => CompanyModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard],

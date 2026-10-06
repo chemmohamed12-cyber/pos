@@ -22,6 +22,11 @@ export class BackupRun {
   @Column({ type: 'uuid', nullable: true })
   initiatedByUserId!: string | null;
 
+  /** Backup/DR Architecture V1 (2026-09-24, Track D §Step 3 freeze). Null = platform-level backup (this row's original meaning, unchanged). Set = a specific Company's own database was backed up. Same nullable convention as `initiatedByUserId` above. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  companyId!: string | null;
+
   @Column({ type: 'varchar', length: 16 })
   status!: BackupRunStatus;
 

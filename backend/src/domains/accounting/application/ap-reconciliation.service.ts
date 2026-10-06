@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ApReconciliationRun } from '../infrastructure/ap-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
@@ -36,35 +36,39 @@ export class ApReconciliationService {
     @Optional() @Inject(SUPPLIER_LEDGER_CONTRACT) private readonly supplierLedger?: SupplierLedgerContract,
   ) {}
 
-  async listRuns(filter?: { status?: string; from?: string; to?: string }): Promise<ApReconciliationRun[]> {
-    const qb = this.dataSource.getRepository(ApReconciliationRun).createQueryBuilder('r');
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async listRuns(filter?: { status?: string; from?: string; to?: string }, manager?: EntityManager): Promise<ApReconciliationRun[]> {
+    const qb = this.em(manager).getRepository(ApReconciliationRun).createQueryBuilder('r');
     if (filter?.status) qb.andWhere('r.status = :s', { s: filter.status });
     if (filter?.from) qb.andWhere('r."asOfDate" >= :f', { f: filter.from });
     if (filter?.to) qb.andWhere('r."asOfDate" <= :t', { t: filter.to });
     return qb.orderBy('r."createdAt"', 'DESC').getMany();
   }
 
-  async getRun(id: string): Promise<ApReconciliationRun> {
-    const run = await this.dataSource.getRepository(ApReconciliationRun).findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<ApReconciliationRun> {
+    const run = await this.em(manager).getRepository(ApReconciliationRun).findOne({ where: { id } });
     if (!run) throw new NotFoundException(`AP reconciliation run "${id}" not found.`);
     return run;
   }
 
-  private async apAccount(): Promise<GLAccount> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { controlFunction: 'ap', isActive: true } });
+  private async apAccount(manager?: EntityManager): Promise<GLAccount> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { controlFunction: 'ap', isActive: true } });
     if (!acc) throw new ConflictException('No active `ap` control account in the chart of accounts — assign controlFunction "ap" to an account first.');
     return acc;
   }
 
-  async reconcile(input: ApReconcileInput, actorUserId: string): Promise<ApReconciliationRun> {
+  async reconcile(input: ApReconcileInput, actorUserId: string, manager?: EntityManager): Promise<ApReconciliationRun> {
     const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
-    const ap = await this.apAccount();
+    const ap = await this.apAccount(manager);
 
     // GL side — always computed
-    const gl = await this.ledger.getAccountLedger(ap.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined });
+    const gl = await this.ledger.getAccountLedger(ap.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
     const glBalanceBase = gl.closingBalanceBase;
 
-    const repo = this.dataSource.getRepository(ApReconciliationRun);
+    const repo = this.em(manager).getRepository(ApReconciliationRun);
 
     // --- No supplier-ledger source (ADR-037 D2/D4) --------------------------
     if (!this.supplierLedger) {
@@ -84,13 +88,13 @@ export class ApReconciliationService {
           glLineCount: gl.lines.length,
         },
         actorUserId,
-      });
-      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_subledger_source' });
+      }, manager);
+      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_subledger_source' }, manager);
       return saved;
     }
 
     // --- Supplier-ledger source present (future OP-AP) --------------------
-    const sub = await this.supplierLedger.getAllSupplierBalances(asOfDate);
+    const sub = await this.supplierLedger.getAllSupplierBalances(asOfDate, manager);
     const subledgerTotalBase = sub.total;
     // BUG FIX (surfaced while building GRNI reconciliation, ADR-057): `getAllSupplierBalances`
     // reports a positive balance when AP is credit-increased (correct — a payable is a credit-normal
@@ -102,7 +106,7 @@ export class ApReconciliationService {
     // AR/Cash-Bank/Inventory are unaffected (debit-normal, their subledger conventions already
     // align with `closingBalanceBase`'s sign) — this fix is scoped to credit-normal accounts only.
     const sign = gl.account.normalBalance === 'credit' ? '-1' : '1';
-    const [d] = (await this.dataSource.query(
+    const [d] = (await this.em(manager).query(
       `SELECT ($1::numeric(20,4) - ($2::numeric(20,4) * $3::numeric(20,4)))::numeric(20,4) AS drift`,
       [subledgerTotalBase, glBalanceBase, sign],
     )) as Array<{ drift: string }>;
@@ -129,17 +133,17 @@ export class ApReconciliationService {
       status: matched ? 'matched' : 'drift_found',
       driftBreakdown,
       actorUserId,
-    });
-    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status });
+    }, manager);
+    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status }, manager);
     return saved;
   }
 
-  async closeRun(id: string, actorUserId: string): Promise<ApReconciliationRun> {
-    const run = await this.getRun(id);
+  async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<ApReconciliationRun> {
+    const run = await this.getRun(id, manager);
     if (run.status === 'closed') return run;
     run.status = 'closed';
     run.closedAt = new Date();
-    const saved = await this.dataSource.getRepository(ApReconciliationRun).save(run);
+    const saved = await this.em(manager).getRepository(ApReconciliationRun).save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -148,7 +152,7 @@ export class ApReconciliationService {
       resourceId: id,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
@@ -157,17 +161,17 @@ export class ApReconciliationService {
    * GL movement (the AP position). The supplier-level subledger statement
    * activates with the OP-AP phase.
    */
-  async apStatement(filter?: { from?: string; to?: string; orgUnitId?: string | null }): Promise<{
+  async apStatement(filter?: { from?: string; to?: string; orgUnitId?: string | null }, manager?: EntityManager): Promise<{
     apAccountCode: string;
     ledger: unknown;
     supplierSubledger: unknown[] | null;
   }> {
-    const ap = await this.apAccount();
+    const ap = await this.apAccount(manager);
     const ledger = await this.ledger.getAccountLedger(ap.id, {
       from: filter?.from,
       to: filter?.to,
       orgUnitId: filter?.orgUnitId ?? undefined,
-    });
+    }, manager);
     return { apAccountCode: ap.code, ledger, supplierSubledger: null };
   }
 
@@ -184,8 +188,7 @@ export class ApReconciliationService {
       status: ApReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    },
-  ): Promise<ApReconciliationRun> {
+    }, manager?: EntityManager): Promise<ApReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({
@@ -210,7 +213,7 @@ export class ApReconciliationService {
     }
   }
 
-  private async recordAudit(actorUserId: string, saved: ApReconciliationRun, after: Record<string, unknown>): Promise<void> {
+  private async recordAudit(actorUserId: string, saved: ApReconciliationRun, after: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -220,6 +223,6 @@ export class ApReconciliationService {
       result: 'success',
       correlationId: null,
       after,
-    });
+    }, manager);
   }
 }

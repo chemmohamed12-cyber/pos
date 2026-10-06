@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { FinancialDimensionType } from '../infrastructure/financial-dimension-type.entity';
 import { FinancialDimensionValue } from '../infrastructure/financial-dimension-value.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -43,8 +43,12 @@ export class FinancialDimensionService {
     private readonly audit: AuditService,
   ) {}
 
-  async createDimensionType(input: CreateDimensionTypeInput, actorUserId: string): Promise<FinancialDimensionType> {
-    const repo = this.dataSource.getRepository(FinancialDimensionType);
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async createDimensionType(input: CreateDimensionTypeInput, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionType> {
+    const repo = this.em(manager).getRepository(FinancialDimensionType);
     const saved = await repo.save(repo.create({ code: input.code, name: input.name, isActive: true }));
     await this.audit.record({
       actorUserId,
@@ -55,23 +59,23 @@ export class FinancialDimensionService {
       result: 'success',
       correlationId: null,
       after: { code: saved.code },
-    });
+    }, manager);
     return saved;
   }
 
-  async listDimensionTypes(): Promise<FinancialDimensionType[]> {
-    return this.dataSource.getRepository(FinancialDimensionType).find({ order: { code: 'ASC' } });
+  async listDimensionTypes(manager?: EntityManager): Promise<FinancialDimensionType[]> {
+    return this.em(manager).getRepository(FinancialDimensionType).find({ order: { code: 'ASC' } });
   }
 
   /** F11 (ADR-044 D10) — used by `JournalEntryService`'s P&L implicit-policy check to resolve a configured type code to its id. Returns null for an unknown code (the caller treats this as "nothing to enforce", never a crash). */
-  async findTypeByCode(code: string): Promise<FinancialDimensionType | null> {
+  async findTypeByCode(code: string, manager?: EntityManager): Promise<FinancialDimensionType | null> {
     if (!code) return null;
-    return this.dataSource.getRepository(FinancialDimensionType).findOne({ where: { code } });
+    return (manager ?? this.dataSource).getRepository(FinancialDimensionType).findOne({ where: { code } });
   }
 
   /** F11 (ADR-044 D8/D11). Mirrors `TaxCodeService.updateTaxCode`'s before/after audit shape. */
-  async updateDimensionType(id: string, input: UpdateDimensionTypeInput, actorUserId: string): Promise<FinancialDimensionType> {
-    const repo = this.dataSource.getRepository(FinancialDimensionType);
+  async updateDimensionType(id: string, input: UpdateDimensionTypeInput, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionType> {
+    const repo = this.em(manager).getRepository(FinancialDimensionType);
     const type = await repo.findOne({ where: { id } });
     if (!type) throw new NotFoundException(`Financial dimension type "${id}" not found.`);
     const before = { name: type.name, isActive: type.isActive };
@@ -88,21 +92,21 @@ export class FinancialDimensionService {
       correlationId: null,
       before,
       after: { name: saved.name, isActive: saved.isActive },
-    });
+    }, manager);
     return saved;
   }
 
   /** F11 (ADR-044 D8) — deactivation only, never a delete (platform "correction, not deletion" principle). */
-  async deactivateDimensionType(id: string, actorUserId: string): Promise<FinancialDimensionType> {
-    return this.updateDimensionType(id, { isActive: false }, actorUserId);
+  async deactivateDimensionType(id: string, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionType> {
+    return this.updateDimensionType(id, { isActive: false }, actorUserId, manager);
   }
 
-  async createDimensionValue(dimensionTypeId: string, input: CreateDimensionValueInput, actorUserId: string): Promise<FinancialDimensionValue> {
-    const typeRepo = this.dataSource.getRepository(FinancialDimensionType);
+  async createDimensionValue(dimensionTypeId: string, input: CreateDimensionValueInput, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionValue> {
+    const typeRepo = this.em(manager).getRepository(FinancialDimensionType);
     const type = await typeRepo.findOne({ where: { id: dimensionTypeId } });
     if (!type) throw new NotFoundException(`Financial dimension type "${dimensionTypeId}" not found.`);
 
-    const repo = this.dataSource.getRepository(FinancialDimensionValue);
+    const repo = this.em(manager).getRepository(FinancialDimensionValue);
     const saved = await repo.save(
       repo.create({ dimensionTypeId, code: input.code, name: input.name, orgUnitId: input.orgUnitId ?? null, isActive: true }),
     );
@@ -115,17 +119,17 @@ export class FinancialDimensionService {
       result: 'success',
       correlationId: null,
       after: { dimensionTypeId, code: saved.code },
-    });
+    }, manager);
     return saved;
   }
 
-  async listDimensionValues(dimensionTypeId: string): Promise<FinancialDimensionValue[]> {
-    return this.dataSource.getRepository(FinancialDimensionValue).find({ where: { dimensionTypeId }, order: { code: 'ASC' } });
+  async listDimensionValues(dimensionTypeId: string, manager?: EntityManager): Promise<FinancialDimensionValue[]> {
+    return this.em(manager).getRepository(FinancialDimensionValue).find({ where: { dimensionTypeId }, order: { code: 'ASC' } });
   }
 
   /** F11 (ADR-044 D8/D11). Mirrors `TaxCodeService.updateTaxCode`'s before/after audit shape. */
-  async updateDimensionValue(id: string, input: UpdateDimensionValueInput, actorUserId: string): Promise<FinancialDimensionValue> {
-    const repo = this.dataSource.getRepository(FinancialDimensionValue);
+  async updateDimensionValue(id: string, input: UpdateDimensionValueInput, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionValue> {
+    const repo = this.em(manager).getRepository(FinancialDimensionValue);
     const value = await repo.findOne({ where: { id } });
     if (!value) throw new NotFoundException(`Financial dimension value "${id}" not found.`);
     const before = { name: value.name, isActive: value.isActive };
@@ -142,12 +146,12 @@ export class FinancialDimensionService {
       correlationId: null,
       before,
       after: { name: saved.name, isActive: saved.isActive },
-    });
+    }, manager);
     return saved;
   }
 
   /** F11 (ADR-044 D8) — deactivation only, never a delete. */
-  async deactivateDimensionValue(id: string, actorUserId: string): Promise<FinancialDimensionValue> {
-    return this.updateDimensionValue(id, { isActive: false }, actorUserId);
+  async deactivateDimensionValue(id: string, actorUserId: string, manager?: EntityManager): Promise<FinancialDimensionValue> {
+    return this.updateDimensionValue(id, { isActive: false }, actorUserId, manager);
   }
 }

@@ -1,0 +1,1682 @@
+diff --git a/backend/src/domains/accounting/application/currency.service.ts b/backend/src/domains/accounting/application/currency.service.ts
+index 31b9d77..a2ab362 100644
+--- a/backend/src/domains/accounting/application/currency.service.ts
++++ b/backend/src/domains/accounting/application/currency.service.ts
+@@ -1,5 +1,5 @@
+ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+-import { DataSource, LessThanOrEqual } from 'typeorm';
++import { DataSource, EntityManager, LessThanOrEqual } from 'typeorm';
+ import { Currency } from '../infrastructure/currency.entity';
+ import { ExchangeRate } from '../infrastructure/exchange-rate.entity';
+ import { FiscalYear } from '../infrastructure/fiscal-year.entity';
+@@ -68,14 +68,14 @@ export class CurrencyService {
+     return this.dataSource.getRepository(Currency).find({ order: { code: 'ASC' } });
+   }
+ 
+-  async getCurrency(code: string): Promise<Currency> {
+-    const currency = await this.dataSource.getRepository(Currency).findOne({ where: { code } });
++  async getCurrency(code: string, manager?: EntityManager): Promise<Currency> {
++    const currency = await (manager ?? this.dataSource).getRepository(Currency).findOne({ where: { code } });
+     if (!currency) throw new NotFoundException(`Currency "${code}" not found.`);
+     return currency;
+   }
+ 
+-  async getBaseCurrency(): Promise<Currency | null> {
+-    return this.dataSource.getRepository(Currency).findOne({ where: { isBaseCurrency: true } });
++  async getBaseCurrency(manager?: EntityManager): Promise<Currency | null> {
++    return (manager ?? this.dataSource).getRepository(Currency).findOne({ where: { isBaseCurrency: true } });
+   }
+ 
+   /**
+@@ -191,8 +191,8 @@ export class CurrencyService {
+    * Fails closed: no rate found is a thrown error, never a silent 1.0
+    * fallback.
+    */
+-  async getRateOnOrBefore(currencyCode: string, date: string): Promise<ExchangeRate> {
+-    const rows = await this.dataSource
++  async getRateOnOrBefore(currencyCode: string, date: string, manager?: EntityManager): Promise<ExchangeRate> {
++    const rows = await (manager ?? this.dataSource)
+       .getRepository(ExchangeRate)
+       .find({ where: { currencyCode, rateDate: LessThanOrEqual(date) }, order: { rateDate: 'DESC' }, take: 1 });
+     if (rows.length === 0) {
+diff --git a/backend/src/domains/accounting/application/financial-dimension.service.ts b/backend/src/domains/accounting/application/financial-dimension.service.ts
+index 33a0e0d..c72bef4 100644
+--- a/backend/src/domains/accounting/application/financial-dimension.service.ts
++++ b/backend/src/domains/accounting/application/financial-dimension.service.ts
+@@ -1,5 +1,5 @@
+ import { Injectable, NotFoundException } from '@nestjs/common';
+-import { DataSource } from 'typeorm';
++import { DataSource, EntityManager } from 'typeorm';
+ import { FinancialDimensionType } from '../infrastructure/financial-dimension-type.entity';
+ import { FinancialDimensionValue } from '../infrastructure/financial-dimension-value.entity';
+ import { AuditService } from '../../../foundation/audit/audit.service';
+@@ -64,9 +64,9 @@ export class FinancialDimensionService {
+   }
+ 
+   /** F11 (ADR-044 D10) — used by `JournalEntryService`'s P&L implicit-policy check to resolve a configured type code to its id. Returns null for an unknown code (the caller treats this as "nothing to enforce", never a crash). */
+-  async findTypeByCode(code: string): Promise<FinancialDimensionType | null> {
++  async findTypeByCode(code: string, manager?: EntityManager): Promise<FinancialDimensionType | null> {
+     if (!code) return null;
+-    return this.dataSource.getRepository(FinancialDimensionType).findOne({ where: { code } });
++    return (manager ?? this.dataSource).getRepository(FinancialDimensionType).findOne({ where: { code } });
+   }
+ 
+   /** F11 (ADR-044 D8/D11). Mirrors `TaxCodeService.updateTaxCode`'s before/after audit shape. */
+diff --git a/backend/src/domains/accounting/application/financial-events/financial-event.service.ts b/backend/src/domains/accounting/application/financial-events/financial-event.service.ts
+index 4ffb283..7ff8ab0 100644
+--- a/backend/src/domains/accounting/application/financial-events/financial-event.service.ts
++++ b/backend/src/domains/accounting/application/financial-events/financial-event.service.ts
+@@ -115,16 +115,16 @@ export class FinancialEventService implements OnModuleInit {
+   // Queries
+   // ---------------------------------------------------------------------------
+ 
+-  async listEvents(filter?: { status?: FinancialEventStatus; sourceDomain?: string; eventType?: string }): Promise<FinancialEvent[]> {
++  async listEvents(filter?: { status?: FinancialEventStatus; sourceDomain?: string; eventType?: string }, manager?: EntityManager): Promise<FinancialEvent[]> {
+     const where: Record<string, unknown> = {};
+     if (filter?.status) where.status = filter.status;
+     if (filter?.sourceDomain) where.sourceDomain = filter.sourceDomain;
+     if (filter?.eventType) where.eventType = filter.eventType;
+-    return this.dataSource.getRepository(FinancialEvent).find({ where, order: { receivedAt: 'DESC' } });
++    return (manager ?? this.dataSource).getRepository(FinancialEvent).find({ where, order: { receivedAt: 'DESC' } });
+   }
+ 
+-  async getEvent(id: string): Promise<FinancialEvent> {
+-    const ev = await this.dataSource.getRepository(FinancialEvent).findOne({ where: { id } });
++  async getEvent(id: string, manager?: EntityManager): Promise<FinancialEvent> {
++    const ev = await (manager ?? this.dataSource).getRepository(FinancialEvent).findOne({ where: { id } });
+     if (!ev) throw new NotFoundException(`Financial event "${id}" not found.`);
+     return ev;
+   }
+@@ -133,7 +133,7 @@ export class FinancialEventService implements OnModuleInit {
+   // Ingest (Blueprint §6.1)
+   // ---------------------------------------------------------------------------
+ 
+-  async ingest(eventType: string, rawPayload: Record<string, unknown>): Promise<IngestResult> {
++  async ingest(eventType: string, rawPayload: Record<string, unknown>, manager?: EntityManager): Promise<IngestResult> {
+     const payload = rawPayload ?? {};
+     const sourceDomain = DOMAIN_OF_TOPIC[eventType] ?? 'unknown';
+     const sourceEntityType = str(payload.sourceEntityType) ?? str(payload.entityType) ?? eventType.split('.')[1] ?? 'unknown';
+@@ -145,9 +145,9 @@ export class FinancialEventService implements OnModuleInit {
+     // 1. idempotency-guarded landing (ADR-035 D6)
+     let event: FinancialEvent;
+     try {
+-      event = await this.dataSource.transaction(async (manager) => {
+-        const repo = manager.getRepository(FinancialEvent);
+-        const base = await this.currencies.getBaseCurrency();
++      event = await (manager ?? this.dataSource).transaction(async (txManager) => {
++        const repo = txManager.getRepository(FinancialEvent);
++        const base = await this.currencies.getBaseCurrency(txManager);
+         return repo.save(
+           repo.create({
+             eventType,
+@@ -168,7 +168,7 @@ export class FinancialEventService implements OnModuleInit {
+       });
+     } catch (err) {
+       if (isUniqueViolation(err)) {
+-        const existing = await this.dataSource.getRepository(FinancialEvent).findOne({ where: { idempotencyKey } });
++        const existing = await (manager ?? this.dataSource).getRepository(FinancialEvent).findOne({ where: { idempotencyKey } });
+         if (existing) {
+           return { financialEventId: existing.id, status: existing.status, journalEntryId: existing.journalEntryId, deduped: true };
+         }
+@@ -179,7 +179,7 @@ export class FinancialEventService implements OnModuleInit {
+     // 2. no handler -> IGNORED (recorded, never dropped)
+     const handler = this.registry.get(eventType);
+     if (!handler) {
+-      await this.mark(event.id, 'IGNORED', null, 'no handler registered for this event type in V1');
++      await this.mark(event.id, 'IGNORED', null, 'no handler registered for this event type in V1', manager);
+       return { financialEventId: event.id, status: 'IGNORED', journalEntryId: null, deduped: false };
+     }
+ 
+@@ -188,15 +188,15 @@ export class FinancialEventService implements OnModuleInit {
+     // observes no behavior change; a handler that mutates something via `ctx.manager` (F08's
+     // inventory-costing bridge) gets that mutation rolled back together with everything else here
+     // on ANY failure — including a later posting-gate rejection.
+-    return this.runHandlerThroughPosting(event, handler);
++    return this.runHandlerThroughPosting(event, handler, manager);
+   }
+ 
+   // ---------------------------------------------------------------------------
+   // Re-drive a REJECTED (or stuck) event (Blueprint §6.1 / API §20)
+   // ---------------------------------------------------------------------------
+ 
+-  async redrive(id: string): Promise<IngestResult> {
+-    const event = await this.getEvent(id);
++  async redrive(id: string, manager?: EntityManager): Promise<IngestResult> {
++    const event = await this.getEvent(id, manager);
+     if (event.status === 'POSTED') {
+       return { financialEventId: id, status: 'POSTED', journalEntryId: event.journalEntryId, deduped: true };
+     }
+@@ -204,14 +204,14 @@ export class FinancialEventService implements OnModuleInit {
+       throw new NotFoundException(`No handler is registered for "${event.eventType}" — nothing to re-drive.`);
+     }
+     // discard any prior draft from a failed attempt
+-    if (event.journalEntryId) await this.discardDraft(event.journalEntryId);
++    if (event.journalEntryId) await this.discardDraft(event.journalEntryId, manager);
+ 
+     const handler = this.registry.get(event.eventType);
+     if (!handler) {
+-      await this.mark(id, 'IGNORED', null, 'no handler registered');
++      await this.mark(id, 'IGNORED', null, 'no handler registered', manager);
+       return { financialEventId: id, status: 'IGNORED', journalEntryId: null, deduped: false };
+     }
+-    return this.runHandlerThroughPosting(event, handler);
++    return this.runHandlerThroughPosting(event, handler, manager);
+   }
+ 
+   // ---------------------------------------------------------------------------
+@@ -227,7 +227,7 @@ export class FinancialEventService implements OnModuleInit {
+    * exactly as the pre-D18a two-transaction design produced it — this is a change to the
+    * TRANSACTIONAL SHAPE only, not to any observable message or to the posting gate's own checks.
+    */
+-  private async runHandlerThroughPosting(event: FinancialEvent, handler: FinancialEventHandler): Promise<IngestResult> {
++  private async runHandlerThroughPosting(event: FinancialEvent, handler: FinancialEventHandler, manager?: EntityManager): Promise<IngestResult> {
+     type Outcome =
+       | { status: 'IGNORED'; reason: string | null }
+       | { status: 'REJECTED'; reason: string }
+@@ -242,8 +242,8 @@ export class FinancialEventService implements OnModuleInit {
+     // this loop only ever retries the specific, transient failure class the RCA reproduced.
+     for (let attempt = 1; attempt <= MAX_POSTING_ATTEMPTS; attempt++) {
+       try {
+-        outcome = await this.dataSource.transaction(async (manager) => {
+-          const ctx = await this.buildContext(manager);
++        outcome = await (manager ?? this.dataSource).transaction(async (txManager) => {
++          const ctx = await this.buildContext(txManager);
+           let result: HandlerResult;
+           try {
+             result = await handler(event, ctx);
+@@ -268,7 +268,7 @@ export class FinancialEventService implements OnModuleInit {
+                 lines: result.draft.lines,
+               },
+               SYSTEM_ACTOR_ID,
+-              manager,
++              txManager,
+             );
+             entryId = created.id;
+           } catch (e) {
+@@ -277,7 +277,7 @@ export class FinancialEventService implements OnModuleInit {
+             throw wrapped;
+           }
+           try {
+-            await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, manager);
++            await this.journals.postEntry(entryId, SYSTEM_ACTOR_ID, { systemPosting: true }, txManager);
+           } catch (e) {
+             const wrapped = new Error(`posting gate rejected: ${(e as Error).message}`) as Error & { pgCode?: unknown };
+             wrapped.pgCode = (e as { code?: unknown })?.code;
+@@ -302,24 +302,24 @@ export class FinancialEventService implements OnModuleInit {
+       // handler-side mutation survives; `discardDraft` is therefore unreachable on this path
+       // (nothing left to discard).
+       const message = finalError.message;
+-      await this.mark(event.id, 'REJECTED', null, message);
+-      await this.publishRejected(event, message);
++      await this.mark(event.id, 'REJECTED', null, message, manager);
++      await this.publishRejected(event, message, manager);
+       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
+     }
+     const result = outcome as Outcome;
+ 
+     if (result.status === 'IGNORED') {
+-      await this.mark(event.id, 'IGNORED', null, result.reason);
++      await this.mark(event.id, 'IGNORED', null, result.reason, manager);
+       return { financialEventId: event.id, status: 'IGNORED', journalEntryId: null, deduped: false };
+     }
+     if (result.status === 'REJECTED') {
+-      await this.mark(event.id, 'REJECTED', null, result.reason);
+-      await this.publishRejected(event, result.reason);
++      await this.mark(event.id, 'REJECTED', null, result.reason, manager);
++      await this.publishRejected(event, result.reason, manager);
+       return { financialEventId: event.id, status: 'REJECTED', journalEntryId: null, deduped: false };
+     }
+ 
+-    await this.mark(event.id, 'POSTED', result.journalEntryId, null);
+-    await this.dataSource.transaction(async (manager) => {
++    await this.mark(event.id, 'POSTED', result.journalEntryId, null, manager);
++    await (manager ?? this.dataSource).transaction(async (txManager) => {
+       await this.audit.record(
+         {
+           actorUserId: SYSTEM_ACTOR_ID,
+@@ -331,15 +331,15 @@ export class FinancialEventService implements OnModuleInit {
+           correlationId: event.id,
+           after: { eventType: event.eventType, journalEntryId: result.journalEntryId },
+         },
+-        manager,
++        txManager,
+       );
+     });
+     return { financialEventId: event.id, status: 'POSTED', journalEntryId: result.journalEntryId, deduped: false };
+   }
+ 
+   private async buildContext(manager: EntityManager): Promise<HandlerContext> {
+-    const base = await this.currencies.getBaseCurrency();
+-    const accRepo = this.dataSource.getRepository(GLAccount);
++    const base = await this.currencies.getBaseCurrency(manager);
++    const accRepo = manager.getRepository(GLAccount);
+     return {
+       manager,
+       baseCurrencyCode: base?.code ?? 'XXX',
+@@ -364,9 +364,9 @@ export class FinancialEventService implements OnModuleInit {
+       },
+       resolveDimension: async (typeCode: string, valueCode: string) => {
+         if (!typeCode || !valueCode) return null;
+-        const type = await this.dataSource.getRepository(FinancialDimensionType).findOne({ where: { code: typeCode, isActive: true } });
++        const type = await manager.getRepository(FinancialDimensionType).findOne({ where: { code: typeCode, isActive: true } });
+         if (!type) return null;
+-        const value = await this.dataSource
++        const value = await manager
+           .getRepository(FinancialDimensionValue)
+           .findOne({ where: { dimensionTypeId: type.id, code: valueCode, isActive: true } });
+         if (!value) return null;
+@@ -375,8 +375,8 @@ export class FinancialEventService implements OnModuleInit {
+     };
+   }
+ 
+-  private async mark(id: string, status: FinancialEventStatus, journalEntryId: string | null, reason: string | null): Promise<void> {
+-    await this.dataSource.getRepository(FinancialEvent).update(
++  private async mark(id: string, status: FinancialEventStatus, journalEntryId: string | null, reason: string | null, manager?: EntityManager): Promise<void> {
++    await (manager ?? this.dataSource).getRepository(FinancialEvent).update(
+       { id },
+       {
+         status,
+@@ -387,18 +387,18 @@ export class FinancialEventService implements OnModuleInit {
+     );
+   }
+ 
+-  private async discardDraft(entryId: string): Promise<void> {
+-    await this.dataSource.transaction(async (manager) => {
+-      const lines = await manager.getRepository(JournalLine).find({ where: { journalEntryId: entryId } });
+-      for (const l of lines) await manager.getRepository(JournalLineDimension).delete({ journalLineId: l.id });
+-      await manager.getRepository(JournalLine).delete({ journalEntryId: entryId });
+-      await manager.getRepository(JournalEntry).delete({ id: entryId });
++  private async discardDraft(entryId: string, manager?: EntityManager): Promise<void> {
++    await (manager ?? this.dataSource).transaction(async (txManager) => {
++      const lines = await txManager.getRepository(JournalLine).find({ where: { journalEntryId: entryId } });
++      for (const l of lines) await txManager.getRepository(JournalLineDimension).delete({ journalLineId: l.id });
++      await txManager.getRepository(JournalLine).delete({ journalEntryId: entryId });
++      await txManager.getRepository(JournalEntry).delete({ id: entryId });
+     });
+   }
+ 
+-  private async publishRejected(event: FinancialEvent, reason: string): Promise<void> {
+-    await this.dataSource.transaction(async (manager) => {
+-      await this.events.publish(manager, 'accounting.financial_event.rejected', {
++  private async publishRejected(event: FinancialEvent, reason: string, manager?: EntityManager): Promise<void> {
++    await (manager ?? this.dataSource).transaction(async (txManager) => {
++      await this.events.publish(txManager, 'accounting.financial_event.rejected', {
+         financialEventId: event.id,
+         eventType: event.eventType,
+         sourceDomain: event.sourceDomain,
+diff --git a/backend/src/domains/accounting/application/financial-reporting.service.ts b/backend/src/domains/accounting/application/financial-reporting.service.ts
+index 80d3c36..627e16c 100644
+--- a/backend/src/domains/accounting/application/financial-reporting.service.ts
++++ b/backend/src/domains/accounting/application/financial-reporting.service.ts
+@@ -1,5 +1,5 @@
+ import { Injectable, NotFoundException } from '@nestjs/common';
+-import { DataSource } from 'typeorm';
++import { DataSource, EntityManager } from 'typeorm';
+ import { TaxPeriod } from '../infrastructure/tax-period.entity';
+ 
+ export interface ReportQuery {
+@@ -119,6 +119,7 @@ export class FinancialReportingService {
+     accountTypes: string[] | null,
+     controlFunctions: string[] | null,
+     opts: { orgUnitId?: string; from?: string; toInclusive?: string; beforeExclusive?: string },
++    manager?: EntityManager,
+   ): Promise<{ rows: SectionAccountRow[]; total: string }> {
+     const params: unknown[] = [];
+     const conds: string[] = [this.postedFilter];
+@@ -151,7 +152,7 @@ export class FinancialReportingService {
+     }
+     const acctWhere = acctConds.length ? `WHERE ${acctConds.join(' AND ')}` : '';
+ 
+-    const rows = (await this.dataSource.query(
++    const rows = (await (manager ?? this.dataSource).query(
+       `SELECT a.id AS "accountId", a.code, a.name, a."nameAr", a."accountType", a."normalBalance",
+               (CASE WHEN a."normalBalance" = 'debit' THEN net ELSE -net END)::numeric(20,4) AS balance,
+               COALESCE(SUM(CASE WHEN a."normalBalance" = 'debit' THEN net ELSE -net END) OVER (), 0)::numeric(20,4) AS "sectionTotal"
+@@ -184,27 +185,27 @@ export class FinancialReportingService {
+    * excludes whatever has already been closed into the stored `retained_earnings` balance this
+    * formula already reads. `retained_earnings` is never written to by this service.
+    */
+-  async getBalanceSheet(query: { orgUnitId?: string; asOfDate: string }): Promise<BalanceSheet> {
++  async getBalanceSheet(query: { orgUnitId?: string; asOfDate: string }, manager?: EntityManager): Promise<BalanceSheet> {
+     const { orgUnitId, asOfDate } = query;
+-    const assets = await this.accountSection(['asset'], null, { orgUnitId, toInclusive: asOfDate });
+-    const liabilities = await this.accountSection(['liability'], null, { orgUnitId, toInclusive: asOfDate });
+-    const equity = await this.accountSection(['equity'], null, { orgUnitId, toInclusive: asOfDate });
+-    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, toInclusive: asOfDate });
+-    const expenses = await this.accountSection(['expense'], null, { orgUnitId, toInclusive: asOfDate });
++    const assets = await this.accountSection(['asset'], null, { orgUnitId, toInclusive: asOfDate }, manager);
++    const liabilities = await this.accountSection(['liability'], null, { orgUnitId, toInclusive: asOfDate }, manager);
++    const equity = await this.accountSection(['equity'], null, { orgUnitId, toInclusive: asOfDate }, manager);
++    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, toInclusive: asOfDate }, manager);
++    const expenses = await this.accountSection(['expense'], null, { orgUnitId, toInclusive: asOfDate }, manager);
+ 
+-    const [uni] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
++    const [uni] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+       revenue.total,
+       expenses.total,
+     ])) as Array<{ v: string }>;
+     const unclosedNetIncome = uni.v;
+ 
+-    const [eq] = (await this.dataSource.query(`SELECT ($1::numeric + $2::numeric)::numeric(20,4) AS v`, [
++    const [eq] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric + $2::numeric)::numeric(20,4) AS v`, [
+       equity.total,
+       unclosedNetIncome,
+     ])) as Array<{ v: string }>;
+     const equityTotal = eq.v;
+ 
+-    const [bal] = (await this.dataSource.query(
++    const [bal] = (await (manager ?? this.dataSource).query(
+       `SELECT ($1::numeric = ($2::numeric + $3::numeric)) AS balanced`,
+       [assets.total, liabilities.total, equityTotal],
+     )) as Array<{ balanced: boolean }>;
+@@ -225,11 +226,11 @@ export class FinancialReportingService {
+ 
+   /** ADR-047 D1. Ordinary, date-range-bounded P&L — NOT the same as the Balance Sheet's unbounded
+    * `unclosedNetIncome` (D3), though both reuse the same `accountSection` primitive. */
+-  async getProfitAndLoss(query: { orgUnitId?: string; from: string; to: string }): Promise<ProfitAndLoss> {
++  async getProfitAndLoss(query: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<ProfitAndLoss> {
+     const { orgUnitId, from, to } = query;
+-    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, from, toInclusive: to });
+-    const expenses = await this.accountSection(['expense'], null, { orgUnitId, from, toInclusive: to });
+-    const [ni] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
++    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, from, toInclusive: to }, manager);
++    const expenses = await this.accountSection(['expense'], null, { orgUnitId, from, toInclusive: to }, manager);
++    const [ni] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+       revenue.total,
+       expenses.total,
+     ])) as Array<{ v: string }>;
+@@ -244,10 +245,10 @@ export class FinancialReportingService {
+     };
+   }
+ 
+-  private async controlFunctionDelta(controlFunction: string, opts: { orgUnitId?: string; from: string; to: string }): Promise<string> {
+-    const opening = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, beforeExclusive: opts.from })).total;
+-    const closing = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, toInclusive: opts.to })).total;
+-    const [row] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [closing, opening])) as Array<{
++  private async controlFunctionDelta(controlFunction: string, opts: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<string> {
++    const opening = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, beforeExclusive: opts.from }, manager)).total;
++    const closing = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, toInclusive: opts.to }, manager)).total;
++    const [row] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [closing, opening])) as Array<{
+       v: string;
+     }>;
+     return row.v;
+@@ -264,10 +265,10 @@ export class FinancialReportingService {
+    * `UPDATE` after `ingest()` returns (`depreciation.service.ts`), so a rare crash in that window could
+    * leave a genuinely-posted row with a still-`NULL` `journalEntryId`.
+    */
+-  private async getDepreciationAddBack(from: string, to: string): Promise<string> {
++  private async getDepreciationAddBack(from: string, to: string, manager?: EntityManager): Promise<string> {
+     const fromYm = from.slice(0, 7);
+     const toYm = to.slice(0, 7);
+-    const [row] = (await this.dataSource.query(
++    const [row] = (await (manager ?? this.dataSource).query(
+       `SELECT COALESCE(SUM("calculatedAmount"),0)::numeric(20,4) AS total FROM accounting_depreciation_run_lines
+        WHERE "depreciationPeriod" >= $1 AND "depreciationPeriod" <= $2`,
+       [fromYm, toYm],
+@@ -291,14 +292,14 @@ export class FinancialReportingService {
+     orgUnitId?: string;
+     from: string;
+     to: string;
+-  }): Promise<{ acquisitionsCashOutflow: string; disposalsCashInflow: string; total: string }> {
++  }, manager?: EntityManager): Promise<{ acquisitionsCashOutflow: string; disposalsCashInflow: string; total: string }> {
+     const acqParams: unknown[] = [opts.from, opts.to];
+     let acqOrgCond = '';
+     if (opts.orgUnitId) {
+       acqParams.push(opts.orgUnitId);
+       acqOrgCond = `AND fa."orgUnitId" = $${acqParams.length}`;
+     }
+-    const [acqRow] = (await this.dataSource.query(
++    const [acqRow] = (await (manager ?? this.dataSource).query(
+       `SELECT COALESCE(SUM(jl."creditBase"),0)::numeric(20,4) AS total
+        FROM accounting_fixed_assets fa
+        JOIN accounting_journal_lines jl ON jl."journalEntryId" = fa."acquisitionJournalEntryId"
+@@ -316,7 +317,7 @@ export class FinancialReportingService {
+       dispParams.push(opts.orgUnitId);
+       dispOrgCond = `AND fa."orgUnitId" = $${dispParams.length}`;
+     }
+-    const [dispRow] = (await this.dataSource.query(
++    const [dispRow] = (await (manager ?? this.dataSource).query(
+       `SELECT COALESCE(SUM(d.proceeds),0)::numeric(20,4) AS total
+        FROM accounting_fixed_asset_disposals d
+        JOIN accounting_fixed_assets fa ON fa.id = d."fixedAssetId"
+@@ -329,7 +330,7 @@ export class FinancialReportingService {
+       dispParams,
+     )) as Array<{ total: string }>;
+ 
+-    const [totalRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
++    const [totalRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+       dispRow.total,
+       acqRow.total,
+     ])) as Array<{ v: string }>;
+@@ -347,39 +348,39 @@ export class FinancialReportingService {
+    * computed Ending-Beginning change — any variance surfaces honestly rather than being silently
+    * absorbed into any one section.
+    */
+-  async getCashFlowStatement(query: { orgUnitId?: string; from: string; to: string }): Promise<CashFlowStatement> {
++  async getCashFlowStatement(query: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<CashFlowStatement> {
+     const { orgUnitId, from, to } = query;
+ 
+-    const beginningCash = (await this.accountSection(null, ['bank'], { orgUnitId, beforeExclusive: from })).total;
+-    const endingCash = (await this.accountSection(null, ['bank'], { orgUnitId, toInclusive: to })).total;
+-    const [netChangeRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
++    const beginningCash = (await this.accountSection(null, ['bank'], { orgUnitId, beforeExclusive: from }, manager)).total;
++    const endingCash = (await this.accountSection(null, ['bank'], { orgUnitId, toInclusive: to }, manager)).total;
++    const [netChangeRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+       endingCash,
+       beginningCash,
+     ])) as Array<{ v: string }>;
+     const netChangeActual = netChangeRow.v;
+ 
+-    const pnl = await this.getProfitAndLoss({ orgUnitId, from, to });
++    const pnl = await this.getProfitAndLoss({ orgUnitId, from, to }, manager);
+     const periodNetIncome = pnl.netIncome;
+-    const depreciationAddBack = await this.getDepreciationAddBack(from, to);
+-    const arDelta = await this.controlFunctionDelta('ar', { orgUnitId, from, to });
+-    const apDelta = await this.controlFunctionDelta('ap', { orgUnitId, from, to });
+-    const inventoryDelta = await this.controlFunctionDelta('inventory', { orgUnitId, from, to });
++    const depreciationAddBack = await this.getDepreciationAddBack(from, to, manager);
++    const arDelta = await this.controlFunctionDelta('ar', { orgUnitId, from, to }, manager);
++    const apDelta = await this.controlFunctionDelta('ap', { orgUnitId, from, to }, manager);
++    const inventoryDelta = await this.controlFunctionDelta('inventory', { orgUnitId, from, to }, manager);
+ 
+     // Indirect method: net income + depreciation add-back − increase in AR − increase in Inventory + increase in AP.
+-    const [operatingRow] = (await this.dataSource.query(
++    const [operatingRow] = (await (manager ?? this.dataSource).query(
+       `SELECT ($1::numeric + $2::numeric - $3::numeric - $4::numeric + $5::numeric)::numeric(20,4) AS v`,
+       [periodNetIncome, depreciationAddBack, arDelta, inventoryDelta, apDelta],
+     )) as Array<{ v: string }>;
+     const operatingTotal = operatingRow.v;
+ 
+-    const investing = await this.getInvestingActivity({ orgUnitId, from, to });
++    const investing = await this.getInvestingActivity({ orgUnitId, from, to }, manager);
+     const financingTotal = '0.0000';
+ 
+-    const [explainedRow] = (await this.dataSource.query(
++    const [explainedRow] = (await (manager ?? this.dataSource).query(
+       `SELECT ($1::numeric + $2::numeric + $3::numeric)::numeric(20,4) AS v`,
+       [operatingTotal, investing.total, financingTotal],
+     )) as Array<{ v: string }>;
+-    const [unclassifiedRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
++    const [unclassifiedRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+       netChangeActual,
+       explainedRow.v,
+     ])) as Array<{ v: string }>;
+@@ -403,15 +404,15 @@ export class FinancialReportingService {
+   }
+ 
+   /** ADR-047 D4 — a small, separately-approvable report consuming F10's `accounting_tax_periods`. */
+-  async getTaxPeriodSummary(taxPeriodId: string): Promise<TaxPeriodSummary> {
+-    const taxPeriod = await this.dataSource.getRepository(TaxPeriod).findOne({ where: { id: taxPeriodId } });
++  async getTaxPeriodSummary(taxPeriodId: string, manager?: EntityManager): Promise<TaxPeriodSummary> {
++    const taxPeriod = await (manager ?? this.dataSource).getRepository(TaxPeriod).findOne({ where: { id: taxPeriodId } });
+     if (!taxPeriod) throw new NotFoundException(`Tax period "${taxPeriodId}" not found.`);
+ 
+     const taxPayableMovement = (
+-      await this.accountSection(null, ['tax_payable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate })
++      await this.accountSection(null, ['tax_payable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate }, manager)
+     ).total;
+     const taxReceivableMovement = (
+-      await this.accountSection(null, ['tax_receivable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate })
++      await this.accountSection(null, ['tax_receivable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate }, manager)
+     ).total;
+ 
+     return {
+diff --git a/backend/src/domains/accounting/application/fiscal-period.service.ts b/backend/src/domains/accounting/application/fiscal-period.service.ts
+index 262a27d..c493fa4 100644
+--- a/backend/src/domains/accounting/application/fiscal-period.service.ts
++++ b/backend/src/domains/accounting/application/fiscal-period.service.ts
+@@ -666,10 +666,10 @@ export class FiscalPeriodService implements OnModuleInit {
+    * or `'closed'` year's periods were postable regardless of the year's
+    * own status).
+    */
+-  async assertOpenForPosting(orgUnitId: string | null, businessDate: string): Promise<void> {
++  async assertOpenForPosting(orgUnitId: string | null, businessDate: string, manager?: EntityManager): Promise<void> {
+     const covers = (start: string, end: string) => start <= businessDate && end >= businessDate; // ISO date strings compare lexicographically
+ 
+-    const yearRepo = this.dataSource.getRepository(FiscalYear);
++    const yearRepo = (manager ?? this.dataSource).getRepository(FiscalYear);
+     let year: FiscalYear | undefined;
+     if (orgUnitId) {
+       const scoped = await yearRepo.find({ where: { orgUnitId } });
+@@ -683,18 +683,18 @@ export class FiscalPeriodService implements OnModuleInit {
+       throw new ConflictException(`No fiscal year covers business date "${businessDate}" — posting is not possible.`);
+     }
+ 
+-    const yearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id);
++    const yearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id, manager);
+     if (yearStatus !== 'active') {
+       throw new ConflictException(`Fiscal year "${year.code}" is "${yearStatus}", not active — posting is not possible.`);
+     }
+ 
+-    const periods = await this.dataSource.getRepository(FiscalPeriod).find({ where: { fiscalYearId: year.id } });
++    const periods = await (manager ?? this.dataSource).getRepository(FiscalPeriod).find({ where: { fiscalYearId: year.id } });
+     const period = periods.find((p) => covers(p.startDate, p.endDate));
+     if (!period) {
+       throw new ConflictException(`No fiscal period covers business date "${businessDate}" — posting is not possible.`);
+     }
+ 
+-    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id);
++    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id, manager);
+     if (status !== 'open' && status !== 'reopened') {
+       throw new ConflictException(`Fiscal period "${period.code}" is "${status}", not open — posting is not possible.`);
+     }
+diff --git a/backend/src/domains/accounting/application/gl-account.service.ts b/backend/src/domains/accounting/application/gl-account.service.ts
+index 0fb1906..a13ae69 100644
+--- a/backend/src/domains/accounting/application/gl-account.service.ts
++++ b/backend/src/domains/accounting/application/gl-account.service.ts
+@@ -710,8 +710,8 @@ export class GLAccountService {
+    * half) before every write, instead of re-deriving account eligibility.
+    * Every check fails closed — throws, never silently proceeds.
+    */
+-  async assertPostable(accountId: string, opts: AssertPostableOptions): Promise<GLAccount> {
+-    const account = await this.dataSource.getRepository(GLAccount).findOne({ where: { id: accountId } });
++  async assertPostable(accountId: string, opts: AssertPostableOptions, manager?: EntityManager): Promise<GLAccount> {
++    const account = await (manager ?? this.dataSource).getRepository(GLAccount).findOne({ where: { id: accountId } });
+     if (!account) throw new NotFoundException(`GL account "${accountId}" not found.`);
+     if (!account.isActive) throw new ConflictException(`GL account "${account.code}" is inactive — posting is not possible.`);
+     if (!account.isPostable) throw new ConflictException(`GL account "${account.code}" is a header/summary account — posting is not possible.`);
+@@ -721,7 +721,7 @@ export class GLAccountService {
+ 
+     // Currency mode
+     if (account.currencyMode === 'functional_only') {
+-      const base = await this.currencies.getBaseCurrency();
++      const base = await this.currencies.getBaseCurrency(manager);
+       if (!base) throw new ConflictException('No base/functional currency is configured — posting is not possible.');
+       if (opts.currencyCode !== base.code) {
+         throw new ConflictException(`GL account "${account.code}" posts only in the functional currency (${base.code}), not "${opts.currencyCode}".`);
+@@ -738,7 +738,7 @@ export class GLAccountService {
+     if (account.orgUnitId !== null) {
+       let compatible = account.orgUnitId === opts.orgUnitId;
+       if (!compatible && opts.orgUnitId) {
+-        const ancestors = await this.organization.getAncestorIds(opts.orgUnitId);
++        const ancestors = await this.organization.getAncestorIds(opts.orgUnitId, manager);
+         compatible = ancestors.includes(account.orgUnitId);
+       }
+       if (!compatible) {
+@@ -751,7 +751,7 @@ export class GLAccountService {
+     // This never touches reading already-persisted JournalLineDimension data on historical
+     // entries — nothing here executes on any read path, only on this write-time gate.
+     if (this.dimensionsEntitled()) {
+-      const rules = await this.dataSource.getRepository(GLAccountDimensionRule).find({ where: { accountId } });
++      const rules = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).find({ where: { accountId } });
+       const provided = new Map<string, string | null>((opts.dimensions ?? []).map((d) => [d.typeId, d.valueId]));
+       for (const rule of rules) {
+         const hasValue = provided.has(rule.dimensionTypeId) && provided.get(rule.dimensionTypeId) != null;
+@@ -764,7 +764,7 @@ export class GLAccountService {
+       }
+       for (const [typeId, valueId] of provided) {
+         if (valueId == null) continue;
+-        const value = await this.dataSource.getRepository(FinancialDimensionValue).findOne({ where: { id: valueId } });
++        const value = await (manager ?? this.dataSource).getRepository(FinancialDimensionValue).findOne({ where: { id: valueId } });
+         if (!value || value.dimensionTypeId !== typeId) {
+           throw new ConflictException(`Dimension value "${valueId}" is not a valid value of type "${typeId}".`);
+         }
+@@ -790,11 +790,12 @@ export class GLAccountService {
+   async resolveDimensions(
+     accountId: string,
+     provided: Array<{ typeId: string; valueId: string | null }>,
++    manager?: EntityManager,
+   ): Promise<Array<{ typeId: string; valueId: string }>> {
+     const explicit = provided.filter((d): d is { typeId: string; valueId: string } => d.valueId != null);
+     if (!this.dimensionsEntitled()) return explicit;
+ 
+-    const rules = await this.dataSource.getRepository(GLAccountDimensionRule).find({ where: { accountId } });
++    const rules = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).find({ where: { accountId } });
+     const resolved = [...explicit];
+     const providedTypeIds = new Set(explicit.map((d) => d.typeId));
+     for (const rule of rules) {
+@@ -806,8 +807,8 @@ export class GLAccountService {
+   }
+ 
+   /** F11 (ADR-044 D10) — used by the P&L implicit-policy check: an account's own explicit rule for a dimension type, whatever its mode, always takes precedence over the implicit policy. */
+-  async hasDimensionRule(accountId: string, dimensionTypeId: string): Promise<boolean> {
+-    const rule = await this.dataSource.getRepository(GLAccountDimensionRule).findOne({ where: { accountId, dimensionTypeId } });
++  async hasDimensionRule(accountId: string, dimensionTypeId: string, manager?: EntityManager): Promise<boolean> {
++    const rule = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).findOne({ where: { accountId, dimensionTypeId } });
+     return !!rule;
+   }
+ 
+diff --git a/backend/src/domains/accounting/application/journal-entry.service.ts b/backend/src/domains/accounting/application/journal-entry.service.ts
+index e2543a4..0065f93 100644
+--- a/backend/src/domains/accounting/application/journal-entry.service.ts
++++ b/backend/src/domains/accounting/application/journal-entry.service.ts
+@@ -114,8 +114,8 @@ export class JournalEntryService implements OnModuleInit {
+     to?: string;
+     accountId?: string;
+     status?: JournalEntryStatus;
+-  }): Promise<JournalEntryView[]> {
+-    const qb = this.dataSource.getRepository(JournalEntry).createQueryBuilder('e');
++  }, manager?: EntityManager): Promise<JournalEntryView[]> {
++    const qb = (manager ?? this.dataSource).getRepository(JournalEntry).createQueryBuilder('e');
+     if (filter?.sourceType) qb.andWhere('e."sourceType" = :st', { st: filter.sourceType });
+     if (filter?.from) qb.andWhere('e."businessDate" >= :from', { from: filter.from });
+     if (filter?.to) qb.andWhere('e."businessDate" <= :to', { to: filter.to });
+@@ -126,7 +126,7 @@ export class JournalEntryService implements OnModuleInit {
+       );
+     }
+     const entries = await qb.orderBy('e."createdAt"', 'DESC').getMany();
+-    const views = await Promise.all(entries.map((e) => this.toView(e)));
++    const views = await Promise.all(entries.map((e) => this.toView(e, manager)));
+     return filter?.status ? views.filter((v) => v.status === filter.status) : views;
+   }
+ 
+@@ -175,15 +175,16 @@ export class JournalEntryService implements OnModuleInit {
+     }
+     this.assertBackdatingAllowed(input.sourceType, input.businessDate);
+ 
+-    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> => (manager ? fn(manager) : this.dataSource.transaction(fn));
++    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> =>
++      manager?.queryRunner?.isTransactionActive ? fn(manager) : (manager ?? this.dataSource).transaction(fn);
+ 
+-    const created = await run(async (manager) => {
+-      const base = await this.currencies.getBaseCurrency();
++    const created = await run(async (txManager) => {
++      const base = await this.currencies.getBaseCurrency(txManager);
+       if (!base) throw new ConflictException('No base/functional currency is configured — a journal entry cannot be created.');
+-      const txnCurrency = await this.currencies.getCurrency(input.transactionCurrencyCode); // throws NotFound
++      const txnCurrency = await this.currencies.getCurrency(input.transactionCurrencyCode, txManager); // throws NotFound
+       if (!txnCurrency.isActive) throw new ConflictException(`Currency "${txnCurrency.code}" is inactive.`);
+ 
+-      const entryRepo = manager.getRepository(JournalEntry);
++      const entryRepo = txManager.getRepository(JournalEntry);
+       const entry = await entryRepo.save(
+         entryRepo.create({
+           entryNumber: null,
+@@ -200,10 +201,10 @@ export class JournalEntryService implements OnModuleInit {
+           postedBy: null,
+         }),
+       );
+-      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, entry.id, manager);
++      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, entry.id, txManager);
+ 
+-      await this.writeLines(manager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
+-      await this.refreshTransactionTotals(manager, entry.id);
++      await this.writeLines(txManager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
++      await this.refreshTransactionTotals(txManager, entry.id);
+ 
+       await this.audit.record(
+         {
+@@ -216,7 +217,7 @@ export class JournalEntryService implements OnModuleInit {
+           correlationId: null,
+           after: { sourceType: entry.sourceType, businessDate: entry.businessDate, lineCount: input.lines.length },
+         },
+-        manager,
++        txManager,
+       );
+       return entry;
+     });
+@@ -228,12 +229,12 @@ export class JournalEntryService implements OnModuleInit {
+   // Edit (DRAFT / VALIDATED -> lines replaced, VALIDATED drops to DRAFT)
+   // ---------------------------------------------------------------------------
+ 
+-  async updateEntry(id: string, input: UpdateJournalEntryInput, actorUserId: string): Promise<JournalEntryView> {
+-    return this.dataSource
+-      .transaction(async (manager) => {
+-        const entry = await this.lockEntry(manager, id);
++  async updateEntry(id: string, input: UpdateJournalEntryInput, actorUserId: string, manager?: EntityManager): Promise<JournalEntryView> {
++    return (manager ?? this.dataSource)
++      .transaction(async (txManager) => {
++        const entry = await this.lockEntry(txManager, id);
+         if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
+-        const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
++        const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
+         if (state !== 'DRAFT' && state !== 'VALIDATED') {
+           throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT or VALIDATED entry can be edited.`);
+         }
+@@ -241,7 +242,7 @@ export class JournalEntryService implements OnModuleInit {
+           throw new ConflictException(`A ${entry.sourceType} journal entry cannot be hand-edited.`);
+         }
+         if (state === 'VALIDATED') {
+-          await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'revise', actorUserId);
++          await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'revise', actorUserId, txManager);
+         }
+ 
+         if (input.businessDate !== undefined) {
+@@ -251,19 +252,19 @@ export class JournalEntryService implements OnModuleInit {
+         if (input.description !== undefined) entry.description = input.description ?? null;
+         if (input.orgUnitId !== undefined) entry.orgUnitId = input.orgUnitId ?? null;
+         if (input.transactionCurrencyCode !== undefined) {
+-          const c = await this.currencies.getCurrency(input.transactionCurrencyCode);
++          const c = await this.currencies.getCurrency(input.transactionCurrencyCode, txManager);
+           if (!c.isActive) throw new ConflictException(`Currency "${c.code}" is inactive.`);
+           entry.transactionCurrencyCode = input.transactionCurrencyCode;
+         }
+-        await manager.getRepository(JournalEntry).save(entry);
++        await txManager.getRepository(JournalEntry).save(entry);
+ 
+         if (input.lines !== undefined) {
+-          const base = await this.currencies.getBaseCurrency();
++          const base = await this.currencies.getBaseCurrency(txManager);
+           if (!base) throw new ConflictException('No base/functional currency is configured.');
+-          await this.deleteLines(manager, id);
+-          await this.writeLines(manager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
++          await this.deleteLines(txManager, id);
++          await this.writeLines(txManager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
+         }
+-        await this.refreshTransactionTotals(manager, id);
++        await this.refreshTransactionTotals(txManager, id);
+ 
+         await this.audit.record(
+           {
+@@ -275,31 +276,31 @@ export class JournalEntryService implements OnModuleInit {
+             result: 'success',
+             correlationId: null,
+           },
+-          manager,
++          txManager,
+         );
+         return id;
+       })
+-      .then((entryId) => this.getEntry(entryId));
++      .then((entryId) => this.getEntry(entryId, manager));
+   }
+ 
+   // ---------------------------------------------------------------------------
+   // Submit (DRAFT -> VALIDATED)
+   // ---------------------------------------------------------------------------
+ 
+-  async submitEntry(id: string, actorUserId: string): Promise<JournalEntryView> {
+-    await this.dataSource.transaction(async (manager) => {
+-      const entry = await this.lockEntry(manager, id);
++  async submitEntry(id: string, actorUserId: string, manager?: EntityManager): Promise<JournalEntryView> {
++    await (manager ?? this.dataSource).transaction(async (txManager) => {
++      const entry = await this.lockEntry(txManager, id);
+       if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
+-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
++      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
+       if (state !== 'DRAFT') throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT can be submitted.`);
+-      await this.assertStructurallyValid(manager, id);
+-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'submit', actorUserId);
++      await this.assertStructurallyValid(txManager, id);
++      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'submit', actorUserId, txManager);
+       await this.audit.record(
+         { actorUserId, organizationId: null, action: 'accounting.journal.submitted', resource: 'journal_entry', resourceId: id, result: 'success', correlationId: null },
+-        manager,
++        txManager,
+       );
+     });
+-    return this.getEntry(id);
++    return this.getEntry(id, manager);
+   }
+ 
+   // ---------------------------------------------------------------------------
+@@ -314,35 +315,36 @@ export class JournalEntryService implements OnModuleInit {
+    * numbering) below are untouched either way.
+    */
+   async postEntry(id: string, actorUserId: string, opts: { systemPosting?: boolean } = {}, manager?: EntityManager): Promise<JournalEntryView> {
+-    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> => (manager ? fn(manager) : this.dataSource.transaction(fn));
+-    await run(async (manager) => {
++    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> =>
++      manager?.queryRunner?.isTransactionActive ? fn(manager) : (manager ?? this.dataSource).transaction(fn);
++    await run(async (txManager) => {
+       // 1. load + state
+-      const entry = await this.lockEntry(manager, id);
++      const entry = await this.lockEntry(txManager, id);
+       if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
+-      // F08 (ADR-041 D18a): pass `manager` — when this runs inside a shared transaction whose
++      // F08 (ADR-041 D18a): pass `txManager` — when this runs inside a shared transaction whose
+       // `createEntry` call (same transaction) just started this entry's process instance, a
+-      // manager-less read here would not see that still-uncommitted row (read-committed isolation).
+-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, manager);
++      // txManager-less read here would not see that still-uncommitted row (read-committed isolation).
++      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
+       if (state !== 'DRAFT' && state !== 'VALIDATED') {
+         throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT or VALIDATED entry can be posted.`);
+       }
+ 
+       // 2. structural
+-      const lines = await this.assertStructurallyValid(manager, id);
++      const lines = await this.assertStructurallyValid(txManager, id);
+ 
+       // 3. fiscal period (F01 — CALL, don't copy)
+-      await this.fiscalPeriods.assertOpenForPosting(entry.orgUnitId, entry.businessDate);
++      await this.fiscalPeriods.assertOpenForPosting(entry.orgUnitId, entry.businessDate, txManager);
+ 
+       // 4/5. currency: resolve rate + (re)compute base amounts per line
+-      const base = await this.currencies.getBaseCurrency();
++      const base = await this.currencies.getBaseCurrency(txManager);
+       if (!base) throw new ConflictException('No base/functional currency is configured — posting is not possible.');
+-      const txnCurrency = await this.currencies.getCurrency(entry.transactionCurrencyCode);
++      const txnCurrency = await this.currencies.getCurrency(entry.transactionCurrencyCode, txManager);
+       if (!txnCurrency.isActive) throw new ConflictException(`Currency "${entry.transactionCurrencyCode}" is inactive.`);
+       if (entry.functionalCurrencyCode !== base.code) {
+         // base currency changed since draft creation — lock it in now (historical accuracy, F01 §3.7)
+         entry.functionalCurrencyCode = base.code;
+       }
+-      const rate = await this.resolveRate(entry.transactionCurrencyCode, base.code, entry.businessDate);
++      const rate = await this.resolveRate(entry.transactionCurrencyCode, base.code, entry.businessDate, txManager);
+       for (const line of lines) {
+         line.exchangeRateUsed = rate.rate;
+         line.exchangeRateDate = rate.rateDate;
+@@ -354,18 +356,18 @@ export class JournalEntryService implements OnModuleInit {
+           Number(line.creditTransaction) > 0
+             ? computeFunctionalAmount(line.creditTransaction, rate.rate, base.decimalPlaces, base.roundingMode)
+             : '0';
+-        await manager.getRepository(JournalLine).save(line);
++        await txManager.getRepository(JournalLine).save(line);
+       }
+ 
+       // 6. account eligibility (F02 — CALL, don't copy) + dimension resolve→validate→persist
+       // (F11, ADR-044 Mandatory Correction 1) + P&L implicit-dimension policy (ADR-044 D10)
+       for (const line of lines) {
+-        const persistedDims = await manager.getRepository(JournalLineDimension).find({ where: { journalLineId: line.id } });
++        const persistedDims = await txManager.getRepository(JournalLineDimension).find({ where: { journalLineId: line.id } });
+         const providedDims = persistedDims.map((d) => ({ typeId: d.dimensionTypeId, valueId: d.dimensionValueId as string | null }));
+ 
+         // resolve: every explicitly-persisted value, plus (for a `required` rule with no
+         // persisted value) the rule's own `defaultValueId`, if one is configured.
+-        const resolvedDims = await this.glAccounts.resolveDimensions(line.accountId, providedDims);
++        const resolvedDims = await this.glAccounts.resolveDimensions(line.accountId, providedDims, txManager);
+ 
+         // validate: GLAccountService.assertPostable's existing required/blocked/value-validity
+         // logic, UNCHANGED, now operating on the RESOLVED set — a required-with-default case is
+@@ -376,25 +378,25 @@ export class JournalEntryService implements OnModuleInit {
+           currencyCode: entry.transactionCurrencyCode,
+           dimensions: resolvedDims,
+           systemPosting: opts.systemPosting,
+-        });
++        }, txManager);
+ 
+         // persist: any resolved entry not already in JournalLineDimension (a default that was
+         // just applied) is inserted NOW, in this SAME transaction, strictly BEFORE this entry can
+         // ever reach POSTED — this is what makes the default a real row, not merely a validation
+         // side-effect (ADR-044 Mandatory Correction 1: acceptance ≠ persistence).
+         const persistedTypeIds = new Set(persistedDims.map((d) => d.dimensionTypeId));
+-        const dimRepo = manager.getRepository(JournalLineDimension);
++        const dimRepo = txManager.getRepository(JournalLineDimension);
+         for (const d of resolvedDims) {
+           if (!persistedTypeIds.has(d.typeId)) {
+             await dimRepo.save(dimRepo.create({ journalLineId: line.id, dimensionTypeId: d.typeId, dimensionValueId: d.valueId }));
+           }
+         }
+ 
+-        await this.enforcePlAccountDimensionPolicy(account, resolvedDims);
++        await this.enforcePlAccountDimensionPolicy(account, resolvedDims, txManager);
+       }
+ 
+       // 7. DOUBLE ENTRY — computed in SQL NUMERIC (ADR-035 D4)
+-      const [bal] = (await manager.query(
++      const [bal] = (await txManager.query(
+         `SELECT
+            (SUM("debitTransaction") = SUM("creditTransaction")) AS bal_txn,
+            (SUM("debitBase")        = SUM("creditBase"))        AS bal_base,
+@@ -412,8 +414,8 @@ export class JournalEntryService implements OnModuleInit {
+       // 8. idempotency: FINANCIAL_EVENT entries are single-processed at ingest via
+       //    FinancialEvent.UNIQUE(idempotencyKey); nothing further needed here.
+ 
+-      // 9. numbering — INSIDE this transaction (ADR-035 D8, NumberingService extended with `manager`)
+-      const entryNumber = await this.numbering.getNextNumber(JOURNAL_ENTRY_DOCUMENT_TYPE, manager);
++      // 9. numbering — INSIDE this transaction (ADR-035 D8, NumberingService extended with `txManager`)
++      const entryNumber = await this.numbering.getNextNumber(JOURNAL_ENTRY_DOCUMENT_TYPE, txManager);
+ 
+       // 10. commit the post
+       entry.entryNumber = entryNumber;
+@@ -424,8 +426,8 @@ export class JournalEntryService implements OnModuleInit {
+       entry.totalCreditTransaction = normaliseAmount(bal.tct, 4);
+       entry.totalDebitBase = normaliseAmount(bal.tdb, 4);
+       entry.totalCreditBase = normaliseAmount(bal.tcb, 4);
+-      await manager.getRepository(JournalEntry).save(entry);
+-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'post', actorUserId, manager);
++      await txManager.getRepository(JournalEntry).save(entry);
++      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'post', actorUserId, txManager);
+ 
+       // 11. audit + event — same transaction
+       await this.audit.record(
+@@ -439,9 +441,9 @@ export class JournalEntryService implements OnModuleInit {
+           correlationId: entry.financialEventId,
+           after: { entryNumber, totalBase: entry.totalDebitBase, sourceType: entry.sourceType },
+         },
+-        manager,
++        txManager,
+       );
+-      await this.events.publish(manager, 'accounting.journal.posted', {
++      await this.events.publish(txManager, 'accounting.journal.posted', {
+         journalEntryId: id,
+         entryNumber,
+         sourceType: entry.sourceType,
+@@ -462,21 +464,22 @@ export class JournalEntryService implements OnModuleInit {
+     id: string,
+     actorUserId: string,
+     opts: { businessDate?: string; description?: string } = {},
++    manager?: EntityManager,
+   ): Promise<{ original: JournalEntryView; reversal: JournalEntryView }> {
+-    const reversalId = await this.dataSource.transaction(async (manager) => {
+-      const original = await this.lockEntry(manager, id);
++    const reversalId = await (manager ?? this.dataSource).transaction(async (txManager) => {
++      const original = await this.lockEntry(txManager, id);
+       if (!original) throw new NotFoundException(`Journal entry "${id}" not found.`);
+-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
++      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
+       if (state !== 'POSTED') throw new ConflictException(`Only a POSTED journal entry can be reversed (this one is "${state}").`);
+       if (original.sourceType === 'REVERSAL') throw new ConflictException('A reversal entry cannot itself be reversed.');
+-      const existing = await manager.getRepository(JournalEntry).findOne({ where: { reversalOfEntryId: id } });
++      const existing = await txManager.getRepository(JournalEntry).findOne({ where: { reversalOfEntryId: id } });
+       if (existing) throw new ConflictException(`Journal entry "${original.entryNumber}" has already been reversed by "${existing.id}".`);
+ 
+-      const originalLines = await manager.getRepository(JournalLine).find({ where: { journalEntryId: id }, order: { lineNumber: 'ASC' } });
+-      const base = await this.currencies.getBaseCurrency();
++      const originalLines = await txManager.getRepository(JournalLine).find({ where: { journalEntryId: id }, order: { lineNumber: 'ASC' } });
++      const base = await this.currencies.getBaseCurrency(txManager);
+       if (!base) throw new ConflictException('No base/functional currency is configured.');
+ 
+-      const entryRepo = manager.getRepository(JournalEntry);
++      const entryRepo = txManager.getRepository(JournalEntry);
+       const reversal = await entryRepo.save(
+         entryRepo.create({
+           entryNumber: null,
+@@ -493,10 +496,10 @@ export class JournalEntryService implements OnModuleInit {
+           postedBy: null,
+         }),
+       );
+-      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, reversal.id);
++      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, reversal.id, txManager);
+ 
+-      const lineRepo = manager.getRepository(JournalLine);
+-      const dimRepo = manager.getRepository(JournalLineDimension);
++      const lineRepo = txManager.getRepository(JournalLine);
++      const dimRepo = txManager.getRepository(JournalLineDimension);
+       for (const src of originalLines) {
+         const swapped = await lineRepo.save(
+           lineRepo.create({
+@@ -519,7 +522,7 @@ export class JournalEntryService implements OnModuleInit {
+           await dimRepo.save(dimRepo.create({ journalLineId: swapped.id, dimensionTypeId: d.dimensionTypeId, dimensionValueId: d.dimensionValueId }));
+         }
+       }
+-      await this.refreshTransactionTotals(manager, reversal.id);
++      await this.refreshTransactionTotals(txManager, reversal.id);
+ 
+       await this.audit.record(
+         {
+@@ -532,24 +535,24 @@ export class JournalEntryService implements OnModuleInit {
+           correlationId: id,
+           after: { reversalOfEntryId: id },
+         },
+-        manager,
++        txManager,
+       );
+       return reversal.id;
+     });
+ 
+     // post the reversal through the FULL gate (system posting — a reversal may need to hit control accounts)
+-    await this.postEntry(reversalId, actorUserId, { systemPosting: true });
++    await this.postEntry(reversalId, actorUserId, { systemPosting: true }, manager);
+ 
+-    await this.dataSource.transaction(async (manager) => {
+-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'reverse', actorUserId);
++    await (manager ?? this.dataSource).transaction(async (txManager) => {
++      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'reverse', actorUserId, txManager);
+       await this.audit.record(
+         { actorUserId, organizationId: null, action: 'accounting.journal.reversed', resource: 'journal_entry', resourceId: id, result: 'success', correlationId: reversalId },
+-        manager,
++        txManager,
+       );
+-      await this.events.publish(manager, 'accounting.journal.reversed', { journalEntryId: id, reversalEntryId: reversalId, actorUserId });
++      await this.events.publish(txManager, 'accounting.journal.reversed', { journalEntryId: id, reversalEntryId: reversalId, actorUserId });
+     });
+ 
+-    return { original: await this.getEntry(id), reversal: await this.getEntry(reversalId) };
++    return { original: await this.getEntry(id, manager), reversal: await this.getEntry(reversalId, manager) };
+   }
+ 
+   // ---------------------------------------------------------------------------
+@@ -581,9 +584,9 @@ export class JournalEntryService implements OnModuleInit {
+     }
+   }
+ 
+-  private async resolveRate(txnCode: string, baseCode: string, businessDate: string): Promise<ResolvedRate> {
++  private async resolveRate(txnCode: string, baseCode: string, businessDate: string, manager?: EntityManager): Promise<ResolvedRate> {
+     if (txnCode === baseCode) return { rate: '1', rateDate: businessDate };
+-    const rate = await this.currencies.getRateOnOrBefore(txnCode, businessDate); // fails closed (F01)
++    const rate = await this.currencies.getRateOnOrBefore(txnCode, businessDate, manager); // fails closed (F01)
+     return { rate: rate.rate, rateDate: rate.rateDate };
+   }
+ 
+@@ -598,7 +601,7 @@ export class JournalEntryService implements OnModuleInit {
+     if (!Array.isArray(inputs) || inputs.length < 2) {
+       throw new BadRequestException('A journal entry must have at least 2 lines.');
+     }
+-    const rate = await this.resolveRate(entry.transactionCurrencyCode, baseCode, entry.businessDate);
++    const rate = await this.resolveRate(entry.transactionCurrencyCode, baseCode, entry.businessDate, manager);
+     const lineRepo = manager.getRepository(JournalLine);
+     const dimRepo = manager.getRepository(JournalLineDimension);
+ 
+@@ -695,7 +698,7 @@ export class JournalEntryService implements OnModuleInit {
+    * it). An account's own EXPLICIT `GLAccountDimensionRule` for the same dimension type — whatever
+    * its mode — always takes precedence; this only fills a genuine absence of configuration.
+    */
+-  private async enforcePlAccountDimensionPolicy(account: GLAccount, resolvedDims: Array<{ typeId: string; valueId: string }>): Promise<void> {
++  private async enforcePlAccountDimensionPolicy(account: GLAccount, resolvedDims: Array<{ typeId: string; valueId: string }>, manager?: EntityManager): Promise<void> {
+     if (!(this.entitlement?.isFeatureEntitled('accounting.financial_dimensions') ?? true)) return; // F11 D9 — feature off, no enforcement
+     const requireDimensionOnPlAccounts = this.config.get<boolean>('accounting.require_dimension_on_pl_accounts');
+     if (!requireDimensionOnPlAccounts) return;
+@@ -703,10 +706,10 @@ export class JournalEntryService implements OnModuleInit {
+ 
+     const typeCode = (this.config.get<string>('accounting.default_pl_dimension_type_code') ?? '').trim();
+     if (!typeCode) return; // policy "on" but names no type — nothing configured to enforce (disclosed, not a crash)
+-    const dimensionType = await this.dimensions.findTypeByCode(typeCode);
++    const dimensionType = await this.dimensions.findTypeByCode(typeCode, manager);
+     if (!dimensionType) return; // the configured code doesn't resolve — nothing to enforce (disclosed, not a crash)
+ 
+-    const hasExplicitRule = await this.glAccounts.hasDimensionRule(account.id, dimensionType.id);
++    const hasExplicitRule = await this.glAccounts.hasDimensionRule(account.id, dimensionType.id, manager);
+     if (hasExplicitRule) return; // an explicit rule (whatever its mode) always takes precedence over the implicit policy
+ 
+     const hasValue = resolvedDims.some((d) => d.typeId === dimensionType.id);
+diff --git a/backend/src/domains/accounting/interface/general-ledger.controller.ts b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+index 67469fa..8c0dd89 100644
+--- a/backend/src/domains/accounting/interface/general-ledger.controller.ts
++++ b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+@@ -1,4 +1,4 @@
+-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
++import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+ import { Throttle } from '@nestjs/throttler';
+ import type { Response } from 'express';
+ import { Type } from 'class-transformer';
+@@ -9,7 +9,8 @@ import { FinancialReportingService, SectionAccountRow } from '../application/fin
+ import { FinancialEventService } from '../application/financial-events/financial-event.service';
+ import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
+ import { JOURNAL_SOURCE_TYPES } from '../domain/journal';
+-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
++import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
++import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
+ import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
+ import { PermissionGuard } from '../../../foundation/permission/permission.guard';
+ import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+@@ -135,8 +136,14 @@ class ReverseJournalEntryDto {
+  * `@RequirePermission('accounting.<feature>.<action>')`, the exact guard
+  * stack F01/F02 use.
+  */
++/**
++ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized).
++ * `CompanyContextGuard` at class level — every route threads
++ * `req.companyContext.dataSource.manager` into the journal/ledger/reporting/
++ * financial-event services.
++ */
+ @Controller('accounting')
+-@UseGuards(JwtAuthGuard, RequireModuleGuard)
++@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+ @RequireModule('accounting')
+ export class GeneralLedgerController {
+   constructor(
+@@ -153,61 +160,79 @@ export class GeneralLedgerController {
+   @RequirePermission('accounting.journal.view', 'read-only')
+   @Get('journals')
+   async listJournals(
++    @Req() req: CompanyScopedRequest,
+     @Query('status') status?: string,
+     @Query('sourceType') sourceType?: string,
+     @Query('from') from?: string,
+     @Query('to') to?: string,
+     @Query('accountId') accountId?: string,
+   ) {
+-    return this.journals.listEntries({
+-      status: status as never,
+-      sourceType: sourceType as never,
+-      from,
+-      to,
+-      accountId,
+-    });
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.listEntries(
++      {
++        status: status as never,
++        sourceType: sourceType as never,
++        from,
++        to,
++        accountId,
++      },
++      manager,
++    );
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.view', 'read-only')
+   @Get('journals/:id')
+-  async getJournal(@Param('id', ParseUUIDPipe) id: string) {
+-    return this.journals.getEntry(id);
++  async getJournal(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.getEntry(id, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.create', 'editable')
+   @Post('journals')
+-  async createJournal(@Body() dto: CreateJournalEntryDto, @Req() req: AuthenticatedRequest) {
+-    return this.journals.createEntry(dto as never, req.user.id);
++  async createJournal(@Body() dto: CreateJournalEntryDto, @Req() req: CompanyScopedRequest) {
++    if (!req.user || !req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.createEntry(dto as never, req.user.id, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.edit', 'editable')
+   @Post('journals/:id')
+-  async updateJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateJournalEntryDto, @Req() req: AuthenticatedRequest) {
+-    return this.journals.updateEntry(id, dto as never, req.user.id);
++  async updateJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateJournalEntryDto, @Req() req: CompanyScopedRequest) {
++    if (!req.user || !req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.updateEntry(id, dto as never, req.user.id, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.submit', 'editable')
+   @Post('journals/:id/submit')
+-  async submitJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
+-    return this.journals.submitEntry(id, req.user.id);
++  async submitJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
++    if (!req.user || !req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.submitEntry(id, req.user.id, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.post', 'editable')
+   @Post('journals/:id/post')
+-  async postJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
+-    return this.journals.postEntry(id, req.user.id);
++  async postJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
++    if (!req.user || !req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.postEntry(id, req.user.id, {}, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.reverse', 'editable')
+   @Post('journals/:id/reverse')
+-  async reverseJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseJournalEntryDto, @Req() req: AuthenticatedRequest) {
+-    return this.journals.reverseEntry(id, req.user.id, dto);
++  async reverseJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseJournalEntryDto, @Req() req: CompanyScopedRequest) {
++    if (!req.user || !req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.journals.reverseEntry(id, req.user.id, dto, manager);
+   }
+ 
+   // ---- Ledger ----
+@@ -215,27 +240,34 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.ledger.view', 'read-only')
+   @Get('ledger')
+-  async getLedgerOverview(@Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+-    return this.ledger.getTrialBalance({ from, to, orgUnitId });
++  async getLedgerOverview(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.ledger.view', 'read-only')
+   @Get('trial-balance')
+-  async getTrialBalance(@Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+-    return this.ledger.getTrialBalance({ from, to, orgUnitId });
++  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.ledger.view', 'read-only')
+   @Get('ledger/:accountId')
+   async getAccountLedger(
++    @Req() req: CompanyScopedRequest,
+     @Param('accountId', ParseUUIDPipe) accountId: string,
+     @Query('from') from?: string,
+     @Query('to') to?: string,
+     @Query('orgUnitId') orgUnitId?: string,
+   ) {
+-    return this.ledger.getAccountLedger(accountId, { from, to, orgUnitId });
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.ledger.getAccountLedger(accountId, { from, to, orgUnitId }, manager);
+   }
+ 
+   // ---- Reports (F14, ADR-047) — a pure read model: these routes never create a Journal Entry, never
+@@ -245,16 +277,20 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.report.view', 'read-only')
+   @Get('reports/balance-sheet')
+-  async getBalanceSheet(@Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId?: string) {
+-    return this.reporting.getBalanceSheet({ asOfDate, orgUnitId });
++  async getBalanceSheet(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.reporting.getBalanceSheet({ asOfDate, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.report.export', 'read-only')
+   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — matches `ReportsController`'s own export throttle
+   @Get('reports/balance-sheet/export')
+-  async exportBalanceSheet(@Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId: string | undefined, @Res() res: Response) {
+-    const bs = await this.reporting.getBalanceSheet({ asOfDate, orgUnitId });
++  async exportBalanceSheet(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId: string | undefined, @Res() res: Response) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    const bs = await this.reporting.getBalanceSheet({ asOfDate, orgUnitId }, manager);
+     const rows = [
+       ...bs.assets.map((r) => this.reportRow('Assets', r)),
+       { section: 'Assets', code: '', name: 'Total Assets', balance: bs.assetsTotal },
+@@ -276,8 +312,10 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.report.view', 'read-only')
+   @Get('reports/profit-and-loss')
+-  async getProfitAndLoss(@Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
+-    return this.reporting.getProfitAndLoss({ from, to, orgUnitId });
++  async getProfitAndLoss(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.reporting.getProfitAndLoss({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+@@ -285,12 +323,15 @@ export class GeneralLedgerController {
+   @Throttle({ default: { limit: 20, ttl: 60_000 } })
+   @Get('reports/profit-and-loss/export')
+   async exportProfitAndLoss(
++    @Req() req: CompanyScopedRequest,
+     @Query('from') from: string,
+     @Query('to') to: string,
+     @Query('orgUnitId') orgUnitId: string | undefined,
+     @Res() res: Response,
+   ) {
+-    const pnl = await this.reporting.getProfitAndLoss({ from, to, orgUnitId });
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    const pnl = await this.reporting.getProfitAndLoss({ from, to, orgUnitId }, manager);
+     const rows = [
+       ...pnl.revenue.map((r) => this.reportRow('Revenue', r)),
+       { section: 'Revenue', code: '', name: 'Total Revenue', balance: pnl.revenueTotal },
+@@ -310,8 +351,10 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.report.view', 'read-only')
+   @Get('reports/cash-flow')
+-  async getCashFlowStatement(@Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
+-    return this.reporting.getCashFlowStatement({ from, to, orgUnitId });
++  async getCashFlowStatement(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+@@ -319,12 +362,15 @@ export class GeneralLedgerController {
+   @Throttle({ default: { limit: 20, ttl: 60_000 } })
+   @Get('reports/cash-flow/export')
+   async exportCashFlowStatement(
++    @Req() req: CompanyScopedRequest,
+     @Query('from') from: string,
+     @Query('to') to: string,
+     @Query('orgUnitId') orgUnitId: string | undefined,
+     @Res() res: Response,
+   ) {
+-    const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId });
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
+     const rows = [
+       { line: 'Beginning Cash', amount: cf.beginningCash },
+       { line: 'Operating — Net Income', amount: cf.operating.periodNetIncome },
+@@ -353,8 +399,10 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.report.view', 'read-only')
+   @Get('reports/tax-period-summary/:taxPeriodId')
+-  async getTaxPeriodSummary(@Param('taxPeriodId', ParseUUIDPipe) taxPeriodId: string) {
+-    return this.reporting.getTaxPeriodSummary(taxPeriodId);
++  async getTaxPeriodSummary(@Req() req: CompanyScopedRequest, @Param('taxPeriodId', ParseUUIDPipe) taxPeriodId: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.reporting.getTaxPeriodSummary(taxPeriodId, manager);
+   }
+ 
+   private reportRow(section: string, r: SectionAccountRow): { section: string; code: string; name: string; balance: string } {
+@@ -366,21 +414,27 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.financial_event.view', 'read-only')
+   @Get('financial-events')
+-  async listFinancialEvents(@Query('status') status?: string, @Query('sourceDomain') sourceDomain?: string, @Query('eventType') eventType?: string) {
+-    return this.financialEvents.listEvents({ status: status as never, sourceDomain, eventType });
++  async listFinancialEvents(@Req() req: CompanyScopedRequest, @Query('status') status?: string, @Query('sourceDomain') sourceDomain?: string, @Query('eventType') eventType?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.financialEvents.listEvents({ status: status as never, sourceDomain, eventType }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.financial_event.view', 'read-only')
+   @Get('financial-events/:id')
+-  async getFinancialEvent(@Param('id', ParseUUIDPipe) id: string) {
+-    return this.financialEvents.getEvent(id);
++  async getFinancialEvent(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.financialEvents.getEvent(id, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.journal.post', 'editable')
+   @Post('financial-events/:id/redrive')
+-  async redriveFinancialEvent(@Param('id', ParseUUIDPipe) id: string) {
+-    return this.financialEvents.redrive(id);
++  async redriveFinancialEvent(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const manager = req.companyContext.dataSource.manager;
++    return this.financialEvents.redrive(id, manager);
+   }
+ }
+diff --git a/backend/src/domains/accounting/interface/general-ledger.company-isolation.spec.ts b/backend/src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+--- /dev/null
++++ b/backend/src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+@@ -0,0 +1,307 @@
++import { randomUUID } from 'crypto';
++import { JournalEntryService } from '../application/journal-entry.service';
++import { LedgerService } from '../application/ledger.service';
++import { FinancialReportingService } from '../application/financial-reporting.service';
++import { FinancialEventService } from '../application/financial-events/financial-event.service';
++import { FinancialEventHandlerRegistry } from '../application/financial-events/handler-registry';
++import { GLAccountService } from '../application/gl-account.service';
++import { FiscalPeriodService } from '../application/fiscal-period.service';
++import { CurrencyService } from '../application/currency.service';
++import { FinancialDimensionService } from '../application/financial-dimension.service';
++import { JournalEntry } from '../infrastructure/journal-entry.entity';
++import { JOURNAL_ENTRY_DOCUMENT_TYPE } from '../application/journal-entry.service';
++import { AuditService } from '../../../foundation/audit/audit.service';
++import { NumberingService } from '../../../foundation/numbering/numbering.service';
++import { EventBusService } from '../../../foundation/events/event-bus.service';
++import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
++import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
++import {
++  setUpTwoCompanyHarness,
++  TwoCompanyHarness,
++  assertDataSourceNeverRequestedFor,
++} from '../../../foundation/testing/two-company-real-pg-harness';
++
++/**
++ * Area 21 Operational Company Scoping Retrofit (2026-10-04, CTO-authorized).
++ * Real-Postgres proof that `general-ledger.controller.ts`'s journal, ledger,
++ * reporting, and financial-event routes are genuinely Company-scoped — two
++ * real, separately provisioned Company databases, each with its own chart
++ * fragment, fiscal year/period, and a journal of a *different* amount
++ * (100.00 vs 250.00), so any cross-Company leak is immediately visible in a
++ * total.
++ *
++ * Every service is built with an inert ambient DataSource for the *business*
++ * path (the control-plane connection is passed only where a service needs an
++ * ambient fallback that no call below ever takes — every call supplies its
++ * own Company manager, which always wins). The Configuration Engine is a
++ * stub: it is installation-wide (Matrix §45, Gate D), not Company-scoped,
++ * and is not what this controller's routes exercise.
++ */
++describe('GeneralLedgerController Area 21 retrofit — real-Postgres Company isolation (2026-10-04)', () => {
++  jest.setTimeout(300_000);
++  let h: TwoCompanyHarness;
++  let journals: JournalEntryService;
++  let ledger: LedgerService;
++  let reporting: FinancialReportingService;
++  let financialEvents: FinancialEventService;
++  const actorUserId = randomUUID();
++
++  const today = new Date().toISOString().slice(0, 10);
++  const year = today.slice(0, 4);
++  const FIGURES = { A: '100.00', B: '250.00' } as const;
++  const EVENT_TYPE = 'isolation.gl.test';
++
++  const seeded: Record<'A' | 'B', { cashId: string; revenueId: string }> = {
++    A: { cashId: '', revenueId: '' },
++    B: { cashId: '', revenueId: '' },
++  };
++
++  async function seedCompanyData(companyId: string, key: 'A' | 'B') {
++    const ds = await h.connections.getDataSource(companyId);
++    await ds.query(`INSERT INTO "users" ("id","fullName","email") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [
++      actorUserId,
++      'Isolation Test Accountant',
++      `iso-gl-${companyId}@test.local`,
++    ]);
++
++    const cashId = randomUUID();
++    const revenueId = randomUUID();
++    await ds.query(
++      `INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive")
++       VALUES ($1,$2,$3,'asset','debit',true,true,true), ($4,$5,$6,'revenue','credit',true,true,true)`,
++      [cashId, `1000-${key}`, `${key} Cash`, revenueId, `4000-${key}`, `${key} Revenue`],
++    );
++    seeded[key] = { cashId, revenueId };
++
++    // A fiscal year + one period spanning it, both seeded directly in their
++    // open states (raw insert — same precedent as the payments spec seeding
++    // a migration-shaped process instance — so the posting gate has a real
++    // open period to find without re-deriving `createFiscalYear`'s approval flow).
++    const fiscalYearId = randomUUID();
++    const fiscalPeriodId = randomUUID();
++    await ds.query(`INSERT INTO "accounting_fiscal_years" ("id","code","startDate","endDate") VALUES ($1,$2,$3,$4)`, [
++      fiscalYearId,
++      `FY-${key}`,
++      `${year}-01-01`,
++      `${year}-12-31`,
++    ]);
++    await ds.query(`INSERT INTO "accounting_fiscal_periods" ("id","fiscalYearId","code","startDate","endDate") VALUES ($1,$2,$3,$4,$5)`, [
++      fiscalPeriodId,
++      fiscalYearId,
++      `P-${key}`,
++      `${year}-01-01`,
++      `${year}-12-31`,
++    ]);
++    await ds.query(
++      `INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'accounting_fiscal_year','FiscalYear',$2,'active'), ($3,'accounting_fiscal_period','FiscalPeriod',$4,'open')`,
++      [randomUUID(), fiscalYearId, randomUUID(), fiscalPeriodId],
++    );
++  }
++
++  const manualJournal = (key: 'A' | 'B') => ({
++    sourceType: 'MANUAL' as const,
++    businessDate: today,
++    description: `Isolation journal ${key}`,
++    transactionCurrencyCode: 'EGP',
++    lines: [
++      { accountId: seeded[key].cashId, debit: FIGURES[key] },
++      { accountId: seeded[key].revenueId, credit: FIGURES[key] },
++    ],
++  });
++
++  beforeAll(async () => {
++    h = await setUpTwoCompanyHarness({
++      namePrefix: 'general_ledger_isolation',
++      extraCompanyTags: ['sales', 'inventory', 'finance', 'procurement', 'accounting'],
++    });
++    await seedCompanyData(h.companyAId, 'A');
++    await seedCompanyData(h.companyBId, 'B');
++
++    const inert = {} as never;
++    const audit = new AuditService(h.controlPlane);
++    const numbering = new NumberingService(h.controlPlane);
++    const events = new EventBusService(inert);
++    const processEngine = new ProcessEngineService(h.controlPlane);
++    const config = { get: () => undefined } as unknown as ConfigurationEngineService;
++
++    // The JV numbering sequence is registered per Company (the module-init
++    // hook is installation-wide and is not what this controller exercises).
++    for (const id of [h.companyAId, h.companyBId]) {
++      const ds = await h.connections.getDataSource(id);
++      await numbering.registerDocumentType(JOURNAL_ENTRY_DOCUMENT_TYPE, 'JV', true, ds.manager);
++    }
++
++    const currencies = new CurrencyService(h.controlPlane, audit);
++    const glAccounts = new GLAccountService(h.controlPlane, audit, events, inert, inert, currencies);
++    const fiscalPeriods = new FiscalPeriodService(h.controlPlane, processEngine, audit, inert, events, inert, inert);
++    const dimensions = new FinancialDimensionService(h.controlPlane, audit);
++    journals = new JournalEntryService(h.controlPlane, glAccounts, fiscalPeriods, currencies, audit, events, numbering, processEngine, config, dimensions);
++    ledger = new LedgerService(h.controlPlane);
++    reporting = new FinancialReportingService(h.controlPlane);
++
++    const registry = new FinancialEventHandlerRegistry();
++    registry.register(EVENT_TYPE, async (event, ctx) => {
++      const key = String(event.payload.key) as 'A' | 'B';
++      const cash = await ctx.findAccountByCode(`1000-${key}`);
++      const revenue = await ctx.findAccountByCode(`4000-${key}`);
++      if (!cash || !revenue) return { kind: 'rejected', reason: 'accounts not found in this Company' };
++      return {
++        kind: 'draft',
++        draft: {
++          businessDate: event.businessDate,
++          description: 'Isolation financial event',
++          transactionCurrencyCode: ctx.baseCurrencyCode,
++          orgUnitId: null,
++          lines: [
++            { accountId: cash, debit: '40.00' },
++            { accountId: revenue, credit: '40.00' },
++          ],
++        },
++      };
++    });
++    financialEvents = new FinancialEventService(h.controlPlane, currencies, journals, audit, events, registry, config);
++  });
++
++  afterAll(async () => {
++    await h.teardown();
++  });
++
++  it("create → submit → post for Company A lands entirely in Company A's database (numbered, POSTED) — Company B sees nothing", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++
++    const draft = await journals.createEntry(manualJournal('A'), actorUserId, dsA.manager);
++    expect(draft.status).toBe('DRAFT');
++    expect((await journals.submitEntry(draft.id, actorUserId, dsA.manager)).status).toBe('VALIDATED');
++    const posted = await journals.postEntry(draft.id, actorUserId, {}, dsA.manager);
++    expect(posted.status).toBe('POSTED');
++    expect(posted.entryNumber).toMatch(/^JV/);
++    expect(posted.totalDebitBase).toBe('100.0000');
++
++    expect(await dsA.getRepository(JournalEntry).findOne({ where: { id: draft.id } })).toBeTruthy();
++    expect(await dsB.getRepository(JournalEntry).count()).toBe(0);
++    expect(await journals.listEntries({}, dsB.manager)).toEqual([]);
++  });
++
++  it("Company B posts its own, different journal (250.00) independently — Company A's list is unchanged", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++
++    const draft = await journals.createEntry(manualJournal('B'), actorUserId, dsB.manager);
++    const posted = await journals.postEntry(draft.id, actorUserId, {}, dsB.manager);
++    expect(posted.status).toBe('POSTED');
++    expect(posted.totalDebitBase).toBe('250.0000');
++
++    expect((await journals.listEntries({}, dsA.manager)).map((e) => e.totalDebitBase)).toEqual(['100.0000']);
++    expect((await journals.listEntries({}, dsB.manager)).map((e) => e.totalDebitBase)).toEqual(['250.0000']);
++  });
++
++  it("getEntry / updateEntry / submitEntry / postEntry / reverseEntry of Company A's journal id through Company B's manager are all rejected (A→B DENY)", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++    const [aEntry] = await journals.listEntries({}, dsA.manager);
++
++    await expect(journals.getEntry(aEntry.id, dsB.manager)).rejects.toThrow(/not found/i);
++    await expect(journals.updateEntry(aEntry.id, { description: 'hijack' }, actorUserId, dsB.manager)).rejects.toThrow(/not found/i);
++    await expect(journals.submitEntry(aEntry.id, actorUserId, dsB.manager)).rejects.toThrow(/not found/i);
++    await expect(journals.postEntry(aEntry.id, actorUserId, {}, dsB.manager)).rejects.toThrow(/not found/i);
++    await expect(journals.reverseEntry(aEntry.id, actorUserId, {}, dsB.manager)).rejects.toThrow(/not found/i);
++  });
++
++  it("B→A DENY — Company B's journal id through Company A's manager is rejected", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++    const [bEntry] = await journals.listEntries({}, dsB.manager);
++    await expect(journals.getEntry(bEntry.id, dsA.manager)).rejects.toThrow(/not found/i);
++    await expect(journals.reverseEntry(bEntry.id, actorUserId, {}, dsA.manager)).rejects.toThrow(/not found/i);
++  });
++
++  it("trial balance / account ledger are per-Company — A totals 100.00, B totals 250.00, never the sum; a foreign account id is rejected", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++
++    const tbA = await ledger.getTrialBalance({}, dsA.manager);
++    expect(tbA.totalDebitBase).toBe('100.0000');
++    expect(tbA.rows.map((r) => r.code).sort()).toEqual(['1000-A', '4000-A']);
++    const tbB = await ledger.getTrialBalance({}, dsB.manager);
++    expect(tbB.totalDebitBase).toBe('250.0000');
++    expect(tbB.rows.map((r) => r.code).sort()).toEqual(['1000-B', '4000-B']);
++
++    const lA = await ledger.getAccountLedger(seeded.A.cashId, {}, dsA.manager);
++    expect(lA.closingBalanceBase).toBe('100.0000');
++    expect(lA.lines).toHaveLength(1);
++    await expect(ledger.getAccountLedger(seeded.A.cashId, {}, dsB.manager)).rejects.toThrow(/not found/i);
++  });
++
++  it('balance sheet / P&L / cash-flow are per-Company (A 100.00 vs B 250.00) and a foreign tax period id is not found', async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++
++    expect((await reporting.getBalanceSheet({ asOfDate: today }, dsA.manager)).assetsTotal).toBe('100.0000');
++    expect((await reporting.getBalanceSheet({ asOfDate: today }, dsB.manager)).assetsTotal).toBe('250.0000');
++
++    expect((await reporting.getProfitAndLoss({ from: `${year}-01-01`, to: today }, dsA.manager)).revenueTotal).toBe('100.0000');
++    expect((await reporting.getProfitAndLoss({ from: `${year}-01-01`, to: today }, dsB.manager)).revenueTotal).toBe('250.0000');
++
++    await expect(reporting.getCashFlowStatement({ from: `${year}-01-01`, to: today }, dsA.manager)).resolves.toBeDefined();
++    await expect(reporting.getTaxPeriodSummary(randomUUID(), dsA.manager)).rejects.toThrow(/not found/i);
++  });
++
++  it('financial event ingest for Company A posts a journal in Company A only; list/get/redrive are per-Company', async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++
++    const result = await financialEvents.ingest(
++      EVENT_TYPE,
++      { key: 'A', sourceEntityId: randomUUID(), businessDate: today, currency: 'EGP' },
++      dsA.manager,
++    );
++    expect(result.status).toBe('POSTED');
++    expect(result.journalEntryId).toBeTruthy();
++
++    const eventsA = await financialEvents.listEvents({}, dsA.manager);
++    expect(eventsA).toHaveLength(1);
++    expect(await financialEvents.listEvents({}, dsB.manager)).toEqual([]);
++
++    // The event's journal is in A, not in B, and A's trial balance moved by exactly 40.00.
++    expect((await journals.getEntry(result.journalEntryId as string, dsA.manager)).status).toBe('POSTED');
++    await expect(journals.getEntry(result.journalEntryId as string, dsB.manager)).rejects.toThrow(/not found/i);
++    expect((await ledger.getTrialBalance({}, dsA.manager)).totalDebitBase).toBe('140.0000');
++    expect((await ledger.getTrialBalance({}, dsB.manager)).totalDebitBase).toBe('250.0000');
++
++    await expect(financialEvents.getEvent(eventsA[0].id, dsB.manager)).rejects.toThrow(/not found/i);
++    await expect(financialEvents.redrive(eventsA[0].id, dsB.manager)).rejects.toThrow(/not found/i);
++    expect((await financialEvents.redrive(eventsA[0].id, dsA.manager)).deduped).toBe(true);
++  });
++
++  it("reversing Company A's journal nets A's trial balance accordingly and leaves Company B untouched", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    const dsB = await h.connections.getDataSource(h.companyBId);
++    const original = (await journals.listEntries({ sourceType: 'MANUAL' }, dsA.manager))[0];
++
++    const { original: reversed, reversal } = await journals.reverseEntry(original.id, actorUserId, {}, dsA.manager);
++    expect(reversed.status).toBe('REVERSED');
++    expect(reversal.status).toBe('POSTED');
++    expect(reversal.reversalOfEntryId).toBe(original.id);
++
++    // Gross debit lines posted in A: 100 (original) + 100 (reversal) + 40 (event) = 240.00;
++    // net by account only the event's 40.00 remains.
++    const tbA = await ledger.getTrialBalance({}, dsA.manager);
++    expect(tbA.totalDebitBase).toBe('240.0000');
++    expect(tbA.rows.map((r) => r.debitBase).filter((v) => v !== '0.0000')).toEqual(['40.0000']);
++    expect((await ledger.getTrialBalance({}, dsB.manager)).totalDebitBase).toBe('250.0000');
++    expect((await journals.listEntries({}, dsB.manager)).filter((e) => e.sourceType === 'REVERSAL')).toEqual([]);
++  });
++
++  it("Test F — resolving Company A's general-ledger data never even requests Company B's DataSource", async () => {
++    const dsA = await h.connections.getDataSource(h.companyAId);
++    await assertDataSourceNeverRequestedFor(h.connections, h.companyBId, async () => {
++      await journals.listEntries({}, dsA.manager);
++      await ledger.getTrialBalance({}, dsA.manager);
++      await reporting.getBalanceSheet({ asOfDate: today }, dsA.manager);
++      await financialEvents.listEvents({}, dsA.manager);
++      const draft = await journals.createEntry(manualJournal('A'), actorUserId, dsA.manager);
++      await journals.postEntry(draft.id, actorUserId, {}, dsA.manager);
++    });
++  });
++});

@@ -1,6 +1,6 @@
 import { Body, Controller, ForbiddenException, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, IsUUID, MinLength } from 'class-validator';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -69,6 +69,11 @@ class LoginDto {
 class RefreshDto {
   @IsString()
   refreshToken!: string;
+}
+
+class SelectCompanyDto {
+  @IsUUID()
+  companyId!: string;
 }
 
 class ChangePasswordDto {
@@ -164,6 +169,23 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body() dto: RefreshDto) {
     const tokens = await this.auth.refresh(dto.refreshToken);
+    return { success: true, data: tokens };
+  }
+
+  /**
+   * Multi-Company Area 5 (2026-09-23, locked decision). Issues a fresh,
+   * Company-scoped token pair — the ONLY way a session acquires or
+   * switches its Company context. Requires an already-authenticated
+   * (base) token; `AuthService.selectCompany` itself validates
+   * `Membership` before issuing anything, but that is a one-time gate at
+   * mint time, not a substitute for `CompanyContextGuard`'s per-request
+   * re-check on every subsequent Company-scoped request.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('select-company')
+  async selectCompany(@Req() req: AuthenticatedRequest, @Body() dto: SelectCompanyDto) {
+    if (!req.user) throw new UnauthorizedException();
+    const tokens = await this.auth.selectCompany(req.user.id, dto.companyId);
     return { success: true, data: tokens };
   }
 

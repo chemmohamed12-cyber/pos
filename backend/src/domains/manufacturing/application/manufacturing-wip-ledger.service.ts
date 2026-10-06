@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ManufacturingWipContract, WipBalanceEntry } from '../../../foundation/module-registry/contracts/manufacturing-wip.contract';
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 
@@ -24,13 +24,15 @@ export class ManufacturingWipLedgerService implements ManufacturingWipContract {
     @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation: InventoryValuationContract,
   ) {}
 
-  async getAllWipBalances(): Promise<{ balances: WipBalanceEntry[]; total: string }> {
-    const workOrders: Array<{ id: string; workOrderNumber: string; wipWarehouseId: string }> = await this.dataSource.query(
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this, AND the internal `valuation.getValuedOnHandTotal` call it depends on, against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+  async getAllWipBalances(_asOfDate?: string, manager?: EntityManager): Promise<{ balances: WipBalanceEntry[]; total: string }> {
+    const runner = manager ?? this.dataSource;
+    const workOrders: Array<{ id: string; workOrderNumber: string; wipWarehouseId: string }> = await runner.query(
       `SELECT "id", "workOrderNumber", "wipWarehouseId" FROM "work_orders" WHERE "wipWarehouseId" IS NOT NULL ORDER BY "workOrderNumber"`,
     );
     if (workOrders.length === 0) return { balances: [], total: '0.0000' };
 
-    const valued = await this.valuation.getValuedOnHandTotal();
+    const valued = await this.valuation.getValuedOnHandTotal(undefined, manager);
     const valueByWarehouse = new Map(valued.map((v) => [v.warehouseId, v.totalValueBase]));
 
     const balances: WipBalanceEntry[] = workOrders.map((wo) => ({

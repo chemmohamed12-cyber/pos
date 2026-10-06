@@ -13,6 +13,8 @@ import { OrganizationModule } from '../../foundation/organization/organization.m
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { IdentityModule } from '../../foundation/identity/identity.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
  * ERP Foundation — P9 (ADR-029), expanded under ADR-059 (HR Phase 1).
@@ -37,6 +39,8 @@ import { IdentityModule } from '../../foundation/identity/identity.module';
     NumberingModule,
     ApprovalEngineModule,
     IdentityModule,
+    CompanyModule, // CompanyContextGuard (Area 21)
+    DatabaseRegistryModule,
   ],
   controllers: [HrController],
   providers: [HrService],

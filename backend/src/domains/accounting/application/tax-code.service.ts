@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { TaxCode, TaxCodeType } from '../infrastructure/tax-code.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
 
@@ -35,8 +35,12 @@ export class TaxCodeService {
     private readonly audit: AuditService,
   ) {}
 
-  async createTaxCode(input: CreateTaxCodeInput, actorUserId: string): Promise<TaxCode> {
-    const repo = this.dataSource.getRepository(TaxCode);
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async createTaxCode(input: CreateTaxCodeInput, actorUserId: string, manager?: EntityManager): Promise<TaxCode> {
+    const repo = this.em(manager).getRepository(TaxCode);
     const saved = await repo.save(
       repo.create({
         code: input.code,
@@ -60,16 +64,16 @@ export class TaxCodeService {
       result: 'success',
       correlationId: null,
       after: { code: saved.code, rate: saved.rate },
-    });
+    }, manager);
     return saved;
   }
 
-  async listTaxCodes(): Promise<TaxCode[]> {
-    return this.dataSource.getRepository(TaxCode).find({ order: { code: 'ASC' } });
+  async listTaxCodes(manager?: EntityManager): Promise<TaxCode[]> {
+    return this.em(manager).getRepository(TaxCode).find({ order: { code: 'ASC' } });
   }
 
-  async updateTaxCode(id: string, input: UpdateTaxCodeInput, actorUserId: string): Promise<TaxCode> {
-    const repo = this.dataSource.getRepository(TaxCode);
+  async updateTaxCode(id: string, input: UpdateTaxCodeInput, actorUserId: string, manager?: EntityManager): Promise<TaxCode> {
+    const repo = this.em(manager).getRepository(TaxCode);
     const taxCode = await repo.findOne({ where: { id } });
     if (!taxCode) throw new NotFoundException(`Tax code "${id}" not found.`);
     const before = { ...taxCode };
@@ -85,7 +89,7 @@ export class TaxCodeService {
       correlationId: null,
       before: { rate: before.rate, isInclusive: before.isInclusive, isActive: before.isActive },
       after: { rate: saved.rate, isInclusive: saved.isInclusive, isActive: saved.isActive },
-    });
+    }, manager);
     return saved;
   }
 }

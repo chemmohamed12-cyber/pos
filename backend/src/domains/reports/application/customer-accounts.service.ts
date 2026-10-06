@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { SALES_ORDERS_READ_CONTRACT, SalesOrdersReadContract, SALES_CUSTOMERS_CONTRACT, SalesCustomersContract, SALES_DEPOSIT_CONTRACT, SalesDepositContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import {
   LOGISTICS_RETURNS_CONTRACT,
@@ -95,11 +96,11 @@ export class CustomerAccountsService {
   ) {}
 
   /** The new primary statement (CTO directive §8) — Date/Type/Reference/SalesOrder/Invoice/Debit/Credit/RunningBalance/Status, every row traceable to its own source document, balance computed live from the Customer Ledger. */
-  async getCustomerAccountStatement(customerId: string, actorUserId: string): Promise<LedgerCustomerAccountStatement> {
-    const customer = await this.customers.getCustomer(customerId, actorUserId); // Scope-checked, same gate every customer-scoped read in this codebase uses
+  async getCustomerAccountStatement(customerId: string, actorUserId: string, manager?: EntityManager): Promise<LedgerCustomerAccountStatement> {
+    const customer = await this.customers.getCustomer(customerId, actorUserId, manager); // Scope-checked, same gate every customer-scoped read in this codebase uses
     const [entries, creditSummary] = await Promise.all([
-      this.customerLedger.listLedger(customerId),
-      this.customerLedger.getCreditSummary(customerId),
+      this.customerLedger.listLedger(customerId, undefined, manager),
+      this.customerLedger.getCreditSummary(customerId, manager),
     ]);
 
     let runningBalance = 0;
@@ -161,11 +162,11 @@ export class CustomerAccountsService {
    * multi-table SQL join that would cross the Cross-Domain Rule this whole
    * codebase otherwise holds to (DAII_DOMAIN_BOUNDARIES.md).
    */
-  async getCustomerAccountReconciliation(customerId: string, actorUserId: string): Promise<CustomerAccountStatement> {
-    const customer = await this.customers.getCustomer(customerId, actorUserId);
+  async getCustomerAccountReconciliation(customerId: string, actorUserId: string, manager?: EntityManager): Promise<CustomerAccountStatement> {
+    const customer = await this.customers.getCustomer(customerId, actorUserId, manager);
 
-    const orders = (await this.salesOrders.listOrders(actorUserId)).filter((o) => o.customerId === customerId);
-    const allReturns = await this.returns.listReturns();
+    const orders = (await this.salesOrders.listOrders(actorUserId, manager)).filter((o) => o.customerId === customerId);
+    const allReturns = await this.returns.listReturns(manager);
 
     const entries: CustomerAccountEntry[] = [];
     let totalOrdered = 0;
@@ -176,7 +177,7 @@ export class CustomerAccountsService {
 
     for (const order of orders) {
       totalOrdered += Number(order.totalAmount);
-      const status = await this.salesOrders.getOrderStatus(order.id);
+      const status = await this.salesOrders.getOrderStatus(order.id, manager);
       entries.push({
         type: 'sales_order',
         date: order.createdAt.toISOString(),
@@ -188,7 +189,7 @@ export class CustomerAccountsService {
         status,
       });
 
-      const orderDeposits = await this.deposits.listDepositsForOrder(order.id, actorUserId);
+      const orderDeposits = await this.deposits.listDepositsForOrder(order.id, actorUserId, manager);
       for (const dep of orderDeposits) {
         if (dep.status === 'approved') totalDeposited += Number(dep.amount);
         entries.push({
@@ -209,7 +210,7 @@ export class CustomerAccountsService {
         // now carries a real credit amount when one was issued
         // (value_credit/product_return dispositions) — an exchange still
         // shows null, since no credit is ever created for one.
-        const credit = await this.returns.getCreditForReturnRequest(ret.id);
+        const credit = await this.returns.getCreditForReturnRequest(ret.id, manager);
         entries.push({
           type: 'return',
           date: ret.createdAt.toISOString(),
@@ -222,9 +223,9 @@ export class CustomerAccountsService {
         });
       }
 
-      const fulfillmentOrder = await this.fulfillment.getFulfillmentOrderBySalesOrderId(order.id);
-      const shipment = fulfillmentOrder ? await this.shipments.getShipmentByFulfillmentOrderId(fulfillmentOrder.id) : null;
-      const collection = shipment ? await this.delivery.getCollectionForShipmentUnscoped(shipment.id) : null;
+      const fulfillmentOrder = await this.fulfillment.getFulfillmentOrderBySalesOrderId(order.id, manager);
+      const shipment = fulfillmentOrder ? await this.shipments.getShipmentByFulfillmentOrderId(fulfillmentOrder.id, manager) : null;
+      const collection = shipment ? await this.delivery.getCollectionForShipmentUnscoped(shipment.id, manager) : null;
       if (shipment && collection) {
         totalCollected += Number(collection.amount);
         if (collection.remittanceStatus === 'remitted') totalRemitted += Number(collection.amount);

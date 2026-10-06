@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 /**
  * One generic print view for every Reports tab (CTO directive §10:
@@ -28,24 +29,31 @@ export function ReportPrint() {
   const [columns, setColumns] = useState<ReportColumn[]>([]);
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const { cols } = REPORT_ENDPOINTS[type] ?? REPORT_ENDPOINTS.sales_orders;
   preload([TITLE_CODE[type] ?? 'nav.reports', ...cols.map((c) => c.code), ...STATUS_CODES]);
 
   useEffect(() => {
     (async () => {
-      const qs = new URLSearchParams(params);
-      qs.delete('type');
-      const query = qs.toString() ? `?${qs.toString()}` : '';
-      const { path, cols } = REPORT_ENDPOINTS[type] ?? REPORT_ENDPOINTS.sales_orders;
-      const data = await api.get<Array<Record<string, unknown>>>(`${path}${query}`);
-      setColumns(cols);
-      setRows(data);
-      setLoaded(true);
+      try {
+        const qs = new URLSearchParams(params);
+        qs.delete('type');
+        const query = qs.toString() ? `?${qs.toString()}` : '';
+        const { path, cols } = REPORT_ENDPOINTS[type] ?? REPORT_ENDPOINTS.sales_orders;
+        const data = await api.get<Array<Record<string, unknown>>>(`${path}${query}`);
+        setColumns(cols);
+        setRows(data);
+        setLoaded(true);
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, params.toString()]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!loaded) return <div style={{ padding: 24 }}>…</div>;
 
   const doc: BusinessDocument = {

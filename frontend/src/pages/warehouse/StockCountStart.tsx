@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Warehouse {
   id: string;
@@ -24,15 +25,26 @@ export function StockCountStart() {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['action.start_count', 'field.warehouse', 'field.product', 'field.sku', 'field.name', 'error.select_at_least_one_product']);
 
   useEffect(() => {
     (async () => {
-      const [wh, prod] = await Promise.all([api.get<Warehouse[]>('/inventory/warehouses'), api.get<Product[]>('/products/all')]);
-      setWarehouses(wh);
-      setProducts(prod);
-      if (wh[0]) setWarehouseId(wh[0].id);
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [wh, prod] = await Promise.all([api.get<Warehouse[]>('/inventory/warehouses'), api.get<Product[]>('/products/all')]);
+        setWarehouses(wh);
+        setProducts(prod);
+        if (wh[0]) setWarehouseId(wh[0].id);
+      } catch (err) {
+        // Foundation fix: this load had no error handling.
+        setLoadError(err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -55,6 +67,28 @@ export function StockCountStart() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('action.start_count')}</h1>
+        </div>
+        <div className="empty-state">Loading…</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('action.start_count')}</h1>
+        </div>
+        <ErrorState error={loadError} onRetry={() => window.location.reload()} />
+      </div>
+    );
   }
 
   return (

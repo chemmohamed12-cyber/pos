@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Product {
   sku: string;
@@ -19,16 +20,24 @@ interface ProductListData {
 export function ProductListPrint() {
   const { preload } = useLanguage();
   const [data, setData] = useState<ProductListData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.product_catalog_title']);
 
   useEffect(() => {
     (async () => {
-      const products = await api.get<Product[]>('/products');
-      setData({ products });
+      try {
+        const products = await api.get<Product[]>('/products');
+        setData({ products });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling — the
+        // page was stuck on "Loading…" forever on failure.
+        setLoadError(err);
+      }
     })();
   }, []);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { products } = data;
 

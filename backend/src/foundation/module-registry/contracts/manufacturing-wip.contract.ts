@@ -1,3 +1,5 @@
+import { EntityManager } from 'typeorm';
+
 /**
  * ADR-061 (Manufacturing) Month-End dependency, closed here per the
  * independent post-implementation review's finding: `InventoryReconciliationService`
@@ -37,8 +39,14 @@ export interface ManufacturingWipContract {
    * it reaches that state (ADR-061 §3's completion guard / §5's
    * zero-issued cancellation guard) — including it unconditionally is
    * therefore always safe and never needs a lifecycle-state filter here.
+   *
+   * Multi-Company Area 9 (2026-09-22) — `manager?` added so a
+   * company-scoped caller (`ClosingSnapshotService`) can run this against
+   * that Company's own connection instead of the ambient one. Falls back
+   * to the ambient connection when omitted, unchanged for every existing
+   * caller.
    */
-  getAllWipBalances(asOfDate?: string): Promise<{ balances: WipBalanceEntry[]; total: string }>;
+  getAllWipBalances(asOfDate?: string, manager?: EntityManager): Promise<{ balances: WipBalanceEntry[]; total: string }>;
 }
 
 export const MANUFACTURING_WIP_CONTRACT = Symbol('MANUFACTURING_WIP_CONTRACT');

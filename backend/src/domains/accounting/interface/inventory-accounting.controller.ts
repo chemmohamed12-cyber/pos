@@ -3,7 +3,8 @@ import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLengt
 import { InventoryReconciliationService } from '../application/inventory-reconciliation.service';
 import { InventoryAdjustmentService } from '../application/inventory-adjustment.service';
 import { INVENTORY_ADJUSTMENT_KINDS } from '../domain/inventory';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -77,7 +78,7 @@ class DecideDto {
  * ADR-024 verb — a run is a create; disclosed like F04/F05/F06).
  */
 @Controller('accounting/inventory')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('accounting')
 export class InventoryAccountingController {
   constructor(
@@ -88,42 +89,42 @@ export class InventoryAccountingController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.view', 'read-only')
   @Get('reconciliations')
-  async listReconciliations(@Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.reconciliation.listRuns({ status, from, to });
+  async listReconciliations(@Req() req: CompanyScopedRequest, @Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.reconciliation.listRuns({ status, from, to }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.view', 'read-only')
   @Get('reconciliations/:id')
-  async getReconciliation(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reconciliation.getRun(id);
+  async getReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.getRun(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.create', 'editable')
   @Post('reconciliations')
-  async runReconciliation(@Body() dto: RunInventoryReconciliationDto, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.reconcile(dto, req.user.id);
+  async runReconciliation(@Body() dto: RunInventoryReconciliationDto, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.reconcile(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.create', 'editable')
   @Post('reconciliations/:id/close')
-  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.closeRun(id, req.user.id);
+  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.closeRun(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.adjust', 'editable')
   @Post('adjustments')
-  async submitAdjustment(@Body() dto: SubmitInventoryAdjustmentDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.submitAdjustment(dto as never, req.user.id);
+  async submitAdjustment(@Body() dto: SubmitInventoryAdjustmentDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.submitAdjustment(dto as never, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.inventory.approve', 'editable')
   @Post('approvals/:id/decide')
-  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note);
+  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note, req.companyContext!.dataSource.manager);
   }
 }

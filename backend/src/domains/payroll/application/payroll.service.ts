@@ -1,6 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository, EntityManager } from 'typeorm';
 import { FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { PayrollPeriod } from '../infrastructure/payroll-period.entity';
 import { PayrollCompensation } from '../infrastructure/payroll-compensation.entity';
@@ -74,14 +73,6 @@ export interface CreateAdjustmentInput {
 @Injectable()
 export class PayrollService implements OnModuleInit {
   constructor(
-    @InjectRepository(PayrollPeriod) private readonly periods: Repository<PayrollPeriod>,
-    @InjectRepository(PayrollCompensation) private readonly compensations: Repository<PayrollCompensation>,
-    @InjectRepository(PayrollEarningLine) private readonly earningLines: Repository<PayrollEarningLine>,
-    @InjectRepository(PayrollRun) private readonly runs: Repository<PayrollRun>,
-    @InjectRepository(PayrollRunLine) private readonly runLines: Repository<PayrollRunLine>,
-    @InjectRepository(PayrollAttendanceDayClassification) private readonly dayClassifications: Repository<PayrollAttendanceDayClassification>,
-    @InjectRepository(PayrollDeductionLine) private readonly deductionLines: Repository<PayrollDeductionLine>,
-    @InjectRepository(PayrollAdjustment) private readonly adjustments: Repository<PayrollAdjustment>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
@@ -94,6 +85,32 @@ export class PayrollService implements OnModuleInit {
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  /** Area 21: repositories bound to the caller's connection — the Company's own when a Company `manager` is passed, the ambient one otherwise. */
+  private repos(manager?: EntityManager) {
+    const em = this.em(manager);
+    return {
+      periods: em.getRepository(PayrollPeriod),
+      compensations: em.getRepository(PayrollCompensation),
+      earningLines: em.getRepository(PayrollEarningLine),
+      runs: em.getRepository(PayrollRun),
+      runLines: em.getRepository(PayrollRunLine),
+      dayClassifications: em.getRepository(PayrollAttendanceDayClassification),
+      deductionLines: em.getRepository(PayrollDeductionLine),
+      adjustments: em.getRepository(PayrollAdjustment),
+    };
+  }
+
+  /** The payroll document types are registered at boot in the ambient DB; a Company's own database gets them on first use (idempotent). */
+  private async ensureNumbering(manager?: EntityManager): Promise<void> {
+    if (!manager) return;
+    await this.numbering.registerDocumentType('payroll_run', 'PR', true, manager);
+    await this.numbering.registerDocumentType('payroll_compensation', 'PC', true, manager);
+  }
+
   async onModuleInit(): Promise<void> {
     await this.numbering.registerDocumentType('payroll_run', 'PR', true).catch(() => undefined);
     await this.numbering.registerDocumentType('payroll_compensation', 'PC', true).catch(() => undefined);
@@ -103,9 +120,13 @@ export class PayrollService implements OnModuleInit {
       .upsertMatrixRule({ requestTypeCode: APPROVAL_TYPE, minApprovers: 1, requiredPermissionNode: APPROVER_NODE, valueThreshold: null, orgUnitId: null }, SYSTEM_ACTOR_ID)
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload as Record<string, unknown>);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
@@ -113,9 +134,9 @@ export class PayrollService implements OnModuleInit {
   // frequency assumption beyond what the caller supplies.
   // ---------------------------------------------------------------------------
 
-  async createPeriod(input: CreatePeriodInput, actorUserId: string): Promise<PayrollPeriod> {
+  async createPeriod(input: CreatePeriodInput, actorUserId: string, manager?: EntityManager): Promise<PayrollPeriod> {
     if (input.startDate > input.endDate) throw new ConflictException('startDate must be on or before endDate.');
-    const saved = await this.periods.save(this.periods.create({ code: input.code, startDate: input.startDate, endDate: input.endDate, status: 'open' }));
+    const saved = await this.repos(manager).periods.save(this.repos(manager).periods.create({ code: input.code, startDate: input.startDate, endDate: input.endDate, status: 'open' }));
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -125,12 +146,12 @@ export class PayrollService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { code: input.code, startDate: input.startDate, endDate: input.endDate },
-    });
+    }, manager);
     return saved;
   }
 
-  async listPeriods(): Promise<PayrollPeriod[]> {
-    return this.periods.find({ order: { startDate: 'DESC' } });
+  async listPeriods(manager?: EntityManager): Promise<PayrollPeriod[]> {
+    return this.repos(manager).periods.find({ order: { startDate: 'DESC' } });
   }
 
   // ---------------------------------------------------------------------------
@@ -138,14 +159,14 @@ export class PayrollService implements OnModuleInit {
   // prior period's history. Componentized Earnings, never a single figure.
   // ---------------------------------------------------------------------------
 
-  async createCompensation(input: CreateCompensationInput, actorUserId: string): Promise<PayrollCompensation> {
-    await this.hr.getEmployee(input.employeeId); // throws NotFoundException if the employee does not exist
+  async createCompensation(input: CreateCompensationInput, actorUserId: string, manager?: EntityManager): Promise<PayrollCompensation> {
+    await this.hr.getEmployee(input.employeeId, manager); // throws NotFoundException if the employee does not exist
     if (input.earnings.length === 0) throw new ConflictException('At least one earning line is required.');
     for (const line of input.earnings) {
       if (!(Number(line.amount) > 0)) throw new ConflictException(`Earning line "${line.componentCode}" must have a positive amount.`);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.em(manager).transaction(async (manager) => {
       const existingActive = await manager.getRepository(PayrollCompensation).findOne({ where: { employeeId: input.employeeId, effectiveTo: IsNull() } });
       const now = new Date();
       if (existingActive) {
@@ -178,14 +199,14 @@ export class PayrollService implements OnModuleInit {
     });
   }
 
-  async listCompensations(employeeId?: string): Promise<PayrollCompensation[]> {
-    return this.compensations.find({ where: employeeId ? { employeeId } : {}, order: { createdAt: 'DESC' } });
+  async listCompensations(employeeId?: string, manager?: EntityManager): Promise<PayrollCompensation[]> {
+    return this.repos(manager).compensations.find({ where: employeeId ? { employeeId } : {}, order: { createdAt: 'DESC' } });
   }
 
-  private async getActiveCompensationWithLines(employeeId: string): Promise<{ compensation: PayrollCompensation; lines: PayrollEarningLine[] } | null> {
-    const compensation = await this.compensations.findOne({ where: { employeeId, effectiveTo: IsNull() } });
+  private async getActiveCompensationWithLines(employeeId: string, manager?: EntityManager): Promise<{ compensation: PayrollCompensation; lines: PayrollEarningLine[] } | null> {
+    const compensation = await this.repos(manager).compensations.findOne({ where: { employeeId, effectiveTo: IsNull() } });
     if (!compensation) return null;
-    const lines = await this.earningLines.find({ where: { compensationId: compensation.id } });
+    const lines = await this.repos(manager).earningLines.find({ where: { compensationId: compensation.id } });
     return { compensation, lines };
   }
 
@@ -223,43 +244,44 @@ export class PayrollService implements OnModuleInit {
   // fact, rejected) once the run has left 'draft'.
   // ---------------------------------------------------------------------------
 
-  async calculate(payrollPeriodId: string, actorUserId: string): Promise<PayrollRun> {
-    const period = await this.periods.findOne({ where: { id: payrollPeriodId } });
+  async calculate(payrollPeriodId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
+    const period = await this.repos(manager).periods.findOne({ where: { id: payrollPeriodId } });
     if (!period) throw new NotFoundException(`Payroll period "${payrollPeriodId}" not found.`);
 
-    let run = await this.runs.findOne({ where: { payrollPeriodId } });
+    let run = await this.repos(manager).runs.findOne({ where: { payrollPeriodId } });
     let isNew = false;
     if (!run) {
-      const code = await this.numbering.getNextNumber('payroll_run');
-      run = await this.runs.save(this.runs.create({ code, payrollPeriodId, status: 'draft', createdByUserId: actorUserId }));
-      await this.processEngine.start(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id);
+      await this.ensureNumbering(manager);
+      const code = await this.numbering.getNextNumber('payroll_run', manager);
+      run = await this.repos(manager).runs.save(this.repos(manager).runs.create({ code, payrollPeriodId, status: 'draft', createdByUserId: actorUserId }));
+      await this.processEngine.start(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, manager);
       isNew = true;
     }
 
-    const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id);
+    const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, manager);
     if (state !== 'draft' && state !== 'calculated') {
       throw new ConflictException(`PayrollRun "${run.id}" is already "${state}" — recalculation requires a new run/period (ADR-070 §18, immutability).`);
     }
 
     // Idempotent recompute: discard prior draft lines for this still-uncommitted run (ADR-070 §12).
-    const existingLines = await this.runLines.find({ where: { payrollRunId: run.id } });
+    const existingLines = await this.repos(manager).runLines.find({ where: { payrollRunId: run.id } });
     for (const line of existingLines) {
-      await this.dayClassifications.delete({ payrollRunLineId: line.id });
-      await this.deductionLines.delete({ payrollRunLineId: line.id });
+      await this.repos(manager).dayClassifications.delete({ payrollRunLineId: line.id });
+      await this.repos(manager).deductionLines.delete({ payrollRunLineId: line.id });
     }
-    if (existingLines.length > 0) await this.runLines.delete({ payrollRunId: run.id });
+    if (existingLines.length > 0) await this.repos(manager).runLines.delete({ payrollRunId: run.id });
 
     // Population scope (ADR-067 §I): active, non-contractor employees only.
-    const employees = await this.hr.listEmployees();
+    const employees = await this.hr.listEmployees(manager);
     const eligible = employees.filter((e) => e.status === 'active' && e.employmentType !== 'contractor');
 
     // Attendance facts via the read contract ADR-070 §9 specifies — approved batches overlapping
     // this period's date range, never raw attendance data.
-    const batches = await this.attendance.listApprovalBatches();
+    const batches = await this.attendance.listApprovalBatches(manager);
     const relevantBatches = batches.filter((b) => b.status === 'approved' && b.periodStart <= period.endDate && b.periodEnd >= period.startDate);
     const daysByEmployee = new Map<string, Array<{ calendarDate: string; status: 'present' | 'absent' | 'on_leave' | 'missing_punch' }>>();
     for (const batch of relevantBatches) {
-      const days = await this.attendance.listApprovedDaysByBatch(batch.id);
+      const days = await this.attendance.listApprovedDaysByBatch(batch.id, manager);
       for (const day of days) {
         const arr = daysByEmployee.get(day.employeeId) ?? [];
         arr.push({ calendarDate: day.calendarDate, status: day.status });
@@ -269,7 +291,7 @@ export class PayrollService implements OnModuleInit {
 
     const now = new Date();
     for (const emp of eligible) {
-      const comp = await this.getActiveCompensationWithLines(emp.id);
+      const comp = await this.getActiveCompensationWithLines(emp.id, manager);
       if (!comp) continue; // no active compensation configured — genuinely out of this run's scope, not an error
 
       const grossPay = comp.lines.reduce((sum, l) => sum + Number(l.amount), 0);
@@ -282,13 +304,13 @@ export class PayrollService implements OnModuleInit {
       // it never recomputes commission from Sales/Customer data. An unapproved/draft/rejected
       // result is not readable through this contract at all (CommissionService.
       // listApprovedCommissionResults only ever returns batch-approved rows).
-      const approvedCommissionResults = await this.commission.listApprovedCommissionResults(emp.id, period.startDate, period.endDate);
+      const approvedCommissionResults = await this.commission.listApprovedCommissionResults(emp.id, period.startDate, period.endDate, manager);
       const commissionAmount = approvedCommissionResults.reduce((sum, r) => sum + Number(r.calculatedAmount), 0);
 
       const netPay = grossPay + commissionAmount - totalDeductions;
 
-      const line = await this.runLines.save(
-        this.runLines.create({
+      const line = await this.repos(manager).runLines.save(
+        this.repos(manager).runLines.create({
           payrollRunId: run.id,
           employeeId: emp.id,
           compensationSnapshot: { compensationId: comp.compensation.id, earnings: comp.lines.map((l) => ({ componentCode: l.componentCode, amount: l.amount })) },
@@ -304,16 +326,16 @@ export class PayrollService implements OnModuleInit {
       const employeeDays = (daysByEmployee.get(emp.id) ?? []).filter((d) => d.calendarDate >= period.startDate && d.calendarDate <= period.endDate);
       for (const day of employeeDays) {
         const { dayType, payImpact } = this.classifyDay(day.status);
-        await this.dayClassifications.save(
-          this.dayClassifications.create({ payrollRunLineId: line.id, calendarDate: day.calendarDate, attendanceStatus: day.status, dayType, payImpact }),
+        await this.repos(manager).dayClassifications.save(
+          this.repos(manager).dayClassifications.create({ payrollRunLineId: line.id, calendarDate: day.calendarDate, attendanceStatus: day.status, dayType, payImpact }),
         );
       }
     }
 
-    await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, isNew ? 'calculate' : 'recalculate', actorUserId);
+    await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, isNew ? 'calculate' : 'recalculate', actorUserId, manager);
     run.status = 'calculated';
     run.calculatedAt = now;
-    await this.runs.save(run);
+    await this.repos(manager).runs.save(run);
 
     await this.audit.record({
       actorUserId,
@@ -324,18 +346,18 @@ export class PayrollService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { payrollPeriodId, employeeCount: eligible.length },
-    });
+    }, manager);
     return run;
   }
 
-  async review(runId: string, actorUserId: string): Promise<PayrollRun> {
-    const run = await this.runs.findOne({ where: { id: runId } });
+  async review(runId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
+    const run = await this.repos(manager).runs.findOne({ where: { id: runId } });
     if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
-    await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, runId, 'review', actorUserId);
+    await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, runId, 'review', actorUserId, manager);
     run.status = 'reviewed';
     run.reviewedByUserId = actorUserId;
     run.reviewedAt = new Date();
-    const saved = await this.runs.save(run);
+    const saved = await this.repos(manager).runs.save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -344,18 +366,18 @@ export class PayrollService implements OnModuleInit {
       resourceId: runId,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
   /** FA-01 submission — the one human control point (ADR-070 §5/§10). `approved -> posted` is automatic afterward, not a second submission. */
-  async submitForApproval(runId: string, actorUserId: string): Promise<PayrollRun> {
-    const run = await this.runs.findOne({ where: { id: runId } });
+  async submitForApproval(runId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
+    const run = await this.repos(manager).runs.findOne({ where: { id: runId } });
     if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
-    const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, runId);
+    const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, runId, manager);
     if (state !== 'reviewed') throw new ConflictException(`PayrollRun must be "reviewed" before FA-01 submission (current: "${state}").`);
 
-    const lines = await this.runLines.find({ where: { payrollRunId: runId } });
+    const lines = await this.repos(manager).runLines.find({ where: { payrollRunId: runId } });
     const totalNet = lines.reduce((sum, l) => sum + Number(l.netPay), 0);
 
     const approvalRequest = await this.approvals.submit({
@@ -365,9 +387,9 @@ export class PayrollService implements OnModuleInit {
       requestedAction: 'approve',
       payload: { payrollRunId: runId, employeeCount: lines.length, totalNet: totalNet.toFixed(2) },
       makerUserId: actorUserId,
-    });
+    }, manager);
     run.approvalRequestId = approvalRequest.id;
-    const saved = await this.runs.save(run);
+    const saved = await this.repos(manager).runs.save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -376,23 +398,23 @@ export class PayrollService implements OnModuleInit {
       resourceId: runId,
       result: 'success',
       correlationId: approvalRequest.id,
-    });
+    }, manager);
     return saved;
   }
 
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide` (e.g. `AttendanceService.decide`). */
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
-  async listRuns(): Promise<PayrollRun[]> {
-    return this.runs.find({ order: { createdAt: 'DESC' } });
+  async listRuns(manager?: EntityManager): Promise<PayrollRun[]> {
+    return this.repos(manager).runs.find({ order: { createdAt: 'DESC' } });
   }
 
-  async getRun(id: string): Promise<{ run: PayrollRun; lines: PayrollRunLine[] }> {
-    const run = await this.runs.findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<{ run: PayrollRun; lines: PayrollRunLine[] }> {
+    const run = await this.repos(manager).runs.findOne({ where: { id } });
     if (!run) throw new NotFoundException(`PayrollRun "${id}" not found.`);
-    const lines = await this.runLines.find({ where: { payrollRunId: id } });
+    const lines = await this.repos(manager).runLines.find({ where: { payrollRunId: id } });
     return { run, lines };
   }
 
@@ -404,16 +426,16 @@ export class PayrollService implements OnModuleInit {
    * `posted`, or the outbox hasn't dispatched it yet) — the UI must show
    * this as its own distinct "not yet posted" state, never blank/error.
    */
-  async getFinancialEventStatus(runId: string): Promise<{ status: string; rejectionReason: string | null; journalEntryId: string | null } | null> {
-    const [event]: Array<{ status: string; rejectionReason: string | null; journalEntryId: string | null }> = await this.dataSource.query(
+  async getFinancialEventStatus(runId: string, manager?: EntityManager): Promise<{ status: string; rejectionReason: string | null; journalEntryId: string | null } | null> {
+    const [event]: Array<{ status: string; rejectionReason: string | null; journalEntryId: string | null }> = await this.em(manager).query(
       `SELECT status, "rejectionReason", "journalEntryId" FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
       [runId],
     );
     return event ?? null;
   }
 
-  async listDayClassifications(payrollRunLineId: string): Promise<PayrollAttendanceDayClassification[]> {
-    return this.dayClassifications.find({ where: { payrollRunLineId }, order: { calendarDate: 'ASC' } });
+  async listDayClassifications(payrollRunLineId: string, manager?: EntityManager): Promise<PayrollAttendanceDayClassification[]> {
+    return this.repos(manager).dayClassifications.find({ where: { payrollRunLineId }, order: { calendarDate: 'ASC' } });
   }
 
   // ---------------------------------------------------------------------------
@@ -422,18 +444,18 @@ export class PayrollService implements OnModuleInit {
   // Event; does NOT wait for or assume GL posting succeeded (ADR-070 §6/§13).
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const run = await this.runs.findOne({ where: { id: resourceId } });
+    const run = await this.repos(manager).runs.findOne({ where: { id: resourceId } });
     if (!run || run.status === 'posted') return; // not found, or already applied — benign no-op
 
-    const lines = await this.runLines.find({ where: { payrollRunId: run.id } });
+    const lines = await this.repos(manager).runLines.find({ where: { payrollRunId: run.id } });
     const totalGross = lines.reduce((sum, l) => sum + Number(l.grossPay), 0);
     const totalNet = lines.reduce((sum, l) => sum + Number(l.netPay), 0);
 
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, 'approve', SYSTEM_ACTOR_ID, manager);
       await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, 'post', SYSTEM_ACTOR_ID, manager);
 
@@ -464,7 +486,7 @@ export class PayrollService implements OnModuleInit {
     // above did not exist when that pass started, so it will not be drained by it. Same explicit
     // "the publisher dispatches" convention every other service in this codebase follows
     // (WorkOrderService, TreasuryService, InvoicesService, ...).
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
 
     await this.audit.record({
       actorUserId: SYSTEM_ACTOR_ID,
@@ -475,7 +497,7 @@ export class PayrollService implements OnModuleInit {
       result: 'success',
       correlationId: String(payload.approvalRequestId ?? ''),
       after: { totalGross: totalGross.toFixed(2), totalNet: totalNet.toFixed(2) },
-    });
+    }, manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -483,8 +505,8 @@ export class PayrollService implements OnModuleInit {
   // "PayrollRun posted + GL not confirmed" — never assumed benign.
   // ---------------------------------------------------------------------------
 
-  async listReconciliationGaps(): Promise<Array<{ payrollRunId: string; code: string }>> {
-    const rows: Array<{ id: string; code: string }> = await this.dataSource.query(`
+  async listReconciliationGaps(manager?: EntityManager): Promise<Array<{ payrollRunId: string; code: string }>> {
+    const rows: Array<{ id: string; code: string }> = await this.em(manager).query(`
       SELECT pr.id, pr.code FROM payroll_runs pr
       LEFT JOIN accounting_financial_events fe
         ON fe."sourceEntityType" = 'PayrollRun' AND fe."sourceEntityId"::text = pr.id::text
@@ -504,13 +526,13 @@ export class PayrollService implements OnModuleInit {
   // this check is mandatory).
   // ---------------------------------------------------------------------------
 
-  async disburse(runId: string, treasuryAccountId: string, actorUserId: string): Promise<PayrollRun> {
-    const run = await this.runs.findOne({ where: { id: runId } });
+  async disburse(runId: string, treasuryAccountId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
+    const run = await this.repos(manager).runs.findOne({ where: { id: runId } });
     if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
     if (run.status !== 'posted') throw new ConflictException(`PayrollRun "${runId}" must be "posted" before disbursement (current: "${run.status}").`);
     if (run.disbursedAt) throw new ConflictException(`PayrollRun "${runId}" has already been disbursed.`);
 
-    const [event]: Array<{ status: string }> = await this.dataSource.query(
+    const [event]: Array<{ status: string }> = await this.em(manager).query(
       `SELECT status FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
       [runId],
     );
@@ -520,9 +542,9 @@ export class PayrollService implements OnModuleInit {
       );
     }
 
-    const lines = await this.runLines.find({ where: { payrollRunId: runId } });
+    const lines = await this.repos(manager).runLines.find({ where: { payrollRunId: runId } });
 
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       // Advisory lock + a fresh re-check inside the transaction — the same idempotency/
       // duplicate-disbursement guard shape SupplierPaymentService.recordPayment already proves.
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:disburse:${runId}`]);
@@ -546,7 +568,7 @@ export class PayrollService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { treasuryAccountId, employeeCount: lines.length, totalNet: lines.reduce((s, l) => s + Number(l.netPay), 0).toFixed(2) },
-    });
+    }, manager);
     return run;
   }
 
@@ -556,12 +578,12 @@ export class PayrollService implements OnModuleInit {
   // may reference it.
   // ---------------------------------------------------------------------------
 
-  async createAdjustment(input: CreateAdjustmentInput, actorUserId: string): Promise<PayrollAdjustment> {
-    const line = await this.runLines.findOne({ where: { id: input.originalPayrollRunLineId } });
+  async createAdjustment(input: CreateAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<PayrollAdjustment> {
+    const line = await this.repos(manager).runLines.findOne({ where: { id: input.originalPayrollRunLineId } });
     if (!line) throw new NotFoundException(`PayrollRunLine "${input.originalPayrollRunLineId}" not found.`);
 
-    const saved = await this.adjustments.save(
-      this.adjustments.create({
+    const saved = await this.repos(manager).adjustments.save(
+      this.repos(manager).adjustments.create({
         originalPayrollRunLineId: input.originalPayrollRunLineId,
         kind: input.kind,
         reason: input.reason,
@@ -578,11 +600,11 @@ export class PayrollService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { originalPayrollRunLineId: input.originalPayrollRunLineId, kind: input.kind, amountDelta: input.amountDelta, reason: input.reason },
-    });
+    }, manager);
     return saved;
   }
 
-  async listAdjustments(originalPayrollRunLineId?: string): Promise<PayrollAdjustment[]> {
-    return this.adjustments.find({ where: originalPayrollRunLineId ? { originalPayrollRunLineId } : {}, order: { createdAt: 'DESC' } });
+  async listAdjustments(originalPayrollRunLineId?: string, manager?: EntityManager): Promise<PayrollAdjustment[]> {
+    return this.repos(manager).adjustments.find({ where: originalPayrollRunLineId ? { originalPayrollRunLineId } : {}, order: { createdAt: 'DESC' } });
   }
 }

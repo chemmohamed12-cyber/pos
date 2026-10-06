@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { TaxPeriod } from '../infrastructure/tax-period.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
 
@@ -22,11 +22,15 @@ export class TaxPeriodService {
     private readonly audit: AuditService,
   ) {}
 
-  async createTaxPeriod(input: CreateTaxPeriodInput, actorUserId: string): Promise<TaxPeriod> {
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async createTaxPeriod(input: CreateTaxPeriodInput, actorUserId: string, manager?: EntityManager): Promise<TaxPeriod> {
     if (input.endDate < input.startDate) {
       throw new BadRequestException('Tax period endDate must be on or after startDate.');
     }
-    const repo = this.dataSource.getRepository(TaxPeriod);
+    const repo = this.em(manager).getRepository(TaxPeriod);
     const saved = await repo.save(
       repo.create({
         code: input.code,
@@ -44,11 +48,11 @@ export class TaxPeriodService {
       result: 'success',
       correlationId: null,
       after: { code: saved.code, startDate: saved.startDate, endDate: saved.endDate },
-    });
+    }, manager);
     return saved;
   }
 
-  async listTaxPeriods(): Promise<TaxPeriod[]> {
-    return this.dataSource.getRepository(TaxPeriod).find({ order: { startDate: 'ASC' } });
+  async listTaxPeriods(manager?: EntityManager): Promise<TaxPeriod[]> {
+    return this.em(manager).getRepository(TaxPeriod).find({ order: { startDate: 'ASC' } });
   }
 }

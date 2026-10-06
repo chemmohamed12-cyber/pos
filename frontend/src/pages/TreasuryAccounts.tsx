@@ -19,7 +19,18 @@ interface TreasuryAccount {
   accountTypeName: string;
   status: 'active' | 'inactive';
   balance: string;
+  glAccountCode: string | null;
   createdAt: string;
+}
+/** Subset of `GET /accounting/accounts` the mapping picker needs. */
+interface GlAccountOption {
+  code: string;
+  name: string;
+  nameAr: string | null;
+  accountType: string;
+  isPostable: boolean;
+  isActive: boolean;
+  controlFunction: string | null;
 }
 
 const NEXT_STATUS: Record<'active' | 'inactive', 'active' | 'inactive'> = { active: 'inactive', inactive: 'active' };
@@ -44,8 +55,19 @@ export function TreasuryAccounts() {
   const [creatingType, setCreatingType] = useState(false);
   const [busyStatus, setBusyStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // D2: GL mapping editor. `glAccounts === null` = the chart could not be listed (e.g. accounting not entitled) — the editor then falls back to a free-text code; the backend remains the real gate.
+  const [glAccounts, setGlAccounts] = useState<GlAccountOption[] | null>(null);
+  const [mappingDraft, setMappingDraft] = useState<Record<string, string>>({});
+  const [busyMapping, setBusyMapping] = useState<string | null>(null);
 
   preload([
+    'field.gl_mapping',
+    'value.gl_mapping.mapped',
+    'value.gl_mapping.unmapped',
+    'panel.gl_mapping_required',
+    'action.save_gl_mapping',
+    'action.clear_gl_mapping',
+    'panel.select_gl_account',
     'nav.treasury_accounts',
     'nav.treasury_account_types',
     'field.account_code',
@@ -65,9 +87,15 @@ export function TreasuryAccounts() {
   ]);
 
   async function loadTypes() {
-    const t2 = await api.get<TreasuryAccountType[]>('/treasury/account-types');
-    setTypes(t2);
-    if (!accountTypeId && t2.length > 0) setAccountTypeId(t2[0].id);
+    try {
+      const t2 = await api.get<TreasuryAccountType[]>('/treasury/account-types');
+      setTypes(t2);
+      if (!accountTypeId && t2.length > 0) setAccountTypeId(t2[0].id);
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling — the account-type
+      // selector was silently left empty on failure.
+      setError(err instanceof ApiError ? err.message : 'Failed to load account types.');
+    }
   }
 
   async function loadAccounts() {
@@ -78,9 +106,35 @@ export function TreasuryAccounts() {
     }
   }
 
+  async function loadGlAccounts() {
+    try {
+      setGlAccounts(await api.get<GlAccountOption[]>('/accounting/accounts'));
+    } catch {
+      setGlAccounts(null);
+    }
+  }
+
+  async function saveMapping(a: TreasuryAccount, glAccountCode: string | null) {
+    setBusyMapping(a.id);
+    setError(null);
+    try {
+      await api.post(`/treasury/accounts/${a.id}/gl-mapping`, { glAccountCode });
+      setMappingDraft((d) => {
+        const { [a.id]: _removed, ...rest } = d;
+        return rest;
+      });
+      await loadAccounts();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save GL mapping.');
+    } finally {
+      setBusyMapping(null);
+    }
+  }
+
   useEffect(() => {
     loadTypes();
     loadAccounts();
+    loadGlAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -197,6 +251,7 @@ export function TreasuryAccounts() {
                     <th>{t('field.account_code')}</th>
                     <th>{t('field.account_name')}</th>
                     <th>{t('field.balance')}</th>
+                    <th>{t('field.gl_mapping')}</th>
                     <th>{t('field.status')}</th>
                     <th>{t('field.actions')}</th>
                   </tr>
@@ -207,6 +262,54 @@ export function TreasuryAccounts() {
                       <td>{a.code}</td>
                       <td>{a.name}</td>
                       <td style={{ fontWeight: 600 }}>{a.balance}</td>
+                      <td>
+                        {a.glAccountCode ? (
+                          <span>
+                            <strong>{t('value.gl_mapping.mapped')}</strong> → {a.glAccountCode}
+                          </span>
+                        ) : (
+                          <div>
+                            <strong>{t('value.gl_mapping.unmapped')}</strong>
+                            <div className="error-text" style={{ margin: 0 }}>
+                              {t('panel.gl_mapping_required')}
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                          {glAccounts ? (
+                            <select value={mappingDraft[a.id] ?? a.glAccountCode ?? ''} onChange={(e) => setMappingDraft((d) => ({ ...d, [a.id]: e.target.value }))}>
+                              <option value="">{t('panel.select_gl_account')}</option>
+                              {[...glAccounts]
+                                .filter((g) => g.isActive && g.isPostable)
+                                .sort((x, y) => Number(y.controlFunction === 'bank') - Number(x.controlFunction === 'bank') || x.code.localeCompare(y.code))
+                                .map((g) => (
+                                  <option key={g.code} value={g.code}>
+                                    {g.code} — {g.nameAr ?? g.name}
+                                    {g.controlFunction === 'bank' ? ' ★' : ''}
+                                  </option>
+                                ))}
+                            </select>
+                          ) : (
+                            <input
+                              value={mappingDraft[a.id] ?? a.glAccountCode ?? ''}
+                              onChange={(e) => setMappingDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+                              placeholder={t('field.gl_account_code')}
+                            />
+                          )}
+                          <button
+                            className="btn btn-secondary"
+                            disabled={busyMapping === a.id || !(mappingDraft[a.id] ?? '').trim() || (mappingDraft[a.id] ?? '') === (a.glAccountCode ?? '')}
+                            onClick={() => saveMapping(a, (mappingDraft[a.id] ?? '').trim())}
+                          >
+                            {t('action.save_gl_mapping')}
+                          </button>
+                          {a.glAccountCode && (
+                            <button className="btn btn-secondary" disabled={busyMapping === a.id} onClick={() => saveMapping(a, null)}>
+                              {t('action.clear_gl_mapping')}
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <StatusBadge code={`warehouse_status.${a.status}`} />
                       </td>

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 
 export interface LedgerQuery {
@@ -72,8 +72,8 @@ export class LedgerService {
       AND pi."currentState" IN ('POSTED', 'REVERSED')
   )`;
 
-  async getAccountLedger(accountId: string, query: LedgerQuery = {}): Promise<AccountLedger> {
-    const account = await this.dataSource.getRepository(GLAccount).findOne({ where: { id: accountId } });
+  async getAccountLedger(accountId: string, query: LedgerQuery = {}, manager?: EntityManager): Promise<AccountLedger> {
+    const account = await (manager ?? this.dataSource).getRepository(GLAccount).findOne({ where: { id: accountId } });
     if (!account) throw new NotFoundException(`GL account "${accountId}" not found.`);
 
     const scopeParams: unknown[] = [accountId];
@@ -87,7 +87,7 @@ export class LedgerService {
     let openingBalanceBase = '0.0000';
     if (query.from) {
       const p = [...scopeParams, query.from];
-      const [row] = (await this.dataSource.query(
+      const [row] = (await (manager ?? this.dataSource).query(
         `SELECT COALESCE(SUM(l."debitBase" - l."creditBase"), 0)::numeric(20,4) AS bal
          FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
          WHERE ${scope} AND e."businessDate" < $${p.length}`,
@@ -107,7 +107,7 @@ export class LedgerService {
       periodScope += ` AND e."businessDate" <= $${periodParams.length}`;
     }
 
-    const [totals] = (await this.dataSource.query(
+    const [totals] = (await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM(l."debitBase"),0)::numeric(20,4) AS d, COALESCE(SUM(l."creditBase"),0)::numeric(20,4) AS c
        FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
        WHERE ${periodScope}`,
@@ -115,7 +115,7 @@ export class LedgerService {
     )) as Array<{ d: string; c: string }>;
 
     const openParam = periodParams.length + 1;
-    const lines = (await this.dataSource.query(
+    const lines = (await (manager ?? this.dataSource).query(
       `SELECT l."journalEntryId", e."entryNumber", e."businessDate", e."postingDate", e."description",
               e."sourceType", l."description" AS "lineDescription", l."debitBase", l."creditBase",
               ($${openParam}::numeric(20,4) + SUM(l."debitBase" - l."creditBase") OVER (
@@ -128,7 +128,7 @@ export class LedgerService {
       [...periodParams, openingBalanceBase],
     )) as LedgerLineRow[];
 
-    const [closing] = (await this.dataSource.query(
+    const [closing] = (await (manager ?? this.dataSource).query(
       `SELECT ($1::numeric(20,4) + $2::numeric(20,4) - $3::numeric(20,4))::numeric(20,4) AS bal`,
       [openingBalanceBase, totals.d, totals.c],
     )) as Array<{ bal: string }>;
@@ -149,7 +149,9 @@ export class LedgerService {
     };
   }
 
-  async getTrialBalance(query: { orgUnitId?: string; from?: string; to?: string } = {}): Promise<TrialBalance> {
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+  async getTrialBalance(query: { orgUnitId?: string; from?: string; to?: string } = {}, manager?: EntityManager): Promise<TrialBalance> {
+    const runner = manager ?? this.dataSource;
     const params: unknown[] = [];
     const conds: string[] = [this.postedFilter];
     if (query.orgUnitId) {
@@ -166,7 +168,7 @@ export class LedgerService {
     }
     const where = conds.join(' AND ');
 
-    const rows = (await this.dataSource.query(
+    const rows = (await runner.query(
       `SELECT a.id AS "accountId", a.code, a.name, a."accountType", a."normalBalance",
               GREATEST(net, 0)::numeric(20,4)  AS "debitBase",
               GREATEST(-net, 0)::numeric(20,4) AS "creditBase"
@@ -183,7 +185,7 @@ export class LedgerService {
       params,
     )) as TrialBalanceRow[];
 
-    const [tot] = (await this.dataSource.query(
+    const [tot] = (await runner.query(
       `SELECT COALESCE(SUM(l."debitBase"),0)::numeric(20,4) AS d,
               COALESCE(SUM(l."creditBase"),0)::numeric(20,4) AS c,
               (COALESCE(SUM(l."debitBase"),0) = COALESCE(SUM(l."creditBase"),0)) AS balanced

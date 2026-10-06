@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument, DocumentLine } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface LedgerEntry {
   entryNumber: string;
@@ -29,30 +30,37 @@ export function CustomerStatementPrint() {
   const [searchParams] = useSearchParams();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<CustomerStatementData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.customer_statement_title', 'field.customer', 'field.date_from', 'field.date_to', 'field.running_balance']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const params = new URLSearchParams();
-      const entryType = searchParams.get('entryType');
-      const from = searchParams.get('from');
-      const to = searchParams.get('to');
-      if (entryType) params.set('entryType', entryType);
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
-      const qs = params.toString();
+      try {
+        const params = new URLSearchParams();
+        const entryType = searchParams.get('entryType');
+        const from = searchParams.get('from');
+        const to = searchParams.get('to');
+        if (entryType) params.set('entryType', entryType);
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        const qs = params.toString();
 
-      const [customer, entries] = await Promise.all([
-        api.get<Customer>(`/customers/${id}`),
-        api.get<LedgerEntry[]>(`/customer-finance/ledger/${id}${qs ? `?${qs}` : ''}`),
-      ]);
+        const [customer, entries] = await Promise.all([
+          api.get<Customer>(`/customers/${id}`),
+          api.get<LedgerEntry[]>(`/customer-finance/ledger/${id}${qs ? `?${qs}` : ''}`),
+        ]);
 
-      setData({ customer, entries });
+        setData({ customer, entries });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id, searchParams]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { customer, entries } = data;
   const from = searchParams.get('from');

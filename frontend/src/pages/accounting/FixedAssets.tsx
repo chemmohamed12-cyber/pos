@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { Link } from 'react-router-dom';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface GLAccount {
   id: string;
@@ -22,6 +24,15 @@ interface FixedAsset {
   accumulatedDepreciationAccountId: string;
   depreciationExpenseAccountId: string;
   acquisitionJournalEntryId: string | null;
+  /** D8 — pending_acquisition → active (after the acquisition JE is linked) → disposed. */
+  lifecycleState?: string;
+}
+interface AcquisitionCandidate {
+  journalEntryId: string;
+  entryNumber: string | null;
+  businessDate: string;
+  description: string | null;
+  debit: string;
 }
 interface DepreciationRun {
   id: string;
@@ -56,6 +67,15 @@ const PRELOAD = [
   'panel.no_fixed_assets_yet',
   'panel.no_depreciation_runs_yet',
   'panel.fixed_asset_disposal_submitted_approval',
+  'field.status',
+  'fixed_asset_lifecycle.state.pending_acquisition',
+  'fixed_asset_lifecycle.state.active',
+  'fixed_asset_lifecycle.state.disposed',
+  'action.link_acquisition',
+  'panel.link_acquisition_steps',
+  'panel.link_acquisition_none',
+  'field.acquisition_journal',
+  'action.open_journals',
 ];
 
 function emptyForm() {
@@ -86,6 +106,10 @@ export function FixedAssets() {
   const [disposeId, setDisposeId] = useState<string | null>(null);
   const [disposalDate, setDisposalDate] = useState(new Date().toISOString().slice(0, 10));
   const [proceeds, setProceeds] = useState('0');
+  // D8 — link the acquisition journal (manual JE + link architecture: the UI links an existing POSTED entry, it never creates one)
+  const [linkId, setLinkId] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<AcquisitionCandidate[] | null>(null);
+  const [candidateId, setCandidateId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -125,6 +149,37 @@ export function FixedAssets() {
       await loadAssets();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create fixed asset.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openLink(assetId: string) {
+    if (linkId === assetId) {
+      setLinkId(null);
+      return;
+    }
+    setLinkId(assetId);
+    setCandidates(null);
+    setCandidateId('');
+    try {
+      setCandidates(await api.get<AcquisitionCandidate[]>(`/accounting/fixed-assets/${assetId}/acquisition-candidates`));
+    } catch (err) {
+      setCandidates([]);
+      setError(err instanceof ApiError ? err.message : 'Failed to load acquisition journal candidates.');
+    }
+  }
+
+  async function submitLink(assetId: string) {
+    if (!candidateId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/accounting/fixed-assets/${assetId}/link-acquisition`, { journalEntryId: candidateId });
+      setLinkId(null);
+      await loadAssets();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to link the acquisition journal.');
     } finally {
       setBusy(false);
     }
@@ -263,6 +318,7 @@ export function FixedAssets() {
               <th>{t('field.cost')}</th>
               <th>{t('field.depreciation_method')}</th>
               <th>{t('field.cost_account')}</th>
+              <th>{t('field.status')}</th>
               <th>{t('field.actions')}</th>
             </tr>
           </thead>
@@ -275,7 +331,13 @@ export function FixedAssets() {
                 <td>{a.cost}</td>
                 <td>{t(`value.depreciation_method.${a.depreciationMethod}`)}</td>
                 <td>{accountLabel(a.costAccountId)}</td>
-                <td>
+                <td>{a.lifecycleState ? <StatusBadge code={`fixed_asset_lifecycle.state.${a.lifecycleState}`} /> : '—'}</td>
+                <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {a.lifecycleState === 'pending_acquisition' && (
+                    <button className="btn btn-primary" onClick={() => openLink(a.id)}>
+                      {t('action.link_acquisition')}
+                    </button>
+                  )}
                   <button className="btn btn-secondary" onClick={() => setDisposeId(disposeId === a.id ? null : a.id)}>
                     {t('action.dispose_asset')}
                   </button>
@@ -284,6 +346,38 @@ export function FixedAssets() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {linkId && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <p style={{ marginTop: 0 }}>{t('panel.link_acquisition_steps')}</p>
+          {candidates === null ? (
+            <div className="empty-state">Loading…</div>
+          ) : candidates.length === 0 ? (
+            <div className="empty-state">{t('panel.link_acquisition_none')}</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="form-field" style={{ marginBottom: 0, minWidth: 320 }}>
+                <label>{t('field.acquisition_journal')}</label>
+                <select value={candidateId} onChange={(e) => setCandidateId(e.target.value)}>
+                  <option value="">—</option>
+                  {candidates.map((c) => (
+                    <option key={c.journalEntryId} value={c.journalEntryId}>
+                      {c.entryNumber ?? c.journalEntryId.slice(0, 8)} · {c.businessDate} · {c.debit}
+                      {c.description ? ` · ${c.description}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button className="btn btn-primary" disabled={busy || !candidateId} onClick={() => submitLink(linkId)}>
+                {t('action.link_acquisition')}
+              </button>
+            </div>
+          )}
+          <div style={{ marginTop: 8 }}>
+            <Link to="/accounting/journals">{t('action.open_journals')}</Link>
+          </div>
+        </div>
       )}
 
       {disposeId && (

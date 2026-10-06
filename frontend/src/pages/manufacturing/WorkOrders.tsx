@@ -71,9 +71,15 @@ export function WorkOrders() {
 
   useEffect(() => {
     (async () => {
-      const [prod, wh] = await Promise.all([api.get<Product[]>('/products/all'), api.get<Warehouse[]>('/inventory/warehouses')]);
-      setProducts(prod);
-      setWarehouses(wh);
+      try {
+        const [prod, wh] = await Promise.all([api.get<Product[]>('/products/all'), api.get<Warehouse[]>('/inventory/warehouses')]);
+        setProducts(prod);
+        setWarehouses(wh);
+      } catch (err) {
+        // Foundation fix: no error handling — the create-work-order form's
+        // product/warehouse selects were silently left empty on failure.
+        setError(err instanceof ApiError ? err.message : 'Failed to load products/warehouses.');
+      }
     })();
     loadWorkOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps

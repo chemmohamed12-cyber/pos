@@ -19,3 +19,21 @@ export interface EntitlementResolver {
   /** The installation's active edition code (for the P2 config EDITION precedence layer). */
   activeEditionCode(): string | null;
 }
+
+/**
+ * Per-Company entitlement (Company Plans / Packages). Resolves what ONE
+ * Company may use: its assigned package, capped by the installation's own
+ * licence (`ENTITLEMENT_RESOLVER`). Bound by `PlansModule` (`@Global()`).
+ *
+ * Callers must pass a Company id that has ALREADY been validated against
+ * Membership (`request.companyContext.companyId`, set by `CompanyContextGuard`)
+ * — never a raw JWT claim, header or parameter. A Company with no package
+ * assigned resolves to the installation's own entitlement unchanged
+ * (backward compatible); once a package is assigned it is enforced.
+ */
+export const COMPANY_ENTITLEMENT_RESOLVER = 'daii:company-entitlement-resolver';
+
+export interface CompanyEntitlementResolver {
+  isModuleEntitled(companyId: string, moduleCode: string): Promise<boolean>;
+  isFeatureEntitled(companyId: string, featureCode: string): Promise<boolean>;
+}

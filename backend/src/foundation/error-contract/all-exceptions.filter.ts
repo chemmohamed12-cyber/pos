@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Response } from 'express';
+import { EntityNotFoundError } from 'typeorm';
 import { DaiiException } from './daii-exception';
 import { httpStatusToCode } from './http-status-to-code';
 import { RequestWithCorrelationId } from './correlation-id.middleware';
@@ -42,6 +43,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
       response.status(status).json({
         success: false,
         error: { code: httpStatusToCode(status), message, details: undefined },
+        meta: { correlationId },
+      });
+      return;
+    }
+
+    // Multi-Company UI acceptance (2026-10-05): a `findOneOrFail`/`findOneByOrFail`
+    // miss — notably a record id that belongs to ANOTHER Company's database,
+    // which the caller's own Company connection simply cannot see — surfaced as
+    // a 500. A missing or inaccessible record is a 404 and must look identical
+    // either way (non-disclosing), so it is mapped here once, centrally. The
+    // body is deliberately generic: TypeORM's own message names the entity and
+    // the lookup criteria, which must never reach the client.
+    if (exception instanceof EntityNotFoundError) {
+      this.logger.warn(`Entity not found (mapped to 404): ${exception.message.split('\n')[0]}`);
+      response.status(HttpStatus.NOT_FOUND).json({
+        success: false,
+        error: { code: httpStatusToCode(HttpStatus.NOT_FOUND), message: 'Not Found', details: undefined },
         meta: { correlationId },
       });
       return;

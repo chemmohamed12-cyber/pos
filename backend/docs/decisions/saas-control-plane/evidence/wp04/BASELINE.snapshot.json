@@ -1,0 +1,27 @@
+{
+  "id": "EB-WP04-20261005-155534",
+  "head": "4bb71f8391321b883b40145b2b5fb6c233048fa2",
+  "pin_hash": "ab186f9f0aa7507c9bead7e56508617f7abeb8e254d5263109d3b754247e001b",
+  "created": "2026-10-05 15:55:34",
+  "snapshot_dir": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\_execution-baselines\\EB-WP04-20261005-155534",
+  "scope": "backend/src/** + backend build/test config + dist (built inside the snapshot from the pinned src) + Architecture Baseline docs exactly as inventoried (saas-control-plane)",
+  "inventory_manifest_sha256": "505cc4947fca883e9c65918c1c60dfdf043e16a16b07bf5451c2a02620b23f92",
+  "inventory_entries": "580",
+  "files_in_snapshot": 3752,
+  "dist_files": 2677,
+  "build_ts_errors": 0,
+  "build_error_sample": [],
+  "counts": {
+    "OUT-OF-SCOPE (not in this baseline)": 128,
+    "OWNED / VERIFIED": 25,
+    "FOREIGN / NEEDS RE-PROOF": 191,
+    "HISTORICAL / ALREADY VERIFIED": 139,
+    "UNATTRIBUTED": 90,
+    "TEST-ONLY": 7
+  },
+  "included": 171,
+  "excluded": 281,
+  "unattributed_in_baseline": 0,
+  "area21_shared_included": 87,
+  "reproof_queue": 48
+}

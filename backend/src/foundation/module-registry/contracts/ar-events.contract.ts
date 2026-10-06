@@ -57,7 +57,28 @@ export interface PaymentRecordedEvent extends ArEventBase {
   amount: string;
   method: string;
   treasuryAccountId: string;
+  /** D2: the receiving Treasury account's own mapped GL account code — the ONLY source of the bank leg (no control-account fallback). */
+  glAccountCode: string;
   bankAccountCode?: string | null;
+}
+
+/**
+ * D4 (2026-10-05) — published by `returns` when a Sales Return / Shipment Return of an INVOICED sale completes: the
+ * Revenue reversal + AR credit (+ tax reversal) of the returned value. `netAmount`/`taxAmount`/`grossAmount` are derived
+ * from the ORIGINAL invoice value (never from a return price). The inventory/COGS leg travels on its own
+ * `inventory.movement.recorded` (`glKind='return_in'`) event.
+ */
+export interface SalesReturnCreditedEvent extends ArEventBase {
+  returnKind: 'sales_return' | 'shipment_return';
+  returnId: string;
+  returnNumber: string;
+  customerId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  salesOrderId: string;
+  netAmount: string;
+  taxAmount: string;
+  grossAmount: string;
 }
 
 export const AR_EVENT_TOPICS = {
@@ -65,6 +86,8 @@ export const AR_EVENT_TOPICS = {
   invoiceVoided: 'finance.invoice.voided',
   paymentRecorded: 'finance.payment.recorded',
   creditNoteIssued: 'finance.credit_note.issued',
+  /** D4 — a completed return of an invoiced sale (Dr Sales Returns [+ Dr tax] / Cr AR). */
+  salesReturnCredited: 'returns.sale_return.credited',
   debitNoteIssued: 'finance.debit_note.issued',
   arOpeningBalanceRecorded: 'finance.ar.opening_balance.recorded',
 } as const;

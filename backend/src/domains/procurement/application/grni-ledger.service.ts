@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { GrniBalanceEntry, GrniLedgerContract } from '../../../foundation/module-registry/contracts/grni-events.contract';
 
 /**
@@ -27,14 +27,15 @@ import { GrniBalanceEntry, GrniLedgerContract } from '../../../foundation/module
 export class GrniLedgerService implements GrniLedgerContract {
   constructor(private readonly dataSource: DataSource) {}
 
-  async getAllGrniBalances(): Promise<{ balances: GrniBalanceEntry[]; total: string }> {
+  /** `_asOfDate` is accepted for `GrniLedgerContract` parity — pre-existing behaviour: balances are always "as of now" (not changed by Area 21). */
+  async getAllGrniBalances(_asOfDate?: string, manager?: EntityManager): Promise<{ balances: GrniBalanceEntry[]; total: string }> {
     const rows: Array<{
       purchaseOrderId: string;
       supplierId: string;
       balance: string;
       goodsReceiptId: string | null;
       goodsReceiptNumber: string | null;
-    }> = await this.dataSource.query(
+    }> = await (manager ?? this.dataSource).query(
       `SELECT pol."purchaseOrderId",
               po."supplierId",
               ((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4) AS balance,
@@ -47,7 +48,7 @@ export class GrniLedgerService implements GrniLedgerContract {
        WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0
        ORDER BY pol."purchaseOrderId"`,
     );
-    const [tot] = await this.dataSource.query(
+    const [tot] = await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase"), 0)::numeric(20,4) AS total
        FROM "purchase_order_lines" pol
        WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0`,

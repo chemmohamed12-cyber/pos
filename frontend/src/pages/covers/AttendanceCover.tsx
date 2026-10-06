@@ -20,11 +20,15 @@ export function AttendanceCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [unmapped, batches] = await Promise.all([
-        api.get<AttendanceRawRecord[]>('/attendance/raw-records/unmapped'),
-        api.get<AttendanceApprovalBatch[]>('/attendance/approval-batches'),
-      ]);
-      setKpis({ unmapped: unmapped.length, pendingBatches: batches.filter((b) => b.status === 'submitted').length });
+      try {
+        const [unmapped, batches] = await Promise.all([
+          api.get<AttendanceRawRecord[]>('/attendance/raw-records/unmapped'),
+          api.get<AttendanceApprovalBatch[]>('/attendance/approval-batches'),
+        ]);
+        setKpis({ unmapped: unmapped.length, pendingBatches: batches.filter((b) => b.status === 'submitted').length });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

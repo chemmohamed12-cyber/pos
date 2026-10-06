@@ -44,4 +44,7 @@ export class SalesReturn {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+  /** D4 — the Customer Ledger credit(s) this document produced (AR reduction / customer credit; never a cash refund). Null ⇒ none. */
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  creditedGrossBase!: string | null;
 }

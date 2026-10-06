@@ -102,6 +102,10 @@ export class GLAccountService {
     @Optional() @Inject(ENTITLEMENT_RESOLVER) private readonly entitlement?: EntitlementResolver,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   /** F11 (ADR-044 D9) — dimension-rule enforcement (this file) and posting-time resolution are both gated by this. Never gates reading already-persisted `JournalLineDimension` data (no read path calls this). */
   private dimensionsEntitled(): boolean {
     return this.entitlement?.isFeatureEntitled(DIMENSIONS_FEATURE_CODE) ?? true;
@@ -125,7 +129,7 @@ export class GLAccountService {
     includeInactive?: boolean;
     parentAccountId?: string | null;
     search?: string;
-  }): Promise<GLAccount[]> {
+  }, manager?: EntityManager): Promise<GLAccount[]> {
     const base: FindOptionsWhere<GLAccount> = {};
     if (filter?.accountType) base.accountType = filter.accountType;
     if (filter?.postableOnly) base.isPostable = true;
@@ -141,23 +145,23 @@ export class GLAccountService {
           { ...base, nameAr: ILike(`%${search}%`) },
         ]
       : base;
-    return this.dataSource.getRepository(GLAccount).find({ where, order: { code: 'ASC' } });
+    return this.em(manager).getRepository(GLAccount).find({ where, order: { code: 'ASC' } });
   }
 
-  async getAccount(id: string): Promise<GLAccount> {
-    const account = await this.dataSource.getRepository(GLAccount).findOne({ where: { id } });
+  async getAccount(id: string, manager?: EntityManager): Promise<GLAccount> {
+    const account = await this.em(manager).getRepository(GLAccount).findOne({ where: { id } });
     if (!account) throw new NotFoundException(`GL account "${id}" not found.`);
     return account;
   }
 
-  async getAccountByCode(code: string): Promise<GLAccount> {
-    const account = await this.dataSource.getRepository(GLAccount).findOne({ where: { code } });
+  async getAccountByCode(code: string, manager?: EntityManager): Promise<GLAccount> {
+    const account = await this.em(manager).getRepository(GLAccount).findOne({ where: { code } });
     if (!account) throw new NotFoundException(`GL account with code "${code}" not found.`);
     return account;
   }
 
-  async getTree(includeInactive = false): Promise<GLAccountTreeNode[]> {
-    const all = await this.dataSource.getRepository(GLAccount).find({ order: { code: 'ASC' } });
+  async getTree(includeInactive = false, manager?: EntityManager): Promise<GLAccountTreeNode[]> {
+    const all = await this.em(manager).getRepository(GLAccount).find({ order: { code: 'ASC' } });
     const visible = includeInactive ? all : all.filter((a) => a.isActive);
     const byId = new Map<string, GLAccountTreeNode>(visible.map((a) => [a.id, { ...a, children: [] }]));
     const roots: GLAccountTreeNode[] = [];
@@ -181,21 +185,21 @@ export class GLAccountService {
     }));
   }
 
-  async getDimensionRules(accountId: string): Promise<GLAccountDimensionRule[]> {
-    await this.getAccount(accountId);
-    return this.dataSource.getRepository(GLAccountDimensionRule).find({ where: { accountId }, order: { createdAt: 'ASC' } });
+  async getDimensionRules(accountId: string, manager?: EntityManager): Promise<GLAccountDimensionRule[]> {
+    await this.getAccount(accountId, manager);
+    return this.em(manager).getRepository(GLAccountDimensionRule).find({ where: { accountId }, order: { createdAt: 'ASC' } });
   }
 
   // ---------------------------------------------------------------------------
   // Create
   // ---------------------------------------------------------------------------
 
-  async createAccount(input: CreateGLAccountInput, actorUserId: string): Promise<GLAccount> {
+  async createAccount(input: CreateGLAccountInput, actorUserId: string, manager?: EntityManager): Promise<GLAccount> {
     this.validateAccountType(input.accountType);
     const isContra = input.isContra ?? false;
     const currencyMode = input.currencyMode ?? 'functional_only';
     this.validateCurrencyMode(currencyMode);
-    const restrictCurrencyCode = await this.resolveRestrictCurrency(currencyMode, input.restrictCurrencyCode ?? null);
+    const restrictCurrencyCode = await this.resolveRestrictCurrency(currencyMode, input.restrictCurrencyCode ?? null, manager);
 
     const isPostable = input.isPostable ?? true;
     const controlFunction = input.controlFunction ?? null;
@@ -203,14 +207,14 @@ export class GLAccountService {
       if (!isControlFunction(controlFunction)) throw new BadRequestException(`Unknown control function "${controlFunction}".`);
       if (!isPostable) throw new ConflictException('A control account must be postable — it cannot be a header/summary account.');
     }
-    if (input.orgUnitId) await this.assertOrgUnitExists(input.orgUnitId);
+    if (input.orgUnitId) await this.assertOrgUnitExists(input.orgUnitId, manager);
 
-    const gate = await this.limits.check(MAX_GL_ACCOUNTS_LIMIT_KEY);
+    const gate = await this.limits.check(MAX_GL_ACCOUNTS_LIMIT_KEY, 1, manager);
     if (!gate.allowed) {
       throw new ConflictException(`GL account limit reached (${gate.max}) — cannot create another account.`);
     }
 
-    const account = await this.dataSource.transaction(async (manager) => {
+    const account = await this.em(manager).transaction(async (manager) => {
       if (input.parentAccountId) {
         const parent = await this.lockAccount(manager, input.parentAccountId);
         if (!parent) throw new NotFoundException(`Parent GL account "${input.parentAccountId}" not found.`);
@@ -306,8 +310,8 @@ export class GLAccountService {
   // Update
   // ---------------------------------------------------------------------------
 
-  async updateAccount(id: string, input: UpdateGLAccountInput, actorUserId: string): Promise<GLAccount> {
-    return this.dataSource.transaction(async (manager) => {
+  async updateAccount(id: string, input: UpdateGLAccountInput, actorUserId: string, manager?: EntityManager): Promise<GLAccount> {
+    return this.em(manager).transaction(async (manager) => {
       const account = await this.lockAccount(manager, id);
       if (!account) throw new NotFoundException(`GL account "${id}" not found.`);
       const before = { ...account };
@@ -337,8 +341,7 @@ export class GLAccountService {
         this.validateCurrencyMode(nextMode);
         const nextRestrict = await this.resolveRestrictCurrency(
           nextMode,
-          input.restrictCurrencyCode !== undefined ? input.restrictCurrencyCode : account.restrictCurrencyCode,
-        );
+          input.restrictCurrencyCode !== undefined ? input.restrictCurrencyCode : account.restrictCurrencyCode, manager);
         if (nextMode !== account.currencyMode) changedFields.push('currencyMode');
         if (nextRestrict !== account.restrictCurrencyCode) changedFields.push('restrictCurrencyCode');
         account.currencyMode = nextMode;
@@ -419,8 +422,8 @@ export class GLAccountService {
   // Reparent
   // ---------------------------------------------------------------------------
 
-  async reparentAccount(id: string, newParentId: string | null, actorUserId: string): Promise<GLAccount> {
-    return this.dataSource.transaction(async (manager) => {
+  async reparentAccount(id: string, newParentId: string | null, actorUserId: string, manager?: EntityManager): Promise<GLAccount> {
+    return this.em(manager).transaction(async (manager) => {
       const account = await this.lockAccount(manager, id);
       if (!account) throw new NotFoundException(`GL account "${id}" not found.`);
       if (newParentId === id) throw new ConflictException('An account cannot be its own parent.');
@@ -487,8 +490,8 @@ export class GLAccountService {
   // Control function
   // ---------------------------------------------------------------------------
 
-  async assignControlFunction(id: string, controlFunction: ControlFunction | null, actorUserId: string): Promise<GLAccount> {
-    return this.dataSource.transaction(async (manager) => {
+  async assignControlFunction(id: string, controlFunction: ControlFunction | null, actorUserId: string, manager?: EntityManager): Promise<GLAccount> {
+    return this.em(manager).transaction(async (manager) => {
       const account = await this.lockAccount(manager, id);
       if (!account) throw new NotFoundException(`GL account "${id}" not found.`);
       const before = { controlFunction: account.controlFunction, allowManualJournal: account.allowManualJournal };
@@ -541,8 +544,8 @@ export class GLAccountService {
   // Dimension rules (replace-set)
   // ---------------------------------------------------------------------------
 
-  async replaceDimensionRules(accountId: string, rules: DimensionRuleInput[], actorUserId: string): Promise<GLAccountDimensionRule[]> {
-    const account = await this.getAccount(accountId);
+  async replaceDimensionRules(accountId: string, rules: DimensionRuleInput[], actorUserId: string, manager?: EntityManager): Promise<GLAccountDimensionRule[]> {
+    const account = await this.getAccount(accountId, manager);
 
     const seenTypes = new Set<string>();
     for (const rule of rules) {
@@ -552,7 +555,7 @@ export class GLAccountService {
       }
       seenTypes.add(rule.dimensionTypeId);
 
-      const type = await this.dataSource.getRepository(FinancialDimensionType).findOne({ where: { id: rule.dimensionTypeId } });
+      const type = await this.em(manager).getRepository(FinancialDimensionType).findOne({ where: { id: rule.dimensionTypeId } });
       if (!type) throw new NotFoundException(`Financial dimension type "${rule.dimensionTypeId}" not found.`);
       if (!type.isActive) throw new ConflictException(`Financial dimension type "${type.code}" is inactive.`);
 
@@ -560,7 +563,7 @@ export class GLAccountService {
         if (rule.mode === 'blocked') {
           throw new ConflictException(`A "blocked" dimension rule cannot carry a default value (type "${type.code}").`);
         }
-        const value = await this.dataSource.getRepository(FinancialDimensionValue).findOne({ where: { id: rule.defaultValueId } });
+        const value = await this.em(manager).getRepository(FinancialDimensionValue).findOne({ where: { id: rule.defaultValueId } });
         if (!value) throw new NotFoundException(`Financial dimension value "${rule.defaultValueId}" not found.`);
         if (value.dimensionTypeId !== rule.dimensionTypeId) {
           throw new ConflictException(`Dimension value "${value.code}" does not belong to type "${type.code}".`);
@@ -569,7 +572,7 @@ export class GLAccountService {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(GLAccountDimensionRule);
       await repo.delete({ accountId });
       const created: GLAccountDimensionRule[] = [];
@@ -612,11 +615,11 @@ export class GLAccountService {
   // Template import (opt-in, empty chart only)
   // ---------------------------------------------------------------------------
 
-  async importTemplate(templateKey: string, dryRun: boolean, actorUserId: string): Promise<ImportTemplateResult> {
+  async importTemplate(templateKey: string, dryRun: boolean, actorUserId: string, manager?: EntityManager): Promise<ImportTemplateResult> {
     const template = getAccountTemplate(templateKey);
     if (!template) throw new NotFoundException(`Account template "${templateKey}" not found.`);
 
-    const existing = await this.dataSource.getRepository(GLAccount).count();
+    const existing = await this.em(manager).getRepository(GLAccount).count();
     if (existing > 0) {
       throw new ConflictException(`The chart of accounts is not empty (${existing} account(s)) — a template can only be imported into an empty chart.`);
     }
@@ -634,14 +637,14 @@ export class GLAccountService {
       return { templateKey, dryRun: true, created: 0, accounts: plan };
     }
 
-    const gate = await this.limits.check(MAX_GL_ACCOUNTS_LIMIT_KEY, template.accounts.length);
+    const gate = await this.limits.check(MAX_GL_ACCOUNTS_LIMIT_KEY, template.accounts.length, manager);
     if (!gate.allowed) {
       throw new ConflictException(
         `Importing "${templateKey}" needs ${template.accounts.length} accounts but the GL account limit (${gate.max}) would be exceeded.`,
       );
     }
 
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(GLAccount);
       const codeToId = new Map<string, string>();
       for (const entry of template.accounts) {
@@ -710,8 +713,8 @@ export class GLAccountService {
    * half) before every write, instead of re-deriving account eligibility.
    * Every check fails closed — throws, never silently proceeds.
    */
-  async assertPostable(accountId: string, opts: AssertPostableOptions): Promise<GLAccount> {
-    const account = await this.dataSource.getRepository(GLAccount).findOne({ where: { id: accountId } });
+  async assertPostable(accountId: string, opts: AssertPostableOptions, manager?: EntityManager): Promise<GLAccount> {
+    const account = await (manager ?? this.dataSource).getRepository(GLAccount).findOne({ where: { id: accountId } });
     if (!account) throw new NotFoundException(`GL account "${accountId}" not found.`);
     if (!account.isActive) throw new ConflictException(`GL account "${account.code}" is inactive — posting is not possible.`);
     if (!account.isPostable) throw new ConflictException(`GL account "${account.code}" is a header/summary account — posting is not possible.`);
@@ -721,7 +724,7 @@ export class GLAccountService {
 
     // Currency mode
     if (account.currencyMode === 'functional_only') {
-      const base = await this.currencies.getBaseCurrency();
+      const base = await this.currencies.getBaseCurrency(manager);
       if (!base) throw new ConflictException('No base/functional currency is configured — posting is not possible.');
       if (opts.currencyCode !== base.code) {
         throw new ConflictException(`GL account "${account.code}" posts only in the functional currency (${base.code}), not "${opts.currencyCode}".`);
@@ -738,7 +741,7 @@ export class GLAccountService {
     if (account.orgUnitId !== null) {
       let compatible = account.orgUnitId === opts.orgUnitId;
       if (!compatible && opts.orgUnitId) {
-        const ancestors = await this.organization.getAncestorIds(opts.orgUnitId);
+        const ancestors = await this.organization.getAncestorIds(opts.orgUnitId, manager);
         compatible = ancestors.includes(account.orgUnitId);
       }
       if (!compatible) {
@@ -751,7 +754,7 @@ export class GLAccountService {
     // This never touches reading already-persisted JournalLineDimension data on historical
     // entries — nothing here executes on any read path, only on this write-time gate.
     if (this.dimensionsEntitled()) {
-      const rules = await this.dataSource.getRepository(GLAccountDimensionRule).find({ where: { accountId } });
+      const rules = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).find({ where: { accountId } });
       const provided = new Map<string, string | null>((opts.dimensions ?? []).map((d) => [d.typeId, d.valueId]));
       for (const rule of rules) {
         const hasValue = provided.has(rule.dimensionTypeId) && provided.get(rule.dimensionTypeId) != null;
@@ -764,7 +767,7 @@ export class GLAccountService {
       }
       for (const [typeId, valueId] of provided) {
         if (valueId == null) continue;
-        const value = await this.dataSource.getRepository(FinancialDimensionValue).findOne({ where: { id: valueId } });
+        const value = await (manager ?? this.dataSource).getRepository(FinancialDimensionValue).findOne({ where: { id: valueId } });
         if (!value || value.dimensionTypeId !== typeId) {
           throw new ConflictException(`Dimension value "${valueId}" is not a valid value of type "${typeId}".`);
         }
@@ -790,11 +793,12 @@ export class GLAccountService {
   async resolveDimensions(
     accountId: string,
     provided: Array<{ typeId: string; valueId: string | null }>,
+    manager?: EntityManager,
   ): Promise<Array<{ typeId: string; valueId: string }>> {
     const explicit = provided.filter((d): d is { typeId: string; valueId: string } => d.valueId != null);
     if (!this.dimensionsEntitled()) return explicit;
 
-    const rules = await this.dataSource.getRepository(GLAccountDimensionRule).find({ where: { accountId } });
+    const rules = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).find({ where: { accountId } });
     const resolved = [...explicit];
     const providedTypeIds = new Set(explicit.map((d) => d.typeId));
     for (const rule of rules) {
@@ -806,8 +810,8 @@ export class GLAccountService {
   }
 
   /** F11 (ADR-044 D10) — used by the P&L implicit-policy check: an account's own explicit rule for a dimension type, whatever its mode, always takes precedence over the implicit policy. */
-  async hasDimensionRule(accountId: string, dimensionTypeId: string): Promise<boolean> {
-    const rule = await this.dataSource.getRepository(GLAccountDimensionRule).findOne({ where: { accountId, dimensionTypeId } });
+  async hasDimensionRule(accountId: string, dimensionTypeId: string, manager?: EntityManager): Promise<boolean> {
+    const rule = await (manager ?? this.dataSource).getRepository(GLAccountDimensionRule).findOne({ where: { accountId, dimensionTypeId } });
     return !!rule;
   }
 
@@ -823,10 +827,10 @@ export class GLAccountService {
     if (!isAccountCurrencyMode(mode)) throw new BadRequestException(`Unknown currency mode "${mode}".`);
   }
 
-  private async resolveRestrictCurrency(mode: AccountCurrencyMode, restrictCurrencyCode: string | null): Promise<string | null> {
+  private async resolveRestrictCurrency(mode: AccountCurrencyMode, restrictCurrencyCode: string | null, manager?: EntityManager): Promise<string | null> {
     if (mode === 'single_foreign') {
       if (!restrictCurrencyCode) throw new BadRequestException('currencyMode "single_foreign" requires a restrictCurrencyCode.');
-      const currency = await this.currencies.getCurrency(restrictCurrencyCode); // throws NotFound if unknown
+      const currency = await this.currencies.getCurrency(restrictCurrencyCode, manager); // throws NotFound if unknown
       if (currency.isBaseCurrency) {
         throw new ConflictException('restrictCurrencyCode cannot be the base/functional currency — use currencyMode "functional_only".');
       }
@@ -835,8 +839,8 @@ export class GLAccountService {
     return null;
   }
 
-  private async assertOrgUnitExists(orgUnitId: string): Promise<void> {
-    const units = await this.organization.listUnits();
+  private async assertOrgUnitExists(orgUnitId: string, manager?: EntityManager): Promise<void> {
+    const units = await this.organization.listUnits(manager);
     if (!units.some((u) => u.id === orgUnitId)) {
       throw new NotFoundException(`Org unit "${orgUnitId}" not found.`);
     }

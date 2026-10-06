@@ -1,0 +1,16 @@
+> backend/docs/decisions/saas-control-plane/BATCH-A-DECISION-PACKAGE-DP8-DP4-DP1.md
+< backend/docs/decisions/saas-control-plane/DP-9-SUSPENSION-ENFORCEMENT-DECISION-RECORD.md
+< backend/docs/decisions/saas-control-plane/SAAS-CONTROL-PLANE-DECISION-DOSSIER-DP1-DP8.md
+< backend/src/domains/accounting/application/financial-events/inventory-costing-handler.service.ts
+< backend/src/domains/inventory-warehouse/application/inventory.service.ts
+> backend/src/foundation/approval-engine/approval-engine.company-isolation.spec.ts
+< backend/src/foundation/approval-engine/approval-engine.module.ts
+< backend/src/foundation/approval-engine/approval-engine.service.ts
+> backend/src/foundation/approval-engine/approval.controller.ts
+> backend/src/foundation/database-provisioning/module-add-existing-company.characterization.spec.ts
+> backend/src/foundation/database-provisioning/provisioning-lifecycle.characterization.spec.ts
+> backend/src/foundation/database-provisioning/ui-created-company-admin.characterization.spec.ts
+> backend/src/foundation/limit-engine/limits-scope.characterization.spec.ts
+> backend/src/foundation/module-registry/manifests/logistics.manifest.ts
+> backend/src/foundation/testing/saas-characterization.helpers.ts
+> backend/src/foundation/testing/saas-provisioning-kit.ts

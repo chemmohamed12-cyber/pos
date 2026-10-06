@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface ReturnRequest {
   salesOrderId: string;
@@ -29,25 +30,32 @@ export function ReturnPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<ReturnPrintData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.return_title', 'field.sales_order', 'field.warehouse', 'field.reason']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const ret = await api.get<ReturnRequest>(`/returns/${id}`);
-      const [order, products, warehouses] = await Promise.all([
-        api.get<Order>(`/sales-orders/${ret.salesOrderId}`),
-        api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
-        api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
-      ]);
-      const product = products.find((p) => p.id === ret.productId);
-      const warehouse = warehouses.find((w) => w.id === ret.warehouseId);
+      try {
+        const ret = await api.get<ReturnRequest>(`/returns/${id}`);
+        const [order, products, warehouses] = await Promise.all([
+          api.get<Order>(`/sales-orders/${ret.salesOrderId}`),
+          api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
+          api.get<Array<{ id: string; code: string; name: string }>>('/inventory/warehouses'),
+        ]);
+        const product = products.find((p) => p.id === ret.productId);
+        const warehouse = warehouses.find((w) => w.id === ret.warehouseId);
 
-      setData({ ret, order, product, warehouse });
+        setData({ ret, order, product, warehouse });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { ret, order, product, warehouse } = data;
 

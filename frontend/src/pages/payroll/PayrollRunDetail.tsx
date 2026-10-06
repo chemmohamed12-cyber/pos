@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Employee {
   id: string;
@@ -140,7 +141,12 @@ export function PayrollRunDetail() {
     }
   }
   async function loadEmployees() {
-    setEmployees(await api.get<Employee[]>('/hr/employees'));
+    try {
+      setEmployees(await api.get<Employee[]>('/hr/employees'));
+    } catch (err) {
+      // Foundation fix: no error handling — employee labels silently stayed empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load employees.');
+    }
   }
   async function loadTreasuryAccounts() {
     try {
@@ -219,6 +225,10 @@ export function PayrollRunDetail() {
     }
   }
 
+  // Foundation fix: loadRun()'s own catch set `error`, but this early-return
+  // gate never reached the `{error && ...}` render below it — a failed load
+  // was stuck on "Loading…" forever with the error silently sitting in state.
+  if (!run && error) return <ErrorState error={new Error(error)} onRetry={loadRun} />;
   if (!run) return <div className="empty-state">Loading…</div>;
 
   const financialEventStatusCode = financialEvent ? financialEvent.status.toLowerCase() : 'none';

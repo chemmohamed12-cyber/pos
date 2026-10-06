@@ -1,0 +1,72 @@
+{
+  "migrationsAtStart": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "provisioned": {
+    "migratedTags": 252,
+    "roleSeedResult": {
+      "roles": 0,
+      "grants": 0
+    },
+    "entitlementApplied": false,
+    "readyMarked": true
+  },
+  "salesNodesTotal": 34,
+  "salesNodesGrantedToAdmin": 34,
+  "platformStyleNodeAccess": {
+    "core.limit.edit": "editable",
+    "core.entitlement": "editable",
+    "core.config": "editable",
+    "system.release": "editable"
+  },
+  "adminRoleNodes": [
+    "accounting",
+    "attendance",
+    "commission",
+    "core.approval",
+    "core.company.audit.view",
+    "core.company.backup.manage",
+    "core.company.members.manage",
+    "core.config",
+    "core.entitlement",
+    "core.limit",
+    "finance",
+    "hr",
+    "inventory",
+    "logistics",
+    "manufacturing",
+    "payroll",
+    "procurement",
+    "reporting",
+    "sales",
+    "system.release",
+    "system.release.backup",
+    "targets"
+  ],
+  "adminGrantsOnReseed": {
+    "created": false,
+    "grants": 0
+  },
+  "salesNodesGrantedAfterReseed": 34,
+  "sourceHashesBefore": {
+    "src/foundation/database-provisioning/database-provisioning.service.ts": "2efea6e4658bf621",
+    "src/foundation/company/company-role-seeding.ts": "79b7c716f81a00d6",
+    "src/foundation/permission/permission.service.ts": "905d6c674d3cc020",
+    "src/foundation/testing/saas-provisioning-kit.ts": "945b46a2378b04d3"
+  },
+  "sourceHashesAfter": {
+    "src/foundation/database-provisioning/database-provisioning.service.ts": "2efea6e4658bf621",
+    "src/foundation/company/company-role-seeding.ts": "79b7c716f81a00d6",
+    "src/foundation/permission/permission.service.ts": "905d6c674d3cc020",
+    "src/foundation/testing/saas-provisioning-kit.ts": "945b46a2378b04d3"
+  },
+  "migrationsTreeBefore": "140cc986cd46b031",
+  "migrationsTreeAfter": "140cc986cd46b031",
+  "residue": [],
+  "migrationsAtEnd": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "cwd": "C:\\Users\\chem_\\AppData\\Local\\Temp\\claude\\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\\84e7fca6-9da1-46cc-b1ed-3e8f7620e909\\scratchpad\\wp05_root"
+}

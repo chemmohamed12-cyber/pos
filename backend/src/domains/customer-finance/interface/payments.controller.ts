@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Inject, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaymentsService } from '../application/payments.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -30,8 +31,46 @@ class RecordPaymentDto {
   reference?: string;
 }
 
+/** CUS-01 — an on-account / advance payment: no invoice yet; optionally earmarked for a sales order of the same customer. */
+class RecordOnAccountPaymentDto {
+  @IsUUID()
+  customerId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  salesOrderId?: string;
+
+  @IsNumberString()
+  amount!: string;
+
+  @IsString()
+  method!: string;
+
+  @IsUUID()
+  treasuryAccountId!: string;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+}
+
+/** CUS-01 — explicit settlement of an unapplied receipt against an invoice (partial amounts supported). */
+class ApplyPaymentDto {
+  @IsUUID()
+  invoiceId!: string;
+
+  @IsNumberString()
+  amount!: string;
+}
+
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized,
+ * controller #13). `CompanyContextGuard` added at the class level — every
+ * route threads `req.companyContext.dataSource.manager` into
+ * `PaymentsService`.
+ */
 @Controller()
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('finance')
 export class PaymentsController {
   constructor(
@@ -70,24 +109,64 @@ export class PaymentsController {
   @UseGuards(PermissionGuard)
   @RequirePermission('finance.payment.create', 'editable')
   @Post('payments')
-  async record(@Req() req: AuthenticatedRequest, @Body() dto: RecordPaymentDto, @Headers('idempotency-key') idempotencyKey?: string) {
-    const result = await this.idempotency.withIdempotencyInTransaction('payments.record', idempotencyKey, (manager) =>
-      this.payments.recordPayment(dto.customerId, dto.invoiceId, dto.amount, dto.method, dto.treasuryAccountId, dto.reference ?? null, req.user.id, manager),
+  async record(@Req() req: CompanyScopedRequest, @Body() dto: RecordPaymentDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const result = await this.idempotency.withIdempotencyInTransaction(
+      'payments.record',
+      idempotencyKey,
+      (txManager) =>
+        this.payments.recordPayment(dto.customerId, dto.invoiceId, dto.amount, dto.method, dto.treasuryAccountId, dto.reference ?? null, req.user!.id, txManager),
+      req.companyContext.dataSource.manager,
     );
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(req.companyContext.dataSource.manager);
     return result;
+  }
+
+  /** CUS-01 — record an on-account / advance customer payment (Dr mapped bank / Cr `ar`; unapplied credit in the Customer Ledger). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.payment.create', 'editable')
+  @Post('payments/on-account')
+  async recordOnAccount(@Req() req: CompanyScopedRequest, @Body() dto: RecordOnAccountPaymentDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const result = await this.idempotency.withIdempotencyInTransaction(
+      'payments.record_on_account',
+      idempotencyKey,
+      (txManager) =>
+        this.payments.recordOnAccountPayment(dto.customerId, dto.salesOrderId ?? null, dto.amount, dto.method, dto.treasuryAccountId, dto.reference ?? null, req.user!.id, txManager),
+      req.companyContext.dataSource.manager,
+    );
+    await this.events.dispatchAfterCommit(req.companyContext.dataSource.manager);
+    return result;
+  }
+
+  /** CUS-01 — settle (part of) an unapplied receipt against an invoice. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.payment.create', 'editable')
+  @Post('payments/:id/apply')
+  async apply(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: ApplyPaymentDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.payments.applyPayment(id, dto.invoiceId, dto.amount, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  /** CUS-01 — "Customer Advance / Unapplied Receipt" list (Scope-filtered, optionally for one customer). */
+  @Get('payments/unapplied')
+  async listUnapplied(@Req() req: CompanyScopedRequest, @Query('customerId') customerId?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.payments.listUnappliedPayments(req.user.id, customerId, req.companyContext.dataSource.manager);
   }
 
   /** AUDIT-SEC-03 remediation: previously no Scope check and no permission node at all — any authenticated user with the `finance` module entitled could list ANY customer's payment history by id. */
   @Get('customers/:id/payments')
-  async listForCustomer(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    await this.customers.getCustomer(id, req.user.id);
-    return this.payments.listPaymentsForCustomer(id);
+  async listForCustomer(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.customers.getCustomer(id, req.user.id, req.companyContext.dataSource.manager);
+    return this.payments.listPaymentsForCustomer(id, req.companyContext.dataSource.manager);
   }
 
   /** ERP UI Integration (CTO directive) — the "التحصيلات والمدفوعات" list screen, across every customer the caller may see. Scope-filtered, not role-gated (a rep legitimately sees their own customers' payment history); recording a payment stays finance/admin-gated above. */
   @Get('payments')
-  async listAll(@Req() req: AuthenticatedRequest) {
-    return this.payments.listAllPayments(req.user.id);
+  async listAll(@Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.payments.listAllPayments(req.user.id, req.companyContext.dataSource.manager);
   }
 }

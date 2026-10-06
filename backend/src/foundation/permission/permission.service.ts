@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { PermissionAccess, RolePermission } from './role-permission.entity';
 import { AuthorizationService } from '../authorization/authorization.service';
 
@@ -33,15 +33,17 @@ export class PermissionService {
     private readonly authorization: AuthorizationService,
   ) {}
 
-  async resolve(userId: string, nodeKey: string): Promise<PermissionAccess> {
-    const roleKeys = await this.authorization.getRoleKeysForUser(userId);
+  /** Multi-Company Area 6 (2026-09-23, Model B decision) — `manager?` threaded through to `AuthorizationService` and, here, to `RolePermission` itself, so a validated Company context routes the whole resolution to that Company's own tables. See `AuthorizationService`'s class doc comment. */
+  async resolve(userId: string, nodeKey: string, manager?: EntityManager): Promise<PermissionAccess> {
+    const roleKeys = await this.authorization.getRoleKeysForUser(userId, manager);
     if (roleKeys.length === 0) return 'hidden';
 
-    const roleIds = await this.authorization.getRoleIdsForKeys(roleKeys);
+    const roleIds = await this.authorization.getRoleIdsForKeys(roleKeys, manager);
     if (roleIds.length === 0) return 'hidden';
 
     const chain = ancestorChain(nodeKey);
-    const rows = await this.rolePermissions.find({
+    const rolePermissionRepo = manager ? manager.getRepository(RolePermission) : this.rolePermissions;
+    const rows = await rolePermissionRepo.find({
       where: { roleId: In(roleIds), nodeKey: In(chain) },
     });
     if (rows.length === 0) return 'hidden';
@@ -60,8 +62,8 @@ export class PermissionService {
     return best;
   }
 
-  async hasAtLeast(userId: string, nodeKey: string, required: PermissionAccess): Promise<boolean> {
-    const resolved = await this.resolve(userId, nodeKey);
+  async hasAtLeast(userId: string, nodeKey: string, required: PermissionAccess, manager?: EntityManager): Promise<boolean> {
+    const resolved = await this.resolve(userId, nodeKey, manager);
     return ACCESS_RANK[resolved] >= ACCESS_RANK[required];
   }
 }

@@ -6,7 +6,15 @@ import { AppConfigService } from '../configuration/app-config.service';
 import { JWT_VERIFY_OPTIONS } from './jwt-constants';
 
 export interface AuthenticatedRequest extends Request {
-  user: { id: string; email: string };
+  /**
+   * `companyId` (Multi-Company Area 5/6, 2026-09-23) is the RAW JWT claim
+   * only — a transport mechanism, never authorization proof by itself
+   * (locked decision: "الـJWT claim هو transport mechanism فقط. ليس
+   * authorization proof"). A route that needs a validated Company context
+   * MUST run `CompanyContextGuard` (which re-checks `Membership` against
+   * the database on every request) before trusting it for anything.
+   */
+  user: { id: string; email: string; companyId?: string };
 }
 
 /**
@@ -35,7 +43,7 @@ export class JwtAuthGuard implements CanActivate {
     }
     const token = authHeader.slice('Bearer '.length);
 
-    let payload: { sub: string };
+    let payload: { sub: string; companyId?: string };
     try {
       payload = await this.jwt.verifyAsync(token, { secret: this.config.auth.accessSecret, ...JWT_VERIFY_OPTIONS });
     } catch {
@@ -47,7 +55,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Account is not active.');
     }
 
-    request.user = { id: user.id, email: user.email };
+    request.user = { id: user.id, email: user.email, companyId: payload.companyId };
     return true;
   }
 }

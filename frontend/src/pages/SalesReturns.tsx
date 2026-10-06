@@ -108,16 +108,21 @@ export function SalesReturns() {
   const [reason, setReason] = useState('');
 
   async function loadAll() {
-    const [rowsData, customersData, ordersData, productsData] = await Promise.all([
-      api.get<SalesReturnRow[]>('/sales-returns'),
-      api.get<Customer[]>('/customers'),
-      api.get<SalesOrder[]>('/sales-orders'),
-      api.get<Product[]>('/products/all'),
-    ]);
-    setRows(rowsData);
-    setCustomers(customersData);
-    setOrders(ordersData);
-    setProducts(productsData);
+    try {
+      const [rowsData, customersData, ordersData, productsData] = await Promise.all([
+        api.get<SalesReturnRow[]>('/sales-returns'),
+        api.get<Customer[]>('/customers'),
+        api.get<SalesOrder[]>('/sales-orders'),
+        api.get<Product[]>('/products/all'),
+      ]);
+      setRows(rowsData);
+      setCustomers(customersData);
+      setOrders(ordersData);
+      setProducts(productsData);
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load sales returns.');
+    }
   }
 
   useEffect(() => {

@@ -25,6 +25,11 @@ export class RestoreOperation {
   @Column('uuid')
   requestedByUserId!: string;
 
+  /** Backup/DR Architecture V1 (2026-09-24, Track D §Step 3 freeze). Null = platform-level restore (this row's original meaning, unchanged). Set = restoring a specific Company's own database only — never mixed with any other Company's restore. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  companyId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   requestedAt!: Date;
 

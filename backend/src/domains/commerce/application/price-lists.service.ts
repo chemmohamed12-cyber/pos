@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { PriceList } from '../infrastructure/price-list.entity';
 import { PriceListItem } from '../infrastructure/price-list-item.entity';
 import { canTransitionPriceListStatus, PriceListStatus } from '../domain/price-list-status';
@@ -51,38 +51,53 @@ export class PriceListsService implements OnModuleInit {
    * `IntegrationsService` already subscribes to for the QR connector
    * (dispatch runs after the product's own write transaction has already
    * committed, so `getProductSnapshot` always finds it here).
+   *
+   * Area 21 / ADR-075 (D10, 2026-10-04): this handler is Company-scope —
+   * it receives the Company's `EventContext` and routes every
+   * `getProductSnapshot`/`getOrCreateGeneralList`/`upsertItem` call through
+   * `ctx.manager` (the previously documented ambient-connection gap, Matrix
+   * §50, is closed for this subscriber).
    */
   onModuleInit(): void {
-    this.events.subscribe('commerce.product.created', async (payload) => {
-      const productId = payload.productId as string;
-      const product = await this.products.getProductSnapshot(productId);
-      if (!product) return; // defensive only — the event always names a product that was just committed
-      const generalList = await this.getOrCreateGeneralList();
-      await this.upsertItem(generalList.id, productId, product.unitPrice, null);
-    });
+    // ADR-075 (D10): Company-scope — reads/writes go through `ctx.manager` (null under ambient dispatch ⇒ unchanged).
+    this.events.subscribe(
+      'commerce.product.created',
+      async (payload, ctx) => {
+        const manager = ctx.manager ?? undefined;
+        const productId = payload.productId as string;
+        const product = await this.products.getProductSnapshot(productId, manager);
+        if (!product) return; // defensive only — the event always names a product that was just committed
+        const generalList = await this.getOrCreateGeneralList(manager);
+        await this.upsertItem(generalList.id, productId, product.unitPrice, null, manager);
+      },
+      { scope: 'company' },
+    );
   }
 
-  async createPriceList(name: string, actorUserId: string | null): Promise<PriceList> {
-    const code = await this.numbering.getNextNumber('price_list');
-    const repo = this.dataSource.getRepository(PriceList);
+  async createPriceList(name: string, actorUserId: string | null, manager?: EntityManager): Promise<PriceList> {
+    const code = await this.numbering.getNextNumber('price_list', manager);
+    const repo = (manager ?? this.dataSource).getRepository(PriceList);
     const saved = await repo.save(repo.create({ code, name, status: 'active' }));
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.price_list.created',
-      resource: 'price_list',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { code: saved.code, name: saved.name },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.price_list.created',
+        resource: 'price_list',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { code: saved.code, name: saved.name },
+      },
+      manager,
+    );
 
     return saved;
   }
 
-  async setStatus(priceListId: string, newStatus: PriceListStatus, actorUserId: string | null): Promise<PriceList> {
-    const repo = this.dataSource.getRepository(PriceList);
+  async setStatus(priceListId: string, newStatus: PriceListStatus, actorUserId: string | null, manager?: EntityManager): Promise<PriceList> {
+    const repo = (manager ?? this.dataSource).getRepository(PriceList);
     const priceList = await repo.findOne({ where: { id: priceListId } });
     if (!priceList) throw new NotFoundException(`Price list "${priceListId}" not found.`);
     if (!canTransitionPriceListStatus(priceList.status, newStatus)) {
@@ -92,17 +107,20 @@ export class PriceListsService implements OnModuleInit {
     priceList.status = newStatus;
     const saved = await repo.save(priceList);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.price_list.status_changed',
-      resource: 'price_list',
-      resourceId: priceListId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { status: newStatus },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.price_list.status_changed',
+        resource: 'price_list',
+        resourceId: priceListId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { status: newStatus },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -117,9 +135,9 @@ export class PriceListsService implements OnModuleInit {
    * requiring a separate confirmation step; `IDX_price_lists_role` is the
    * DB-level backstop for this same invariant.
    */
-  async setRole(priceListId: string, role: PriceListRole, actorUserId: string | null): Promise<PriceList> {
-    const priceList = await this.getPriceList(priceListId);
-    const repo = this.dataSource.getRepository(PriceList);
+  async setRole(priceListId: string, role: PriceListRole, actorUserId: string | null, manager?: EntityManager): Promise<PriceList> {
+    const priceList = await this.getPriceList(priceListId, manager);
+    const repo = (manager ?? this.dataSource).getRepository(PriceList);
 
     if (role !== null) {
       const previousHolder = await repo.findOne({ where: { role } });
@@ -133,27 +151,30 @@ export class PriceListsService implements OnModuleInit {
     priceList.role = role;
     const saved = await repo.save(priceList);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.price_list.role_changed',
-      resource: 'price_list',
-      resourceId: priceListId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { role },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.price_list.role_changed',
+        resource: 'price_list',
+        resourceId: priceListId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { role },
+      },
+      manager,
+    );
 
     return saved;
   }
 
   /** The single system-owned General list — created on first use if it doesn't exist yet (normally already created by the `AddPriceListRoleAndGeneralList` migration; this is a defensive fallback, not the primary bootstrap path). */
-  private async getOrCreateGeneralList(): Promise<PriceList> {
-    const repo = this.dataSource.getRepository(PriceList);
+  private async getOrCreateGeneralList(manager?: EntityManager): Promise<PriceList> {
+    const repo = (manager ?? this.dataSource).getRepository(PriceList);
     const existing = await repo.findOne({ where: { role: 'general' } });
     if (existing) return existing;
-    const code = await this.numbering.getNextNumber('price_list');
+    const code = await this.numbering.getNextNumber('price_list', manager);
     return repo.save(repo.create({ code, name: 'General Price List', status: 'active', role: 'general' }));
   }
 
@@ -168,45 +189,46 @@ export class PriceListsService implements OnModuleInit {
    * as before this hotfix (never a broken order over incomplete pricing
    * data).
    */
-  async resolvePrice(customerPriceListId: string | null, productId: string): Promise<ResolvedPrice> {
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — PriceList/PriceListItem are Company-owned, called from Company-scoped flows (e.g. `SalesOrdersService.createOrder`). */
+  async resolvePrice(customerPriceListId: string | null, productId: string, manager?: EntityManager): Promise<ResolvedPrice> {
     if (customerPriceListId) {
-      const price = await this.getOverridePrice(customerPriceListId, productId);
+      const price = await this.getOverridePrice(customerPriceListId, productId, manager);
       if (price !== null) return { price, priceListId: customerPriceListId };
     }
 
-    const repo = this.dataSource.getRepository(PriceList);
+    const repo = (manager ?? this.dataSource).getRepository(PriceList);
     const main = await repo.findOne({ where: { role: 'main' } });
     if (main) {
-      const price = await this.getOverridePrice(main.id, productId);
+      const price = await this.getOverridePrice(main.id, productId, manager);
       if (price !== null) return { price, priceListId: main.id };
     }
 
     const general = await repo.findOne({ where: { role: 'general' } });
     if (general) {
-      const price = await this.getOverridePrice(general.id, productId);
+      const price = await this.getOverridePrice(general.id, productId, manager);
       if (price !== null) return { price, priceListId: general.id };
     }
 
     return { price: null, priceListId: null };
   }
 
-  async listPriceLists(): Promise<PriceList[]> {
-    return this.dataSource.getRepository(PriceList).find({ order: { code: 'ASC' } });
+  async listPriceLists(manager?: EntityManager): Promise<PriceList[]> {
+    return (manager ?? this.dataSource).getRepository(PriceList).find({ order: { code: 'ASC' } });
   }
 
-  async getPriceList(priceListId: string): Promise<PriceList> {
-    const priceList = await this.dataSource.getRepository(PriceList).findOne({ where: { id: priceListId } });
+  async getPriceList(priceListId: string, manager?: EntityManager): Promise<PriceList> {
+    const priceList = await (manager ?? this.dataSource).getRepository(PriceList).findOne({ where: { id: priceListId } });
     if (!priceList) throw new NotFoundException(`Price list "${priceListId}" not found.`);
     return priceList;
   }
 
   /** Backs the Price List detail screen — items joined with the product's own SKU/name for display, resolved through ProductsService (same domain, not a cross-domain violation). */
-  async listItems(priceListId: string): Promise<PriceListItemView[]> {
-    await this.getPriceList(priceListId); // 404s for an unknown price list before listing its (empty) items
-    const items = await this.dataSource.getRepository(PriceListItem).find({ where: { priceListId } });
+  async listItems(priceListId: string, manager?: EntityManager): Promise<PriceListItemView[]> {
+    await this.getPriceList(priceListId, manager); // 404s for an unknown price list before listing its (empty) items
+    const items = await (manager ?? this.dataSource).getRepository(PriceListItem).find({ where: { priceListId } });
     const views: PriceListItemView[] = [];
     for (const item of items) {
-      const product = await this.products.getProductSnapshot(item.productId);
+      const product = await this.products.getProductSnapshot(item.productId, manager);
       views.push({
         id: item.id,
         productId: item.productId,
@@ -219,50 +241,56 @@ export class PriceListsService implements OnModuleInit {
   }
 
   /** Create-or-update a product's override price within a price list — one price per product per list, never duplicated. */
-  async upsertItem(priceListId: string, productId: string, price: string, actorUserId: string | null): Promise<PriceListItem> {
-    await this.getPriceList(priceListId);
-    const product = await this.products.getProductSnapshot(productId);
+  async upsertItem(priceListId: string, productId: string, price: string, actorUserId: string | null, manager?: EntityManager): Promise<PriceListItem> {
+    await this.getPriceList(priceListId, manager);
+    const product = await this.products.getProductSnapshot(productId, manager);
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     if (Number.isNaN(Number(price)) || Number(price) < 0) {
       throw new ConflictException(`Invalid price "${price}" — must be a non-negative number.`);
     }
 
-    const repo = this.dataSource.getRepository(PriceListItem);
+    const repo = (manager ?? this.dataSource).getRepository(PriceListItem);
     const existing = await repo.findOne({ where: { priceListId, productId } });
     const saved = existing
       ? await repo.save({ ...existing, price })
       : await repo.save(repo.create({ priceListId, productId, price }));
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: existing ? 'commerce.price_list_item.updated' : 'commerce.price_list_item.added',
-      resource: 'price_list_item',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after: { priceListId, productId, price },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: existing ? 'commerce.price_list_item.updated' : 'commerce.price_list_item.added',
+        resource: 'price_list_item',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after: { priceListId, productId, price },
+      },
+      manager,
+    );
 
     return saved;
   }
 
-  async removeItem(priceListId: string, itemId: string, actorUserId: string | null): Promise<void> {
-    const repo = this.dataSource.getRepository(PriceListItem);
+  async removeItem(priceListId: string, itemId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(PriceListItem);
     const item = await repo.findOne({ where: { id: itemId, priceListId } });
     if (!item) throw new NotFoundException(`Price list item "${itemId}" not found in price list "${priceListId}".`);
     await repo.remove(item);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.price_list_item.removed',
-      resource: 'price_list_item',
-      resourceId: itemId,
-      result: 'success',
-      correlationId: null,
-      before: { priceListId, productId: item.productId, price: item.price },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.price_list_item.removed',
+        resource: 'price_list_item',
+        resourceId: itemId,
+        result: 'success',
+        correlationId: null,
+        before: { priceListId, productId: item.productId, price: item.price },
+      },
+      manager,
+    );
   }
 
   /**
@@ -273,10 +301,10 @@ export class PriceListsService implements OnModuleInit {
    * caller's fallback to the product's own base price is always a plain
    * `?? product.unitPrice`, never a try/catch.
    */
-  async getOverridePrice(priceListId: string, productId: string): Promise<string | null> {
-    const priceList = await this.dataSource.getRepository(PriceList).findOne({ where: { id: priceListId } });
+  async getOverridePrice(priceListId: string, productId: string, manager?: EntityManager): Promise<string | null> {
+    const priceList = await (manager ?? this.dataSource).getRepository(PriceList).findOne({ where: { id: priceListId } });
     if (!priceList || priceList.status !== 'active') return null;
-    const item = await this.dataSource.getRepository(PriceListItem).findOne({ where: { priceListId, productId } });
+    const item = await (manager ?? this.dataSource).getRepository(PriceListItem).findOne({ where: { priceListId, productId } });
     return item?.price ?? null;
   }
 
@@ -292,8 +320,9 @@ export class PriceListsService implements OnModuleInit {
     priceListId: string,
     rows: Array<{ sku: string; price: string }>,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ succeededCount: number; rejected: Array<{ row: number; errors: string[] }> }> {
-    await this.getPriceList(priceListId);
+    await this.getPriceList(priceListId, manager);
     let succeededCount = 0;
     const rejected: Array<{ row: number; errors: string[] }> = [];
 
@@ -311,7 +340,7 @@ export class PriceListsService implements OnModuleInit {
 
       let productId: string | null = null;
       if (sku) {
-        const product = await this.products.getProductSnapshotBySku(sku);
+        const product = await this.products.getProductSnapshotBySku(sku, manager);
         if (!product) errors.push(`Product with code "${sku}" was not found.`);
         else productId = product.id;
       }
@@ -322,7 +351,7 @@ export class PriceListsService implements OnModuleInit {
       }
 
       try {
-        await this.upsertItem(priceListId, productId as string, priceText, actorUserId);
+        await this.upsertItem(priceListId, productId as string, priceText, actorUserId, manager);
         succeededCount++;
       } catch (err) {
         rejected.push({ row: rowNumber, errors: [err instanceof Error ? err.message : 'Unknown error importing row.'] });

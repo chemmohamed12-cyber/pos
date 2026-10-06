@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Deposit {
   id: string;
@@ -28,23 +29,30 @@ export function DepositReceiptPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<DepositReceiptData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.deposit_receipt_title', 'field.customer', 'field.sales_order', 'field.method', 'field.total_amount']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const deposit = await api.get<Deposit>(`/deposits/${id}`);
-      const [order, customers] = await Promise.all([
-        api.get<Order>(`/sales-orders/${deposit.salesOrderId}`),
-        api.get<Array<{ id: string; name: string }>>('/customers'),
-      ]);
-      const customer = customers.find((c) => c.id === order.customerId);
+      try {
+        const deposit = await api.get<Deposit>(`/deposits/${id}`);
+        const [order, customers] = await Promise.all([
+          api.get<Order>(`/sales-orders/${deposit.salesOrderId}`),
+          api.get<Array<{ id: string; name: string }>>('/customers'),
+        ]);
+        const customer = customers.find((c) => c.id === order.customerId);
 
-      setData({ deposit, order, customer });
+        setData({ deposit, order, customer });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { deposit, order, customer } = data;
 

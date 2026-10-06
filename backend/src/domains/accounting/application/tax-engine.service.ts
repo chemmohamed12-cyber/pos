@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { TaxCode } from '../infrastructure/tax-code.entity';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { TaxCalculationResult, TaxEngineContract } from '../../../foundation/module-registry/contracts/tax-engine.contract';
@@ -25,6 +25,10 @@ export class TaxEngineService implements TaxEngineContract {
     private readonly config: ConfigurationEngineService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   private isEffective(taxCode: TaxCode, today: string): boolean {
     if (!taxCode.isActive) return false;
     if (taxCode.effectiveFrom && taxCode.effectiveFrom > today) return false;
@@ -32,8 +36,8 @@ export class TaxEngineService implements TaxEngineContract {
     return true;
   }
 
-  private async resolveTaxCode(explicitTaxCodeId: string | null | undefined): Promise<TaxCode | null> {
-    const repo = this.dataSource.getRepository(TaxCode);
+  private async resolveTaxCode(explicitTaxCodeId: string | null | undefined, manager?: EntityManager): Promise<TaxCode | null> {
+    const repo = this.em(manager).getRepository(TaxCode);
     const today = new Date().toISOString().slice(0, 10);
 
     if (explicitTaxCodeId) {
@@ -49,8 +53,8 @@ export class TaxEngineService implements TaxEngineContract {
     return null;
   }
 
-  async calculateForInvoice(baseAmount: string, explicitTaxCodeId?: string | null): Promise<TaxCalculationResult> {
-    const taxCode = await this.resolveTaxCode(explicitTaxCodeId ?? null);
+  async calculateForInvoice(baseAmount: string, explicitTaxCodeId?: string | null, manager?: EntityManager): Promise<TaxCalculationResult> {
+    const taxCode = await this.resolveTaxCode(explicitTaxCodeId ?? null, manager);
     if (!taxCode) return { taxCodeId: null, taxAmount: '0.00' };
 
     const base = Number(baseAmount);
@@ -67,9 +71,9 @@ export class TaxEngineService implements TaxEngineContract {
     return { taxCodeId: taxCode.id, taxAmount: taxAmount.toFixed(2) };
   }
 
-  async resolveTaxAccountCode(taxCodeId: string | null): Promise<string | null> {
+  async resolveTaxAccountCode(taxCodeId: string | null, manager?: EntityManager): Promise<string | null> {
     if (!taxCodeId) return null;
-    const taxCode = await this.dataSource.getRepository(TaxCode).findOne({ where: { id: taxCodeId } });
+    const taxCode = await this.em(manager).getRepository(TaxCode).findOne({ where: { id: taxCodeId } });
     return taxCode?.accountMappingRef ?? null;
   }
 }

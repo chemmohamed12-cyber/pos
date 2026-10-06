@@ -52,7 +52,16 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
       throw new BadRequestException('Ledger entry amount must be a positive number.');
     }
 
-    await this.numbering.registerDocumentType(LEDGER_ENTRY_DOCUMENT_TYPE, LEDGER_ENTRY_PREFIX); // idempotent
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28): `manager`
+    // now threaded through — this row is pre-seeded per Company by
+    // `AddCustomerFinancialCore`'s own migration, so this call is a
+    // guaranteed no-op in practice, but the pre-Area-21 ambient
+    // `this.dataSource` call was still the wrong DataSource under Model B
+    // (found live via `payments.company-isolation.spec.ts`'s deep-chain
+    // `recordPayment` proof — a control-plane DataSource has no
+    // `NumberingSequence` metadata at all, so this threw outright rather
+    // than silently misrouting).
+    await this.numbering.registerDocumentType(LEDGER_ENTRY_DOCUMENT_TYPE, LEDGER_ENTRY_PREFIX, true, manager);
     // Gap Resolution Package 3 (2026-09-14): this call previously did not forward `manager` — a
     // caller-supplied transaction covered the entry save below but not this number draw, leaving one
     // un-threaded write inside an otherwise-atomic operation. `getNextNumber` already supports the
@@ -129,7 +138,9 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
    * discipline as `getCustomerBalance`, no `status` filter (a reversal's
    * own opposite row cancels the original).
    */
-  async getAllCustomerBalances(asOfDate?: string): Promise<{ balances: Array<{ customerId: string; balance: string }>; total: string }> {
+  /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+  async getAllCustomerBalances(asOfDate?: string, manager?: EntityManager): Promise<{ balances: Array<{ customerId: string; balance: string }>; total: string }> {
+    const runner = manager ?? this.dataSource;
     const params: unknown[] = [];
     let dateClause = '';
     if (asOfDate) {
@@ -142,7 +153,7 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
       // reconciliation run on the current day. Compare on the date part.
       dateClause = `WHERE "entryDate" < ($1::date + INTERVAL '1 day')`;
     }
-    const rows = await this.dataSource.query(
+    const rows = await runner.query(
       `SELECT "customerId",
               COALESCE(SUM(CASE WHEN "direction" = 'debit' THEN "amount" ELSE -"amount" END), 0)::numeric(20,4) AS balance
        FROM "customer_ledger_entries" ${dateClause}
@@ -151,7 +162,7 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
        ORDER BY "customerId"`,
       params,
     );
-    const [tot] = await this.dataSource.query(
+    const [tot] = await runner.query(
       `SELECT COALESCE(SUM(CASE WHEN "direction" = 'debit' THEN "amount" ELSE -"amount" END), 0)::numeric(20,4) AS total
        FROM "customer_ledger_entries" ${dateClause}`,
       params,
@@ -171,8 +182,8 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
    * (a reversed entry's own opposite row already cancels it out; filtering
    * by status here would double-exclude it).
    */
-  private async getOverdueAmount(customerId: string): Promise<string> {
-    const rows = await this.dataSource.query(
+  private async getOverdueAmount(customerId: string, manager?: EntityManager): Promise<string> {
+    const rows = await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM(GREATEST(inv."totalAmount" - COALESCE(applied.total, 0), 0)), 0) AS overdue
        FROM "sales_invoices" inv
        LEFT JOIN (
@@ -189,11 +200,11 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
   }
 
   /** Customer Account Dashboard's header figures (CTO directive §11) — expose-only in this phase, no hard credit-limit enforcement on order creation (disclosed scoping decision, see plan). */
-  async getCreditSummary(customerId: string): Promise<{ balance: string; creditLimit: string | null; availableCredit: string | null; overdueAmount: string }> {
+  async getCreditSummary(customerId: string, manager?: EntityManager): Promise<{ balance: string; creditLimit: string | null; availableCredit: string | null; overdueAmount: string }> {
     const [balance, creditLimit, overdueAmount] = await Promise.all([
-      this.getCustomerBalance(customerId),
-      this.customers.getCreditLimit(customerId),
-      this.getOverdueAmount(customerId),
+      this.getCustomerBalance(customerId, manager),
+      this.customers.getCreditLimit(customerId, manager),
+      this.getOverdueAmount(customerId, manager),
     ]);
     const availableCredit = creditLimit !== null ? (Number(creditLimit) - Number(balance)).toFixed(2) : null;
     return { balance, creditLimit, availableCredit, overdueAmount };
@@ -205,18 +216,18 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
    * at a time (Customer Ledger entries, unlike Treasury transfers, never
    * come in linked pairs).
    */
-  async reverseEntry(entryId: string, reason: string, actorUserId: string): Promise<CustomerLedgerEntry> {
-    const repo = this.dataSource.getRepository(CustomerLedgerEntry);
+  async reverseEntry(entryId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<CustomerLedgerEntry> {
+    const repo = (manager ?? this.dataSource).getRepository(CustomerLedgerEntry);
     const original = await repo.findOne({ where: { id: entryId } });
     if (!original) throw new NotFoundException(`Customer ledger entry "${entryId}" not found.`);
     if (original.status !== 'posted') {
       throw new ConflictException(`Cannot reverse a ledger entry in status "${original.status}".`);
     }
 
-    await this.numbering.registerDocumentType(LEDGER_ENTRY_DOCUMENT_TYPE, LEDGER_ENTRY_PREFIX);
-    const entryNumber = await this.numbering.getNextNumber(LEDGER_ENTRY_DOCUMENT_TYPE);
+    await this.numbering.registerDocumentType(LEDGER_ENTRY_DOCUMENT_TYPE, LEDGER_ENTRY_PREFIX, undefined, manager);
+    const entryNumber = await this.numbering.getNextNumber(LEDGER_ENTRY_DOCUMENT_TYPE, manager);
 
-    const reversal = await this.dataSource.transaction(async (manager) => {
+    const reversal = await (manager ?? this.dataSource.manager).transaction(async (manager) => {
       const mRepo = manager.getRepository(CustomerLedgerEntry);
       const saved = await mRepo.save(
         mRepo.create({
@@ -254,13 +265,13 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
       correlationId: null,
       before: { status: 'posted' },
       after: { status: 'reversed', reversalEntryId: reversal.id, reason },
-    });
+    }, manager);
 
     return reversal;
   }
 
-  async listLedger(customerId: string, filters?: { entryType?: string; from?: string; to?: string }): Promise<CustomerLedgerEntry[]> {
-    const repo = this.dataSource.getRepository(CustomerLedgerEntry);
+  async listLedger(customerId: string, filters?: { entryType?: string; from?: string; to?: string }, manager?: EntityManager): Promise<CustomerLedgerEntry[]> {
+    const repo = (manager ?? this.dataSource).getRepository(CustomerLedgerEntry);
     const qb = repo.createQueryBuilder('e').where('e.customerId = :customerId', { customerId });
     if (filters?.entryType) qb.andWhere('e.entryType = :entryType', { entryType: filters.entryType });
     if (filters?.from) qb.andWhere('e.entryDate >= :from', { from: filters.from });
@@ -290,11 +301,17 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
       .createQueryBuilder()
       .update(CustomerLedgerEntry)
       .set({ invoiceId })
-      .where('"customerId" = :customerId AND "salesOrderId" = :salesOrderId AND "invoiceId" IS NULL AND "status" = :status', {
+      // CUS-01: an unapplied remainder of a payment that already has explicit applications (`payment_application` rows) is NEVER swept —
+      // it is settled only by an explicit apply, so a partially applied receipt cannot be applied twice.
+      .where(
+        `"customerId" = :customerId AND "salesOrderId" = :salesOrderId AND "invoiceId" IS NULL AND "status" = :status
+         AND ("paymentId" IS NULL OR NOT EXISTS (SELECT 1 FROM "customer_ledger_entries" a WHERE a."paymentId" = "customer_ledger_entries"."paymentId" AND a."entryType" = 'payment_application'))`,
+        {
         customerId,
         salesOrderId,
         status: 'posted',
-      })
+        },
+      )
       .execute();
   }
 
@@ -308,12 +325,12 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
    * One aggregate SQL query, not N calls — the balance formula itself is
    * identical to `getCustomerBalance`, just grouped.
    */
-  async getBalancesForVisibleCustomers(actorUserId: string): Promise<Array<{ customerId: string; balance: string }>> {
-    const customers = await this.customers.listCustomers(actorUserId);
+  async getBalancesForVisibleCustomers(actorUserId: string, manager?: EntityManager): Promise<Array<{ customerId: string; balance: string }>> {
+    const customers = await this.customers.listCustomers(actorUserId, manager);
     const ids = customers.map((c) => c.id);
     if (ids.length === 0) return [];
 
-    const rows = await this.dataSource.query(
+    const rows = await (manager ?? this.dataSource).query(
       `SELECT "customerId", COALESCE(SUM(CASE WHEN "direction" = 'debit' THEN "amount" ELSE -"amount" END), 0) AS balance
        FROM "customer_ledger_entries" WHERE "customerId" = ANY($1) GROUP BY "customerId"`,
       [ids],

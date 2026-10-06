@@ -49,6 +49,7 @@ const PRELOAD = [
   'field.account_code',
   'field.account_name',
   'field.account_name_ar',
+  'field.description',
   'field.account_type',
   'field.normal_balance',
   'field.parent_account',
@@ -104,6 +105,54 @@ function emptyCreateForm(parentAccountId: string | null) {
     parentAccountId,
     isPostable: true,
   };
+}
+
+/**
+ * COA-01 — edit an existing account's descriptive fields (name, Arabic name, description). Code and type stay immutable by design;
+ * contra / currency changes are intentionally NOT offered here (they alter normal-balance semantics and need an accounting decision
+ * once the account has history). Remounted per account via `key`.
+ */
+function AccountDetailsEditor({ account, busy, onSave }: { account: GLAccount; busy: boolean; onSave: (patch: { name: string; nameAr: string | null; description: string | null }) => Promise<void> }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(account.name);
+  const [nameAr, setNameAr] = useState(account.nameAr ?? '');
+  const [description, setDescription] = useState(account.description ?? '');
+  if (!open) {
+    return (
+      <div className="form-field">
+        <button className="btn btn-secondary" onClick={() => setOpen(true)}>
+          {t('action.edit')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="form-field"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        await onSave({ name, nameAr: nameAr.trim() || null, description: description.trim() || null });
+        setOpen(false);
+      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+    >
+      <label>{t('field.account_name')}</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={160} />
+      <label>{t('field.account_name_ar')}</label>
+      <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} maxLength={160} />
+      <label>{t('field.description')}</label>
+      <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={512} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {t('action.save')}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setOpen(false)}>
+          {t('action.cancel')}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 /** F02 — Chart of Accounts (ADR-034). Recovered/integrated frontend source — a recursive tree with a detail/edit panel for the selected node. */
@@ -174,6 +223,19 @@ export function ChartOfAccounts() {
     setError(null);
     try {
       await api.post(`/accounting/accounts/${a.id}`, { isActive: !a.isActive });
+      await loadAccounts();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to update account.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDetails(a: GLAccount, patch: { name: string; nameAr: string | null; description: string | null }) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/accounting/accounts/${a.id}`, patch);
       await loadAccounts();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to update account.');
@@ -358,6 +420,8 @@ export function ChartOfAccounts() {
             <h3 style={{ marginTop: 0 }}>
               {selected.code} — {selected.nameAr ?? selected.name}
             </h3>
+
+            <AccountDetailsEditor key={selected.id + (selected.name ?? '') + (selected.nameAr ?? '') + (selected.description ?? '')} account={selected} busy={busy} onSave={(patch) => saveDetails(selected, patch)} />
 
             <div className="form-field">
               <label>{t('action.add_child_account')}</label>

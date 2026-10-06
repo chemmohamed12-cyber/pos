@@ -1,0 +1,29 @@
+# D2 — Treasury account → mapped GL bank leg (2026-10-04) — IMPLEMENTED / REAL-PG VERIFIED
+
+**CTO decision (approved):** GL mapping becomes mandatory at the first financial posting from a Treasury account, not at account creation. Unmapped accounts may exist (shown `Unmapped`); a financial operation from one is REJECTED before any ledger/GL mutation. The GL bank leg is the paying/receiving Treasury account's OWN mapped GL account — never "the first `bank` control account", never DB order. The UI manages the mapping; the backend is the gate.
+
+## Root cause (T0 baseline)
+`handleSupplierPaymentRecorded` / `handlePaymentRecorded` / `handleCashRecorded` resolved the bank leg as `payload.bankAccountCode ?? payload.accountCode`, else `resolveControlAccount('bank')` (`findOne`, no ORDER BY). The payment events carried only `treasuryAccountId` (no code), so every payment fell to the control account (1101 in T0) regardless of the paying account's mapping; an unmapped account was accepted. Handler-only enforcement would also have left the Treasury transaction + ledger rows committed while the event rejected — hence the pre-mutation guard below.
+
+## Change
+- **Guard (pre-mutation):** `TreasuryService.requireGlMappedAccount(accountId, manager)` (409 "…is not GL-mapped — map it … before any financial posting"), exposed on `FinanceTreasuryContract`. `SupplierPaymentService.recordPayment` and `PaymentsService.recordPayment` (customer) call it as the first write-adjacent step inside their transaction, before `cashOutForSupplier` / `cashIn`, ledger, payment row, event. The resolved code is published as `glAccountCode` on `finance.supplier_payment.recorded` / `finance.payment.recorded` (types updated).
+- **Handlers (no fallback):** the bank leg of `handleSupplierPaymentRecorded`, `handlePaymentRecorded`, `handleCashRecorded` is resolved by the published code only (`findAccountByCode`); missing/unknown ⇒ `rejected`. No `resolveControlAccount('bank')` remains in these paths. (AR/AP/GRNI control-account resolution unchanged.)
+- **Residual, by design:** whether the mapped code is still an active postable chart account is checked by the Financial Event handler (fail-closed REJECTED, visible/re-drivable) — Treasury cannot read the chart (`AccountingModule` imports `TreasuryModule`; no reverse dependency). So "unmapped" is rejected pre-mutation; "mapped to a code absent from the chart" is rejected at the event (the Treasury/ledger rows already exist in that narrow case).
+- **UI:** `TreasuryAccounts.tsx` — new "GL Mapping" column: `Mapped → <code>` or `Unmapped` + "Requires GL mapping before financial posting"; editor (picker over `GET /accounting/accounts`, postable+active, bank-control accounts first and starred; free-text fallback if the chart can't be listed) using the existing `POST /treasury/accounts/:id/gl-mapping`; clear mapping. Strings: migration `1789850000000-SeedTreasuryGlMappingTerminology` (written; **not run on the shared dev DB**).
+
+## Scope held
+Not touched: D3/D4/D5, returns, fixed assets, deposits/collections, payroll disbursement, `customer-ledger` reverse path, any other controller. `payments`/`supplier-payment` services are behind CLOSED controllers (blast radius: their isolation specs re-run; both specs' fixtures now map `MAIN-CASH` to 1102 because an unmapped payment is now correctly rejected).
+
+## Verification
+- **Real-PG A/B** `treasury-bank-leg.company-isolation.spec.ts` (7/7): chart with TWO `bank` control accounts (1101, 1102) in both Companies. Supplier payment from an account mapped→1102 credits 1102 (not 1101) / debits AP; mapped→1101 credits 1101; UNMAPPED ⇒ rejected with zero rows in treasury_transactions / supplier_payments / supplier_ledger / financial_events / journals / outbox and invoice state unchanged; Company B posts in B only with A's fingerprint unchanged and B's DataSource never requested during A; customer payment into 1102 debits 1102 / credits AR, unmapped rejected with zero side effects; a mapped-but-not-in-chart code ⇒ event REJECTED, no journal, no fallback; control-plane outbox = 0.
+- **Unit** `finance-handlers.bank-leg.spec.ts` (7/7): `resolveControlAccount('bank')` is never called; missing/unknown code ⇒ rejected.
+- **T0 re-run on a clean company (post-D2):** the unmapped `MAIN-CASH` payment is REJECTED ("…is not GL-mapped…"); the 60.00 and 40.00 payments from BANK-1 (→1102) both credit **1102** (GL 1102 −100.00 = the treasury outflow); GL 1101 untouched; Dr = Cr = 300.00; AP and GRNI 0.
+- **Build** clean, **lint** clean on D2 files, **frontend** `tsc -b` + `vite build` clean.
+- **Full regression (one run):** 739 tests — 736 passed, 1 skipped (the opt-in T0 baseline spec), 2 failed in 3 suites (`f03-deadlock-retry-verification`, `artifact-integrity` [5 s timeout], `restore-manager-audit-chain.real-pg` [suite-level teardown]); each re-run in isolation (serial) and PASSED (11/11). Per CTO wording: **736/739 with transient failures isolated and individually cleared** — not "739/739", not "clean".
+
+## Not verified / limits (disclosed)
+- The Treasury Accounts UI is type-checked and built but **not exercised in a browser**: the running dev backend is a stale build and I did not restart it; the new terminology migration was not applied to the shared dev DB.
+- Pre-existing, outside D2 (observations): `deposit.verified` / `collection.remitted` already reject unmapped accounts at the event but only after the Treasury leg and customer ledger are committed (the partial-mutation shape D2 removed for payments); payroll disbursement's cash leg posts no bank GL; `cashInDirect/cashOutDirect` still emit only when mapped. These need their own decisions — not D2.
+
+## Status
+D2 = **IMPLEMENTED / VERIFIED**. Next per CTO: D3 (Inventory movement posting policy) — a P0 accounting-policy decision; no code before the per-movement-type posting table is approved.

@@ -16,6 +16,8 @@ import { ProcessEngineModule } from '../../foundation/process-engine/process-eng
 import { HrModule } from '../hr/hr.module';
 import { TargetsModule } from '../targets/targets.module';
 
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 /**
  * ADR-071 — `commission`'s composition root, Phase 1. `HrModule` (Sales-Rep
  * identity, read-only) and `TargetsModule` (`getApprovedTargetForDate`,
@@ -27,7 +29,7 @@ import { TargetsModule } from '../targets/targets.module';
  * (`finance.invoice.posted`, `collection.remitted`), never a code import.
  */
 @Module({
-  imports: [
+  imports: [CompanyModule, DatabaseRegistryModule, 
     TypeOrmModule.forFeature([CommissionPolicy, CommissionTier, CommissionApprovalBatch, CommissionResult, CommissionAdjustment]),
     AuthenticationModule,
     EventsModule,

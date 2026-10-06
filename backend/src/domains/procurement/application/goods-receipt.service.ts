@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { GoodsReceipt } from '../infrastructure/goods-receipt.entity';
 import { GoodsReceiptLine } from '../infrastructure/goods-receipt-line.entity';
 import { PurchaseOrder } from '../infrastructure/purchase-order.entity';
@@ -10,6 +10,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
+import { ProductLifecycleGate } from './product-lifecycle-gate.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
 
 const GR_DOCUMENT_TYPE = 'goods_receipt';
@@ -49,23 +50,24 @@ export class GoodsReceiptService {
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
     private readonly events: EventBusService,
+    private readonly lifecycleGate: ProductLifecycleGate,
   ) {}
 
-  async listForPurchaseOrder(purchaseOrderId: string): Promise<GoodsReceipt[]> {
-    return this.dataSource.getRepository(GoodsReceipt).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
+  async listForPurchaseOrder(purchaseOrderId: string, manager?: EntityManager): Promise<GoodsReceipt[]> {
+    return (manager ?? this.dataSource).getRepository(GoodsReceipt).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
   }
 
-  async post(input: PostGoodsReceiptInput, actorUserId: string): Promise<GoodsReceipt> {
+  async post(input: PostGoodsReceiptInput, actorUserId: string, manager?: EntityManager): Promise<GoodsReceipt> {
     if (input.lines.length === 0) throw new BadRequestException('A Goods Receipt needs at least one line.');
 
-    const po = await this.dataSource.getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
+    const po = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
     if (!po) throw new NotFoundException(`Purchase Order "${input.purchaseOrderId}" not found.`);
-    const state = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id);
+    const state = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id, manager);
     if (state !== 'approved' && state !== 'partially_received') {
       throw new ConflictException(`Purchase Order is "${state}" — a Goods Receipt can only be posted against an "approved" or "partially_received" order.`);
     }
 
-    const poLines = await this.dataSource.getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
+    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
     const poLineById = new Map(poLines.map((l) => [l.id, l]));
 
     for (const line of input.lines) {
@@ -81,13 +83,14 @@ export class GoodsReceiptService {
       }
     }
 
-    await this.numbering.registerDocumentType(GR_DOCUMENT_TYPE, 'GR');
+    await this.lifecycleGate.assertNoneDraft(poLines.map((l) => l.productId), 'Cannot receive goods on this Purchase Order', manager); // D7 gate (before any mutation)
+    await this.numbering.registerDocumentType(GR_DOCUMENT_TYPE, 'GR', true, manager);
 
-    return this.dataSource.transaction(async (manager) => {
-      const grNumber = await this.numbering.getNextNumber(GR_DOCUMENT_TYPE, manager);
-      const grRepo = manager.getRepository(GoodsReceipt);
-      const grLineRepo = manager.getRepository(GoodsReceiptLine);
-      const poLineRepo = manager.getRepository(PurchaseOrderLine);
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      const grNumber = await this.numbering.getNextNumber(GR_DOCUMENT_TYPE, txManager);
+      const grRepo = txManager.getRepository(GoodsReceipt);
+      const grLineRepo = txManager.getRepository(GoodsReceiptLine);
+      const poLineRepo = txManager.getRepository(PurchaseOrderLine);
 
       const gr = await grRepo.save(
         grRepo.create({
@@ -125,7 +128,7 @@ export class GoodsReceiptService {
           'goods_receipt',
           gr.id,
           actorUserId,
-          manager,
+          txManager,
           poLine.unitCostBase,
         );
 
@@ -143,7 +146,7 @@ export class GoodsReceiptService {
       // ADR-054/ADR-057 — GRNI: Dr Inventory / Cr GRNI, one event for this whole receipt, published
       // in the SAME transaction as every line's inventory movement and quantityReceived increment —
       // or none of it commits.
-      await this.events.publish(manager, AP_EVENT_TOPICS.goodsReceiptPosted, {
+      await this.events.publish(txManager, AP_EVENT_TOPICS.goodsReceiptPosted, {
         idempotencyKey: `procurement:goods_receipt:${gr.id}:posted`,
         businessDate: new Date().toISOString().slice(0, 10),
         orgUnitId: null,
@@ -169,7 +172,7 @@ export class GoodsReceiptService {
         po.id,
         fullyReceived ? 'receive_full' : 'receive_partial',
         actorUserId,
-        manager,
+        txManager,
       );
 
       await this.audit.record(
@@ -183,7 +186,7 @@ export class GoodsReceiptService {
           correlationId: gr.id,
           after: { grNumber, purchaseOrderId: po.id, lines: input.lines.length, fullyReceived },
         },
-        manager,
+        txManager,
       );
 
       return gr;
@@ -193,7 +196,7 @@ export class GoodsReceiptService {
       // this call the `finance.goods_receipt.posted` event would sit `pending` until some UNRELATED
       // later action happened to sweep it up, an accidental and non-deterministic delay, not "GR
       // posts → one journal" (ADR-057's own Acceptance Matrix item 1).
-      await this.events.dispatchPending();
+      await this.events.dispatchAfterCommit(manager);
       return gr;
     });
   }

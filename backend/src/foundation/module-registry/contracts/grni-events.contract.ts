@@ -1,3 +1,5 @@
+import type { EntityManager } from 'typeorm';
+
 /**
  * ADR-054/ADR-056 (Month-End Closing, Phase 8). The GRNI (Goods Received
  * Not Invoiced) integration boundary a **future Procurement-side GRNI
@@ -26,7 +28,8 @@ export interface GrniBalanceEntry {
 
 export interface GrniLedgerContract {
   /** Σ of every outstanding (uninvoiced) goods-receipt balance as of the date, SQL NUMERIC. */
-  getAllGrniBalances(asOfDate?: string): Promise<{ balances: GrniBalanceEntry[]; total: string }>;
+  /** Area 21 (2026-09-28): `manager?` added — the concrete `GrniLedgerService` gained it during `grni.controller.ts`'s own retrofit. */
+  getAllGrniBalances(asOfDate?: string, manager?: EntityManager): Promise<{ balances: GrniBalanceEntry[]; total: string }>;
 }
 
 export const GRNI_LEDGER_CONTRACT = Symbol('GRNI_LEDGER_CONTRACT');

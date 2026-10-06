@@ -1,3 +1,5 @@
+import type { EntityManager } from 'typeorm';
+
 /**
  * P4 Tranche-2 decoupling (ADR-027, MODULE_DEPENDENCY_CONTRACT.md §3,
  * F-MOD-1/F-MOD-2). The `sales` module's public surface for other modules.
@@ -31,10 +33,25 @@ export interface ProductSnapshotContract {
   status: 'draft' | 'active' | 'discontinued';
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+ * added to every method here — `Product`/`BillOfMaterial`/`BomComponent`
+ * are Company-owned data, and this contract is exactly the seam a
+ * Company-scoped caller (e.g. `InventoryController`/`InventoryService`)
+ * crosses to reach them. The concrete implementations
+ * (`ProductsService`/`BomService`) already accept `manager?` — this
+ * widens the published INTERFACE to match, since a caller typed against
+ * the contract (not the concrete class) could not otherwise pass it
+ * through.
+ */
 export interface SalesProductsContract {
-  getProductSnapshot(productId: string): Promise<ProductSnapshotContract | null>;
-  getProductSnapshotBySku(sku: string): Promise<ProductSnapshotContract | null>;
-  listAllProducts(): Promise<Array<{ id: string; unitPrice: string }>>;
+  getProductSnapshot(productId: string, manager?: EntityManager): Promise<ProductSnapshotContract | null>;
+  getProductSnapshotBySku(sku: string, manager?: EntityManager): Promise<ProductSnapshotContract | null>;
+  listAllProducts(manager?: EntityManager): Promise<Array<{ id: string; unitPrice: string }>>;
+  /** D7 — a New Item Request creates a `draft` Product (price 0, unit optional) through the catalog's own creation path. */
+  createDraftProduct(input: { sku: string; name: string; unit?: string | null }, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshotContract>;
+  /** D7 — approval of a New Item Request: the catalog's own `draft → active` transition (never a raw table write). */
+  activateDraftProduct(productId: string, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshotContract>;
 }
 export const SALES_PRODUCTS_CONTRACT = Symbol('SALES_PRODUCTS_CONTRACT');
 
@@ -43,8 +60,45 @@ export interface BomComponentInputContract {
   quantityPerUnit: number;
 }
 
+export type BomStatusContract = 'active' | 'inactive';
+
+export interface BomComponentViewContract extends BomComponentInputContract {
+  sku: string;
+  productName: string;
+  /** The component Product's existing free-text `unit` label (display only — no UoM engine, ADR-061 Addendum 1 A2). */
+  unit: string | null;
+}
+
+export interface BomViewContract {
+  id: string;
+  finishedProductId: string;
+  finishedProductSku: string;
+  finishedProductName: string;
+  status: BomStatusContract;
+  components: BomComponentViewContract[];
+}
+
+export interface BomListEntryContract {
+  finishedProductId: string;
+  sku: string;
+  name: string;
+  status: BomStatusContract;
+  componentCount: number;
+}
+
+/**
+ * `getBomForAssembly` (consumed by Inventory assembly + Work Order release) returns `null` for a
+ * missing OR `inactive` BOM. The remaining members (ADR-061 Addendum 1, 2026-10-06) let the
+ * Manufacturing workspace manage BOM master data through the SAME commerce `BomService` — one
+ * store, one service, manufacturing-owned permission nodes (`manufacturing.bom.*`).
+ */
 export interface SalesBomContract {
-  getBomForAssembly(finishedProductId: string): Promise<BomComponentInputContract[] | null>;
+  getBomForAssembly(finishedProductId: string, manager?: EntityManager): Promise<BomComponentInputContract[] | null>;
+  listBoms(manager?: EntityManager): Promise<BomListEntryContract[]>;
+  getBom(finishedProductId: string, manager?: EntityManager): Promise<BomViewContract | null>;
+  defineBom(finishedProductId: string, components: BomComponentInputContract[], actorUserId: string | null, manager?: EntityManager): Promise<{ id: string }>;
+  setBomStatus(finishedProductId: string, status: BomStatusContract, actorUserId: string | null, manager?: EntityManager): Promise<void>;
+  deleteBom(finishedProductId: string, actorUserId: string | null, manager?: EntityManager): Promise<void>;
 }
 export const SALES_BOM_CONTRACT = Symbol('SALES_BOM_CONTRACT');
 
@@ -69,15 +123,23 @@ export interface CustomerSnapshotContract {
   governorate: string | null;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+ * added to `getCustomer`/`listCustomers`/`getCreditLimit` — the concrete
+ * `CustomersService` implementations of the first two have accepted it
+ * since §16/§20; `getCreditLimit`'s own concrete method gains it now,
+ * for `customer-ledger.controller.ts`'s retrofit (its first real caller
+ * through this published contract).
+ */
 export interface SalesCustomersContract {
   /** P4 Tranche-2 (reports domain) — widened with `id`/`code`/`name`, still an object-shape subset of the real `Promise<Customer>`. */
-  getCustomer(customerId: string, requestingUserId: string): Promise<{ id: string; code: string; name: string; paymentTermsDays: number | null }>;
-  listCustomers(requestingUserId: string): Promise<Array<{ id: string; code: string; name: string }>>;
-  getCreditLimit(customerId: string): Promise<string | null>;
-  /** P4 Tranche-2 (shipment domain) — only `.id` is ever read; narrowed from the concrete `Promise<Customer | null>`. */
-  findByCode(code: string): Promise<{ id: string } | null>;
-  /** P4 Tranche-2 (shipment domain) — matches the concrete method's real return shape exactly (already a narrow, purpose-built cross-domain DTO, not the raw entity). */
-  getCustomerSnapshot(customerId: string): Promise<CustomerSnapshotContract | null>;
+  getCustomer(customerId: string, requestingUserId: string, manager?: EntityManager): Promise<{ id: string; code: string; name: string; paymentTermsDays: number | null }>;
+  listCustomers(requestingUserId: string, manager?: EntityManager): Promise<Array<{ id: string; code: string; name: string }>>;
+  getCreditLimit(customerId: string, manager?: EntityManager): Promise<string | null>;
+  /** P4 Tranche-2 (shipment domain) — only `.id` is ever read; narrowed from the concrete `Promise<Customer | null>`. Area 21: `manager?` added — concrete `CustomersService.findByCode` gained it in the same pass (had none at all before). */
+  findByCode(code: string, manager?: EntityManager): Promise<{ id: string } | null>;
+  /** P4 Tranche-2 (shipment domain) — matches the concrete method's real return shape exactly (already a narrow, purpose-built cross-domain DTO, not the raw entity). Area 21: `manager?` added — concrete `CustomersService.getCustomerSnapshot` already had it. */
+  getCustomerSnapshot(customerId: string, manager?: EntityManager): Promise<CustomerSnapshotContract | null>;
 }
 export const SALES_CUSTOMERS_CONTRACT = Symbol('SALES_CUSTOMERS_CONTRACT');
 
@@ -87,10 +149,19 @@ export const SALES_CUSTOMERS_CONTRACT = Symbol('SALES_CUSTOMERS_CONTRACT');
  * `getInvoice`'s reused Scope check). Narrowed the same way as the
  * contract above: only the fields actually read at the call sites.
  */
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+ * added to `getOrder`/`getOrderLines`/`getOrderSnapshot`/`getOrderLineById`/
+ * `getOrderStatus` — the concrete `SalesOrdersService` implementations
+ * have accepted it since §16; this contract was simply never widened to
+ * match (same class of drift as `SalesProductsContract`/`SalesBomContract`
+ * in §21.1, `SalesCustomersContract` in §25.1). Discovered while
+ * evaluating `shipment.controller.ts`/`returns.controller.ts` (§23/§26).
+ */
 export interface SalesOrdersReadContract {
   /** P4 Tranche-2 (returns domain) — widened with `warehouseId`, still an object-shape subset of the real `Promise<SalesOrder>`. */
-  getOrder(orderId: string, requestingUserId: string): Promise<{ customerId: string; warehouseId: string | null }>;
-  getOrderLines(orderId: string): Promise<
+  getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<{ customerId: string; warehouseId: string | null }>;
+  getOrderLines(orderId: string, manager?: EntityManager): Promise<
     Array<{ id: string; productId: string; quantity: number; unitPrice: string; discountAmount: string; lineTotal: string }>
   >;
   /**
@@ -101,13 +172,13 @@ export interface SalesOrdersReadContract {
    * contract method" precedent as `warehouseId` on `getOrder` above,
    * not a new method.
    */
-  getOrderSnapshot(orderId: string): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null>;
+  getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null>;
   /** P4 Tranche-2 (returns domain) — narrowed from the real `Promise<SalesOrderLine | null>` to the 4 fields actually read. */
-  getOrderLineById(lineId: string): Promise<{ salesOrderId: string; productId: string; quantity: number; lineTotal: string } | null>;
+  getOrderLineById(lineId: string, manager?: EntityManager): Promise<{ salesOrderId: string; productId: string; quantity: number; lineTotal: string } | null>;
   /** P4 Tranche-2 (returns domain) — real return is already a primitive `Promise<string>`. */
-  getOrderStatus(orderId: string): Promise<string>;
+  getOrderStatus(orderId: string, manager?: EntityManager): Promise<string>;
   /** P4 Tranche-2 (reports domain) — narrowed to the fields both `reports.service.ts` and `customer-accounts.service.ts` actually read from the real `Promise<SalesOrder[]>`. */
-  listOrders(actorUserId: string): Promise<
+  listOrders(actorUserId: string, manager?: EntityManager): Promise<
     Array<{
       id: string;
       orderNumber: string;
@@ -139,6 +210,7 @@ export interface SalesOrdersReadContract {
     customerId: string,
     returnDate: Date,
     windowDays: number,
+    manager?: EntityManager,
   ): Promise<
     Array<{
       salesOrderId: string;
@@ -169,7 +241,8 @@ export interface DepositViewContract {
 }
 
 export interface SalesDepositContract {
-  listDepositsForOrder(salesOrderId: string, requestingUserId: string): Promise<DepositViewContract[]>;
-  getLatestDepositForOrder(salesOrderId: string, requestingUserId: string): Promise<DepositViewContract | null>;
+  listDepositsForOrder(salesOrderId: string, requestingUserId: string, manager?: EntityManager): Promise<DepositViewContract[]>;
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-28): `manager?` added — the concrete `DepositsService.getLatestDepositForOrder` gained it during `deposits.controller.ts`'s own retrofit. */
+  getLatestDepositForOrder(salesOrderId: string, requestingUserId: string, manager?: EntityManager): Promise<DepositViewContract | null>;
 }
 export const SALES_DEPOSIT_CONTRACT = Symbol('SALES_DEPOSIT_CONTRACT');

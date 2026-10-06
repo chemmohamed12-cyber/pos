@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { FixedAsset } from '../infrastructure/fixed-asset.entity';
 import { DepreciationRun } from '../infrastructure/depreciation-run.entity';
 import { DepreciationRunLine } from '../infrastructure/depreciation-run-line.entity';
@@ -45,18 +45,22 @@ export class DepreciationService implements OnModuleInit {
     private readonly audit: AuditService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   onModuleInit(): void {
     if (!this.registry.get(FIXED_ASSET_DEPRECIATION_CALCULATED_EVENT)) {
       this.registry.register(FIXED_ASSET_DEPRECIATION_CALCULATED_EVENT, handleFixedAssetDepreciationCalculated);
     }
   }
 
-  async listRuns(): Promise<DepreciationRun[]> {
-    return this.dataSource.getRepository(DepreciationRun).find({ order: { createdAt: 'DESC' } });
+  async listRuns(manager?: EntityManager): Promise<DepreciationRun[]> {
+    return this.em(manager).getRepository(DepreciationRun).find({ order: { createdAt: 'DESC' } });
   }
 
-  async getRunLines(depreciationRunId: string): Promise<DepreciationRunLine[]> {
-    return this.dataSource.getRepository(DepreciationRunLine).find({ where: { depreciationRunId }, order: { createdAt: 'ASC' } });
+  async getRunLines(depreciationRunId: string, manager?: EntityManager): Promise<DepreciationRunLine[]> {
+    return this.em(manager).getRepository(DepreciationRunLine).find({ where: { depreciationRunId }, order: { createdAt: 'ASC' } });
   }
 
   /**
@@ -65,27 +69,27 @@ export class DepreciationService implements OnModuleInit {
    * depreciated). `businessDate` defaults to `depreciationPeriod`'s own last calendar day — the REAL
    * accounting date, preserved even when the run is executed much later (D2 fix) — never "today."
    */
-  async runDepreciation(depreciationPeriod: string, actorUserId: string, businessDate?: string): Promise<RunDepreciationResult> {
+  async runDepreciation(depreciationPeriod: string, actorUserId: string, businessDate?: string, manager?: EntityManager): Promise<RunDepreciationResult> {
     if (!isValidDepreciationPeriod(depreciationPeriod)) {
       throw new BadRequestException(`"${depreciationPeriod}" is not a valid depreciation period (expected YYYY-MM).`);
     }
     const effectiveBusinessDate = businessDate ?? this.lastDayOf(depreciationPeriod);
-    const base = await this.currencies.getBaseCurrency();
+    const base = await this.currencies.getBaseCurrency(manager);
     if (!base) throw new BadRequestException('No base/functional currency is configured — a depreciation run cannot post.');
 
-    const run = await this.dataSource.getRepository(DepreciationRun).save(
-      this.dataSource.getRepository(DepreciationRun).create({
+    const run = await this.em(manager).getRepository(DepreciationRun).save(
+      this.em(manager).getRepository(DepreciationRun).create({
         depreciationPeriod,
         businessDate: effectiveBusinessDate,
         createdBy: actorUserId,
       }),
     );
 
-    const assets = await this.dataSource.getRepository(FixedAsset).find();
+    const assets = await this.em(manager).getRepository(FixedAsset).find();
     const results: RunDepreciationResult['lines'] = [];
 
     for (const asset of assets) {
-      const outcome = await this.runOneAsset(asset, run, depreciationPeriod, effectiveBusinessDate, base.code);
+      const outcome = await this.runOneAsset(asset, run, depreciationPeriod, effectiveBusinessDate, base.code, manager);
       results.push(outcome);
     }
 
@@ -101,7 +105,7 @@ export class DepreciationService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { depreciationPeriod, businessDate: effectiveBusinessDate, assetCount: assets.length, posted: results.filter((r) => !r.skipped && !r.failureReason).length },
-    });
+    }, manager);
 
     return { depreciationRunId: run.id, depreciationPeriod, lines: results };
   }
@@ -111,22 +115,21 @@ export class DepreciationService implements OnModuleInit {
     run: DepreciationRun,
     depreciationPeriod: string,
     businessDate: string,
-    baseCurrencyCode: string,
-  ): Promise<RunDepreciationResult['lines'][number]> {
-    const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id);
+    baseCurrencyCode: string, manager?: EntityManager): Promise<RunDepreciationResult['lines'][number]> {
+    const state = await this.processEngine.getState(FIXED_ASSET_PROCESS, FIXED_ASSET_ENTITY_TYPE, asset.id, manager);
     if (state !== 'active') {
       return { fixedAssetId: asset.id, calculatedAmount: '0.0000', skipped: 'not_active' };
     }
 
     // cheap first filter — the real, binding defense is the DB constraint inside the handler (D2)
-    const existing = await this.dataSource
+    const existing = await this.em(manager)
       .getRepository(DepreciationRunLine)
       .findOne({ where: { fixedAssetId: asset.id, depreciationPeriod } });
     if (existing) {
       return { fixedAssetId: asset.id, calculatedAmount: '0.0000', skipped: 'already_posted' };
     }
 
-    const [row] = (await this.dataSource.query(
+    const [row] = (await this.em(manager).query(
       `SELECT COALESCE(SUM("calculatedAmount"), 0)::numeric(20,4) AS total FROM accounting_depreciation_run_lines WHERE "fixedAssetId" = $1`,
       [asset.id],
     )) as Array<{ total: string }>;
@@ -175,7 +178,7 @@ export class DepreciationService implements OnModuleInit {
       depreciableBase: asset.depreciableBase,
       resultingAccumulatedDepreciation,
       resultingNetBookValue,
-    });
+    }, manager);
 
     if (result.deduped) {
       if (result.status === 'POSTED') {
@@ -187,11 +190,11 @@ export class DepreciationService implements OnModuleInit {
       // the exact same mechanism this codebase already uses to re-drive any other stuck event. This
       // is still ONE FinancialEvent row throughout (never duplicated) and, if it now succeeds, ONE
       // JournalEntry — never two.
-      result = await this.financialEvents.redrive(result.financialEventId);
+      result = await this.financialEvents.redrive(result.financialEventId, manager);
     }
     if (result.status === 'POSTED') {
       if (result.journalEntryId) {
-        await this.dataSource.query(
+        await this.em(manager).query(
           `UPDATE accounting_depreciation_run_lines SET "journalEntryId" = $1 WHERE "fixedAssetId" = $2 AND "depreciationPeriod" = $3`,
           [result.journalEntryId, asset.id, depreciationPeriod],
         );
@@ -201,7 +204,7 @@ export class DepreciationService implements OnModuleInit {
 
     // REJECTED — distinguish "a concurrent run already claimed this pair" (a safe, expected outcome,
     // D2's own concurrency case) from a genuine failure (surfaced, not silently swallowed).
-    const event = await this.financialEvents.getEvent(result.financialEventId);
+    const event = await this.financialEvents.getEvent(result.financialEventId, manager);
     const reason = event.rejectionReason ?? '';
     if (/duplicate key value violates unique constraint/i.test(reason) || /UQ_accounting_depreciation_run_lines_asset_period/i.test(reason)) {
       return { fixedAssetId: asset.id, calculatedAmount: '0.0000', skipped: 'already_posted' };

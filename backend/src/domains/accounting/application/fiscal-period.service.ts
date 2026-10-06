@@ -73,6 +73,10 @@ export class FiscalPeriodService implements OnModuleInit {
     private readonly closingSnapshot: ClosingSnapshotService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async onModuleInit(): Promise<void> {
     await this.approvals.registerRequestType(FISCAL_CLOSING_REQUEST_TYPES.periodClose, 'action.fiscal_period_close');
     await this.approvals.registerRequestType(FISCAL_CLOSING_REQUEST_TYPES.periodReopen, 'action.fiscal_period_reopen');
@@ -129,24 +133,28 @@ export class FiscalPeriodService implements OnModuleInit {
       )
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload as Record<string, unknown>);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
-  async createFiscalYear(input: CreateFiscalYearInput, actorUserId: string): Promise<FiscalYearView> {
-    const fiscalYear = await this.dataSource.transaction(async (manager) => {
+  async createFiscalYear(input: CreateFiscalYearInput, actorUserId: string, manager?: EntityManager): Promise<FiscalYearView> {
+    const fiscalYear = await this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(FiscalYear);
       const saved = await repo.save(
         repo.create({ code: input.code, startDate: input.startDate, endDate: input.endDate, orgUnitId: input.orgUnitId ?? null }),
       );
 
-      await this.processEngine.start(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, saved.id);
+      await this.processEngine.start(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, saved.id, manager);
 
       const periodRepo = manager.getRepository(FiscalPeriod);
       for (const [start, end, code] of this.monthlyPeriods(input.startDate, input.endDate)) {
         const period = await periodRepo.save(periodRepo.create({ fiscalYearId: saved.id, code, startDate: start, endDate: end }));
-        await this.processEngine.start(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id);
+        await this.processEngine.start(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id, manager);
       }
 
       await this.audit.record(
@@ -166,7 +174,7 @@ export class FiscalPeriodService implements OnModuleInit {
       return saved;
     });
 
-    return this.toFiscalYearView(fiscalYear);
+    return this.toFiscalYearView(fiscalYear, manager);
   }
 
   /** Splits [startDate, endDate] into calendar-month periods, code `YYYY-MM`. Last period is truncated to `endDate`, never overruns it. */
@@ -191,19 +199,19 @@ export class FiscalPeriodService implements OnModuleInit {
     return d.toISOString().slice(0, 10);
   }
 
-  async listFiscalYears(): Promise<FiscalYearView[]> {
-    const years = await this.dataSource.getRepository(FiscalYear).find({ order: { startDate: 'DESC' } });
-    return Promise.all(years.map((y) => this.toFiscalYearView(y)));
+  async listFiscalYears(manager?: EntityManager): Promise<FiscalYearView[]> {
+    const years = await this.em(manager).getRepository(FiscalYear).find({ order: { startDate: 'DESC' } });
+    return Promise.all(years.map((y) => this.toFiscalYearView(y, manager)));
   }
 
-  async getFiscalYear(id: string): Promise<FiscalYearView> {
-    const year = await this.dataSource.getRepository(FiscalYear).findOne({ where: { id } });
+  async getFiscalYear(id: string, manager?: EntityManager): Promise<FiscalYearView> {
+    const year = await this.em(manager).getRepository(FiscalYear).findOne({ where: { id } });
     if (!year) throw new NotFoundException(`Fiscal year "${id}" not found.`);
-    return this.toFiscalYearView(year);
+    return this.toFiscalYearView(year, manager);
   }
 
-  private async toFiscalYearView(year: FiscalYear): Promise<FiscalYearView> {
-    const status = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id);
+  private async toFiscalYearView(year: FiscalYear, manager?: EntityManager): Promise<FiscalYearView> {
+    const status = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id, manager);
     return { ...year, status };
   }
 
@@ -222,16 +230,16 @@ export class FiscalPeriodService implements OnModuleInit {
    * ADR-046 D4 — `activate` stays plain-permission, not FA-01-gated
    * (low-risk: activating a fresh, never-posted-into year).
    */
-  async activateFiscalYear(id: string, actorUserId: string): Promise<FiscalYearView> {
-    const year = await this.dataSource.getRepository(FiscalYear).findOne({ where: { id } });
+  async activateFiscalYear(id: string, actorUserId: string, manager?: EntityManager): Promise<FiscalYearView> {
+    const year = await this.em(manager).getRepository(FiscalYear).findOne({ where: { id } });
     if (!year) throw new NotFoundException(`Fiscal year "${id}" not found.`);
 
-    const others = await this.dataSource
+    const others = await this.em(manager)
       .getRepository(FiscalYear)
       .find({ where: { orgUnitId: year.orgUnitId === null ? IsNull() : year.orgUnitId } });
     for (const other of others) {
       if (other.id === id) continue;
-      const otherStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, other.id);
+      const otherStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, other.id, manager);
       if (otherStatus === 'active') {
         throw new ConflictException(
           `Fiscal year "${other.code}" is already active in this scope — only one fiscal year may be active at a time.`,
@@ -239,7 +247,7 @@ export class FiscalPeriodService implements OnModuleInit {
       }
     }
 
-    await this.processEngine.transition(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, id, 'activate', actorUserId);
+    await this.processEngine.transition(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, id, 'activate', actorUserId, manager);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -248,14 +256,14 @@ export class FiscalPeriodService implements OnModuleInit {
       resourceId: id,
       result: 'success',
       correlationId: null,
-    });
-    return this.toFiscalYearView(year);
+    }, manager);
+    return this.toFiscalYearView(year, manager);
   }
 
-  async listPeriods(fiscalYearId: string): Promise<FiscalPeriodView[]> {
-    const periods = await this.dataSource.getRepository(FiscalPeriod).find({ where: { fiscalYearId }, order: { startDate: 'ASC' } });
+  async listPeriods(fiscalYearId: string, manager?: EntityManager): Promise<FiscalPeriodView[]> {
+    const periods = await this.em(manager).getRepository(FiscalPeriod).find({ where: { fiscalYearId }, order: { startDate: 'ASC' } });
     return Promise.all(
-      periods.map(async (p) => ({ ...p, status: await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, p.id) })),
+      periods.map(async (p) => ({ ...p, status: await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, p.id, manager) })),
     );
   }
 
@@ -270,18 +278,18 @@ export class FiscalPeriodService implements OnModuleInit {
    * fired directly here; the controller's own DTO enforces this at the
    * HTTP boundary too).
    */
-  async transitionPeriod(id: string, action: string, actorUserId: string): Promise<FiscalPeriodView> {
+  async transitionPeriod(id: string, action: string, actorUserId: string, manager?: EntityManager): Promise<FiscalPeriodView> {
     if (action === 'close' || action === 'reopen' || action === 'close_after_reopen') {
       throw new ConflictException(
         `Action "${action}" must go through the FA-01 approval flow (submitPeriodClose/submitPeriodReopen) — it cannot be fired directly.`,
       );
     }
-    const period = await this.dataSource.getRepository(FiscalPeriod).findOne({ where: { id } });
+    const period = await this.em(manager).getRepository(FiscalPeriod).findOne({ where: { id } });
     if (!period) throw new NotFoundException(`Fiscal period "${id}" not found.`);
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       await this.applyPeriodTransition(manager, id, action, actorUserId, null);
     });
-    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, id);
+    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, id, manager);
     return { ...period, status };
   }
 
@@ -326,13 +334,13 @@ export class FiscalPeriodService implements OnModuleInit {
   }
 
   /** ADR-050 — lets a maker preview Closing Audit exceptions before submitting (`accounting.fiscal_period.view`, controller-enforced). Runs a fresh audit each call — read-only, same cost as any other reconciliation preview. */
-  async previewClosingAudit(periodId: string, actorUserId: string) {
-    return this.closingAudit.run(periodId, actorUserId);
+  async previewClosingAudit(periodId: string, actorUserId: string, manager?: EntityManager) {
+    return this.closingAudit.run(periodId, actorUserId, manager);
   }
 
   /** ADR-050 — prior Closing Audit runs for this period, newest first. */
-  async listClosingAuditRuns(periodId: string) {
-    return this.closingAudit.listRuns(periodId);
+  async listClosingAuditRuns(periodId: string, manager?: EntityManager) {
+    return this.closingAudit.listRuns(periodId, manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -354,10 +362,10 @@ export class FiscalPeriodService implements OnModuleInit {
    * action) applies is determined by the period's OWN current state —
    * never by which method the caller happened to call.
    */
-  async submitPeriodClose(periodId: string, actorUserId: string): Promise<ApprovalRequestView> {
-    const period = await this.dataSource.getRepository(FiscalPeriod).findOne({ where: { id: periodId } });
+  async submitPeriodClose(periodId: string, actorUserId: string, manager?: EntityManager): Promise<ApprovalRequestView> {
+    const period = await this.em(manager).getRepository(FiscalPeriod).findOne({ where: { id: periodId } });
     if (!period) throw new NotFoundException(`Fiscal period "${periodId}" not found.`);
-    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId);
+    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId, manager);
     if (status !== 'soft_close' && status !== 'reopened') {
       throw new ConflictException(`Fiscal period "${period.code}" is "${status}" — must be "soft_close" or "reopened" before it can be (re)closed.`);
     }
@@ -365,12 +373,12 @@ export class FiscalPeriodService implements OnModuleInit {
     const requestTypeCode = entryState === 'soft_close' ? FISCAL_CLOSING_REQUEST_TYPES.periodClose : FISCAL_CLOSING_REQUEST_TYPES.periodReclose;
     const requestedAction = entryState === 'soft_close' ? 'close' : 'close_after_reopen';
 
-    const workflowRepo = this.dataSource.getRepository(ClosingWorkflowRun);
+    const workflowRepo = this.em(manager).getRepository(ClosingWorkflowRun);
     const workflowRun = await workflowRepo.save(workflowRepo.create({ fiscalPeriodId: periodId, entryState, status: 'audit_run' }));
 
     let finalReconciliationRun;
     try {
-      finalReconciliationRun = await this.closingAudit.assertCleanForClose(periodId, actorUserId);
+      finalReconciliationRun = await this.closingAudit.assertCleanForClose(periodId, actorUserId, manager);
     } catch (err) {
       workflowRun.status = 'exceptions_open';
       workflowRun.completedAt = new Date();
@@ -389,7 +397,7 @@ export class FiscalPeriodService implements OnModuleInit {
       requestedAction,
       payload: { fiscalPeriodId: periodId },
       makerUserId: actorUserId,
-    });
+    }, manager);
 
     workflowRun.approvalRequestId = approvalRequest.id;
     workflowRun.status = 'approval_submitted';
@@ -399,15 +407,15 @@ export class FiscalPeriodService implements OnModuleInit {
   }
 
   /** ADR-051 §1/§6 — evidence trail for a period's closing attempts, newest first. */
-  async listClosingWorkflowRuns(periodId: string): Promise<ClosingWorkflowRun[]> {
-    return this.dataSource.getRepository(ClosingWorkflowRun).find({ where: { fiscalPeriodId: periodId }, order: { createdAt: 'DESC' } });
+  async listClosingWorkflowRuns(periodId: string, manager?: EntityManager): Promise<ClosingWorkflowRun[]> {
+    return this.em(manager).getRepository(ClosingWorkflowRun).find({ where: { fiscalPeriodId: periodId }, order: { createdAt: 'DESC' } });
   }
 
   /** Submit-side permission: the already-existing `accounting.fiscal_period.reopen` node (controller-enforced), unchanged. */
-  async submitPeriodReopen(periodId: string, actorUserId: string): Promise<ApprovalRequestView> {
-    const period = await this.dataSource.getRepository(FiscalPeriod).findOne({ where: { id: periodId } });
+  async submitPeriodReopen(periodId: string, actorUserId: string, manager?: EntityManager): Promise<ApprovalRequestView> {
+    const period = await this.em(manager).getRepository(FiscalPeriod).findOne({ where: { id: periodId } });
     if (!period) throw new NotFoundException(`Fiscal period "${periodId}" not found.`);
-    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId);
+    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId, manager);
     if (status !== 'closed') {
       throw new ConflictException(`Fiscal period "${period.code}" is "${status}" — must be "closed" before it can be reopened.`);
     }
@@ -418,7 +426,7 @@ export class FiscalPeriodService implements OnModuleInit {
       requestedAction: 'reopen',
       payload: { fiscalPeriodId: periodId },
       makerUserId: actorUserId,
-    });
+    }, manager);
   }
 
   /**
@@ -427,10 +435,10 @@ export class FiscalPeriodService implements OnModuleInit {
    * in `applyApprovedYearClose` below, since a period can be `reopen`ed
    * during the unbounded FA-01 approval window.
    */
-  async submitYearClose(yearId: string, actorUserId: string): Promise<ApprovalRequestView> {
-    const year = await this.dataSource.getRepository(FiscalYear).findOne({ where: { id: yearId } });
+  async submitYearClose(yearId: string, actorUserId: string, manager?: EntityManager): Promise<ApprovalRequestView> {
+    const year = await this.em(manager).getRepository(FiscalYear).findOne({ where: { id: yearId } });
     if (!year) throw new NotFoundException(`Fiscal year "${yearId}" not found.`);
-    const blocking = await this.findNonClosedPeriods(yearId);
+    const blocking = await this.findNonClosedPeriods(yearId, manager);
     if (blocking.length > 0) {
       throw new ConflictException(
         `Cannot submit fiscal year "${year.code}" for closing — the following periods are not closed: ${blocking.map((p) => p.code).join(', ')}.`,
@@ -443,13 +451,13 @@ export class FiscalPeriodService implements OnModuleInit {
       requestedAction: 'close',
       payload: { fiscalYearId: yearId },
       makerUserId: actorUserId,
-    });
+    }, manager);
   }
 
-  private async findNonClosedPeriods(fiscalYearId: string): Promise<Array<{ id: string; code: string; status: string }>> {
-    const periods = await this.dataSource.getRepository(FiscalPeriod).find({ where: { fiscalYearId } });
+  private async findNonClosedPeriods(fiscalYearId: string, manager?: EntityManager): Promise<Array<{ id: string; code: string; status: string }>> {
+    const periods = await this.em(manager).getRepository(FiscalPeriod).find({ where: { fiscalYearId } });
     const withStatus = await Promise.all(
-      periods.map(async (p) => ({ id: p.id, code: p.code, status: await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, p.id) })),
+      periods.map(async (p) => ({ id: p.id, code: p.code, status: await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, p.id, manager) })),
     );
     return withStatus.filter((p) => p.status !== 'closed');
   }
@@ -458,15 +466,15 @@ export class FiscalPeriodService implements OnModuleInit {
   // ADR-046 D7 — FA-01 approval subscriber (checker-decided side effect)
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     const approvalRequestId = String(payload.approvalRequestId ?? '');
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
 
     if (requestTypeCode === FISCAL_CLOSING_REQUEST_TYPES.periodClose) {
-      const { snapshotRunId } = await this.applyApprovedPeriodTransition(String(inner.fiscalPeriodId ?? ''), 'close', 'closed', approvalRequestId, true);
-      await this.markClosingWorkflowLocked(approvalRequestId);
-      if (snapshotRunId) await this.closingSnapshot.assembleAndFinalize(snapshotRunId);
+      const { snapshotRunId } = await this.applyApprovedPeriodTransition(String(inner.fiscalPeriodId ?? ''), 'close', 'closed', approvalRequestId, true, manager);
+      await this.markClosingWorkflowLocked(approvalRequestId, manager);
+      if (snapshotRunId) await this.closingSnapshot.assembleAndFinalize(snapshotRunId, manager);
     } else if (requestTypeCode === FISCAL_CLOSING_REQUEST_TYPES.periodReclose) {
       // ADR-051 §1.3 — the reclose path (`reopened -> closed`, action `close_after_reopen`), now
       // FA-01-gated exactly like periodClose (closes the gap the review flagged: no more silent,
@@ -476,14 +484,13 @@ export class FiscalPeriodService implements OnModuleInit {
         'close_after_reopen',
         'closed',
         approvalRequestId,
-        true,
-      );
-      await this.markClosingWorkflowLocked(approvalRequestId);
-      if (snapshotRunId) await this.closingSnapshot.assembleAndFinalize(snapshotRunId);
+        true, manager);
+      await this.markClosingWorkflowLocked(approvalRequestId, manager);
+      if (snapshotRunId) await this.closingSnapshot.assembleAndFinalize(snapshotRunId, manager);
     } else if (requestTypeCode === FISCAL_CLOSING_REQUEST_TYPES.periodReopen) {
-      await this.applyApprovedPeriodTransition(String(inner.fiscalPeriodId ?? ''), 'reopen', 'reopened', approvalRequestId);
+      await this.applyApprovedPeriodTransition(String(inner.fiscalPeriodId ?? ''), 'reopen', 'reopened', approvalRequestId, undefined, manager);
     } else if (requestTypeCode === FISCAL_CLOSING_REQUEST_TYPES.yearClose) {
-      await this.applyApprovedYearClose(String(inner.fiscalYearId ?? ''), approvalRequestId);
+      await this.applyApprovedYearClose(String(inner.fiscalYearId ?? ''), approvalRequestId, manager);
     }
     // else: not one of F13's request types — not ours, ignore (mirrors F12's FixedAssetDisposalService).
   }
@@ -510,17 +517,16 @@ export class FiscalPeriodService implements OnModuleInit {
     action: string,
     targetStatus: string,
     approvalRequestId: string,
-    beginSnapshot = false,
-  ): Promise<{ snapshotRunId: string | null }> {
+    beginSnapshot = false, manager?: EntityManager): Promise<{ snapshotRunId: string | null }> {
     if (!periodId) return { snapshotRunId: null };
-    const currentStatus = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId);
+    const currentStatus = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId, manager);
     if (currentStatus === targetStatus) {
-      await this.auditSkipAlreadyApplied('fiscal_period', periodId, action, approvalRequestId, currentStatus);
+      await this.auditSkipAlreadyApplied('fiscal_period', periodId, action, approvalRequestId, currentStatus, manager);
       return { snapshotRunId: null };
     }
     try {
       let snapshotRunId: string | null = null;
-      await this.dataSource.transaction(async (manager) => {
+      await this.em(manager).transaction(async (manager) => {
         await this.applyPeriodTransition(manager, periodId, action, SYSTEM_ACTOR_ID, approvalRequestId);
         if (beginSnapshot) {
           const run = await this.closingSnapshot.beginPending(manager, periodId, approvalRequestId, SYSTEM_ACTOR_ID);
@@ -530,9 +536,9 @@ export class FiscalPeriodService implements OnModuleInit {
       return { snapshotRunId };
     } catch (err) {
       if (err instanceof ConflictException) {
-        const recheck = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId);
+        const recheck = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, periodId, manager);
         if (recheck === targetStatus) {
-          await this.auditSkipAlreadyApplied('fiscal_period', periodId, action, approvalRequestId, recheck);
+          await this.auditSkipAlreadyApplied('fiscal_period', periodId, action, approvalRequestId, recheck, manager);
           return { snapshotRunId: null };
         }
       }
@@ -551,15 +557,15 @@ export class FiscalPeriodService implements OnModuleInit {
    * commits fully before this lock is acquired (seen here, correctly) or
    * blocks until this transaction ends (seen next time, never mid-read).
    */
-  private async applyApprovedYearClose(yearId: string, approvalRequestId: string): Promise<void> {
+  private async applyApprovedYearClose(yearId: string, approvalRequestId: string, manager?: EntityManager): Promise<void> {
     if (!yearId) return;
-    const currentYearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, yearId);
+    const currentYearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, yearId, manager);
     if (currentYearStatus === 'closed') {
-      await this.auditSkipAlreadyApplied('fiscal_year', yearId, 'close', approvalRequestId, currentYearStatus);
+      await this.auditSkipAlreadyApplied('fiscal_year', yearId, 'close', approvalRequestId, currentYearStatus, manager);
       return;
     }
     try {
-      await this.dataSource.transaction(async (manager) => {
+      await this.em(manager).transaction(async (manager) => {
         const periods = await manager.getRepository(FiscalPeriod).find({ where: { fiscalYearId: yearId }, order: { id: 'ASC' } });
         const periodIds = periods.map((p) => p.id);
         let lockedRows: Array<{ entityId: string; currentState: string }> = [];
@@ -619,9 +625,9 @@ export class FiscalPeriodService implements OnModuleInit {
       });
     } catch (err) {
       if (err instanceof ConflictException) {
-        const recheck = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, yearId);
+        const recheck = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, yearId, manager);
         if (recheck === 'closed') {
-          await this.auditSkipAlreadyApplied('fiscal_year', yearId, 'close', approvalRequestId, recheck);
+          await this.auditSkipAlreadyApplied('fiscal_year', yearId, 'close', approvalRequestId, recheck, manager);
           return;
         }
       }
@@ -630,8 +636,8 @@ export class FiscalPeriodService implements OnModuleInit {
   }
 
   /** ADR-051 §1/§6 — marks this closing attempt's evidence trail complete once the transition has actually applied. Benign no-op if no matching row exists (e.g. a very old approval predating Phase 3). */
-  private async markClosingWorkflowLocked(approvalRequestId: string): Promise<void> {
-    const repo = this.dataSource.getRepository(ClosingWorkflowRun);
+  private async markClosingWorkflowLocked(approvalRequestId: string, manager?: EntityManager): Promise<void> {
+    const repo = this.em(manager).getRepository(ClosingWorkflowRun);
     const run = await repo.findOne({ where: { approvalRequestId } });
     if (!run || run.status === 'period_locked') return;
     run.status = 'period_locked';
@@ -639,7 +645,7 @@ export class FiscalPeriodService implements OnModuleInit {
     await repo.save(run);
   }
 
-  private async auditSkipAlreadyApplied(resource: string, resourceId: string, action: string, approvalRequestId: string, status: string): Promise<void> {
+  private async auditSkipAlreadyApplied(resource: string, resourceId: string, action: string, approvalRequestId: string, status: string, manager?: EntityManager): Promise<void> {
     await this.audit.record({
       actorUserId: SYSTEM_ACTOR_ID,
       organizationId: null,
@@ -649,7 +655,7 @@ export class FiscalPeriodService implements OnModuleInit {
       result: 'success',
       correlationId: approvalRequestId,
       after: { status },
-    });
+    }, manager);
   }
 
   /**
@@ -666,10 +672,10 @@ export class FiscalPeriodService implements OnModuleInit {
    * or `'closed'` year's periods were postable regardless of the year's
    * own status).
    */
-  async assertOpenForPosting(orgUnitId: string | null, businessDate: string): Promise<void> {
+  async assertOpenForPosting(orgUnitId: string | null, businessDate: string, manager?: EntityManager): Promise<void> {
     const covers = (start: string, end: string) => start <= businessDate && end >= businessDate; // ISO date strings compare lexicographically
 
-    const yearRepo = this.dataSource.getRepository(FiscalYear);
+    const yearRepo = (manager ?? this.dataSource).getRepository(FiscalYear);
     let year: FiscalYear | undefined;
     if (orgUnitId) {
       const scoped = await yearRepo.find({ where: { orgUnitId } });
@@ -683,18 +689,18 @@ export class FiscalPeriodService implements OnModuleInit {
       throw new ConflictException(`No fiscal year covers business date "${businessDate}" — posting is not possible.`);
     }
 
-    const yearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id);
+    const yearStatus = await this.processEngine.getState(FISCAL_YEAR_PROCESS, FISCAL_YEAR_ENTITY_TYPE, year.id, manager);
     if (yearStatus !== 'active') {
       throw new ConflictException(`Fiscal year "${year.code}" is "${yearStatus}", not active — posting is not possible.`);
     }
 
-    const periods = await this.dataSource.getRepository(FiscalPeriod).find({ where: { fiscalYearId: year.id } });
+    const periods = await (manager ?? this.dataSource).getRepository(FiscalPeriod).find({ where: { fiscalYearId: year.id } });
     const period = periods.find((p) => covers(p.startDate, p.endDate));
     if (!period) {
       throw new ConflictException(`No fiscal period covers business date "${businessDate}" — posting is not possible.`);
     }
 
-    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id);
+    const status = await this.processEngine.getState(FISCAL_PERIOD_PROCESS, FISCAL_PERIOD_ENTITY_TYPE, period.id, manager);
     if (status !== 'open' && status !== 'reopened') {
       throw new ConflictException(`Fiscal period "${period.code}" is "${status}", not open — posting is not possible.`);
     }

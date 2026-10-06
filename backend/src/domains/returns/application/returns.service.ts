@@ -48,6 +48,10 @@ export class ReturnsService implements LogisticsReturnsContract {
     @Inject(SALES_CUSTOMERS_CONTRACT) private readonly customers: SalesCustomersContract,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   /**
    * Returns Engine (CTO directive) — resolves the line directly rather
    * than trusting a client-supplied productId/salesOrderId pair (ambiguous
@@ -62,22 +66,21 @@ export class ReturnsService implements LogisticsReturnsContract {
     quantity: number,
     returnType: ReturnType,
     reason: string,
-    requestedByUserId: string,
-  ): Promise<ReturnRequest> {
+    requestedByUserId: string, manager?: EntityManager): Promise<ReturnRequest> {
     if (!isValidReturnType(returnType)) throw new BadRequestException(`Invalid return type "${returnType}".`);
     if (!Number.isInteger(quantity) || quantity <= 0) throw new BadRequestException('Return quantity must be a positive integer.');
 
-    const line = await this.salesOrders.getOrderLineById(salesOrderLineId);
+    const line = await this.salesOrders.getOrderLineById(salesOrderLineId, manager);
     if (!line) throw new NotFoundException(`Sales order line "${salesOrderLineId}" not found.`);
-    const order = await this.salesOrders.getOrder(line.salesOrderId, requestedByUserId);
+    const order = await this.salesOrders.getOrder(line.salesOrderId, requestedByUserId, manager);
     if (!order.warehouseId) {
       throw new BadRequestException(`Sales order "${line.salesOrderId}" has no warehouse to return stock into.`);
     }
 
-    const priorRequests = await this.dataSource.getRepository(ReturnRequest).find({ where: { salesOrderLineId } });
+    const priorRequests = await this.em(manager).getRepository(ReturnRequest).find({ where: { salesOrderLineId } });
     let previouslyReturned = 0;
     for (const prior of priorRequests) {
-      const state = await this.getStatus(prior.id);
+      const state = await this.getStatus(prior.id, manager);
       if (state !== 'rejected') previouslyReturned += prior.quantity;
     }
     const maxReturnable = line.quantity - previouslyReturned;
@@ -87,10 +90,10 @@ export class ReturnsService implements LogisticsReturnsContract {
       );
     }
 
-    await this.numbering.registerDocumentType('return', 'RET'); // idempotent
-    const returnNumber = await this.numbering.getNextNumber('return');
+    await this.numbering.registerDocumentType('return', 'RET', undefined, manager); // idempotent
+    const returnNumber = await this.numbering.getNextNumber('return', manager);
 
-    const repo = this.dataSource.getRepository(ReturnRequest);
+    const repo = this.em(manager).getRepository(ReturnRequest);
     const request = await repo.save(
       repo.create({
         salesOrderId: line.salesOrderId,
@@ -112,7 +115,7 @@ export class ReturnsService implements LogisticsReturnsContract {
         custodianId: null,
       }),
     );
-    await this.processEngine.start(RETURN_PROCESS, ENTITY_TYPE, request.id);
+    await this.processEngine.start(RETURN_PROCESS, ENTITY_TYPE, request.id, manager);
 
     await this.audit.record({
       actorUserId: requestedByUserId,
@@ -123,7 +126,7 @@ export class ReturnsService implements LogisticsReturnsContract {
       result: 'success',
       correlationId: null,
       after: { salesOrderId: line.salesOrderId, salesOrderLineId, productId: line.productId, quantity, reason, returnType, returnNumber },
-    });
+    }, manager);
 
     return request;
   }
@@ -148,18 +151,17 @@ export class ReturnsService implements LogisticsReturnsContract {
     productId: string,
     quantity: number,
     reason: string,
-    actorUserId: string,
-  ): Promise<ReturnRequest> {
-    await this.requireRole(actorUserId, ['warehouse_worker', 'sales_supervisor']);
+    actorUserId: string, manager?: EntityManager): Promise<ReturnRequest> {
+    await this.requireRole(actorUserId, ['warehouse_worker', 'sales_supervisor'], manager);
 
     if (!Number.isInteger(quantity) || quantity <= 0) throw new BadRequestException('Return quantity must be a positive integer.');
 
-    const shipmentState = await this.shipments.getStatus(shipmentId);
+    const shipmentState = await this.shipments.getStatus(shipmentId, manager);
     if (shipmentState === 'delivered' || shipmentState === 'returned') {
       throw new BadRequestException(`Cannot initiate a custody return for a shipment in state "${shipmentState}" — the goods are no longer in custody.`);
     }
 
-    const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId);
+    const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId, manager);
     if (!shipmentSnapshot) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
     if (!shipmentSnapshot.shippingCompanyId && !shipmentSnapshot.vehicleId) {
       throw new BadRequestException('This shipment has no shipping company or vehicle custodian assigned — use the standard customer return instead.');
@@ -174,19 +176,19 @@ export class ReturnsService implements LogisticsReturnsContract {
     // perform in the common case (COD only ever posts at actual delivery,
     // `DeliveryService.recordCollection`) — but if collection already
     // happened, reject outright rather than silently mishandle money.
-    const existingCollection = await this.delivery.getCollectionForShipmentUnscoped(shipmentId);
+    const existingCollection = await this.delivery.getCollectionForShipmentUnscoped(shipmentId, manager);
     if (existingCollection) {
       throw new ConflictException(
         `Shipment "${shipmentId}" already has a COD collection recorded (${existingCollection.id}) — a custody return after collection requires manual finance reconciliation and is not supported here.`,
       );
     }
 
-    const order = await this.salesOrders.getOrder(shipmentSnapshot.salesOrderId, actorUserId);
+    const order = await this.salesOrders.getOrder(shipmentSnapshot.salesOrderId, actorUserId, manager);
     if (!order.warehouseId) {
       throw new BadRequestException(`Sales order "${shipmentSnapshot.salesOrderId}" has no warehouse to return stock into.`);
     }
 
-    const custodyWarehouseId = await this.shipments.getCurrentCustodyWarehouseId(shipmentId);
+    const custodyWarehouseId = await this.shipments.getCurrentCustodyWarehouseId(shipmentId, manager);
     if (!custodyWarehouseId) {
       throw new ConflictException('Could not resolve the current custody warehouse for this shipment.');
     }
@@ -195,10 +197,10 @@ export class ReturnsService implements LogisticsReturnsContract {
     const custodianId = shipmentSnapshot.vehicleId ?? shipmentSnapshot.shippingCompanyId!;
     const origin: ReturnOrigin = custodianType === 'vehicle' ? 'vehicle_custody' : 'shipping_company_custody';
 
-    await this.numbering.registerDocumentType('return', 'RET'); // idempotent
-    const returnNumber = await this.numbering.getNextNumber('return');
+    await this.numbering.registerDocumentType('return', 'RET', undefined, manager); // idempotent
+    const returnNumber = await this.numbering.getNextNumber('return', manager);
 
-    const repo = this.dataSource.getRepository(ReturnRequest);
+    const repo = this.em(manager).getRepository(ReturnRequest);
     const request = await repo.save(
       repo.create({
         salesOrderId: shipmentSnapshot.salesOrderId,
@@ -216,19 +218,19 @@ export class ReturnsService implements LogisticsReturnsContract {
         custodianId,
       }),
     );
-    await this.processEngine.start(RETURN_PROCESS, ENTITY_TYPE, request.id);
+    await this.processEngine.start(RETURN_PROCESS, ENTITY_TYPE, request.id, manager);
     // Custody returns are dispatcher-initiated (already role-gated at entry
     // above), not a customer-facing request awaiting a supervisor's
     // separate approval — auto-authorize straight through, same as no
     // second approval gate exists on Inventory's own deposit-confirm path.
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, request.id, 'authorize', actorUserId);
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, request.id, 'authorize', actorUserId, manager);
 
     // `relocateReservedStock` enforces the REAL cap here: it fails if this
     // custodian's warehouse doesn't actually hold >= `quantity` of this
     // product under an active reservation for this order — the custody
     // return's equivalent of Phase A's "sold qty - previously returned"
     // check, just checked against physical custody instead.
-    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(order.warehouseId, 'inspection');
+    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(order.warehouseId, 'inspection', manager);
     await this.inventory.relocateReservedStock(
       shipmentSnapshot.salesOrderId,
       productId,
@@ -238,10 +240,11 @@ export class ReturnsService implements LogisticsReturnsContract {
       'custody_return_request',
       request.id,
       actorUserId,
+      manager,
     );
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, request.id, 'receive_at_warehouse', actorUserId);
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, request.id, 'receive_at_warehouse', actorUserId, manager);
 
-    await this.shipments.recordCustodyReversal(shipmentId, productId, quantity, actorUserId);
+    await this.shipments.recordCustodyReversal(shipmentId, productId, quantity, actorUserId, manager);
 
     await this.audit.record({
       actorUserId,
@@ -252,37 +255,37 @@ export class ReturnsService implements LogisticsReturnsContract {
       result: 'success',
       correlationId: null,
       after: { shipmentId, custodianType, custodianId, productId, quantity, reason, origin, returnNumber },
-    });
+    }, manager);
 
     return request;
   }
 
   /** Backs the Returns operational screen — every actor in the return lifecycle (rep, supervisor, warehouse_worker) needs visibility across the whole queue to do their stage's job, same "qualified role over the whole queue" pattern as Sales Orders' reviewer visibility. */
-  async listReturns(): Promise<Array<ReturnRequest & { state: string }>> {
-    const requests = await this.dataSource.getRepository(ReturnRequest).find({ order: { createdAt: 'DESC' } });
+  async listReturns(manager?: EntityManager): Promise<Array<ReturnRequest & { state: string }>> {
+    const requests = await (manager ?? this.dataSource).getRepository(ReturnRequest).find({ order: { createdAt: 'DESC' } });
     return Promise.all(
-      requests.map(async (r) => ({ ...r, state: await this.getStatus(r.id) })),
+      requests.map(async (r) => ({ ...r, state: await this.getStatus(r.id, manager) })),
     );
   }
 
-  private async requireRole(actorUserId: string, roles: string[]): Promise<void> {
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId);
+  private async requireRole(actorUserId: string, roles: string[], manager?: EntityManager): Promise<void> {
+    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
     if (userRoles.includes('admin')) return;
     if (!roles.some((r) => userRoles.includes(r))) {
       throw new ForbiddenException(`Role required: one of [${roles.join(', ')}] (or admin).`);
     }
   }
 
-  async authorize(returnRequestId: string, actorUserId: string): Promise<string> {
-    await this.requireRole(actorUserId, ['sales_supervisor']);
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'authorize', actorUserId);
-    return this.getStatus(returnRequestId);
+  async authorize(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    await this.requireRole(actorUserId, ['sales_supervisor'], manager);
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'authorize', actorUserId, manager);
+    return this.getStatus(returnRequestId, manager);
   }
 
-  async reject(returnRequestId: string, actorUserId: string): Promise<string> {
-    await this.requireRole(actorUserId, ['sales_supervisor']);
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'reject', actorUserId);
-    return this.getStatus(returnRequestId);
+  async reject(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    await this.requireRole(actorUserId, ['sales_supervisor'], manager);
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'reject', actorUserId, manager);
+    return this.getStatus(returnRequestId, manager);
   }
 
   /**
@@ -294,12 +297,12 @@ export class ReturnsService implements LogisticsReturnsContract {
    * `authorized`), nothing has touched the ledger — matches the
    * directive's "Draft لا يحرك مخزونًا" boundary.
    */
-  async receiveAtWarehouse(returnRequestId: string, actorUserId: string): Promise<string> {
-    await this.requireRole(actorUserId, ['warehouse_worker']);
-    const request = await this.dataSource.getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'receive_at_warehouse', actorUserId);
+  async receiveAtWarehouse(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
+    const request = await this.em(manager).getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'receive_at_warehouse', actorUserId, manager);
 
-    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(request.warehouseId, 'inspection');
+    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(request.warehouseId, 'inspection', manager);
     await this.inventory.recordMovement(
       inspectionWarehouseId,
       request.productId,
@@ -308,38 +311,39 @@ export class ReturnsService implements LogisticsReturnsContract {
       'return_request',
       returnRequestId,
       actorUserId,
+      manager,
     );
 
-    return this.getStatus(returnRequestId);
+    return this.getStatus(returnRequestId, manager);
   }
 
-  async inspect(returnRequestId: string, actorUserId: string): Promise<string> {
-    await this.requireRole(actorUserId, ['warehouse_worker']);
-    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'inspect', actorUserId);
-    return this.getStatus(returnRequestId);
+  async inspect(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
+    await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'inspect', actorUserId, manager);
+    return this.getStatus(returnRequestId, manager);
   }
 
-  private async getOrCreateReturnSubLocation(parentWarehouseId: string, kind: ReturnSubLocationKind): Promise<string> {
+  private async getOrCreateReturnSubLocation(parentWarehouseId: string, kind: ReturnSubLocationKind, manager?: EntityManager): Promise<string> {
     const config = RETURN_SUB_LOCATIONS[kind];
-    const existing = await this.inventory.findOperationalSubLocation(parentWarehouseId, `${config.prefix}-`);
+    const existing = await this.inventory.findOperationalSubLocation(parentWarehouseId, `${config.prefix}-`, manager);
     if (existing) return existing.id;
 
-    await this.numbering.registerDocumentType(config.documentType, config.prefix, false);
-    const code = await this.numbering.getNextNumber(config.documentType);
-    const warehouse = await this.inventory.createWarehouse(code, config.name, null, null, parentWarehouseId, 'operational');
+    await this.numbering.registerDocumentType(config.documentType, config.prefix, false, manager);
+    const code = await this.numbering.getNextNumber(config.documentType, manager);
+    const warehouse = await this.inventory.createWarehouse(code, config.name, null, null, parentWarehouseId, 'operational', manager);
     return warehouse.id;
   }
 
   /** `null` return means a write-off with no inbound leg (scrap) — never a bug, a deliberate one-sided ledger exit, same precedent as a final customer dispatch. */
-  private async resolveDispositionDestination(mainWarehouseId: string, disposition: DispositionType): Promise<string | null> {
+  private async resolveDispositionDestination(mainWarehouseId: string, disposition: DispositionType, manager?: EntityManager): Promise<string | null> {
     switch (disposition) {
       case 'restock':
       case 'replacement':
         return mainWarehouseId; // Finished Goods — the order's own warehouse
       case 'damaged':
-        return this.getOrCreateReturnSubLocation(mainWarehouseId, 'damaged');
+        return this.getOrCreateReturnSubLocation(mainWarehouseId, 'damaged', manager);
       case 'repair':
-        return this.getOrCreateReturnSubLocation(mainWarehouseId, 'repair');
+        return this.getOrCreateReturnSubLocation(mainWarehouseId, 'repair', manager);
       case 'scrap':
         return null;
     }
@@ -385,16 +389,15 @@ export class ReturnsService implements LogisticsReturnsContract {
     returnRequestId: string,
     disposition: DispositionType,
     notes: string | null,
-    actorUserId: string,
-  ): Promise<ReturnDisposition> {
-    await this.requireRole(actorUserId, ['warehouse_worker']);
+    actorUserId: string, manager?: EntityManager): Promise<ReturnDisposition> {
+    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
 
-    const currentState = await this.getStatus(returnRequestId);
+    const currentState = await this.getStatus(returnRequestId, manager);
     if (currentState !== 'inspected') {
       throw new ConflictException(`Cannot record a disposition for a return in state "${currentState}".`);
     }
 
-    const request = await this.dataSource.getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
+    const request = await this.em(manager).getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
 
     // Phase B — "replacement" (issue a different unit to the customer) is
     // meaningless for a pre-delivery custody return: the customer never
@@ -404,10 +407,10 @@ export class ReturnsService implements LogisticsReturnsContract {
       throw new BadRequestException('"replacement" is a customer-facing disposition — not valid for a pre-delivery custody return.');
     }
 
-    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(request.warehouseId, 'inspection');
-    const destinationWarehouseId = await this.resolveDispositionDestination(request.warehouseId, disposition);
+    const inspectionWarehouseId = await this.getOrCreateReturnSubLocation(request.warehouseId, 'inspection', manager);
+    const destinationWarehouseId = await this.resolveDispositionDestination(request.warehouseId, disposition, manager);
 
-    const { record, createdCredit } = await this.dataSource.transaction(async (manager) => {
+    const { record, createdCredit } = await this.em(manager).transaction(async (manager) => {
       const repo = manager.getRepository(ReturnDisposition);
       const saved = await repo.save(repo.create({ returnRequestId, disposition, notes, inspectedByUserId: actorUserId }));
       await this.events.publish(manager, 'return.disposition.recorded', { returnRequestId, disposition });
@@ -477,7 +480,7 @@ export class ReturnsService implements LogisticsReturnsContract {
 
       return { record: saved, createdCredit };
     });
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
 
     await this.audit.record({
       actorUserId,
@@ -493,7 +496,7 @@ export class ReturnsService implements LogisticsReturnsContract {
         creditId: createdCredit?.id ?? null,
         creditAmount: createdCredit?.originalAmount ?? null,
       },
-    });
+    }, manager);
 
     return record;
   }
@@ -513,9 +516,9 @@ export class ReturnsService implements LogisticsReturnsContract {
     actorUserId: string,
     manager?: EntityManager,
   ): Promise<ReturnCredit> {
-    const line = await this.salesOrders.getOrderLineById(salesOrderLineId);
+    const line = await this.salesOrders.getOrderLineById(salesOrderLineId, manager);
     if (!line) throw new NotFoundException(`Sales order line "${salesOrderLineId}" not found — cannot price the return credit.`);
-    const order = await this.salesOrders.getOrderSnapshot(request.salesOrderId);
+    const order = await this.salesOrders.getOrderSnapshot(request.salesOrderId, manager);
     if (!order) throw new NotFoundException(`Sales order "${request.salesOrderId}" not found.`);
 
     const perUnitEffectivePrice = Number(line.lineTotal) / line.quantity;
@@ -579,9 +582,8 @@ export class ReturnsService implements LogisticsReturnsContract {
   private async validateAndDecrementCreditAmount(
     creditId: string,
     requestedAmountStr: string,
-    expectedCustomerId: string,
-  ): Promise<{ credit: ReturnCredit; beforeUsed: string; beforeRemaining: string; requestedAmount: number }> {
-    const repo = this.dataSource.getRepository(ReturnCredit);
+    expectedCustomerId: string, manager?: EntityManager): Promise<{ credit: ReturnCredit; beforeUsed: string; beforeRemaining: string; requestedAmount: number }> {
+    const repo = this.em(manager).getRepository(ReturnCredit);
     const credit = await repo.findOne({ where: { id: creditId } });
     if (!credit) throw new NotFoundException(`Return credit "${creditId}" not found.`);
     if (credit.status !== 'active') {
@@ -608,16 +610,16 @@ export class ReturnsService implements LogisticsReturnsContract {
     return { credit, beforeUsed, beforeRemaining, requestedAmount };
   }
 
-  async applyCreditToOrder(creditId: string, salesOrderId: string, amount: string, actorUserId: string): Promise<ReturnCredit> {
-    const order = await this.salesOrders.getOrder(salesOrderId, actorUserId);
-    const orderStatus = await this.salesOrders.getOrderStatus(salesOrderId);
+  async applyCreditToOrder(creditId: string, salesOrderId: string, amount: string, actorUserId: string, manager?: EntityManager): Promise<ReturnCredit> {
+    const order = await this.salesOrders.getOrder(salesOrderId, actorUserId, manager);
+    const orderStatus = await this.salesOrders.getOrderStatus(salesOrderId, manager);
     if (orderStatus !== 'draft') {
       throw new ConflictException(`Credits can only be applied to a draft order (this order is "${orderStatus}").`);
     }
 
-    const { credit, beforeUsed, beforeRemaining, requestedAmount } = await this.validateAndDecrementCreditAmount(creditId, amount, order.customerId);
+    const { credit, beforeUsed, beforeRemaining, requestedAmount } = await this.validateAndDecrementCreditAmount(creditId, amount, order.customerId, manager);
     credit.appliedToSalesOrderId = salesOrderId;
-    const saved = await this.dataSource.getRepository(ReturnCredit).save(credit);
+    const saved = await this.em(manager).getRepository(ReturnCredit).save(credit);
 
     await this.audit.record({
       actorUserId,
@@ -629,7 +631,7 @@ export class ReturnsService implements LogisticsReturnsContract {
       correlationId: null,
       before: { usedAmount: beforeUsed, remainingAmount: beforeRemaining },
       after: { usedAmount: saved.usedAmount, remainingAmount: saved.remainingAmount, appliedToSalesOrderId: salesOrderId, amountApplied: requestedAmount.toFixed(2) },
-    });
+    }, manager);
 
     return saved;
   }
@@ -643,15 +645,15 @@ export class ReturnsService implements LogisticsReturnsContract {
    * `CustomerLedgerEntry` (`return_credit_note`, credit) so the invoice's
    * own remaining balance and the customer's statement both reflect it.
    */
-  async applyCreditToInvoice(creditId: string, invoiceId: string, amount: string, actorUserId: string): Promise<ReturnCredit> {
-    const invoice = await this.invoices.getInvoice(invoiceId, actorUserId);
+  async applyCreditToInvoice(creditId: string, invoiceId: string, amount: string, actorUserId: string, manager?: EntityManager): Promise<ReturnCredit> {
+    const invoice = await this.invoices.getInvoice(invoiceId, actorUserId, manager);
     if (invoice.state !== 'posted' && invoice.state !== 'partially_paid') {
       throw new ConflictException(`Credits can only be applied to a posted invoice (this invoice is "${invoice.state}").`);
     }
 
-    const { credit, beforeUsed, beforeRemaining, requestedAmount } = await this.validateAndDecrementCreditAmount(creditId, amount, invoice.customerId);
+    const { credit, beforeUsed, beforeRemaining, requestedAmount } = await this.validateAndDecrementCreditAmount(creditId, amount, invoice.customerId, manager);
     credit.appliedToInvoiceId = invoiceId;
-    const saved = await this.dataSource.getRepository(ReturnCredit).save(credit);
+    const saved = await this.em(manager).getRepository(ReturnCredit).save(credit);
 
     await this.customerLedger.postEntry({
       customerId: invoice.customerId,
@@ -664,8 +666,8 @@ export class ReturnsService implements LogisticsReturnsContract {
       reference: saved.id,
       reason: 'Return credit applied to invoice',
       createdByUserId: actorUserId,
-    });
-    await this.invoices.recomputeStatus(invoiceId, actorUserId);
+    }, manager);
+    await this.invoices.recomputeStatus(invoiceId, actorUserId, manager);
 
     await this.audit.record({
       actorUserId,
@@ -677,16 +679,15 @@ export class ReturnsService implements LogisticsReturnsContract {
       correlationId: null,
       before: { usedAmount: beforeUsed, remainingAmount: beforeRemaining },
       after: { usedAmount: saved.usedAmount, remainingAmount: saved.remainingAmount, appliedToInvoiceId: invoiceId, amountApplied: requestedAmount.toFixed(2) },
-    });
+    }, manager);
 
     return saved;
   }
 
   /** Backs the SO-draft "Returns / Credits" panel — active (remainingAmount > 0) credits for a customer, enriched with their originating return's own number/product/quantity/type (directive §6's exact field list) via one small join, never a direct cross-domain query. */
   async listAvailableCredits(
-    customerId: string,
-  ): Promise<Array<ReturnCredit & { returnNumber: string | null; productId: string; quantity: number; returnType: ReturnType | null }>> {
-    const credits = await this.dataSource
+    customerId: string, manager?: EntityManager): Promise<Array<ReturnCredit & { returnNumber: string | null; productId: string; quantity: number; returnType: ReturnType | null }>> {
+    const credits = await this.em(manager)
       .getRepository(ReturnCredit)
       .createQueryBuilder('c')
       .where('c.customerId = :customerId', { customerId })
@@ -697,7 +698,7 @@ export class ReturnsService implements LogisticsReturnsContract {
     const requestIds = [...new Set(credits.map((c) => c.returnRequestId))];
     // Small N (this customer's own credited returns) — individual lookups, same
     // "N calls fine at V1 scale" precedent already used elsewhere in this codebase.
-    const requestRepo = this.dataSource.getRepository(ReturnRequest);
+    const requestRepo = this.em(manager).getRepository(ReturnRequest);
     const requests = await Promise.all(requestIds.map((id) => requestRepo.findOne({ where: { id } })));
     const byId = new Map(requests.filter((r): r is ReturnRequest => !!r).map((r) => [r.id, r]));
 
@@ -715,13 +716,12 @@ export class ReturnsService implements LogisticsReturnsContract {
    * instead of one customer — never a second independent query shape.
    */
   async listAllAvailableCredits(
-    actorUserId: string,
-  ): Promise<Array<ReturnCredit & { returnNumber: string | null; productId: string; quantity: number; returnType: ReturnType | null; customerCode: string; customerName: string }>> {
-    const customers = await this.customers.listCustomers(actorUserId);
+    actorUserId: string, manager?: EntityManager): Promise<Array<ReturnCredit & { returnNumber: string | null; productId: string; quantity: number; returnType: ReturnType | null; customerCode: string; customerName: string }>> {
+    const customers = await this.customers.listCustomers(actorUserId, manager);
     const customerById = new Map(customers.map((c) => [c.id, c]));
     if (customerById.size === 0) return [];
 
-    const credits = await this.dataSource
+    const credits = await this.em(manager)
       .getRepository(ReturnCredit)
       .createQueryBuilder('c')
       .where('c."customerId" = ANY(:customerIds)', { customerIds: [...customerById.keys()] })
@@ -730,7 +730,7 @@ export class ReturnsService implements LogisticsReturnsContract {
       .getMany();
 
     const requestIds = [...new Set(credits.map((c) => c.returnRequestId))];
-    const requestRepo = this.dataSource.getRepository(ReturnRequest);
+    const requestRepo = this.em(manager).getRepository(ReturnRequest);
     const requests = await Promise.all(requestIds.map((id) => requestRepo.findOne({ where: { id } })));
     const byId = new Map(requests.filter((r): r is ReturnRequest => !!r).map((r) => [r.id, r]));
 
@@ -750,23 +750,23 @@ export class ReturnsService implements LogisticsReturnsContract {
   }
 
   /** Cross-domain read for `CustomerAccountsService` (directive §7 — ERP/AR readiness) — the credit issued for a given return, if any (never issued for `exchange`). */
-  async getCreditForReturnRequest(returnRequestId: string): Promise<ReturnCredit | null> {
-    return this.dataSource.getRepository(ReturnCredit).findOne({ where: { returnRequestId } });
+  async getCreditForReturnRequest(returnRequestId: string, manager?: EntityManager): Promise<ReturnCredit | null> {
+    return (manager ?? this.dataSource).getRepository(ReturnCredit).findOne({ where: { returnRequestId } });
   }
 
   /** Cross-domain read for the upcoming Customer Financial Account/AR phase — a single credit by id, needed to price/validate an `applyCreditToInvoice` call. */
-  async getCreditById(creditId: string): Promise<ReturnCredit | null> {
-    return this.dataSource.getRepository(ReturnCredit).findOne({ where: { id: creditId } });
+  async getCreditById(creditId: string, manager?: EntityManager): Promise<ReturnCredit | null> {
+    return this.em(manager).getRepository(ReturnCredit).findOne({ where: { id: creditId } });
   }
 
-  async getStatus(returnRequestId: string): Promise<string> {
-    return this.processEngine.getState(RETURN_PROCESS, ENTITY_TYPE, returnRequestId);
+  async getStatus(returnRequestId: string, manager?: EntityManager): Promise<string> {
+    return this.processEngine.getState(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, manager);
   }
 
   /** Backs the Return print document — single-request read with state, didn't exist before (only list + bare status existed). */
-  async getReturnRequest(returnRequestId: string): Promise<ReturnRequest & { state: string }> {
-    const request = await this.dataSource.getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
-    const state = await this.getStatus(returnRequestId);
+  async getReturnRequest(returnRequestId: string, manager?: EntityManager): Promise<ReturnRequest & { state: string }> {
+    const request = await this.em(manager).getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
+    const state = await this.getStatus(returnRequestId, manager);
     return { ...request, state };
   }
 }

@@ -20,11 +20,15 @@ export function PayrollCover() {
   useEffect(() => {
     if (!canView) return;
     (async () => {
-      const [runs, gaps] = await Promise.all([api.get<PayrollRun[]>('/payroll/runs'), api.get<ReconciliationGap[]>('/payroll/reconciliation-gaps')]);
-      setKpis({
-        pendingRuns: runs.filter((r) => r.status !== 'posted').length,
-        reconciliationGaps: gaps.length,
-      });
+      try {
+        const [runs, gaps] = await Promise.all([api.get<PayrollRun[]>('/payroll/runs'), api.get<ReconciliationGap[]>('/payroll/reconciliation-gaps')]);
+        setKpis({
+          pendingRuns: runs.filter((r) => r.status !== 'posted').length,
+          reconciliationGaps: gaps.length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, [canView]);
 

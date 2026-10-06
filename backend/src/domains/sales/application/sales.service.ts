@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { SalesRepProfile } from '../infrastructure/sales-rep-profile.entity';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -16,17 +16,20 @@ export class SalesService {
     private readonly audit: AuditService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
   async createSalesRepProfile(
     userId: string,
     territory: string | null,
-    actorUserId: string | null,
-  ): Promise<SalesRepProfile> {
-    const repo = this.dataSource.getRepository(SalesRepProfile);
+    actorUserId: string | null, manager?: EntityManager): Promise<SalesRepProfile> {
+    const repo = this.em(manager).getRepository(SalesRepProfile);
     const existing = await repo.findOne({ where: { userId } });
     if (existing) throw new ConflictException(`User "${userId}" already has a Sales Rep profile.`);
 
-    const salesCode = await this.numbering.getNextNumber('sales_rep');
-    await this.authorization.assignRole(userId, SALES_REP_ROLE);
+    const salesCode = await this.numbering.getNextNumber('sales_rep', manager);
+    await this.authorization.assignRole(userId, SALES_REP_ROLE, manager);
     const profile = await repo.save(repo.create({ userId, salesCode, territory, status: 'active' }));
 
     await this.audit.record({
@@ -38,18 +41,18 @@ export class SalesService {
       result: 'success',
       correlationId: null,
       after: { salesCode, territory },
-    });
+    }, manager);
 
     return profile;
   }
 
-  async getSalesRepProfile(userId: string): Promise<SalesRepProfile> {
-    const profile = await this.dataSource.getRepository(SalesRepProfile).findOne({ where: { userId } });
+  async getSalesRepProfile(userId: string, manager?: EntityManager): Promise<SalesRepProfile> {
+    const profile = await this.em(manager).getRepository(SalesRepProfile).findOne({ where: { userId } });
     if (!profile) throw new NotFoundException(`No Sales Rep profile for user "${userId}".`);
     return profile;
   }
 
-  async isSalesRep(userId: string): Promise<boolean> {
-    return this.authorization.hasRole(userId, SALES_REP_ROLE);
+  async isSalesRep(userId: string, manager?: EntityManager): Promise<boolean> {
+    return this.authorization.hasRole(userId, SALES_REP_ROLE, manager);
   }
 }

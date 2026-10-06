@@ -33,6 +33,9 @@ export interface CostEngine {
     manager?: EntityManager,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
 
+  /** D4 — PURE read: the cost the ORIGINAL issues (by idempotency key) were actually charged; keys without an `issue` row are absent. */
+  getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>>;
+
   /** MUTATING — the one scoped receipt path (ADR-041 D7): a maker-supplied unit cost, never inferred. */
   applyReceipt(
     productId: string,

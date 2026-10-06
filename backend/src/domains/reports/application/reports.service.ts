@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { SALES_ORDERS_READ_CONTRACT, SalesOrdersReadContract, SALES_CUSTOMERS_CONTRACT, SalesCustomersContract, SALES_DEPOSIT_CONTRACT, SalesDepositContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { UsersService } from '../../../foundation/identity/users.service';
 import {
@@ -99,11 +100,11 @@ export class ReportsService {
    * and (Gap G-1-adjacent) its latest deposit status if one exists. Also
    * IS the "Deposit / order operational status" report on its own.
    */
-  async getSalesOrdersReport(actorUserId: string): Promise<SalesOrderReportRow[]> {
-    const orders = await this.salesOrders.listOrders(actorUserId);
+  async getSalesOrdersReport(actorUserId: string, manager?: EntityManager): Promise<SalesOrderReportRow[]> {
+    const orders = await this.salesOrders.listOrders(actorUserId, manager);
 
     const customerNames = new Map<string, string>();
-    for (const c of await this.customers.listCustomers(actorUserId)) customerNames.set(c.id, c.name);
+    for (const c of await this.customers.listCustomers(actorUserId, manager)) customerNames.set(c.id, c.name);
 
     const repNames = new Map<string, string>();
     for (const repId of new Set(orders.map((o) => o.salesRepUserId))) {
@@ -123,8 +124,8 @@ export class ReportsService {
     const rows = await Promise.all(
       orders.map(async (order) => {
         const [status, deposit] = await Promise.all([
-          this.salesOrders.getOrderStatus(order.id),
-          this.deposits.getLatestDepositForOrder(order.id, actorUserId),
+          this.salesOrders.getOrderStatus(order.id, manager),
+          this.deposits.getLatestDepositForOrder(order.id, actorUserId, manager),
         ]);
         return {
           id: order.id,
@@ -145,8 +146,8 @@ export class ReportsService {
     return rows;
   }
 
-  async getSalesByPeriod(actorUserId: string, groupBy: 'day' | 'month'): Promise<SalesByPeriodRow[]> {
-    const rows = await this.getSalesOrdersReport(actorUserId);
+  async getSalesByPeriod(actorUserId: string, groupBy: 'day' | 'month', manager?: EntityManager): Promise<SalesByPeriodRow[]> {
+    const rows = await this.getSalesOrdersReport(actorUserId, manager);
     const groups = new Map<string, { count: number; total: number }>();
     for (const row of rows) {
       const period = groupBy === 'month' ? row.createdAt.slice(0, 7) : row.createdAt.slice(0, 10);
@@ -160,8 +161,8 @@ export class ReportsService {
       .map(([period, g]) => ({ period, orderCount: g.count, totalAmount: g.total.toFixed(2) }));
   }
 
-  async getSalesByCustomer(actorUserId: string): Promise<SalesByCustomerRow[]> {
-    const rows = await this.getSalesOrdersReport(actorUserId);
+  async getSalesByCustomer(actorUserId: string, manager?: EntityManager): Promise<SalesByCustomerRow[]> {
+    const rows = await this.getSalesOrdersReport(actorUserId, manager);
     const groups = new Map<string, { customerName: string; count: number; total: number }>();
     for (const row of rows) {
       const g = groups.get(row.customerId) ?? { customerName: row.customerName, count: 0, total: 0 };
@@ -174,8 +175,8 @@ export class ReportsService {
       .map(([customerId, g]) => ({ customerId, customerName: g.customerName, orderCount: g.count, totalAmount: g.total.toFixed(2) }));
   }
 
-  async getSalesByRep(actorUserId: string): Promise<SalesByRepRow[]> {
-    const rows = await this.getSalesOrdersReport(actorUserId);
+  async getSalesByRep(actorUserId: string, manager?: EntityManager): Promise<SalesByRepRow[]> {
+    const rows = await this.getSalesOrdersReport(actorUserId, manager);
     const groups = new Map<string, { salesRepName: string; count: number; total: number }>();
     for (const row of rows) {
       const g = groups.get(row.salesRepUserId) ?? { salesRepName: row.salesRepName, count: 0, total: 0 };
@@ -198,11 +199,11 @@ export class ReportsService {
    * per `delivery.service.ts`'s own doc comment), so collections group to
    * their custodian directly, with no need to join through Shipment.
    */
-  async getCustodyCodReport(): Promise<CustodyCodReport> {
+  async getCustodyCodReport(manager?: EntityManager): Promise<CustodyCodReport> {
     const [companies, vehicles, collections] = await Promise.all([
-      this.shipments.listShippingCompanies(),
-      this.shipments.listVehicles(),
-      this.delivery.listAllCollections(),
+      this.shipments.listShippingCompanies(manager),
+      this.shipments.listVehicles(manager),
+      this.delivery.listAllCollections(manager),
     ]);
 
     const collectionsByCustodyAccount = new Map<string, typeof collections>();
@@ -220,7 +221,7 @@ export class ReportsService {
     ]) {
       for (const custodian of custodians) {
         if (!custodian.custodyAccountId) continue;
-        const overview = await this.shipments.getCustodianOverview(custodianType, custodian.id);
+        const overview = await this.shipments.getCustodianOverview(custodianType, custodian.id, manager);
         const custodianCollections = collectionsByCustodyAccount.get(custodian.custodyAccountId) ?? [];
         const collected = custodianCollections.reduce((sum, c) => sum + Number(c.amount), 0);
         const pending = custodianCollections

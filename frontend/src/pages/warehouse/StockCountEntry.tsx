@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Transaction {
   id: string;
@@ -40,6 +41,7 @@ export function StockCountEntry() {
   const [physical, setPhysical] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'action.back',
@@ -55,21 +57,29 @@ export function StockCountEntry() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [t2, l, prod] = await Promise.all([
-      api.get<Transaction>(`/warehouse-transactions/${id}`),
-      api.get<Line[]>(`/warehouse-transactions/${id}/lines`),
-      api.get<Product[]>('/products/all'),
-    ]);
-    setTxn(t2);
-    setLines(l);
-    setProducts(prod);
-    setPhysical(Object.fromEntries(l.map((line) => [line.id, line.physicalQuantity !== null ? String(line.physicalQuantity) : ''])));
+    setLoadError(null);
+    try {
+      const [t2, l, prod] = await Promise.all([
+        api.get<Transaction>(`/warehouse-transactions/${id}`),
+        api.get<Line[]>(`/warehouse-transactions/${id}/lines`),
+        api.get<Product[]>('/products/all'),
+      ]);
+      setTxn(t2);
+      setLines(l);
+      setProducts(prod);
+      setPhysical(Object.fromEntries(l.map((line) => [line.id, line.physicalQuantity !== null ? String(line.physicalQuantity) : ''])));
+    } catch (err) {
+      // Foundation fix: this load had no error handling — a failure left
+      // the page stuck on "Loading…" forever with no explanation.
+      setLoadError(err);
+    }
   }, [id]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={load} />;
   if (!txn) return <div className="empty-state">Loading…</div>;
   const productName = (pid: string) => {
     const p = products.find((x) => x.id === pid);

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { SupplierInvoice } from '../infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from '../infrastructure/supplier-invoice-line.entity';
@@ -14,6 +14,7 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 const ENTITY_TYPE = 'supplier_invoice';
 const PO_ENTITY_TYPE = 'purchase_order';
@@ -30,6 +31,8 @@ export interface CreateSupplierInvoiceInput {
   purchaseOrderId: string;
   supplierReference?: string | null;
   lines: CreateSupplierInvoiceLineInput[];
+  /** D5 — the EXPLICIT VAT amount stated by the supplier's invoice (the lines' total is NET). Omitted/0 = no VAT. Never derived or defaulted. */
+  taxAmount?: string | null;
 }
 
 export interface ApAgingRow {
@@ -65,35 +68,87 @@ export class SupplierInvoiceService {
     private readonly audit: AuditService,
     private readonly ledger: SupplierLedgerService,
     private readonly events: EventBusService,
+    // D5 — the accounting pre-flight (PPV / Input VAT accounts), bound by `accounting` through the foundation holder.
+    @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
   ) {}
 
   async getStatus(invoiceId: string, manager?: EntityManager): Promise<string> {
     return this.processEngine.getState(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, manager);
   }
 
-  async createDraftInvoice(input: CreateSupplierInvoiceInput, actorUserId: string): Promise<SupplierInvoice> {
+  private r4(n: number): number {
+    return Math.round(n * 10000) / 10000;
+  }
+
+  /** D5 — gross = net (`totalAmount`, tax-exclusive) + the explicit VAT. What AP / the Supplier Ledger carry. */
+  private grossOf(invoice: SupplierInvoice): number {
+    return Math.round((Number(invoice.totalAmount) + Number(invoice.taxAmount ?? 0)) * 100) / 100;
+  }
+
+  private parseVatAmount(raw: string | number | null | undefined): number {
+    if (raw == null || String(raw).trim() === '') return 0;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) throw new BadRequestException('The VAT amount must be a non-negative number.');
+    return Math.round(n * 100) / 100;
+  }
+
+  /** D5 (CTO policy): VAT > 0 on an invoice from a supplier with no VAT registration number is rejected — the tax data is insufficient to prove a valid Input VAT. VAT = 0 is always allowed. */
+  private assertVatAllowed(supplier: Supplier, tax: number): void {
+    if (tax > 0 && !(supplier.vatRegistrationNumber ?? '').trim()) {
+      throw new ConflictException(
+        `Supplier "${supplier.legalName}" has no VAT registration number — Input VAT cannot be recorded on its invoice. Nothing was changed.`,
+      );
+    }
+  }
+
+  /** D5 — the figures a posted journal is built from, derived from the STORED invoice lines (receipt basis = qty × PO unit cost = qty × (billed cost − stored variance)). */
+  private invoiceBasis(invoice: SupplierInvoice, lines: SupplierInvoiceLine[]): { net: number; receiptValue: number; ppv: number; tax: number; gross: number } {
+    const net = Number(invoice.totalAmount);
+    const receiptValue = this.r4(lines.reduce((sum, l) => sum + this.r4(Number(l.quantity) * (Number(l.unitCostBase) - Number(l.unitCostVariance))), 0));
+    const ppv = this.r4(net - receiptValue);
+    const tax = Number(invoice.taxAmount ?? 0);
+    return { net, receiptValue, ppv, tax, gross: this.grossOf(invoice) };
+  }
+
+  /** D5 — give back the invoiced quantity of every line (void / cancel_draft), inside the caller's transaction; never below zero. */
+  private async restoreInvoicedQuantities(lines: SupplierInvoiceLine[], m: EntityManager): Promise<void> {
+    const poLineRepo = m.getRepository(PurchaseOrderLine);
+    for (const line of lines) {
+      const poLine = await poLineRepo.findOne({ where: { id: line.purchaseOrderLineId } });
+      if (!poLine || Number(poLine.quantityInvoiced) < Number(line.quantity)) {
+        throw new ConflictException(`Cannot restore the invoiced quantity of purchase order line "${line.purchaseOrderLineId}" — its invoiced quantity is lower than this invoice's line (data integrity). Nothing was changed.`);
+      }
+      await poLineRepo.decrement({ id: line.purchaseOrderLineId }, 'quantityInvoiced', Number(line.quantity));
+    }
+  }
+
+  async createDraftInvoice(input: CreateSupplierInvoiceInput, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
     if (input.lines.length === 0) throw new BadRequestException('A Supplier Invoice needs at least one line.');
 
-    const po = await this.dataSource.getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
+    const po = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
     if (!po) throw new NotFoundException(`Purchase Order "${input.purchaseOrderId}" not found.`);
-    const poState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id);
+    const poState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id, manager);
     if (poState !== 'partially_received' && poState !== 'received' && poState !== 'closed') {
       throw new ConflictException(`Purchase Order is "${poState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
     }
 
-    const supplier = await this.dataSource.getRepository(Supplier).findOne({ where: { id: po.supplierId } });
+    const supplier = await (manager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: po.supplierId } });
     if (!supplier) throw new NotFoundException(`Supplier "${po.supplierId}" not found.`);
     const dueDate = supplier.paymentTermsDays != null ? new Date(Date.now() + supplier.paymentTermsDays * 86400000) : null;
+
+    // D5 — explicit VAT as stated by the supplier's invoice; validated BEFORE any write.
+    const taxAmount = this.parseVatAmount(input.taxAmount);
+    this.assertVatAllowed(supplier, taxAmount);
 
     // 3-way match, duplicate-invoice leg: the same supplier's own reference number can't be billed
     // twice (a live, still-usable invoice — void doesn't count, matching how `findOpenInvoiceForOrder`
     // treats void on the AR side).
     if (input.supplierReference?.trim()) {
-      const candidates = await this.dataSource
+      const candidates = await (manager ?? this.dataSource)
         .getRepository(SupplierInvoice)
         .find({ where: { supplierId: po.supplierId, supplierReference: input.supplierReference.trim() } });
       for (const candidate of candidates) {
-        const candidateState = await this.getStatus(candidate.id);
+        const candidateState = await this.getStatus(candidate.id, manager);
         if (candidateState !== 'void') {
           throw new ConflictException(
             `Supplier reference "${input.supplierReference}" was already billed on invoice "${candidate.invoiceNumber}" (state "${candidateState}") — possible duplicate invoice.`,
@@ -102,11 +157,12 @@ export class SupplierInvoiceService {
       }
     }
 
-    const poLines = await this.dataSource.getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
+    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
     const poLineById = new Map(poLines.map((l) => [l.id, l]));
 
     let totalAmount = 0;
     let priceVarianceAmount = 0;
+    let receiptValue = 0;
     const lineEntities: Array<Omit<SupplierInvoiceLine, 'id' | 'supplierInvoiceId'>> = [];
 
     for (const line of input.lines) {
@@ -126,11 +182,12 @@ export class SupplierInvoiceService {
         );
       }
 
-      // 3-way match, price leg (informational): variance vs the PO's own agreed unit cost.
+      // 3-way match, price leg: variance vs the PO's own agreed unit cost. D5: it is now POSTED (to the configured PPV account), not just stored.
       const unitCostVariance = cost - Number(poLine.unitCostBase);
       const lineTotal = qty * cost;
       priceVarianceAmount += Math.abs(unitCostVariance) * qty;
       totalAmount += lineTotal;
+      receiptValue += this.r4(qty * Number(poLine.unitCostBase));
 
       lineEntities.push({
         purchaseOrderLineId: poLine.id,
@@ -142,13 +199,18 @@ export class SupplierInvoiceService {
       } as Omit<SupplierInvoiceLine, 'id' | 'supplierInvoiceId'>);
     }
 
-    await this.numbering.registerDocumentType(INVOICE_DOCUMENT_TYPE, INVOICE_PREFIX);
+    const net = Number(totalAmount.toFixed(2));
+    const receiptValueBase = this.r4(receiptValue);
+    const ppvBase = this.r4(net - receiptValueBase);
 
-    const invoice = await this.dataSource.transaction(async (manager) => {
-      const invoiceNumber = await this.numbering.getNextNumber(INVOICE_DOCUMENT_TYPE, manager);
-      const invoiceRepo = manager.getRepository(SupplierInvoice);
-      const lineRepo = manager.getRepository(SupplierInvoiceLine);
-      const poLineRepo = manager.getRepository(PurchaseOrderLine);
+    // T0-F1 (2026-10-04): was un-threaded (ambient/Platform connection) — a Company-scoped write must register the sequence in THIS Company's database.
+    await this.numbering.registerDocumentType(INVOICE_DOCUMENT_TYPE, INVOICE_PREFIX, true, manager);
+
+    const invoice = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const invoiceNumber = await this.numbering.getNextNumber(INVOICE_DOCUMENT_TYPE, txManager);
+      const invoiceRepo = txManager.getRepository(SupplierInvoice);
+      const lineRepo = txManager.getRepository(SupplierInvoiceLine);
+      const poLineRepo = txManager.getRepository(PurchaseOrderLine);
 
       const savedInvoice = await invoiceRepo.save(
         invoiceRepo.create({
@@ -156,7 +218,10 @@ export class SupplierInvoiceService {
           supplierReference: input.supplierReference ?? null,
           supplierId: po.supplierId,
           purchaseOrderId: po.id,
-          totalAmount: totalAmount.toFixed(2),
+          totalAmount: net.toFixed(2),
+          taxAmount: taxAmount.toFixed(2),
+          receiptValueBase: receiptValueBase.toFixed(4),
+          ppvBase: ppvBase.toFixed(4),
           dueDate,
           priceVarianceAmount: priceVarianceAmount.toFixed(2),
           createdByUserId: actorUserId,
@@ -171,30 +236,52 @@ export class SupplierInvoiceService {
       return savedInvoice;
     });
 
-    await this.processEngine.start(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoice.id);
+    await this.processEngine.start(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoice.id, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'supplier_invoice.created',
-      resource: 'supplier_invoice',
-      resourceId: invoice.id,
-      result: 'success',
-      correlationId: null,
-      after: { supplierId: po.supplierId, purchaseOrderId: po.id, totalAmount: invoice.totalAmount, priceVarianceAmount: invoice.priceVarianceAmount },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'supplier_invoice.created',
+        resource: 'supplier_invoice',
+        resourceId: invoice.id,
+        result: 'success',
+        correlationId: null,
+        after: { supplierId: po.supplierId, purchaseOrderId: po.id, totalAmount: invoice.totalAmount, taxAmount: invoice.taxAmount, priceVarianceAmount: invoice.priceVarianceAmount, ppvBase: invoice.ppvBase },
+      },
+      manager,
+    );
 
     return invoice;
   }
 
-  /** Posts the invoice's own credit to the Supplier Ledger (AP up) — the ONE place a supplier invoice ever hits it — and publishes `finance.supplier_invoice.posted` for Accounting's GL handler. Mirrors `InvoiceService.postInvoice`'s single-transaction discipline. */
-  async postInvoice(invoiceId: string, actorUserId: string): Promise<SupplierInvoice> {
-    const invoice = await this.dataSource.getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
+  /**
+   * Posts the invoice — the ONE place a supplier invoice ever hits the Supplier Ledger — and publishes `finance.supplier_invoice.posted`.
+   *
+   * D5 flow: validate (state, VAT rule) → derive the figures from the stored lines → **resolve every required GL account
+   * (pre-flight) BEFORE any write** → ONE transaction: state transition, Supplier Ledger credit = GROSS (net + VAT), event
+   * carrying the receipt value / signed PPV / VAT → commit. A missing PPV account (variance ≠ 0), a missing/ambiguous Input VAT
+   * account (VAT > 0) or an unregistered supplier with VAT rejects here, with nothing written.
+   */
+  async postInvoice(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
+    const invoice = await (manager ?? this.dataSource).getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
-    const state = await this.getStatus(invoiceId);
+    const state = await this.getStatus(invoiceId, manager);
     if (state !== 'draft') throw new ConflictException(`Cannot post an invoice in state "${state}".`);
 
-    const saved = await this.dataSource.transaction(async (m) => {
+    const lines = await (manager ?? this.dataSource).getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } });
+    const basis = this.invoiceBasis(invoice, lines);
+    const supplier = await (manager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: invoice.supplierId } });
+    if (!supplier) throw new NotFoundException(`Supplier "${invoice.supplierId}" not found.`);
+    this.assertVatAllowed(supplier, basis.tax);
+
+    if (basis.ppv !== 0 || basis.tax > 0) {
+      const policy = this.postingPolicy?.get();
+      if (!policy) throw new ConflictException('This invoice has a price variance or VAT but the accounting posting policy is not available — nothing was changed.');
+      await policy.assertSupplierInvoicePostable({ ppvBase: basis.ppv.toFixed(4), taxAmount: basis.tax.toFixed(2) }, manager ?? this.dataSource.manager);
+    }
+
+    const saved = await (manager ?? this.dataSource).transaction(async (m) => {
       await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'post', actorUserId, m);
       invoice.postedByUserId = actorUserId;
       const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);
@@ -204,7 +291,7 @@ export class SupplierInvoiceService {
           supplierId: invoice.supplierId,
           entryType: 'supplier_invoice',
           direction: 'credit',
-          amount: invoice.totalAmount,
+          amount: basis.gross.toFixed(2), // D5: GROSS — what we owe the supplier (net + VAT)
           purchaseOrderId: invoice.purchaseOrderId,
           supplierInvoiceId: invoice.id,
           reference: invoice.invoiceNumber,
@@ -222,14 +309,16 @@ export class SupplierInvoiceService {
         sourceEntityType: 'supplier_invoice' as const,
         sourceEntityId: invoice.id,
         externalDocument: null,
-        payloadVersion: 1,
+        payloadVersion: 2,
         supplierInvoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         supplierId: invoice.supplierId,
         purchaseOrderId: invoice.purchaseOrderId,
         netAmount: invoice.totalAmount,
-        taxAmount: '0',
-        grossAmount: invoice.totalAmount,
+        taxAmount: basis.tax.toFixed(2),
+        grossAmount: basis.gross.toFixed(2),
+        receiptValueBase: basis.receiptValue.toFixed(4),
+        ppvBase: basis.ppv.toFixed(4),
         dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
       });
 
@@ -242,7 +331,7 @@ export class SupplierInvoiceService {
           resourceId: invoiceId,
           result: 'success',
           correlationId: null,
-          after: { totalAmount: invoice.totalAmount },
+          after: { totalAmount: invoice.totalAmount, taxAmount: basis.tax.toFixed(2), ppvBase: basis.ppv.toFixed(4) },
         },
         m,
       );
@@ -250,30 +339,34 @@ export class SupplierInvoiceService {
       return savedInvoice;
     });
 
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
     return saved;
   }
 
-  async voidInvoice(invoiceId: string, reason: string, actorUserId: string): Promise<SupplierInvoice> {
-    const repo = this.dataSource.getRepository(SupplierInvoice);
+  /**
+   * D5 — void / cancel is ONE atomic unit: Supplier Ledger reversal + state transition + (posted only) the void event whose GL
+   * journal mirrors the posted one (GRNI, PPV, Input VAT, AP) + restoring every line's `quantityInvoiced`. Either all of it commits or none.
+   */
+  async voidInvoice(invoiceId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
+    const repo = (manager ?? this.dataSource).getRepository(SupplierInvoice);
     const invoice = await repo.findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
-    const state = await this.getStatus(invoiceId);
+    const state = await this.getStatus(invoiceId, manager);
     if (state === 'void') throw new ConflictException(`Invoice "${invoiceId}" is already void.`);
     if (state === 'paid' || state === 'partially_paid') {
       throw new ConflictException(`Cannot void invoice "${invoiceId}" — it already has a payment applied.`);
     }
+    const lines = await (manager ?? this.dataSource).getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } });
+    const gross = this.grossOf(invoice);
 
-    if (state === 'posted') {
-      const entries = await this.dataSource
-        .getRepository(SupplierLedgerEntry)
-        .find({ where: { supplierInvoiceId: invoiceId, entryType: 'supplier_invoice', status: 'posted' } });
-      for (const entry of entries) {
-        await this.ledger.reverseEntry(entry.id, `Invoice voided: ${reason}`, actorUserId);
-      }
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'void', actorUserId);
-      await this.dataSource.transaction(async (manager) => {
-        await this.events.publish(manager, AP_EVENT_TOPICS.supplierInvoiceVoided, {
+    const saved = await (manager ?? this.dataSource).transaction(async (m) => {
+      if (state === 'posted') {
+        const entries = await m.getRepository(SupplierLedgerEntry).find({ where: { supplierInvoiceId: invoiceId, entryType: 'supplier_invoice', status: 'posted' } });
+        for (const entry of entries) {
+          await this.ledger.reverseEntry(entry.id, `Invoice voided: ${reason}`, actorUserId, m);
+        }
+        await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'void', actorUserId, m);
+        await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceVoided, {
           idempotencyKey: `procurement:supplier_invoice:${invoice.id}:voided`,
           businessDate: new Date().toISOString().slice(0, 10),
           orgUnitId: null,
@@ -281,37 +374,41 @@ export class SupplierInvoiceService {
           sourceEntityType: 'supplier_invoice' as const,
           sourceEntityId: invoice.id,
           externalDocument: null,
-          payloadVersion: 1,
+          payloadVersion: 2,
           supplierInvoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           supplierId: invoice.supplierId,
           purchaseOrderId: invoice.purchaseOrderId,
           netAmount: invoice.totalAmount,
-          taxAmount: '0',
-          grossAmount: invoice.totalAmount,
+          taxAmount: Number(invoice.taxAmount ?? 0).toFixed(2),
+          grossAmount: gross.toFixed(2),
           dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
           voidReason: reason,
         });
-      });
-      await this.events.dispatchPending();
-    } else {
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId);
-    }
+      } else {
+        await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId, m);
+      }
+      await this.restoreInvoicedQuantities(lines, m);
 
-    invoice.voidedReason = reason;
-    const saved = await repo.save(invoice);
-
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'supplier_invoice.voided',
-      resource: 'supplier_invoice',
-      resourceId: invoiceId,
-      result: 'success',
-      correlationId: null,
-      after: { reason, fromState: state },
+      invoice.voidedReason = reason;
+      const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'supplier_invoice.voided',
+          resource: 'supplier_invoice',
+          resourceId: invoiceId,
+          result: 'success',
+          correlationId: null,
+          after: { reason, fromState: state, quantitiesRestored: lines.length },
+        },
+        m,
+      );
+      return savedInvoice;
     });
 
+    if (state === 'posted') await this.events.dispatchAfterCommit(manager);
     return saved;
   }
 
@@ -327,7 +424,7 @@ export class SupplierInvoiceService {
       [invoiceId],
     );
     const applied = Number(rows[0].applied);
-    return (Number(invoice.totalAmount) - applied).toFixed(2);
+    return (this.grossOf(invoice) - applied).toFixed(2);
   }
 
   async recomputeStatus(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
@@ -341,42 +438,42 @@ export class SupplierInvoiceService {
 
     if (remaining <= 0) {
       await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'mark_paid', actorUserId, manager);
-    } else if (state === 'posted' && remaining < Number(invoice.totalAmount)) {
+    } else if (state === 'posted' && remaining < this.grossOf(invoice)) {
       await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'record_partial_payment', actorUserId, manager);
     }
     return this.getStatus(invoiceId, manager);
   }
 
-  async getInvoice(invoiceId: string): Promise<SupplierInvoice & { state: string; remaining: string; lines: SupplierInvoiceLine[] }> {
-    const invoice = await this.dataSource.getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
+  async getInvoice(invoiceId: string, manager?: EntityManager): Promise<SupplierInvoice & { state: string; remaining: string; lines: SupplierInvoiceLine[] }> {
+    const invoice = await (manager ?? this.dataSource).getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
     const [lines, state, remaining] = await Promise.all([
-      this.dataSource.getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } }),
-      this.getStatus(invoiceId),
-      this.getInvoiceRemaining(invoiceId),
+      (manager ?? this.dataSource).getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } }),
+      this.getStatus(invoiceId, manager),
+      this.getInvoiceRemaining(invoiceId, manager),
     ]);
     return { ...invoice, state, remaining, lines };
   }
 
-  async listForSupplier(supplierId: string): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
-    const invoices = await this.dataSource.getRepository(SupplierInvoice).find({ where: { supplierId }, order: { createdAt: 'DESC' } });
-    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id), remaining: await this.getInvoiceRemaining(i.id) })));
+  async listForSupplier(supplierId: string, manager?: EntityManager): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { supplierId }, order: { createdAt: 'DESC' } });
+    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id, manager), remaining: await this.getInvoiceRemaining(i.id, manager) })));
   }
 
-  async listForPurchaseOrder(purchaseOrderId: string): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
-    const invoices = await this.dataSource.getRepository(SupplierInvoice).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
-    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id), remaining: await this.getInvoiceRemaining(i.id) })));
+  async listForPurchaseOrder(purchaseOrderId: string, manager?: EntityManager): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
+    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id, manager), remaining: await this.getInvoiceRemaining(i.id, manager) })));
   }
 
-  async listAll(): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
-    const invoices = await this.dataSource.getRepository(SupplierInvoice).find({ order: { createdAt: 'DESC' } });
-    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id), remaining: await this.getInvoiceRemaining(i.id) })));
+  async listAll(manager?: EntityManager): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ order: { createdAt: 'DESC' } });
+    return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id, manager), remaining: await this.getInvoiceRemaining(i.id, manager) })));
   }
 
-  private async computeAgingRow(invoice: SupplierInvoice): Promise<ApAgingRow | null> {
-    const state = await this.getStatus(invoice.id);
+  private async computeAgingRow(invoice: SupplierInvoice, manager?: EntityManager): Promise<ApAgingRow | null> {
+    const state = await this.getStatus(invoice.id, manager);
     if (state === 'void' || state === 'draft') return null;
-    const remaining = Number(await this.getInvoiceRemaining(invoice.id));
+    const remaining = Number(await this.getInvoiceRemaining(invoice.id, manager));
     if (remaining <= 0) return null;
 
     const daysOverdue = invoice.dueDate ? Math.max(0, Math.floor((Date.now() - invoice.dueDate.getTime()) / 86400000)) : 0;
@@ -391,8 +488,8 @@ export class SupplierInvoiceService {
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       dueDate: invoice.dueDate,
-      originalAmount: invoice.totalAmount,
-      paidAmount: (Number(invoice.totalAmount) - remaining).toFixed(2),
+      originalAmount: this.grossOf(invoice).toFixed(2),
+      paidAmount: (this.grossOf(invoice) - remaining).toFixed(2),
       remaining: remaining.toFixed(2),
       daysOverdue,
       bucket,
@@ -400,24 +497,24 @@ export class SupplierInvoiceService {
   }
 
   /** AP Aging (CTO directive §3) — Current/1-30/31-60/61-90/90+, only invoices with real remaining balance. */
-  async getApAging(supplierId: string): Promise<ApAgingRow[]> {
-    const invoices = await this.dataSource.getRepository(SupplierInvoice).find({ where: { supplierId }, order: { createdAt: 'ASC' } });
+  async getApAging(supplierId: string, manager?: EntityManager): Promise<ApAgingRow[]> {
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { supplierId }, order: { createdAt: 'ASC' } });
     const rows: ApAgingRow[] = [];
     for (const invoice of invoices) {
-      const row = await this.computeAgingRow(invoice);
+      const row = await this.computeAgingRow(invoice, manager);
       if (row) rows.push(row);
     }
     return rows;
   }
 
   /** AP Aging across every supplier — the "all suppliers" statement/aging screen backing read. */
-  async getApAgingForAllSuppliers(): Promise<Array<ApAgingRow & { supplierId: string; supplierCode: string; supplierLegalName: string }>> {
-    const suppliers = await this.dataSource.getRepository(Supplier).find();
+  async getApAgingForAllSuppliers(manager?: EntityManager): Promise<Array<ApAgingRow & { supplierId: string; supplierCode: string; supplierLegalName: string }>> {
+    const suppliers = await (manager ?? this.dataSource).getRepository(Supplier).find();
     const supplierById = new Map(suppliers.map((s) => [s.id, s]));
-    const invoices = await this.dataSource.getRepository(SupplierInvoice).find({ order: { createdAt: 'ASC' } });
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ order: { createdAt: 'ASC' } });
     const rows: Array<ApAgingRow & { supplierId: string; supplierCode: string; supplierLegalName: string }> = [];
     for (const invoice of invoices) {
-      const row = await this.computeAgingRow(invoice);
+      const row = await this.computeAgingRow(invoice, manager);
       if (row) {
         const supplier = supplierById.get(invoice.supplierId);
         rows.push({ ...row, supplierId: invoice.supplierId, supplierCode: supplier?.code ?? '', supplierLegalName: supplier?.legalName ?? '' });

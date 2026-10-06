@@ -18,16 +18,20 @@ export function CatalogCover() {
 
   useEffect(() => {
     (async () => {
-      const [products, priceLists, boms] = await Promise.all([
-        api.get<Product[]>('/products/all'),
-        api.get<PriceList[]>('/price-lists'),
-        api.get<BomRow[]>('/bom'),
-      ]);
-      setKpis({
-        activeProducts: products.filter((p) => p.status === 'active').length,
-        priceLists: priceLists.length,
-        boms: boms.length,
-      });
+      try {
+        const [products, priceLists, boms] = await Promise.all([
+          api.get<Product[]>('/products/all'),
+          api.get<PriceList[]>('/price-lists'),
+          api.get<BomRow[]>('/bom'),
+        ]);
+        setKpis({
+          activeProducts: products.filter((p) => p.status === 'active').length,
+          priceLists: priceLists.length,
+          boms: boms.length,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, []);
 

@@ -30,29 +30,33 @@ export function ShippingCover() {
 
   useEffect(() => {
     (async () => {
-      const [shipments, companies, vehicles] = await Promise.all([
-        api.get<Shipment[]>('/shipments'),
-        api.get<ShippingCompany[]>('/shipments/shipping-companies'),
-        api.get<Vehicle[]>('/shipments/vehicles'),
-      ]);
+      try {
+        const [shipments, companies, vehicles] = await Promise.all([
+          api.get<Shipment[]>('/shipments'),
+          api.get<ShippingCompany[]>('/shipments/shipping-companies'),
+          api.get<Vehicle[]>('/shipments/vehicles'),
+        ]);
 
-      let pendingRemittances: number | null = null;
-      if (canReviewFinance) {
-        const pending = await api.get<PendingCollection[]>('/delivery/collections/pending-remittance');
-        pendingRemittances = pending.length;
+        let pendingRemittances: number | null = null;
+        if (canReviewFinance) {
+          const pending = await api.get<PendingCollection[]>('/delivery/collections/pending-remittance');
+          pendingRemittances = pending.length;
+        }
+
+        const overviews = await Promise.all([
+          ...companies.map((c) => api.get<CustodianOverview>(`/shipments/shipping-companies/${c.id}/overview`)),
+          ...vehicles.map((v) => api.get<CustodianOverview>(`/shipments/vehicles/${v.id}/overview`)),
+        ]);
+        const custodyBalance = overviews.reduce((sum, o) => sum + Number(o.custodyBalance ?? 0), 0).toFixed(2);
+
+        setKpis({
+          inTransit: shipments.filter((s) => IN_TRANSIT_STATES.includes(s.state)).length,
+          pendingRemittances,
+          custodyBalance,
+        });
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
       }
-
-      const overviews = await Promise.all([
-        ...companies.map((c) => api.get<CustodianOverview>(`/shipments/shipping-companies/${c.id}/overview`)),
-        ...vehicles.map((v) => api.get<CustodianOverview>(`/shipments/vehicles/${v.id}/overview`)),
-      ]);
-      const custodyBalance = overviews.reduce((sum, o) => sum + Number(o.custodyBalance ?? 0), 0).toFixed(2);
-
-      setKpis({
-        inTransit: shipments.filter((s) => IN_TRANSIT_STATES.includes(s.state)).length,
-        pendingRemittances,
-        custodyBalance,
-      });
     })();
   }, [canReviewFinance]);
 

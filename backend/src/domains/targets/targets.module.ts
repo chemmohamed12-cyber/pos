@@ -10,10 +10,12 @@ import { AuditModule } from '../../foundation/audit/audit.module';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { ProcessEngineModule } from '../../foundation/process-engine/process-engine.module';
 import { HrModule } from '../hr/hr.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /** ADR-071 — `targets`'s composition root, Phase 1. `HrModule` is this module's one real cross-domain import (Employee identity, read-only). */
 @Module({
-  imports: [TypeOrmModule.forFeature([Target]), AuthenticationModule, EventsModule, PermissionModule, AuditModule, ApprovalEngineModule, ProcessEngineModule, HrModule],
+  imports: [TypeOrmModule.forFeature([Target]), AuthenticationModule, EventsModule, PermissionModule, AuditModule, ApprovalEngineModule, ProcessEngineModule, HrModule, CompanyModule, DatabaseRegistryModule],
   controllers: [TargetController],
   providers: [TargetService],
   exports: [TargetService],

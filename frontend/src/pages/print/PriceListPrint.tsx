@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface PriceList {
   code: string;
@@ -25,21 +26,28 @@ export function PriceListPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, preload } = useLanguage();
   const [data, setData] = useState<PriceListData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload(['document.price_list_title', 'field.name']);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [priceList, items] = await Promise.all([
-        api.get<PriceList>(`/price-lists/${id}`),
-        api.get<PriceListItem[]>(`/price-lists/${id}/items`),
-      ]);
+      try {
+        const [priceList, items] = await Promise.all([
+          api.get<PriceList>(`/price-lists/${id}`),
+          api.get<PriceListItem[]>(`/price-lists/${id}/items`),
+        ]);
 
-      setData({ priceList, items });
+        setData({ priceList, items });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { priceList, items } = data;
 

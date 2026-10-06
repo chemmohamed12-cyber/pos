@@ -4,7 +4,8 @@ import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { IsIn, IsISO8601, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { AttendanceService } from '../application/attendance.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -82,7 +83,7 @@ class CorrectDayDto {
  * node.
  */
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('attendance')
 export class AttendanceController {
   constructor(private readonly attendance: AttendanceService) {}
@@ -90,50 +91,50 @@ export class AttendanceController {
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.connector.create', 'editable')
   @Post('connectors')
-  async createConnector(@Body() dto: CreateConnectorDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.createConnector(dto.name, dto.connectorType, req.user.id);
+  async createConnector(@Body() dto: CreateConnectorDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.createConnector(dto.name, dto.connectorType, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.connector.view', 'read-only')
   @Get('connectors')
-  async listConnectors() {
-    return this.attendance.listConnectors();
+  async listConnectors(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listConnectors(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.mapping.create', 'editable')
   @Post('mappings')
-  async createMapping(@Body() dto: CreateMappingDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.createMapping(dto, req.user.id);
+  async createMapping(@Body() dto: CreateMappingDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.createMapping(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.mapping.edit', 'editable')
   @Post('mappings/:id/close')
-  async closeMapping(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.attendance.closeMapping(id, req.user.id);
+  async closeMapping(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.attendance.closeMapping(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.mapping.view', 'read-only')
   @Get('mappings')
-  async listMappings() {
-    return this.attendance.listMappings();
+  async listMappings(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listMappings(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.raw_record.view', 'read-only')
   @Get('raw-records/unmapped')
-  async listUnmappedRecords() {
-    return this.attendance.listUnmappedRecords();
+  async listUnmappedRecords(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listUnmappedRecords(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.manual_entry.create', 'editable')
   @Post('manual-entries')
-  async recordManualPunch(@Body() dto: ManualPunchDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.recordManualPunch(dto, req.user.id);
+  async recordManualPunch(@Body() dto: ManualPunchDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.recordManualPunch(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -149,16 +150,16 @@ export class AttendanceController {
   @RequirePermission('attendance.import.create', 'editable')
   @Post('import/preview')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async previewImport(@UploadedFile() file: Express.Multer.File) {
-    return this.attendance.previewImport(file.buffer);
+  async previewImport(@UploadedFile() file: Express.Multer.File, @Req() req: CompanyScopedRequest) {
+    return this.attendance.previewImport(file.buffer, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.import.create', 'editable')
   @Post('import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async importExcel(@UploadedFile() file: Express.Multer.File, @Req() req: AuthenticatedRequest) {
-    return this.attendance.importExcel(file.buffer, file.originalname, req.user.id);
+  async importExcel(@UploadedFile() file: Express.Multer.File, @Req() req: CompanyScopedRequest) {
+    return this.attendance.importExcel(file.buffer, file.originalname, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -181,72 +182,72 @@ export class AttendanceController {
   @RequirePermission('attendance.import.create', 'editable')
   @Post('biometric-import/preview')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async previewBiometricImport(@UploadedFile() file: Express.Multer.File) {
-    return this.attendance.previewBiometricDailyImport(file.buffer);
+  async previewBiometricImport(@UploadedFile() file: Express.Multer.File, @Req() req: CompanyScopedRequest) {
+    return this.attendance.previewBiometricDailyImport(file.buffer, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.import.create', 'editable')
   @Post('biometric-import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async importBiometric(@UploadedFile() file: Express.Multer.File, @Req() req: AuthenticatedRequest) {
-    return this.attendance.importBiometricDailySummary(file.buffer, file.originalname, req.user.id);
+  async importBiometric(@UploadedFile() file: Express.Multer.File, @Req() req: CompanyScopedRequest) {
+    return this.attendance.importBiometricDailySummary(file.buffer, file.originalname, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.raw_record.view', 'read-only')
   @Get('biometric-import/unmapped')
-  async listUnmappedBiometricRows() {
-    return this.attendance.listUnmappedBiometricRows();
+  async listUnmappedBiometricRows(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listUnmappedBiometricRows(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.import.view', 'read-only')
   @Get('biometric-import/history')
-  async listBiometricImportBatches() {
-    return this.attendance.listBiometricImportBatches();
+  async listBiometricImportBatches(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listBiometricImportBatches(req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.day.view', 'read-only')
   @Get('biometric-facts')
-  async listBiometricFacts(@Query('employeeId') employeeId?: string) {
-    return this.attendance.listBiometricFacts(employeeId);
+  async listBiometricFacts(@Req() req: CompanyScopedRequest, @Query('employeeId') employeeId?: string) {
+    return this.attendance.listBiometricFacts(employeeId, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.day.view', 'read-only')
   @Get('days')
-  async listDays(@Query('employeeId') employeeId?: string) {
-    return this.attendance.listDays(employeeId);
+  async listDays(@Req() req: CompanyScopedRequest, @Query('employeeId') employeeId?: string) {
+    return this.attendance.listDays(employeeId, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.correction.create', 'editable')
   @Post('days/:id/correct')
-  async correctDay(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CorrectDayDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.correctDay(id, dto, req.user.id);
+  async correctDay(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CorrectDayDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.correctDay(id, dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.approval.create', 'editable')
   @Post('approval-batches')
-  async submitApprovalBatch(@Body() dto: SubmitApprovalBatchDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.submitApprovalBatch(dto.periodStart, dto.periodEnd, req.user.id);
+  async submitApprovalBatch(@Body() dto: SubmitApprovalBatchDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.submitApprovalBatch(dto.periodStart, dto.periodEnd, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.approval.view', 'read-only')
   @Get('approval-batches')
-  async listApprovalBatches() {
-    return this.attendance.listApprovalBatches();
+  async listApprovalBatches(@Req() req: CompanyScopedRequest) {
+    return this.attendance.listApprovalBatches(req.companyContext!.dataSource.manager);
   }
 
   /** Same generic decide route for BOTH request types this module registers (approval batches and corrections) — `ApprovalEngineService.decide` needs only the request id, never a type discriminator, so one route serves both. Same shape as `ApprovalsPanel`'s own generic `decidePath`. */
   @UseGuards(PermissionGuard)
   @RequirePermission('attendance.approval.approve', 'editable')
   @Post('approvals/:requestId/decide')
-  async decide(@Param('requestId', ParseUUIDPipe) requestId: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.attendance.decide(requestId, req.user.id, dto.decision, dto.note);
+  async decide(@Param('requestId', ParseUUIDPipe) requestId: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.attendance.decide(requestId, req.user.id, dto.decision, dto.note, req.companyContext!.dataSource.manager);
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Deposit } from '../infrastructure/deposit.entity';
 import { canTransitionDepositStatus } from '../domain/deposit-status';
 import { SalesOrdersService } from '../../sales-orders/application/sales-orders.service';
@@ -36,6 +36,7 @@ export class DepositsService implements SalesDepositContract {
     reference: string | null,
     evidenceMediaAssetId: string | null,
     submittedByUserId: string,
+    manager?: EntityManager,
   ): Promise<Deposit> {
     // Security Assurance Gate — Track S4 (Business Logic / Sequencing
     // Abuse), found 2026-09-08: unlike every other financial write path
@@ -60,10 +61,10 @@ export class DepositsService implements SalesDepositContract {
     // SalesOrdersService.getOrder's existing check (reviewer roles pass,
     // otherwise Scope must include this order) rather than duplicating
     // it, which also confirms the order actually exists.
-    await this.salesOrders.getOrder(salesOrderId, submittedByUserId);
+    await this.salesOrders.getOrder(salesOrderId, submittedByUserId, manager);
 
-    const deposit = await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(Deposit);
+    const deposit = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const repo = txManager.getRepository(Deposit);
       const saved = await repo.save(
         repo.create({
           salesOrderId,
@@ -75,7 +76,7 @@ export class DepositsService implements SalesDepositContract {
           submittedByUserId,
         }),
       );
-      await this.events.publish(manager, 'deposit.submitted', {
+      await this.events.publish(txManager, 'deposit.submitted', {
         depositId: saved.id,
         salesOrderId,
         amount,
@@ -84,16 +85,19 @@ export class DepositsService implements SalesDepositContract {
       return saved;
     });
 
-    await this.audit.record({
-      actorUserId: submittedByUserId,
-      organizationId: null,
-      action: 'deposit.submitted',
-      resource: 'deposit',
-      resourceId: deposit.id,
-      result: 'success',
-      correlationId: null,
-      after: { salesOrderId, amount, method },
-    });
+    await this.audit.record(
+      {
+        actorUserId: submittedByUserId,
+        organizationId: null,
+        action: 'deposit.submitted',
+        resource: 'deposit',
+        resourceId: deposit.id,
+        result: 'success',
+        correlationId: null,
+        after: { salesOrderId, amount, method },
+      },
+      manager,
+    );
 
     return deposit;
   }
@@ -150,22 +154,30 @@ export class DepositsService implements SalesDepositContract {
    * no session-persistence pitfall the way a bare `pg_advisory_lock`
    * (non-`_xact`) would have.
    */
-  async approveDeposit(depositId: string, actorUserId: string, treasuryAccountId: string): Promise<Deposit> {
-    const { saved, order, deposit } = await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(Deposit);
+  async approveDeposit(depositId: string, actorUserId: string, treasuryAccountId: string, manager?: EntityManager): Promise<Deposit> {
+    const { saved, order, deposit } = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const repo = txManager.getRepository(Deposit);
       const lockedDeposit = await repo.findOne({ where: { id: depositId }, lock: { mode: 'pessimistic_write' } });
       if (!lockedDeposit) throw new NotFoundException(`Deposit "${depositId}" not found.`);
       if (!canTransitionDepositStatus(lockedDeposit.status, 'approved')) {
         throw new ConflictException(`Cannot approve a deposit in status "${lockedDeposit.status}".`);
       }
 
-      const resolvedOrder = await this.salesOrders.getOrder(lockedDeposit.salesOrderId, actorUserId);
-      const orderStatus = await this.salesOrders.getOrderStatus(lockedDeposit.salesOrderId);
+      const resolvedOrder = await this.salesOrders.getOrder(lockedDeposit.salesOrderId, actorUserId, txManager);
+      const orderStatus = await this.salesOrders.getOrderStatus(lockedDeposit.salesOrderId, txManager);
       if (orderStatus !== 'deposit_verification') {
         throw new ConflictException(`Cannot approve this deposit — order "${lockedDeposit.salesOrderId}" is in status "${orderStatus}", not awaiting deposit verification.`);
       }
 
-      const treasuryTxn = await this.treasury.createDepositTransaction(depositId, lockedDeposit.salesOrderId, resolvedOrder.customerId, lockedDeposit.amount, treasuryAccountId, actorUserId);
+      const treasuryTxn = await this.treasury.createDepositTransaction(
+        depositId,
+        lockedDeposit.salesOrderId,
+        resolvedOrder.customerId,
+        lockedDeposit.amount,
+        treasuryAccountId,
+        actorUserId,
+        txManager,
+      );
 
       // Customer Financial Account / AR (CTO directive) — the existing
       // Deposit/Treasury flow is reused as-is; this only ADDS the Customer
@@ -173,24 +185,27 @@ export class DepositsService implements SalesDepositContract {
       // and is posted (an edge case — deposits normally precede invoicing),
       // link directly; otherwise post unapplied and let `InvoiceService.
       // postInvoice`'s own sweep pick it up later.
-      const existingInvoice = await this.invoices.findOpenInvoiceForOrder(lockedDeposit.salesOrderId);
-      const existingInvoiceState = existingInvoice ? await this.invoices.getStatus(existingInvoice.id) : null;
+      const existingInvoice = await this.invoices.findOpenInvoiceForOrder(lockedDeposit.salesOrderId, txManager);
+      const existingInvoiceState = existingInvoice ? await this.invoices.getStatus(existingInvoice.id, txManager) : null;
       const linkedInvoiceId = existingInvoiceState === 'posted' || existingInvoiceState === 'partially_paid' ? existingInvoice!.id : null;
 
-      await this.customerLedger.postEntry({
-        customerId: resolvedOrder.customerId,
-        entryType: 'deposit',
-        direction: 'credit',
-        amount: lockedDeposit.amount,
-        salesOrderId: lockedDeposit.salesOrderId,
-        invoiceId: linkedInvoiceId,
-        depositId,
-        treasuryTransactionId: treasuryTxn.id,
-        reference: depositId,
-        reason: `Customer deposit (${lockedDeposit.method})`,
-        createdByUserId: actorUserId,
-      });
-      if (linkedInvoiceId) await this.invoices.recomputeStatus(linkedInvoiceId, actorUserId);
+      await this.customerLedger.postEntry(
+        {
+          customerId: resolvedOrder.customerId,
+          entryType: 'deposit',
+          direction: 'credit',
+          amount: lockedDeposit.amount,
+          salesOrderId: lockedDeposit.salesOrderId,
+          invoiceId: linkedInvoiceId,
+          depositId,
+          treasuryTransactionId: treasuryTxn.id,
+          reference: depositId,
+          reason: `Customer deposit (${lockedDeposit.method})`,
+          createdByUserId: actorUserId,
+        },
+        txManager,
+      );
+      if (linkedInvoiceId) await this.invoices.recomputeStatus(linkedInvoiceId, actorUserId, txManager);
 
       lockedDeposit.status = 'approved';
       lockedDeposit.reviewedByUserId = actorUserId;
@@ -198,17 +213,17 @@ export class DepositsService implements SalesDepositContract {
       return { saved: savedDeposit, order: resolvedOrder, deposit: lockedDeposit };
     });
 
-    await this.salesOrders.releaseAfterDepositVerified(deposit.salesOrderId, actorUserId);
+    await this.salesOrders.releaseAfterDepositVerified(deposit.salesOrderId, actorUserId, manager);
 
     // F09-H1 (ADR-042 D0/D1/D9) — resolve the approver-chosen Treasury account's mapped GL code
     // via the EXISTING `getAllTreasuryBalances` read (no new contract method — ADR-042 D1). `null`
     // when unmapped; the event is still published (never silently skipped) so F09's handler can
     // reject with a specific, re-drivable reason rather than leaving no trail at all.
-    const { balances } = await this.treasury.getAllTreasuryBalances();
+    const { balances } = await this.treasury.getAllTreasuryBalances(undefined, manager);
     const glAccountCode = balances.find((b) => b.treasuryAccountId === treasuryAccountId)?.glAccountCode ?? null;
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.events.publish(manager, 'deposit.verified', {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.events.publish(txManager, 'deposit.verified', {
         // ADR-042 D0 — publisher-built, from this deposit's own real, stable, unique row id.
         // Fixes RBW Gap 1: the previous payload had no field ingest()'s idempotency-key derivation
         // recognized, so every occurrence collided on the SAME derived key.
@@ -229,18 +244,21 @@ export class DepositsService implements SalesDepositContract {
     });
     // F09-H1 (RBW Gap 2) — every other financial-event publisher in this codebase calls this
     // immediately after publish(); `deposit.verified` previously did not.
-    await this.events.dispatchPending();
+    await this.events.dispatchAfterCommit(manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'deposit.verified',
-      resource: 'deposit',
-      resourceId: depositId,
-      result: 'success',
-      correlationId: null,
-      after: { status: 'approved', salesOrderId: deposit.salesOrderId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'deposit.verified',
+        resource: 'deposit',
+        resourceId: depositId,
+        result: 'success',
+        correlationId: null,
+        after: { status: 'approved', salesOrderId: deposit.salesOrderId },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -253,11 +271,11 @@ export class DepositsService implements SalesDepositContract {
    * (ordered by `createdAt DESC`) naturally picks up the new one, so no
    * separate "resubmit" endpoint is needed — it's the same submit path.
    */
-  async rejectDeposit(depositId: string, reason: string, actorUserId: string): Promise<Deposit> {
-    const repo = this.dataSource.getRepository(Deposit);
+  async rejectDeposit(depositId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<Deposit> {
+    const repo = (manager ?? this.dataSource).getRepository(Deposit);
     const deposit = await repo.findOne({ where: { id: depositId } });
     if (!deposit) throw new NotFoundException(`Deposit "${depositId}" not found.`);
-    await this.salesOrders.getOrder(deposit.salesOrderId, actorUserId); // AUDIT-SEC-03 remediation: its sibling approveDeposit already had this check — rejectDeposit didn't, a write-path gap
+    await this.salesOrders.getOrder(deposit.salesOrderId, actorUserId, manager); // AUDIT-SEC-03 remediation: its sibling approveDeposit already had this check — rejectDeposit didn't, a write-path gap
     if (!canTransitionDepositStatus(deposit.status, 'rejected')) {
       throw new ConflictException(`Cannot reject a deposit in status "${deposit.status}".`);
     }
@@ -267,32 +285,35 @@ export class DepositsService implements SalesDepositContract {
     deposit.rejectionReason = reason;
     const saved = await repo.save(deposit);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'deposit.rejected',
-      resource: 'deposit',
-      resourceId: depositId,
-      result: 'success',
-      correlationId: null,
-      after: { status: 'rejected', salesOrderId: deposit.salesOrderId, reason },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'deposit.rejected',
+        resource: 'deposit',
+        resourceId: depositId,
+        result: 'success',
+        correlationId: null,
+        after: { status: 'rejected', salesOrderId: deposit.salesOrderId, reason },
+      },
+      manager,
+    );
 
     return saved;
   }
 
   /** V1 Release Audit MEDIUM fix (IDOR) — exposed payment amount/method/reference/evidence for any order to any authenticated user. */
-  async getDeposit(depositId: string, requestingUserId: string): Promise<Deposit> {
-    const deposit = await this.dataSource.getRepository(Deposit).findOne({ where: { id: depositId } });
+  async getDeposit(depositId: string, requestingUserId: string, manager?: EntityManager): Promise<Deposit> {
+    const deposit = await (manager ?? this.dataSource).getRepository(Deposit).findOne({ where: { id: depositId } });
     if (!deposit) throw new NotFoundException(`Deposit "${depositId}" not found.`);
-    await this.salesOrders.getOrder(deposit.salesOrderId, requestingUserId);
+    await this.salesOrders.getOrder(deposit.salesOrderId, requestingUserId, manager);
     return deposit;
   }
 
   /** Backs the Sales Order detail screen's deposit panel — most recent deposit for an order, or null before one is ever submitted. V1 Release Audit MEDIUM fix (IDOR): same missing check as getDeposit. */
-  async getLatestDepositForOrder(salesOrderId: string, requestingUserId: string): Promise<Deposit | null> {
-    await this.salesOrders.getOrder(salesOrderId, requestingUserId);
-    return this.dataSource
+  async getLatestDepositForOrder(salesOrderId: string, requestingUserId: string, manager?: EntityManager): Promise<Deposit | null> {
+    await this.salesOrders.getOrder(salesOrderId, requestingUserId, manager);
+    return (manager ?? this.dataSource)
       .getRepository(Deposit)
       .findOne({ where: { salesOrderId }, order: { createdAt: 'DESC' } });
   }
@@ -304,8 +325,8 @@ export class DepositsService implements SalesDepositContract {
    * — Customer Account Foundation) needs the full deposit history, not
    * just the latest.
    */
-  async listDepositsForOrder(salesOrderId: string, requestingUserId: string): Promise<Deposit[]> {
-    await this.salesOrders.getOrder(salesOrderId, requestingUserId);
-    return this.dataSource.getRepository(Deposit).find({ where: { salesOrderId }, order: { createdAt: 'ASC' } });
+  async listDepositsForOrder(salesOrderId: string, requestingUserId: string, manager?: EntityManager): Promise<Deposit[]> {
+    await this.salesOrders.getOrder(salesOrderId, requestingUserId, manager);
+    return (manager ?? this.dataSource).getRepository(Deposit).find({ where: { salesOrderId }, order: { createdAt: 'ASC' } });
   }
 }

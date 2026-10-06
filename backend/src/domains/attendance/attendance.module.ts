@@ -18,6 +18,8 @@ import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-
 import { ExcelModule } from '../../foundation/excel/excel.module';
 import { HrModule } from '../hr/hr.module';
 
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 /**
  * ADR-065 — `attendance`'s composition root, Phase 1. `HrModule` is this
  * module's one real cross-domain import (`HrService.isApprovedLeaveDate`,
@@ -25,7 +27,7 @@ import { HrModule } from '../hr/hr.module';
  * too. No other `src/domains/*` sibling is imported.
  */
 @Module({
-  imports: [
+  imports: [CompanyModule, DatabaseRegistryModule, 
     TypeOrmModule.forFeature([
       AttendanceConnector,
       AttendanceEmployeeMapping,

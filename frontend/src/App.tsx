@@ -123,6 +123,11 @@ import { TreasuryCover } from './pages/covers/TreasuryCover';
 import { AdminCover } from './pages/covers/AdminCover';
 import { FulfillmentCover } from './pages/covers/FulfillmentCover';
 import { CustomersAccountsCover } from './pages/covers/CustomersAccountsCover';
+import { ProcurementCover } from './pages/covers/ProcurementCover';
+import { CompanyRegistry } from './pages/control-plane/CompanyRegistry';
+import { CreateCompany } from './pages/control-plane/CreateCompany';
+import { CompanyDetails } from './pages/control-plane/CompanyDetails';
+import { Plans } from './pages/control-plane/Plans';
 import './styles/ui.css';
 
 function WarehouseTransactionFormRoute() {
@@ -188,6 +193,7 @@ function AppRoutes() {
         <Route path="price-lists" element={<PriceLists />} />
         <Route path="bom" element={<Bom />} />
         <Route path="warehouses" element={<Warehouses />} />
+        <Route path="procurement" element={<ProcurementCover />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="supplier-invoices" element={<SupplierInvoices />} />
@@ -266,6 +272,10 @@ function AppRoutes() {
         <Route path="accounting/reports/balance-sheet" element={<BalanceSheet />} />
         <Route path="accounting/reports/profit-and-loss" element={<ProfitAndLoss />} />
         <Route path="accounting/reports/cash-flow" element={<CashFlowStatement />} />
+        <Route path="control-plane" element={<CompanyRegistry />} />
+        <Route path="control-plane/plans" element={<Plans />} />
+        <Route path="control-plane/companies/new" element={<CreateCompany />} />
+        <Route path="control-plane/companies/:id" element={<CompanyDetails />} />
       </Route>
       {/* Print routes: auth-gated, but deliberately outside <Layout> — no sidebar/topbar chrome on a printed document. */}
       <Route path="print/sales-order/:id" element={<RequireAuth><SalesOrderPrint /></RequireAuth>} />

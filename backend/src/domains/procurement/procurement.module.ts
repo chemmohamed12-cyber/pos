@@ -41,11 +41,18 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { ProcessEngineModule } from '../../foundation/process-engine/process-engine.module';
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
+import { CommerceModule } from '../commerce/commerce.module';
+import { ProductItemRequest } from './infrastructure/product-item-request.entity';
+import { ProductLifecycleGate } from './application/product-lifecycle-gate.service';
+import { NewItemRequestService } from './application/new-item-request.service';
+import { NewItemRequestController } from './interface/new-item-request.controller';
 import { EventsModule } from '../../foundation/events/events.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { TreasuryModule } from '../treasury/treasury.module';
 import { SUPPLIER_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts/ap-events.contract';
 import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts/grni-events.contract';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
  * ADR-048 — Procurement domain (promoted from `ReservedModuleCode`).
@@ -94,6 +101,7 @@ import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts
       RfqSupplierInvite,
       SupplierQuotation,
       SupplierQuotationLine,
+      ProductItemRequest,
     ]),
     AuditModule,
     AuthenticationModule,
@@ -104,7 +112,16 @@ import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts
     NumberingModule,
     EventsModule,
     InventoryWarehouseModule,
+    // D7 — the Sales product contract (SALES_PRODUCTS_CONTRACT) for the lifecycle gate and New Item Requests; acyclic (Commerce never imports Procurement).
+    CommerceModule,
     TreasuryModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard` on `SupplierInvoiceController` only (the
+    // other 6 controllers in this module are not yet retrofitted).
+    // `DatabaseRegistryModule` alongside it, the same required pairing
+    // discovered during `products.controller.ts`'s retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [
     SupplierController,
@@ -114,6 +131,7 @@ import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts
     SupplierPaymentController,
     PurchaseRequestController,
     RfqController,
+    NewItemRequestController,
   ],
   providers: [
     SupplierService,
@@ -125,6 +143,8 @@ import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts
     PurchaseRequestService,
     RfqService,
     GrniLedgerService,
+    ProductLifecycleGate,
+    NewItemRequestService,
     { provide: SUPPLIER_LEDGER_CONTRACT, useExisting: SupplierLedgerService },
     { provide: GRNI_LEDGER_CONTRACT, useExisting: GrniLedgerService },
   ],

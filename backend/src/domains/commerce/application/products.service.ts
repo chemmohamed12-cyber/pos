@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Product } from '../infrastructure/product.entity';
 import { canTransitionProductStatus, ProductStatus } from '../domain/product-status';
 import { ProductSnapshot } from './product-snapshot.dto';
@@ -16,48 +16,65 @@ export class ProductsService implements SalesProductsContract {
     private readonly events: EventBusService,
   ) {}
 
+  /** D7 (2026-10-05) — published contract: a New Item Request's draft product (unit price 0 — pricing is set by the catalog owner). */
+  async createDraftProduct(input: { sku: string; name: string; unit?: string | null }, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshot> {
+    const p = await this.createProduct(input.sku, input.name, '0', actorUserId, input.unit ?? null, manager);
+    return { id: p.id, sku: p.sku, name: p.name, unitPrice: p.unitPrice, status: p.status };
+  }
+
+  /** D7 (2026-10-05) — published contract: the approved New Item Request's `draft → active` step. */
+  async activateDraftProduct(productId: string, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshot> {
+    const p = await this.setStatus(productId, 'active', actorUserId, manager);
+    return { id: p.id, sku: p.sku, name: p.name, unitPrice: p.unitPrice, status: p.status };
+  }
+
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added, threaded into the transaction, `audit.record`, and `events.dispatchPending`. */
   async createProduct(
     sku: string,
     name: string,
     unitPrice: string,
     actorUserId: string | null,
     unit: string | null = null,
+    manager?: EntityManager,
   ): Promise<Product> {
-    const repo = this.dataSource.getRepository(Product);
+    const repo = (manager ?? this.dataSource).getRepository(Product);
     const existing = await repo.findOne({ where: { sku } });
     if (existing) throw new ConflictException(`Product with SKU "${sku}" already exists.`);
 
-    const product = await this.dataSource.transaction(async (manager) => {
-      const saved = await manager.getRepository(Product).save(manager.getRepository(Product).create({ sku, name, unitPrice, unit, status: 'draft' }));
+    const product = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const saved = await txManager.getRepository(Product).save(txManager.getRepository(Product).create({ sku, name, unitPrice, unit, status: 'draft' }));
       // Outbox write in the SAME transaction as the insert (ADR-012) —
       // External Integrations (CTO handover directive: "Daii <-> QR Store
       // Integration") subscribes to this to auto-publish new products.
-      await this.events.publish(manager, 'commerce.product.created', { productId: saved.id, sku: saved.sku, name: saved.name });
+      await this.events.publish(txManager, 'commerce.product.created', { productId: saved.id, sku: saved.sku, name: saved.name });
       return saved;
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.product.created',
-      resource: 'product',
-      resourceId: product.id,
-      result: 'success',
-      correlationId: null,
-      after: { sku, name, unitPrice },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.product.created',
+        resource: 'product',
+        resourceId: product.id,
+        result: 'success',
+        correlationId: null,
+        after: { sku, name, unitPrice },
+      },
+      manager,
+    );
 
     // Dispatched inline, not by a background worker — Background
     // Processing (foundation/background-processing/README.md) is
     // explicitly not built yet. Harmless to call unconditionally: any
     // topic with no subscriber is a no-op (EventBusService.dispatchPending).
-    await this.events.dispatchPending();
+    await this.events.dispatchPending(undefined, manager);
 
     return product;
   }
 
-  async setStatus(productId: string, newStatus: Product['status'], actorUserId: string | null): Promise<Product> {
-    const repo = this.dataSource.getRepository(Product);
+  async setStatus(productId: string, newStatus: Product['status'], actorUserId: string | null, manager?: EntityManager): Promise<Product> {
+    const repo = (manager ?? this.dataSource).getRepository(Product);
     const product = await repo.findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     if (!canTransitionProductStatus(product.status, newStatus)) {
@@ -65,10 +82,10 @@ export class ProductsService implements SalesProductsContract {
     }
     const before = { status: product.status };
 
-    const saved = await this.dataSource.transaction(async (manager) => {
+    const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
       product.status = newStatus;
-      const updated = await manager.getRepository(Product).save(product);
-      await this.events.publish(manager, 'commerce.product.status_changed', {
+      const updated = await txManager.getRepository(Product).save(product);
+      await this.events.publish(txManager, 'commerce.product.status_changed', {
         productId: updated.id,
         sku: updated.sku,
         name: updated.name,
@@ -77,19 +94,22 @@ export class ProductsService implements SalesProductsContract {
       return updated;
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.product.status_changed',
-      resource: 'product',
-      resourceId: productId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { status: newStatus },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.product.status_changed',
+        resource: 'product',
+        resourceId: productId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { status: newStatus },
+      },
+      manager,
+    );
 
-    await this.events.dispatchPending();
+    await this.events.dispatchPending(undefined, manager);
 
     return saved;
   }
@@ -104,29 +124,32 @@ export class ProductsService implements SalesProductsContract {
    * from a Price List override (Gap G-3), which stays untouched by this.
    */
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — the descriptive unit label shown on the Inventory Grid. */
-  async updateUnit(productId: string, unit: string | null, actorUserId: string | null): Promise<Product> {
-    const repo = this.dataSource.getRepository(Product);
+  async updateUnit(productId: string, unit: string | null, actorUserId: string | null, manager?: EntityManager): Promise<Product> {
+    const repo = (manager ?? this.dataSource).getRepository(Product);
     const product = await repo.findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     const before = { unit: product.unit };
     product.unit = unit;
     const saved = await repo.save(product);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.product.unit_changed',
-      resource: 'product',
-      resourceId: productId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { unit },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.product.unit_changed',
+        resource: 'product',
+        resourceId: productId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { unit },
+      },
+      manager,
+    );
     return saved;
   }
 
-  async updatePrice(productId: string, unitPrice: string, actorUserId: string | null): Promise<Product> {
-    const repo = this.dataSource.getRepository(Product);
+  async updatePrice(productId: string, unitPrice: string, actorUserId: string | null, manager?: EntityManager): Promise<Product> {
+    const repo = (manager ?? this.dataSource).getRepository(Product);
     const product = await repo.findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     if (Number.isNaN(Number(unitPrice)) || Number(unitPrice) < 0) {
@@ -134,10 +157,10 @@ export class ProductsService implements SalesProductsContract {
     }
     const before = { unitPrice: product.unitPrice };
 
-    const saved = await this.dataSource.transaction(async (manager) => {
+    const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
       product.unitPrice = unitPrice;
-      const updated = await manager.getRepository(Product).save(product);
-      await this.events.publish(manager, 'commerce.product.price_changed', {
+      const updated = await txManager.getRepository(Product).save(product);
+      await this.events.publish(txManager, 'commerce.product.price_changed', {
         productId: updated.id,
         sku: updated.sku,
         name: updated.name,
@@ -146,25 +169,28 @@ export class ProductsService implements SalesProductsContract {
       return updated;
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.product.price_changed',
-      resource: 'product',
-      resourceId: productId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { unitPrice },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.product.price_changed',
+        resource: 'product',
+        resourceId: productId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { unitPrice },
+      },
+      manager,
+    );
 
-    await this.events.dispatchPending();
+    await this.events.dispatchPending(undefined, manager);
 
     return saved;
   }
 
-  async updateName(productId: string, name: string, actorUserId: string | null): Promise<Product> {
-    const repo = this.dataSource.getRepository(Product);
+  async updateName(productId: string, name: string, actorUserId: string | null, manager?: EntityManager): Promise<Product> {
+    const repo = (manager ?? this.dataSource).getRepository(Product);
     const product = await repo.findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     if (name.trim().length === 0) {
@@ -172,10 +198,10 @@ export class ProductsService implements SalesProductsContract {
     }
     const before = { name: product.name };
 
-    const saved = await this.dataSource.transaction(async (manager) => {
+    const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
       product.name = name;
-      const updated = await manager.getRepository(Product).save(product);
-      await this.events.publish(manager, 'commerce.product.name_changed', {
+      const updated = await txManager.getRepository(Product).save(product);
+      await this.events.publish(txManager, 'commerce.product.name_changed', {
         productId: updated.id,
         sku: updated.sku,
         name: updated.name,
@@ -183,37 +209,40 @@ export class ProductsService implements SalesProductsContract {
       return updated;
     });
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'commerce.product.name_changed',
-      resource: 'product',
-      resourceId: productId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { name },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'commerce.product.name_changed',
+        resource: 'product',
+        resourceId: productId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { name },
+      },
+      manager,
+    );
 
-    await this.events.dispatchPending();
+    await this.events.dispatchPending(undefined, manager);
 
     return saved;
   }
 
-  async getProduct(productId: string): Promise<Product> {
-    const product = await this.dataSource.getRepository(Product).findOne({ where: { id: productId } });
+  async getProduct(productId: string, manager?: EntityManager): Promise<Product> {
+    const product = await (manager ?? this.dataSource).getRepository(Product).findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
     return product;
   }
 
   /** Catalog reads are broadly available (Stage 1: "reads broadly available, writes admin-gated"). */
-  async listActiveProducts(): Promise<Product[]> {
-    return this.dataSource.getRepository(Product).find({ where: { status: 'active' } });
+  async listActiveProducts(manager?: EntityManager): Promise<Product[]> {
+    return (manager ?? this.dataSource).getRepository(Product).find({ where: { status: 'active' } });
   }
 
   /** Backs the Products management screen — every status, not just active, so draft/discontinued products can still be managed and historical order-line name lookups always resolve. */
-  async listAllProducts(): Promise<Product[]> {
-    return this.dataSource.getRepository(Product).find({ order: { sku: 'ASC' } });
+  async listAllProducts(manager?: EntityManager): Promise<Product[]> {
+    return (manager ?? this.dataSource).getRepository(Product).find({ order: { sku: 'ASC' } });
   }
 
   /**
@@ -228,6 +257,7 @@ export class ProductsService implements SalesProductsContract {
   async importRows(
     rows: Array<{ sku: string; name: string; unitPrice: string; status: string }>,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ succeeded: Product[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: Product[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
@@ -264,17 +294,17 @@ export class ProductsService implements SalesProductsContract {
       seenSkusInFile.add(sku);
 
       try {
-        const product = await this.createProduct(sku, name, unitPriceText, actorUserId);
+        const product = await this.createProduct(sku, name, unitPriceText, actorUserId, null, manager);
         // canTransitionProductStatus only allows one step at a time
         // (draft->active->discontinued) — a fresh product always starts
         // at 'draft', so reaching 'discontinued' from an import walks
         // through 'active' first, same as an operator would via the UI.
         if (status === 'active' || status === 'discontinued') {
-          await this.setStatus(product.id, 'active', actorUserId);
+          await this.setStatus(product.id, 'active', actorUserId, manager);
           product.status = 'active';
         }
         if (status === 'discontinued') {
-          await this.setStatus(product.id, 'discontinued', actorUserId);
+          await this.setStatus(product.id, 'discontinued', actorUserId, manager);
           product.status = 'discontinued';
         }
         succeeded.push(product);
@@ -292,15 +322,16 @@ export class ProductsService implements SalesProductsContract {
    * future consumer) calls this instead of importing Product's TypeORM
    * entity/repository directly.
    */
-  async getProductSnapshot(productId: string): Promise<ProductSnapshot | null> {
-    const product = await this.dataSource.getRepository(Product).findOne({ where: { id: productId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — Product is Company-owned, and this cross-domain contract is called from Company-scoped flows (e.g. `SalesOrdersService.createOrder`). */
+  async getProductSnapshot(productId: string, manager?: EntityManager): Promise<ProductSnapshot | null> {
+    const product = await (manager ?? this.dataSource).getRepository(Product).findOne({ where: { id: productId } });
     if (!product) return null;
     return { id: product.id, sku: product.sku, name: product.name, unitPrice: product.unitPrice, status: product.status };
   }
 
   /** Same published contract, keyed by SKU — Inventory's opening-stock Excel import resolves a spreadsheet's SKU column through this, never through Product's raw table. */
-  async getProductSnapshotBySku(sku: string): Promise<ProductSnapshot | null> {
-    const product = await this.dataSource.getRepository(Product).findOne({ where: { sku } });
+  async getProductSnapshotBySku(sku: string, manager?: EntityManager): Promise<ProductSnapshot | null> {
+    const product = await (manager ?? this.dataSource).getRepository(Product).findOne({ where: { sku } });
     if (!product) return null;
     return { id: product.id, sku: product.sku, name: product.name, unitPrice: product.unitPrice, status: product.status };
   }

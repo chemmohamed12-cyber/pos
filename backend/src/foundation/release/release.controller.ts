@@ -175,6 +175,53 @@ export class ReleaseController {
     return this.restoreManager.confirmAndRestore(id, req.user.id);
   }
 
+  // --- Backup/DR Architecture V1 (2026-09-24, Track D §Step 10, D-Backup-05/06).
+  // The Installation-Admin half of the dual authorization path: a platform
+  // admin explicitly names a Company via the route param (unlike the
+  // self-service `CompanyBackupController`, which derives it exclusively
+  // from `req.companyContext` — never a client-suppliable identifier
+  // there). This controller's own class-level `RolesGuard`/`@RequireRole('admin')`
+  // is what makes trusting the route param here legitimate: only a
+  // platform admin reaches these handlers at all, exactly the same
+  // precedent `InstallationMembershipController` already established for
+  // Membership HTTP Management's own D2 dual path. `companyId` is still
+  // only ever an INPUT to `DatabaseRegistryService`'s validated chain
+  // inside `BackupManagerService`/`RestoreManagerService` — never a direct
+  // database selector reaching those services from here.
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('system.release.view', 'read-only')
+  @Get('companies/:companyId/backups')
+  async listCompanyBackups(@Param('companyId') companyId: string) {
+    return redactErrorForResponse(
+      await this.dataSource.getRepository(BackupRun).find({ where: { companyId }, order: { startedAt: 'DESC' }, take: 100 }),
+    );
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('system.release.backup', 'editable')
+  @Post('companies/:companyId/backups')
+  async createCompanyBackup(@Param('companyId') companyId: string, @Req() req: AuthenticatedRequest) {
+    return redactErrorForResponse(await this.backupManager.createBackup('manual', req.user.id, companyId));
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('system.release.restore', 'editable')
+  @Post('companies/:companyId/backups/:backupRunId/restore/preflight')
+  async preflightCompanyRestore(@Param('companyId') companyId: string, @Param('backupRunId') backupRunId: string, @Req() req: AuthenticatedRequest) {
+    return this.restoreManager.preflight(backupRunId, req.user.id, companyId);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('system.release.restore', 'editable')
+  @Post('companies/:companyId/restores/:id/confirm')
+  async confirmCompanyRestore(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    // `companyId` is re-validated INSIDE confirmAndRestore/preflight against the RestoreOperation's
+    // own stored companyId (fixed at preflight time) — the route param here is for URL clarity only,
+    // it is never trusted as the source of truth for which Company is actually being restored.
+    return this.restoreManager.confirmAndRestore(id, req.user.id);
+  }
+
   // --- Phase C (foundation slice): register/validate a release manifest,
   // link it to a verified backup, and check the mandatory deployment
   // gate. Actual file deployment/migration execution/health-check/

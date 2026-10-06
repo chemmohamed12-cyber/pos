@@ -88,6 +88,24 @@ export const MODULE_ROLE_TEMPLATES: Record<string, RoleTemplate[]> = {
     { key: 'hr.manager', titleCode: 'role.hr.manager', grants: [{ node: 'hr', access: 'editable' }] },
     { key: 'hr.viewer', titleCode: 'role.hr.viewer', grants: [{ node: 'hr', access: 'read-only' }] },
   ],
+  manufacturing: [
+    { key: 'manufacturing.manager', titleCode: 'role.manufacturing.manager', grants: [{ node: 'manufacturing', access: 'editable' }] },
+    {
+      key: 'manufacturing.operator',
+      titleCode: 'role.manufacturing.operator',
+      grants: [
+        { node: 'manufacturing.work_order.view', access: 'read-only' },
+        { node: 'manufacturing.work_order.material_issue', access: 'editable' },
+        { node: 'manufacturing.work_order.material_return', access: 'editable' },
+        { node: 'manufacturing.work_order.finished_goods_receive', access: 'editable' },
+        { node: 'manufacturing.work_order.operation_execute', access: 'editable' },
+        { node: 'manufacturing.bom.view', access: 'read-only' },
+        { node: 'manufacturing.routing.view', access: 'read-only' },
+        { node: 'manufacturing.work_center.view', access: 'read-only' },
+      ],
+    },
+    { key: 'manufacturing.viewer', titleCode: 'role.manufacturing.viewer', grants: [{ node: 'manufacturing', access: 'read-only' }] },
+  ],
   accounting: [
     { key: 'accounting.manager', titleCode: 'role.accounting.manager', grants: [{ node: 'accounting', access: 'editable' }] },
     { key: 'accounting.viewer', titleCode: 'role.accounting.viewer', grants: [{ node: 'accounting', access: 'read-only' }] },

@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Transaction {
   id: string;
@@ -13,6 +14,7 @@ interface Transaction {
   destinationWarehouseId: string | null;
   reference: string | null;
   reason: string | null;
+  reasonCode?: string | null;
   notes: string | null;
   reversalOfTransactionId: string | null;
   state: string;
@@ -60,19 +62,27 @@ export function WarehouseTransactionDetail() {
   const [products, setProducts] = useState<Product[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [t2, l, wh, prod] = await Promise.all([
-      api.get<Transaction>(`/warehouse-transactions/${id}`),
-      api.get<Line[]>(`/warehouse-transactions/${id}/lines`),
-      api.get<Warehouse[]>('/inventory/warehouses'),
-      api.get<Product[]>('/products/all'),
-    ]);
-    setTxn(t2);
-    setLines(l);
-    setWarehouses(wh);
-    setProducts(prod);
+    setLoadError(null);
+    try {
+      const [t2, l, wh, prod] = await Promise.all([
+        api.get<Transaction>(`/warehouse-transactions/${id}`),
+        api.get<Line[]>(`/warehouse-transactions/${id}/lines`),
+        api.get<Warehouse[]>('/inventory/warehouses'),
+        api.get<Product[]>('/products/all'),
+      ]);
+      setTxn(t2);
+      setLines(l);
+      setWarehouses(wh);
+      setProducts(prod);
+    } catch (err) {
+      // Foundation fix: this load had no error handling — a failure left
+      // the page stuck on "Loading…" forever with no explanation.
+      setLoadError(err);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -90,6 +100,7 @@ export function WarehouseTransactionDetail() {
     'field.type',
     'field.reference',
     'field.reason',
+    'field.reason_code',
     'field.movement_date',
     'field.lines',
     'field.system_quantity',
@@ -115,6 +126,7 @@ export function WarehouseTransactionDetail() {
     }
   }
 
+  if (loadError) return <ErrorState error={loadError} onRetry={load} />;
   if (!txn) return <div className="empty-state">Loading…</div>;
 
   const warehouseName = (whId: string | null) => {
@@ -173,6 +185,12 @@ export function WarehouseTransactionDetail() {
             <div className="detail-field">
               <div className="label">{t('field.reference')}</div>
               <div className="value">{txn.reference}</div>
+            </div>
+          )}
+          {txn.reasonCode && (
+            <div className="detail-field">
+              <div className="label">{t('field.reason_code')}</div>
+              <div className="value">{txn.reasonCode}</div>
             </div>
           )}
           {txn.reason && (

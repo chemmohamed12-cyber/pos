@@ -19,6 +19,7 @@ import {
   SupplierLedgerContract,
 } from '../../../foundation/module-registry/contracts/ap-events.contract';
 import { isPositiveAmount } from '../domain/money';
+import { EntityManager } from 'typeorm';
 
 const SYSTEM_ACTOR = '00000000-0000-0000-0000-000000000000';
 
@@ -82,16 +83,20 @@ export class ApAdjustmentService implements OnModuleInit {
         )
         .catch(() => undefined); // idempotent-ish; a concurrent init is harmless
     }
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
   // Submit (maker) — always gated
   // ---------------------------------------------------------------------------
 
-  async submitAdjustment(input: SubmitApAdjustmentInput, actorUserId: string): Promise<{ mode: 'approval'; approvalRequestId: string }> {
+  async submitAdjustment(input: SubmitApAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<{ mode: 'approval'; approvalRequestId: string }> {
     if (!isApAdjustmentKind(input.kind)) throw new BadRequestException(`Unknown AP adjustment kind "${input.kind}".`);
     if (!isPositiveAmount(input.amount)) throw new BadRequestException('Amount must be a positive decimal.');
     if (!input.reason?.trim()) throw new BadRequestException('A reason is required.');
@@ -121,7 +126,7 @@ export class ApAdjustmentService implements OnModuleInit {
       payload,
       makerUserId: actorUserId,
       orgUnitId: input.orgUnitId ?? null,
-    });
+    }, manager);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -131,7 +136,7 @@ export class ApAdjustmentService implements OnModuleInit {
       result: 'success',
       correlationId: input.supplierRef.trim().slice(0, 64),
       after: { kind: input.kind, amount: input.amount, requestTypeCode: meta.requestTypeCode },
-    });
+    }, manager);
     return { mode: 'approval', approvalRequestId: request.id };
   }
 
@@ -139,18 +144,17 @@ export class ApAdjustmentService implements OnModuleInit {
   // FA-01 approval subscriber
   // ---------------------------------------------------------------------------
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (!Object.values(AP_APPROVAL_REQUEST_TYPES).includes(requestTypeCode as never)) return; // not ours
     const inner = (payload.payload ?? {}) as Record<string, unknown>;
-    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''));
+    await this.performApprovedAdjustment(inner, SYSTEM_ACTOR, String(payload.approvalRequestId ?? ''), manager);
   }
 
   private async performApprovedAdjustment(
     p: Record<string, unknown>,
     actorUserId: string,
-    approvalRequestId = '',
-  ): Promise<string> {
+    approvalRequestId = '', manager?: EntityManager): Promise<string> {
     const kind = String(p.kind) as ApAdjustmentKind;
     const supplierRef = String(p.supplierRef ?? '');
     const amount = String(p.amount);
@@ -169,7 +173,7 @@ export class ApAdjustmentService implements OnModuleInit {
         amount,
         reason: `AP ${kind}: ${String(p.reason ?? '')}`.slice(0, 250),
         createdByUserId: actorUserId,
-      });
+      }, manager);
     }
 
     // GL via an internal FinancialEvent → F05 handler → F03 posting gate
@@ -188,7 +192,7 @@ export class ApAdjustmentService implements OnModuleInit {
       contraAccountCode: p.contraAccountCode ?? null,
       direction,
       apAccountCode: p.apAccountCode ?? null,
-    });
+    }, manager);
 
     await this.audit.record({
       actorUserId,
@@ -199,7 +203,7 @@ export class ApAdjustmentService implements OnModuleInit {
       result: result.status === 'POSTED' ? 'success' : 'failure',
       correlationId: approvalRequestId || null,
       after: { kind, amount, financialEventId: result.financialEventId, status: result.status },
-    });
+    }, manager);
 
     if (result.status === 'REJECTED') {
       throw new ConflictException(`AP ${kind} GL posting was rejected — see financial event ${result.financialEventId}.`);
@@ -211,7 +215,7 @@ export class ApAdjustmentService implements OnModuleInit {
   // Checker
   // ---------------------------------------------------------------------------
 
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 }

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { GoodsReceiptService } from '../application/goods-receipt.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -30,8 +31,14 @@ class PostGoodsReceiptDto {
   lines!: PostGoodsReceiptLineDto[];
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized,
+ * controller #18). `CompanyContextGuard` added at the class level — both
+ * routes thread `req.companyContext.dataSource.manager` into
+ * `GoodsReceiptService`.
+ */
 @Controller('procurement/goods-receipts')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('procurement')
 export class GoodsReceiptController {
   constructor(private readonly goodsReceipts: GoodsReceiptService) {}
@@ -39,14 +46,16 @@ export class GoodsReceiptController {
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.goods_receipt.view', 'read-only')
   @Get('by-purchase-order/:purchaseOrderId')
-  async listForPurchaseOrder(@Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
-    return this.goodsReceipts.listForPurchaseOrder(purchaseOrderId);
+  async listForPurchaseOrder(@Req() req: CompanyScopedRequest, @Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.goodsReceipts.listForPurchaseOrder(purchaseOrderId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.goods_receipt.create', 'editable')
   @Post()
-  async post(@Body() dto: PostGoodsReceiptDto, @Req() req: AuthenticatedRequest) {
-    return this.goodsReceipts.post(dto, req.user.id);
+  async post(@Body() dto: PostGoodsReceiptDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.goodsReceipts.post(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 }

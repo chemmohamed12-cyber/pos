@@ -41,20 +41,24 @@ export function SalesCover() {
 
   useEffect(() => {
     (async () => {
-      const [orders, salesOrdersReport, byRep] = await Promise.all([
-        api.get<SalesOrder[]>('/sales-orders'),
-        api.get<SalesOrderReportRow[]>('/reports/sales-orders'),
-        api.get<SalesByRepRow[]>('/reports/sales-by-rep'),
-      ]);
-      const thisMonth = new Date().toISOString().slice(0, 7);
-      const thisMonthOrders = salesOrdersReport.filter((r) => r.createdAt.slice(0, 7) === thisMonth);
-      setKpis({
-        open: orders.filter((o) => OPEN_ORDER_STATES.includes(o.status)).length,
-        released: orders.filter((o) => o.status === 'released').length,
-        pendingDeposits: salesOrdersReport.filter((r) => r.status === 'deposit_verification' || r.depositStatus === 'submitted').length,
-        monthTotal: thisMonthOrders.reduce((sum, r) => sum + Number(r.totalAmount), 0).toFixed(2),
-      });
-      setTopReps([...byRep].sort((a, b) => Number(b.totalAmount) - Number(a.totalAmount)).slice(0, 5));
+      try {
+        const [orders, salesOrdersReport, byRep] = await Promise.all([
+          api.get<SalesOrder[]>('/sales-orders'),
+          api.get<SalesOrderReportRow[]>('/reports/sales-orders'),
+          api.get<SalesByRepRow[]>('/reports/sales-by-rep'),
+        ]);
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        const thisMonthOrders = salesOrdersReport.filter((r) => r.createdAt.slice(0, 7) === thisMonth);
+        setKpis({
+          open: orders.filter((o) => OPEN_ORDER_STATES.includes(o.status)).length,
+          released: orders.filter((o) => o.status === 'released').length,
+          pendingDeposits: salesOrdersReport.filter((r) => r.status === 'deposit_verification' || r.depositStatus === 'submitted').length,
+          monthTotal: thisMonthOrders.reduce((sum, r) => sum + Number(r.totalAmount), 0).toFixed(2),
+        });
+        setTopReps([...byRep].sort((a, b) => Number(b.totalAmount) - Number(a.totalAmount)).slice(0, 5));
+      } catch {
+        // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
+      }
     })();
   }, []);
 

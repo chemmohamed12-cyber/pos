@@ -12,6 +12,8 @@ import { AuthorizationModule } from '../../foundation/authorization/authorizatio
 import { CustomerFinanceModule } from '../customer-finance/customer-finance.module';
 import { SALES_DEPOSIT_CONTRACT } from '../../foundation/module-registry/contracts/sales.contract';
 import { PermissionModule } from '../../foundation/permission/permission.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -26,6 +28,12 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
     // no cycle: CustomerFinanceModule never imports DepositControlModule.
     CustomerFinanceModule,
     PermissionModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for
+    // `CompanyContextGuard`. `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [DepositsController],
   providers: [DepositsService, { provide: SALES_DEPOSIT_CONTRACT, useExisting: DepositsService }],

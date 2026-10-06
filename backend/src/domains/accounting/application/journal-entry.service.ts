@@ -114,8 +114,8 @@ export class JournalEntryService implements OnModuleInit {
     to?: string;
     accountId?: string;
     status?: JournalEntryStatus;
-  }): Promise<JournalEntryView[]> {
-    const qb = this.dataSource.getRepository(JournalEntry).createQueryBuilder('e');
+  }, manager?: EntityManager): Promise<JournalEntryView[]> {
+    const qb = (manager ?? this.dataSource).getRepository(JournalEntry).createQueryBuilder('e');
     if (filter?.sourceType) qb.andWhere('e."sourceType" = :st', { st: filter.sourceType });
     if (filter?.from) qb.andWhere('e."businessDate" >= :from', { from: filter.from });
     if (filter?.to) qb.andWhere('e."businessDate" <= :to', { to: filter.to });
@@ -126,7 +126,7 @@ export class JournalEntryService implements OnModuleInit {
       );
     }
     const entries = await qb.orderBy('e."createdAt"', 'DESC').getMany();
-    const views = await Promise.all(entries.map((e) => this.toView(e)));
+    const views = await Promise.all(entries.map((e) => this.toView(e, manager)));
     return filter?.status ? views.filter((v) => v.status === filter.status) : views;
   }
 
@@ -175,15 +175,16 @@ export class JournalEntryService implements OnModuleInit {
     }
     this.assertBackdatingAllowed(input.sourceType, input.businessDate);
 
-    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> => (manager ? fn(manager) : this.dataSource.transaction(fn));
+    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> =>
+      manager?.queryRunner?.isTransactionActive ? fn(manager) : (manager ?? this.dataSource).transaction(fn);
 
-    const created = await run(async (manager) => {
-      const base = await this.currencies.getBaseCurrency();
+    const created = await run(async (txManager) => {
+      const base = await this.currencies.getBaseCurrency(txManager);
       if (!base) throw new ConflictException('No base/functional currency is configured — a journal entry cannot be created.');
-      const txnCurrency = await this.currencies.getCurrency(input.transactionCurrencyCode); // throws NotFound
+      const txnCurrency = await this.currencies.getCurrency(input.transactionCurrencyCode, txManager); // throws NotFound
       if (!txnCurrency.isActive) throw new ConflictException(`Currency "${txnCurrency.code}" is inactive.`);
 
-      const entryRepo = manager.getRepository(JournalEntry);
+      const entryRepo = txManager.getRepository(JournalEntry);
       const entry = await entryRepo.save(
         entryRepo.create({
           entryNumber: null,
@@ -200,10 +201,10 @@ export class JournalEntryService implements OnModuleInit {
           postedBy: null,
         }),
       );
-      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, entry.id, manager);
+      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, entry.id, txManager);
 
-      await this.writeLines(manager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
-      await this.refreshTransactionTotals(manager, entry.id);
+      await this.writeLines(txManager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
+      await this.refreshTransactionTotals(txManager, entry.id);
 
       await this.audit.record(
         {
@@ -216,7 +217,7 @@ export class JournalEntryService implements OnModuleInit {
           correlationId: null,
           after: { sourceType: entry.sourceType, businessDate: entry.businessDate, lineCount: input.lines.length },
         },
-        manager,
+        txManager,
       );
       return entry;
     });
@@ -228,12 +229,12 @@ export class JournalEntryService implements OnModuleInit {
   // Edit (DRAFT / VALIDATED -> lines replaced, VALIDATED drops to DRAFT)
   // ---------------------------------------------------------------------------
 
-  async updateEntry(id: string, input: UpdateJournalEntryInput, actorUserId: string): Promise<JournalEntryView> {
-    return this.dataSource
-      .transaction(async (manager) => {
-        const entry = await this.lockEntry(manager, id);
+  async updateEntry(id: string, input: UpdateJournalEntryInput, actorUserId: string, manager?: EntityManager): Promise<JournalEntryView> {
+    return (manager ?? this.dataSource)
+      .transaction(async (txManager) => {
+        const entry = await this.lockEntry(txManager, id);
         if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
-        const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
+        const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
         if (state !== 'DRAFT' && state !== 'VALIDATED') {
           throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT or VALIDATED entry can be edited.`);
         }
@@ -241,7 +242,7 @@ export class JournalEntryService implements OnModuleInit {
           throw new ConflictException(`A ${entry.sourceType} journal entry cannot be hand-edited.`);
         }
         if (state === 'VALIDATED') {
-          await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'revise', actorUserId);
+          await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'revise', actorUserId, txManager);
         }
 
         if (input.businessDate !== undefined) {
@@ -251,19 +252,19 @@ export class JournalEntryService implements OnModuleInit {
         if (input.description !== undefined) entry.description = input.description ?? null;
         if (input.orgUnitId !== undefined) entry.orgUnitId = input.orgUnitId ?? null;
         if (input.transactionCurrencyCode !== undefined) {
-          const c = await this.currencies.getCurrency(input.transactionCurrencyCode);
+          const c = await this.currencies.getCurrency(input.transactionCurrencyCode, txManager);
           if (!c.isActive) throw new ConflictException(`Currency "${c.code}" is inactive.`);
           entry.transactionCurrencyCode = input.transactionCurrencyCode;
         }
-        await manager.getRepository(JournalEntry).save(entry);
+        await txManager.getRepository(JournalEntry).save(entry);
 
         if (input.lines !== undefined) {
-          const base = await this.currencies.getBaseCurrency();
+          const base = await this.currencies.getBaseCurrency(txManager);
           if (!base) throw new ConflictException('No base/functional currency is configured.');
-          await this.deleteLines(manager, id);
-          await this.writeLines(manager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
+          await this.deleteLines(txManager, id);
+          await this.writeLines(txManager, entry, input.lines, base.code, base.decimalPlaces, base.roundingMode);
         }
-        await this.refreshTransactionTotals(manager, id);
+        await this.refreshTransactionTotals(txManager, id);
 
         await this.audit.record(
           {
@@ -275,31 +276,31 @@ export class JournalEntryService implements OnModuleInit {
             result: 'success',
             correlationId: null,
           },
-          manager,
+          txManager,
         );
         return id;
       })
-      .then((entryId) => this.getEntry(entryId));
+      .then((entryId) => this.getEntry(entryId, manager));
   }
 
   // ---------------------------------------------------------------------------
   // Submit (DRAFT -> VALIDATED)
   // ---------------------------------------------------------------------------
 
-  async submitEntry(id: string, actorUserId: string): Promise<JournalEntryView> {
-    await this.dataSource.transaction(async (manager) => {
-      const entry = await this.lockEntry(manager, id);
+  async submitEntry(id: string, actorUserId: string, manager?: EntityManager): Promise<JournalEntryView> {
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const entry = await this.lockEntry(txManager, id);
       if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
+      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
       if (state !== 'DRAFT') throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT can be submitted.`);
-      await this.assertStructurallyValid(manager, id);
-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'submit', actorUserId);
+      await this.assertStructurallyValid(txManager, id);
+      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'submit', actorUserId, txManager);
       await this.audit.record(
         { actorUserId, organizationId: null, action: 'accounting.journal.submitted', resource: 'journal_entry', resourceId: id, result: 'success', correlationId: null },
-        manager,
+        txManager,
       );
     });
-    return this.getEntry(id);
+    return this.getEntry(id, manager);
   }
 
   // ---------------------------------------------------------------------------
@@ -314,35 +315,36 @@ export class JournalEntryService implements OnModuleInit {
    * numbering) below are untouched either way.
    */
   async postEntry(id: string, actorUserId: string, opts: { systemPosting?: boolean } = {}, manager?: EntityManager): Promise<JournalEntryView> {
-    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> => (manager ? fn(manager) : this.dataSource.transaction(fn));
-    await run(async (manager) => {
+    const run = <T,>(fn: (m: EntityManager) => Promise<T>): Promise<T> =>
+      manager?.queryRunner?.isTransactionActive ? fn(manager) : (manager ?? this.dataSource).transaction(fn);
+    await run(async (txManager) => {
       // 1. load + state
-      const entry = await this.lockEntry(manager, id);
+      const entry = await this.lockEntry(txManager, id);
       if (!entry) throw new NotFoundException(`Journal entry "${id}" not found.`);
-      // F08 (ADR-041 D18a): pass `manager` — when this runs inside a shared transaction whose
+      // F08 (ADR-041 D18a): pass `txManager` — when this runs inside a shared transaction whose
       // `createEntry` call (same transaction) just started this entry's process instance, a
-      // manager-less read here would not see that still-uncommitted row (read-committed isolation).
-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, manager);
+      // txManager-less read here would not see that still-uncommitted row (read-committed isolation).
+      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
       if (state !== 'DRAFT' && state !== 'VALIDATED') {
         throw new ConflictException(`Journal entry "${id}" is "${state}" — only a DRAFT or VALIDATED entry can be posted.`);
       }
 
       // 2. structural
-      const lines = await this.assertStructurallyValid(manager, id);
+      const lines = await this.assertStructurallyValid(txManager, id);
 
       // 3. fiscal period (F01 — CALL, don't copy)
-      await this.fiscalPeriods.assertOpenForPosting(entry.orgUnitId, entry.businessDate);
+      await this.fiscalPeriods.assertOpenForPosting(entry.orgUnitId, entry.businessDate, txManager);
 
       // 4/5. currency: resolve rate + (re)compute base amounts per line
-      const base = await this.currencies.getBaseCurrency();
+      const base = await this.currencies.getBaseCurrency(txManager);
       if (!base) throw new ConflictException('No base/functional currency is configured — posting is not possible.');
-      const txnCurrency = await this.currencies.getCurrency(entry.transactionCurrencyCode);
+      const txnCurrency = await this.currencies.getCurrency(entry.transactionCurrencyCode, txManager);
       if (!txnCurrency.isActive) throw new ConflictException(`Currency "${entry.transactionCurrencyCode}" is inactive.`);
       if (entry.functionalCurrencyCode !== base.code) {
         // base currency changed since draft creation — lock it in now (historical accuracy, F01 §3.7)
         entry.functionalCurrencyCode = base.code;
       }
-      const rate = await this.resolveRate(entry.transactionCurrencyCode, base.code, entry.businessDate);
+      const rate = await this.resolveRate(entry.transactionCurrencyCode, base.code, entry.businessDate, txManager);
       for (const line of lines) {
         line.exchangeRateUsed = rate.rate;
         line.exchangeRateDate = rate.rateDate;
@@ -354,18 +356,18 @@ export class JournalEntryService implements OnModuleInit {
           Number(line.creditTransaction) > 0
             ? computeFunctionalAmount(line.creditTransaction, rate.rate, base.decimalPlaces, base.roundingMode)
             : '0';
-        await manager.getRepository(JournalLine).save(line);
+        await txManager.getRepository(JournalLine).save(line);
       }
 
       // 6. account eligibility (F02 — CALL, don't copy) + dimension resolve→validate→persist
       // (F11, ADR-044 Mandatory Correction 1) + P&L implicit-dimension policy (ADR-044 D10)
       for (const line of lines) {
-        const persistedDims = await manager.getRepository(JournalLineDimension).find({ where: { journalLineId: line.id } });
+        const persistedDims = await txManager.getRepository(JournalLineDimension).find({ where: { journalLineId: line.id } });
         const providedDims = persistedDims.map((d) => ({ typeId: d.dimensionTypeId, valueId: d.dimensionValueId as string | null }));
 
         // resolve: every explicitly-persisted value, plus (for a `required` rule with no
         // persisted value) the rule's own `defaultValueId`, if one is configured.
-        const resolvedDims = await this.glAccounts.resolveDimensions(line.accountId, providedDims);
+        const resolvedDims = await this.glAccounts.resolveDimensions(line.accountId, providedDims, txManager);
 
         // validate: GLAccountService.assertPostable's existing required/blocked/value-validity
         // logic, UNCHANGED, now operating on the RESOLVED set — a required-with-default case is
@@ -376,25 +378,25 @@ export class JournalEntryService implements OnModuleInit {
           currencyCode: entry.transactionCurrencyCode,
           dimensions: resolvedDims,
           systemPosting: opts.systemPosting,
-        });
+        }, txManager);
 
         // persist: any resolved entry not already in JournalLineDimension (a default that was
         // just applied) is inserted NOW, in this SAME transaction, strictly BEFORE this entry can
         // ever reach POSTED — this is what makes the default a real row, not merely a validation
         // side-effect (ADR-044 Mandatory Correction 1: acceptance ≠ persistence).
         const persistedTypeIds = new Set(persistedDims.map((d) => d.dimensionTypeId));
-        const dimRepo = manager.getRepository(JournalLineDimension);
+        const dimRepo = txManager.getRepository(JournalLineDimension);
         for (const d of resolvedDims) {
           if (!persistedTypeIds.has(d.typeId)) {
             await dimRepo.save(dimRepo.create({ journalLineId: line.id, dimensionTypeId: d.typeId, dimensionValueId: d.valueId }));
           }
         }
 
-        await this.enforcePlAccountDimensionPolicy(account, resolvedDims);
+        await this.enforcePlAccountDimensionPolicy(account, resolvedDims, txManager);
       }
 
       // 7. DOUBLE ENTRY — computed in SQL NUMERIC (ADR-035 D4)
-      const [bal] = (await manager.query(
+      const [bal] = (await txManager.query(
         `SELECT
            (SUM("debitTransaction") = SUM("creditTransaction")) AS bal_txn,
            (SUM("debitBase")        = SUM("creditBase"))        AS bal_base,
@@ -412,8 +414,8 @@ export class JournalEntryService implements OnModuleInit {
       // 8. idempotency: FINANCIAL_EVENT entries are single-processed at ingest via
       //    FinancialEvent.UNIQUE(idempotencyKey); nothing further needed here.
 
-      // 9. numbering — INSIDE this transaction (ADR-035 D8, NumberingService extended with `manager`)
-      const entryNumber = await this.numbering.getNextNumber(JOURNAL_ENTRY_DOCUMENT_TYPE, manager);
+      // 9. numbering — INSIDE this transaction (ADR-035 D8, NumberingService extended with `txManager`)
+      const entryNumber = await this.numbering.getNextNumber(JOURNAL_ENTRY_DOCUMENT_TYPE, txManager);
 
       // 10. commit the post
       entry.entryNumber = entryNumber;
@@ -424,8 +426,8 @@ export class JournalEntryService implements OnModuleInit {
       entry.totalCreditTransaction = normaliseAmount(bal.tct, 4);
       entry.totalDebitBase = normaliseAmount(bal.tdb, 4);
       entry.totalCreditBase = normaliseAmount(bal.tcb, 4);
-      await manager.getRepository(JournalEntry).save(entry);
-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'post', actorUserId, manager);
+      await txManager.getRepository(JournalEntry).save(entry);
+      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'post', actorUserId, txManager);
 
       // 11. audit + event — same transaction
       await this.audit.record(
@@ -439,9 +441,9 @@ export class JournalEntryService implements OnModuleInit {
           correlationId: entry.financialEventId,
           after: { entryNumber, totalBase: entry.totalDebitBase, sourceType: entry.sourceType },
         },
-        manager,
+        txManager,
       );
-      await this.events.publish(manager, 'accounting.journal.posted', {
+      await this.events.publish(txManager, 'accounting.journal.posted', {
         journalEntryId: id,
         entryNumber,
         sourceType: entry.sourceType,
@@ -462,21 +464,22 @@ export class JournalEntryService implements OnModuleInit {
     id: string,
     actorUserId: string,
     opts: { businessDate?: string; description?: string } = {},
+    manager?: EntityManager,
   ): Promise<{ original: JournalEntryView; reversal: JournalEntryView }> {
-    const reversalId = await this.dataSource.transaction(async (manager) => {
-      const original = await this.lockEntry(manager, id);
+    const reversalId = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const original = await this.lockEntry(txManager, id);
       if (!original) throw new NotFoundException(`Journal entry "${id}" not found.`);
-      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id);
+      const state = await this.processEngine.getState(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, txManager);
       if (state !== 'POSTED') throw new ConflictException(`Only a POSTED journal entry can be reversed (this one is "${state}").`);
       if (original.sourceType === 'REVERSAL') throw new ConflictException('A reversal entry cannot itself be reversed.');
-      const existing = await manager.getRepository(JournalEntry).findOne({ where: { reversalOfEntryId: id } });
+      const existing = await txManager.getRepository(JournalEntry).findOne({ where: { reversalOfEntryId: id } });
       if (existing) throw new ConflictException(`Journal entry "${original.entryNumber}" has already been reversed by "${existing.id}".`);
 
-      const originalLines = await manager.getRepository(JournalLine).find({ where: { journalEntryId: id }, order: { lineNumber: 'ASC' } });
-      const base = await this.currencies.getBaseCurrency();
+      const originalLines = await txManager.getRepository(JournalLine).find({ where: { journalEntryId: id }, order: { lineNumber: 'ASC' } });
+      const base = await this.currencies.getBaseCurrency(txManager);
       if (!base) throw new ConflictException('No base/functional currency is configured.');
 
-      const entryRepo = manager.getRepository(JournalEntry);
+      const entryRepo = txManager.getRepository(JournalEntry);
       const reversal = await entryRepo.save(
         entryRepo.create({
           entryNumber: null,
@@ -493,10 +496,10 @@ export class JournalEntryService implements OnModuleInit {
           postedBy: null,
         }),
       );
-      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, reversal.id);
+      await this.processEngine.start(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, reversal.id, txManager);
 
-      const lineRepo = manager.getRepository(JournalLine);
-      const dimRepo = manager.getRepository(JournalLineDimension);
+      const lineRepo = txManager.getRepository(JournalLine);
+      const dimRepo = txManager.getRepository(JournalLineDimension);
       for (const src of originalLines) {
         const swapped = await lineRepo.save(
           lineRepo.create({
@@ -519,7 +522,7 @@ export class JournalEntryService implements OnModuleInit {
           await dimRepo.save(dimRepo.create({ journalLineId: swapped.id, dimensionTypeId: d.dimensionTypeId, dimensionValueId: d.dimensionValueId }));
         }
       }
-      await this.refreshTransactionTotals(manager, reversal.id);
+      await this.refreshTransactionTotals(txManager, reversal.id);
 
       await this.audit.record(
         {
@@ -532,24 +535,24 @@ export class JournalEntryService implements OnModuleInit {
           correlationId: id,
           after: { reversalOfEntryId: id },
         },
-        manager,
+        txManager,
       );
       return reversal.id;
     });
 
     // post the reversal through the FULL gate (system posting — a reversal may need to hit control accounts)
-    await this.postEntry(reversalId, actorUserId, { systemPosting: true });
+    await this.postEntry(reversalId, actorUserId, { systemPosting: true }, manager);
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'reverse', actorUserId);
+    await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.processEngine.transition(JOURNAL_ENTRY_PROCESS, JOURNAL_ENTRY_ENTITY_TYPE, id, 'reverse', actorUserId, txManager);
       await this.audit.record(
         { actorUserId, organizationId: null, action: 'accounting.journal.reversed', resource: 'journal_entry', resourceId: id, result: 'success', correlationId: reversalId },
-        manager,
+        txManager,
       );
-      await this.events.publish(manager, 'accounting.journal.reversed', { journalEntryId: id, reversalEntryId: reversalId, actorUserId });
+      await this.events.publish(txManager, 'accounting.journal.reversed', { journalEntryId: id, reversalEntryId: reversalId, actorUserId });
     });
 
-    return { original: await this.getEntry(id), reversal: await this.getEntry(reversalId) };
+    return { original: await this.getEntry(id, manager), reversal: await this.getEntry(reversalId, manager) };
   }
 
   // ---------------------------------------------------------------------------
@@ -581,9 +584,9 @@ export class JournalEntryService implements OnModuleInit {
     }
   }
 
-  private async resolveRate(txnCode: string, baseCode: string, businessDate: string): Promise<ResolvedRate> {
+  private async resolveRate(txnCode: string, baseCode: string, businessDate: string, manager?: EntityManager): Promise<ResolvedRate> {
     if (txnCode === baseCode) return { rate: '1', rateDate: businessDate };
-    const rate = await this.currencies.getRateOnOrBefore(txnCode, businessDate); // fails closed (F01)
+    const rate = await this.currencies.getRateOnOrBefore(txnCode, businessDate, manager); // fails closed (F01)
     return { rate: rate.rate, rateDate: rate.rateDate };
   }
 
@@ -598,7 +601,7 @@ export class JournalEntryService implements OnModuleInit {
     if (!Array.isArray(inputs) || inputs.length < 2) {
       throw new BadRequestException('A journal entry must have at least 2 lines.');
     }
-    const rate = await this.resolveRate(entry.transactionCurrencyCode, baseCode, entry.businessDate);
+    const rate = await this.resolveRate(entry.transactionCurrencyCode, baseCode, entry.businessDate, manager);
     const lineRepo = manager.getRepository(JournalLine);
     const dimRepo = manager.getRepository(JournalLineDimension);
 
@@ -695,7 +698,7 @@ export class JournalEntryService implements OnModuleInit {
    * it). An account's own EXPLICIT `GLAccountDimensionRule` for the same dimension type — whatever
    * its mode — always takes precedence; this only fills a genuine absence of configuration.
    */
-  private async enforcePlAccountDimensionPolicy(account: GLAccount, resolvedDims: Array<{ typeId: string; valueId: string }>): Promise<void> {
+  private async enforcePlAccountDimensionPolicy(account: GLAccount, resolvedDims: Array<{ typeId: string; valueId: string }>, manager?: EntityManager): Promise<void> {
     if (!(this.entitlement?.isFeatureEntitled('accounting.financial_dimensions') ?? true)) return; // F11 D9 — feature off, no enforcement
     const requireDimensionOnPlAccounts = this.config.get<boolean>('accounting.require_dimension_on_pl_accounts');
     if (!requireDimensionOnPlAccounts) return;
@@ -703,10 +706,10 @@ export class JournalEntryService implements OnModuleInit {
 
     const typeCode = (this.config.get<string>('accounting.default_pl_dimension_type_code') ?? '').trim();
     if (!typeCode) return; // policy "on" but names no type — nothing configured to enforce (disclosed, not a crash)
-    const dimensionType = await this.dimensions.findTypeByCode(typeCode);
+    const dimensionType = await this.dimensions.findTypeByCode(typeCode, manager);
     if (!dimensionType) return; // the configured code doesn't resolve — nothing to enforce (disclosed, not a crash)
 
-    const hasExplicitRule = await this.glAccounts.hasDimensionRule(account.id, dimensionType.id);
+    const hasExplicitRule = await this.glAccounts.hasDimensionRule(account.id, dimensionType.id, manager);
     if (hasExplicitRule) return; // an explicit rule (whatever its mode) always takes precedence over the implicit policy
 
     const hasValue = resolvedDims.some((d) => d.typeId === dimensionType.id);

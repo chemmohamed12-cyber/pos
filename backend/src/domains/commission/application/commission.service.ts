@@ -1,6 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository, EntityManager } from 'typeorm';
 import { CommissionPolicy } from '../infrastructure/commission-policy.entity';
 import { CommissionTier } from '../infrastructure/commission-tier.entity';
 import { CommissionApprovalBatch } from '../infrastructure/commission-approval-batch.entity';
@@ -65,11 +64,6 @@ export interface CreateAdjustmentInput {
 @Injectable()
 export class CommissionService implements OnModuleInit {
   constructor(
-    @InjectRepository(CommissionPolicy) private readonly policies: Repository<CommissionPolicy>,
-    @InjectRepository(CommissionTier) private readonly tiers: Repository<CommissionTier>,
-    @InjectRepository(CommissionApprovalBatch) private readonly batches: Repository<CommissionApprovalBatch>,
-    @InjectRepository(CommissionResult) private readonly results: Repository<CommissionResult>,
-    @InjectRepository(CommissionAdjustment) private readonly adjustments: Repository<CommissionAdjustment>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
@@ -79,45 +73,77 @@ export class CommissionService implements OnModuleInit {
     private readonly targets: TargetService,
   ) {}
 
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  /** Area 21: repositories bound to the caller's connection — the Company's own when a Company `manager` is passed, the ambient one otherwise. */
+  private repos(manager?: EntityManager) {
+    const em = this.em(manager);
+    return {
+      policies: em.getRepository(CommissionPolicy),
+      tiers: em.getRepository(CommissionTier),
+      batches: em.getRepository(CommissionApprovalBatch),
+      results: em.getRepository(CommissionResult),
+      adjustments: em.getRepository(CommissionAdjustment),
+    };
+  }
+
   async onModuleInit(): Promise<void> {
     await this.approvals.registerRequestType(APPROVAL_TYPE, 'action.commission_submit_approval');
     await this.approvals
       .upsertMatrixRule({ requestTypeCode: APPROVAL_TYPE, minApprovers: 1, requiredPermissionNode: APPROVER_NODE, valueThreshold: null, orgUnitId: null }, SYSTEM_ACTOR_ID)
       .catch(() => undefined);
 
-    this.events.subscribe('approval.request.approved', async (payload) => {
-      await this.onApprovalApproved(payload as Record<string, unknown>);
-    });
-    this.events.subscribe('approval.request.rejected', async (payload) => {
-      await this.onApprovalRejected(payload as Record<string, unknown>);
-    });
+    this.events.subscribe(
+    'approval.request.approved',
+    async (payload, ctx) => {
+      await this.onApprovalApproved(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
+    this.events.subscribe(
+    'approval.request.rejected',
+    async (payload, ctx) => {
+      await this.onApprovalRejected(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
 
     // ADR-071 §9 — the existing, already-consumed Financial Event topics, never a new event
     // Commission invents. 'collection.recorded' is deliberately NOT subscribed here, mirroring
     // F03's own convention (handler-registry.ts) that topic stays permanently-ignored-by-design —
     // 'collection.remitted' is the one real GL/business trigger for a collection.
-    this.events.subscribe('finance.invoice.posted', async (payload) => {
-      await this.onInvoicePosted(payload as Record<string, unknown>);
-    });
-    this.events.subscribe('collection.remitted', async (payload) => {
-      await this.onCollectionRemitted(payload as Record<string, unknown>);
-    });
+    this.events.subscribe(
+    'finance.invoice.posted',
+    async (payload, ctx) => {
+      await this.onInvoicePosted(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
+    this.events.subscribe(
+    'collection.remitted',
+    async (payload, ctx) => {
+      await this.onCollectionRemitted(payload as Record<string, unknown>, ctx.manager ?? undefined);
+    },
+    { scope: 'company' },
+  );
   }
 
   // ---------------------------------------------------------------------------
   // Policy — ADR-068 §A/§2/§3. Effective-dated, new row per change.
   // ---------------------------------------------------------------------------
 
-  async createPolicy(input: CreatePolicyInput, actorUserId: string): Promise<CommissionPolicy> {
+  async createPolicy(input: CreatePolicyInput, actorUserId: string, manager?: EntityManager): Promise<CommissionPolicy> {
     if (input.rateModel === 'flat' && !input.flatRate) throw new ConflictException('flatRate is required when rateModel is "flat".');
     if (input.rateModel === 'target_tiered' && (!input.tiers || input.tiers.length === 0)) {
       throw new ConflictException('At least one tier is required when rateModel is "target_tiered".');
     }
     if (input.scope === 'sales_rep') {
-      await this.hr.getEmployee(input.scopeRefId); // throws NotFoundException if not a real Employee (ADR-068 §G — never a User id)
+      await this.hr.getEmployee(input.scopeRefId, manager); // throws NotFoundException if not a real Employee (ADR-068 §G — never a User id)
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.em(manager).transaction(async (manager) => {
       const existingActive = await manager
         .getRepository(CommissionPolicy)
         .findOne({ where: { scope: input.scope, scopeRefId: input.scopeRefId, effectiveTo: IsNull() } });
@@ -164,12 +190,12 @@ export class CommissionService implements OnModuleInit {
     });
   }
 
-  async listPolicies(): Promise<CommissionPolicy[]> {
-    return this.policies.find({ order: { createdAt: 'DESC' } });
+  async listPolicies(manager?: EntityManager): Promise<CommissionPolicy[]> {
+    return this.repos(manager).policies.find({ order: { createdAt: 'DESC' } });
   }
 
-  async listTiers(policyId: string): Promise<CommissionTier[]> {
-    return this.tiers.find({ where: { policyId }, order: { tierOrder: 'ASC' } });
+  async listTiers(policyId: string, manager?: EntityManager): Promise<CommissionTier[]> {
+    return this.repos(manager).tiers.find({ where: { policyId }, order: { tierOrder: 'ASC' } });
   }
 
   // ---------------------------------------------------------------------------
@@ -177,21 +203,21 @@ export class CommissionService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   /** ADR-068 §G — CustomerAssignment.salesRepUserId (User) reverse-resolved to the authoritative Employee. Raw SQL read of CRM's own table, the same "read another domain's table directly, no entity import" pattern Payroll already uses for accounting_financial_events. */
-  private async resolveSalesRepEmployeeId(customerId: string): Promise<string | null> {
-    const [assignment]: Array<{ salesRepUserId: string }> = await this.dataSource.query(
+  private async resolveSalesRepEmployeeId(customerId: string, manager?: EntityManager): Promise<string | null> {
+    const [assignment]: Array<{ salesRepUserId: string }> = await this.em(manager).query(
       `SELECT "salesRepUserId" FROM customer_assignments WHERE "customerId" = $1 AND status = 'active' ORDER BY "startDate" DESC LIMIT 1`,
       [customerId],
     );
     if (!assignment) return null;
-    const employee = await this.hr.getEmployeeByUserId(assignment.salesRepUserId);
+    const employee = await this.hr.getEmployeeByUserId(assignment.salesRepUserId, manager);
     return employee?.id ?? null;
   }
 
   /** ADR-068 §A's ratified precedence: Customer -> Customer Group (architecturally present, functionally inert per ADR-071 §3/§21) -> Sales Rep. */
-  private async resolvePolicy(customerId: string, salesRepEmployeeId: string | null, date: Date): Promise<CommissionPolicy | null> {
+  private async resolvePolicy(customerId: string, salesRepEmployeeId: string | null, date: Date, manager?: EntityManager): Promise<CommissionPolicy | null> {
     const dateIso = date.toISOString();
 
-    const byCustomer = await this.policies
+    const byCustomer = await this.repos(manager).policies
       .createQueryBuilder('p')
       .where('p.scope = :scope', { scope: 'customer' })
       .andWhere('p."scopeRefId" = :customerId', { customerId })
@@ -205,7 +231,7 @@ export class CommissionService implements OnModuleInit {
     // field, ADR-071 §3/§21). Nothing to resolve against yet; not invented here.
 
     if (salesRepEmployeeId) {
-      const byRep = await this.policies
+      const byRep = await this.repos(manager).policies
         .createQueryBuilder('p')
         .where('p.scope = :scope', { scope: 'sales_rep' })
         .andWhere('p."scopeRefId" = :employeeId', { employeeId: salesRepEmployeeId })
@@ -224,7 +250,7 @@ export class CommissionService implements OnModuleInit {
   // (ADR-071 §12) distinguishing Invoice/Collection/Correction/Recalculation.
   // ---------------------------------------------------------------------------
 
-  private computeMarginalTierAmount(achievementPercent: number, eligibleAmount: number, tiers: CommissionTier[]): { amount: number; appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> } {
+  private computeMarginalTierAmount(achievementPercent: number, eligibleAmount: number, tiers: CommissionTier[], manager?: EntityManager): { amount: number; appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> } {
     let amount = 0;
     const appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> = [];
     const sorted = [...tiers].sort((a, b) => a.tierOrder - b.tierOrder);
@@ -248,19 +274,19 @@ export class CommissionService implements OnModuleInit {
     customerId: string;
     basisAmountByType: Partial<Record<CommissionBasis, number>>;
     eventDate: Date;
-  }): Promise<CommissionResult | null> {
+  }, manager?: EntityManager): Promise<CommissionResult | null> {
     const triggerEventKey = `${params.triggerKind}:${params.sourceEntityId}`;
-    const existing = await this.results.findOne({ where: { triggerEventKey } });
+    const existing = await this.repos(manager).results.findOne({ where: { triggerEventKey } });
     if (existing) return existing; // idempotent — a redelivery is a safe no-op, never a duplicate
 
-    const salesRepEmployeeId = await this.resolveSalesRepEmployeeId(params.customerId);
+    const salesRepEmployeeId = await this.resolveSalesRepEmployeeId(params.customerId, manager);
     if (!salesRepEmployeeId) {
       // ADR-071 §14 — no CommissionResult is created; surfaced for admin remediation
       // (link the User to an Employee), never a silently zeroed/wrong result.
       return null;
     }
 
-    const policy = await this.resolvePolicy(params.customerId, salesRepEmployeeId, params.eventDate);
+    const policy = await this.resolvePolicy(params.customerId, salesRepEmployeeId, params.eventDate, manager);
     if (!policy) return null; // no policy resolves — surfaced, not silently skipped or zeroed (ADR-071 §9 step 4)
 
     const eligibleAmount = params.basisAmountByType[policy.basis];
@@ -276,11 +302,11 @@ export class CommissionService implements OnModuleInit {
       rate = policy.flatRate ?? '0';
       calculatedAmount = eligibleAmount * Number(rate);
     } else {
-      const target = await this.targets.getApprovedTargetForDate(salesRepEmployeeId, params.eventDate.toISOString().slice(0, 10));
+      const target = await this.targets.getApprovedTargetForDate(salesRepEmployeeId, params.eventDate.toISOString().slice(0, 10), manager);
       if (!target) return null; // target-tiered policy with no Target available — surfaced, not defaulted (ADR-071 §14)
-      const tierRows = await this.tiers.find({ where: { policyId: policy.id } });
+      const tierRows = await this.repos(manager).tiers.find({ where: { policyId: policy.id } });
       const achievementPercent = (eligibleAmount / Number(target.targetValue)) * 100;
-      const { amount, appliedTiers } = this.computeMarginalTierAmount(achievementPercent, eligibleAmount, tierRows);
+      const { amount, appliedTiers } = this.computeMarginalTierAmount(achievementPercent, eligibleAmount, tierRows, manager);
       calculatedAmount = amount;
       rate = appliedTiers.length > 0 ? appliedTiers[appliedTiers.length - 1].rate : '0';
       applicableTier = { achievementPercent, appliedTiers };
@@ -288,8 +314,8 @@ export class CommissionService implements OnModuleInit {
       targetSnapshot = { periodStart: target.periodStart, periodEnd: target.periodEnd, targetValue: target.targetValue };
     }
 
-    const saved = await this.results.save(
-      this.results.create({
+    const saved = await this.repos(manager).results.save(
+      this.repos(manager).results.create({
         employeeId: salesRepEmployeeId,
         customerId: params.customerId,
         customerGroupId: null,
@@ -317,11 +343,11 @@ export class CommissionService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { employeeId: salesRepEmployeeId, customerId: params.customerId, calculatedAmount: saved.calculatedAmount },
-    });
+    }, manager);
     return saved;
   }
 
-  private async onInvoicePosted(payload: Record<string, unknown>): Promise<void> {
+  private async onInvoicePosted(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const invoiceId = String(payload.invoiceId ?? payload.sourceEntityId ?? '');
     const customerId = String(payload.customerId ?? '');
     if (!invoiceId || !customerId) return;
@@ -333,10 +359,10 @@ export class CommissionService implements OnModuleInit {
       customerId,
       basisAmountByType: { gross_sales: grossAmount, net_sales: netAmount },
       eventDate: new Date(),
-    });
+    }, manager);
   }
 
-  private async onCollectionRemitted(payload: Record<string, unknown>): Promise<void> {
+  private async onCollectionRemitted(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const collectionId = String(payload.collectionId ?? '');
     const shipmentId = String(payload.shipmentId ?? '');
     const amount = Number(payload.amount ?? 0);
@@ -346,7 +372,7 @@ export class CommissionService implements OnModuleInit {
     // resolved via the existing Shipment -> Sales Order -> Customer relational path (a read-only
     // join, not a new mechanism), the same "read another domain's table directly" pattern already
     // used for the Sales Rep resolution above.
-    const [row]: Array<{ customerId: string }> = await this.dataSource.query(
+    const [row]: Array<{ customerId: string }> = await this.em(manager).query(
       `SELECT so."customerId" FROM shipments s JOIN sales_orders so ON so.id = s."salesOrderId" WHERE s.id = $1`,
       [shipmentId],
     );
@@ -358,17 +384,17 @@ export class CommissionService implements OnModuleInit {
       customerId: row.customerId,
       basisAmountByType: { collected_amount: amount },
       eventDate: new Date(),
-    });
+    }, manager);
   }
 
   // ---------------------------------------------------------------------------
   // Approval Batch — mirrors Attendance's own proven shape (ADR-069 §1).
   // ---------------------------------------------------------------------------
 
-  async submitApprovalBatch(periodStart: string, periodEnd: string, actorUserId: string): Promise<CommissionApprovalBatch> {
+  async submitApprovalBatch(periodStart: string, periodEnd: string, actorUserId: string, manager?: EntityManager): Promise<CommissionApprovalBatch> {
     if (periodStart > periodEnd) throw new ConflictException('periodStart must be on or before periodEnd.');
     const { start, end } = this.utcDayRange(periodStart, periodEnd);
-    const inRange = await this.results
+    const inRange = await this.repos(manager).results
       .createQueryBuilder('r')
       .where('r."calculationTimestamp" >= :start', { start })
       .andWhere('r."calculationTimestamp" <= :end', { end })
@@ -376,9 +402,9 @@ export class CommissionService implements OnModuleInit {
       .getMany();
     if (inRange.length === 0) throw new ConflictException('No un-batched commission results exist in this period.');
 
-    const batch = await this.batches.save(this.batches.create({ periodStart, periodEnd, status: 'draft', createdByUserId: actorUserId }));
-    await this.processEngine.start(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id);
-    await this.results.update(
+    const batch = await this.repos(manager).batches.save(this.repos(manager).batches.create({ periodStart, periodEnd, status: 'draft', createdByUserId: actorUserId }));
+    await this.processEngine.start(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id, manager);
+    await this.repos(manager).results.update(
       inRange.map((r) => r.id),
       { batchId: batch.id },
     );
@@ -392,21 +418,21 @@ export class CommissionService implements OnModuleInit {
         requestedAction: 'approve',
         payload: { periodStart, periodEnd, resultCount: inRange.length },
         makerUserId: actorUserId,
-      });
+      }, manager);
     } catch (err) {
       // Same recovery shape commit d76e22e already proved for Attendance's own approval batches.
-      await this.results.update(
+      await this.repos(manager).results.update(
         inRange.map((r) => r.id),
         { batchId: null as unknown as string },
       );
-      await this.batches.delete(batch.id);
+      await this.repos(manager).batches.delete(batch.id);
       throw err;
     }
 
-    await this.processEngine.transition(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id, 'submit', actorUserId);
+    await this.processEngine.transition(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id, 'submit', actorUserId, manager);
     batch.approvalRequestId = approvalRequest.id;
     batch.status = 'submitted';
-    await this.batches.save(batch);
+    await this.repos(manager).batches.save(batch);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -415,22 +441,22 @@ export class CommissionService implements OnModuleInit {
       resourceId: batch.id,
       result: 'success',
       correlationId: approvalRequest.id,
-    });
+    }, manager);
     return batch;
   }
 
-  async listApprovalBatches(): Promise<CommissionApprovalBatch[]> {
-    return this.batches.find({ order: { createdAt: 'DESC' } });
+  async listApprovalBatches(manager?: EntityManager): Promise<CommissionApprovalBatch[]> {
+    return this.repos(manager).batches.find({ order: { createdAt: 'DESC' } });
   }
 
-  async listResults(employeeId?: string): Promise<CommissionResult[]> {
-    return this.results.find({ where: employeeId ? { employeeId } : {}, order: { calculationTimestamp: 'DESC' } });
+  async listResults(employeeId?: string, manager?: EntityManager): Promise<CommissionResult[]> {
+    return this.repos(manager).results.find({ where: employeeId ? { employeeId } : {}, order: { calculationTimestamp: 'DESC' } });
   }
 
   /** ADR-071 §9 — Payroll's own read contract into Commission. Returns only APPROVED results, never pending/rejected (ADR-072 §19 item 8). */
-  async listApprovedCommissionResults(employeeId: string, periodStart: string, periodEnd: string): Promise<CommissionResult[]> {
+  async listApprovedCommissionResults(employeeId: string, periodStart: string, periodEnd: string, manager?: EntityManager): Promise<CommissionResult[]> {
     const { start, end } = this.utcDayRange(periodStart, periodEnd);
-    return this.results
+    return this.repos(manager).results
       .createQueryBuilder('r')
       .innerJoin(CommissionApprovalBatch, 'b', 'b.id = r."batchId"')
       .where('r."employeeId" = :employeeId', { employeeId })
@@ -462,20 +488,20 @@ export class CommissionService implements OnModuleInit {
   }
 
   /** Pure pass-through to the generic engine — same shape as every other FA-01 consumer's own `decide`. */
-  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null): Promise<unknown> {
-    return this.approvals.decide(requestId, approverUserId, decision, note ?? null);
+  async decide(requestId: string, approverUserId: string, decision: 'approved' | 'rejected', note?: string | null, manager?: EntityManager): Promise<unknown> {
+    return this.approvals.decide(requestId, approverUserId, decision, note ?? null, manager);
   }
 
-  private async onApprovalApproved(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalApproved(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const batch = await this.batches.findOne({ where: { id: resourceId } });
+    const batch = await this.repos(manager).batches.findOne({ where: { id: resourceId } });
     if (!batch || batch.status === 'approved') return;
 
     // Atomic, matching PayrollService's/TargetService's own proven `onApprovalApproved` shape —
     // a DB-level failure on the batch save must never leave ProcessEngine's own state ahead of it.
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       await this.processEngine.transition(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id, 'approve', SYSTEM_ACTOR_ID, manager);
       batch.status = 'approved';
       batch.decidedAt = new Date();
@@ -489,17 +515,17 @@ export class CommissionService implements OnModuleInit {
       resourceId: batch.id,
       result: 'success',
       correlationId: String(payload.approvalRequestId ?? ''),
-    });
+    }, manager);
   }
 
-  private async onApprovalRejected(payload: Record<string, unknown>): Promise<void> {
+  private async onApprovalRejected(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
     const requestTypeCode = String(payload.requestTypeCode ?? '');
     if (requestTypeCode !== APPROVAL_TYPE) return;
     const resourceId = String(payload.resourceId ?? '');
-    const batch = await this.batches.findOne({ where: { id: resourceId } });
+    const batch = await this.repos(manager).batches.findOne({ where: { id: resourceId } });
     if (!batch || batch.status === 'rejected') return;
 
-    await this.dataSource.transaction(async (manager) => {
+    await this.em(manager).transaction(async (manager) => {
       await this.processEngine.transition(COMMISSION_BATCH_PROCESS, BATCH_ENTITY_TYPE, batch.id, 'reject', SYSTEM_ACTOR_ID, manager);
       batch.status = 'rejected';
       batch.decidedAt = new Date();
@@ -512,12 +538,12 @@ export class CommissionService implements OnModuleInit {
   // Correction — ADR-068 §H. No CommissionResult field is ever updated.
   // ---------------------------------------------------------------------------
 
-  async createAdjustment(input: CreateAdjustmentInput, actorUserId: string): Promise<CommissionAdjustment> {
-    const result = await this.results.findOne({ where: { id: input.originalCommissionResultId } });
+  async createAdjustment(input: CreateAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<CommissionAdjustment> {
+    const result = await this.repos(manager).results.findOne({ where: { id: input.originalCommissionResultId } });
     if (!result) throw new NotFoundException(`CommissionResult "${input.originalCommissionResultId}" not found.`);
 
-    const saved = await this.adjustments.save(
-      this.adjustments.create({
+    const saved = await this.repos(manager).adjustments.save(
+      this.repos(manager).adjustments.create({
         originalCommissionResultId: input.originalCommissionResultId,
         kind: input.kind,
         reason: input.reason,
@@ -534,11 +560,11 @@ export class CommissionService implements OnModuleInit {
       result: 'success',
       correlationId: null,
       after: { originalCommissionResultId: input.originalCommissionResultId, kind: input.kind, amountDelta: input.amountDelta },
-    });
+    }, manager);
     return saved;
   }
 
-  async listAdjustments(originalCommissionResultId?: string): Promise<CommissionAdjustment[]> {
-    return this.adjustments.find({ where: originalCommissionResultId ? { originalCommissionResultId } : {}, order: { createdAt: 'DESC' } });
+  async listAdjustments(originalCommissionResultId?: string, manager?: EntityManager): Promise<CommissionAdjustment[]> {
+    return this.repos(manager).adjustments.find({ where: originalCommissionResultId ? { originalCommissionResultId } : {}, order: { createdAt: 'DESC' } });
   }
 }

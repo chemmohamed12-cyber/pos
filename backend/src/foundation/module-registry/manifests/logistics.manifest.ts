@@ -29,7 +29,11 @@ export const logisticsManifest: ModuleManifest = {
   // public_contract.events is deliberately NOT extended here -- declaring an event nothing
   // publishes would repeat the exact manifest/code mismatch the RBW already found on
   // sales.manifest.ts.
-  manifest_version: '1.2.0',
+  // 1.3.0 — D4 (Returns accounting, 2026-10-05, CTO-approved): completing a Sales Return / Shipment Return of an
+  // INVOICED sale now publishes `returns.sale_return.credited` (Revenue/AR/tax reversal) — a real publisher exists, so
+  // the event is declared (1.2.0's note above no longer applies). Additive columns only (migration
+  // `AddReturnFinancialSnapshot`); no new permission node, no new dependency edge (events + contracts, never imports).
+  manifest_version: '1.3.0',
   title_code: 'module.logistics',
   business_domains: ['shipment', 'tracking', 'delivery', 'returns'],
   depends_on: ['sales', 'inventory', 'finance'],
@@ -141,6 +145,6 @@ export const logisticsManifest: ModuleManifest = {
     commands: ['CreateShipmentRequest', 'AssignDriver', 'RecordTrackingEvent', 'RecordDeliveryOutcome', 'RecordCollection', 'RequestReturn', 'AuthorizeReturn', 'RecordInspection', 'CreateShipmentReturn', 'CompleteShipmentReturn', 'CreateSalesReturn', 'CompleteSalesReturn'],
     queries: ['GetShipmentStatus', 'GetWaybillHistory', 'GetLiveLocation', 'GetDeliveryOutcome', 'GetReturnStatus', 'GetShipmentDetail', 'ListEligibleReturnPurchaseLines', 'ListShipmentReturns', 'ListSalesReturns'],
     // F09-H2 — 'collection.remitted' added.
-    events: ['shipment.offer.created', 'shipment.assignment.accepted', 'shipment.dispatched', 'waybill.status.changed', 'delivery.completed', 'delivery.failed', 'collection.recorded', 'collection.remitted', 'return.completed', 'return.disposition.recorded'],
+    events: ['shipment.offer.created', 'shipment.assignment.accepted', 'shipment.dispatched', 'waybill.status.changed', 'delivery.completed', 'delivery.failed', 'collection.recorded', 'collection.remitted', 'return.completed', 'return.disposition.recorded', 'returns.sale_return.credited'],
   },
 };

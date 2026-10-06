@@ -3,7 +3,8 @@ import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLengt
 import { ApReconciliationService } from '../application/ap-reconciliation.service';
 import { ApAdjustmentService } from '../application/ap-adjustment.service';
 import { AP_ADJUSTMENT_KINDS } from '../domain/ap';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -81,7 +82,7 @@ class DecideDto {
  * `.import` / F04's).
  */
 @Controller('accounting/ap')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('accounting')
 export class ApController {
   constructor(
@@ -92,49 +93,49 @@ export class ApController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.view', 'read-only')
   @Get('reconciliations')
-  async listReconciliations(@Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.reconciliation.listRuns({ status, from, to });
+  async listReconciliations(@Req() req: CompanyScopedRequest, @Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.reconciliation.listRuns({ status, from, to }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.view', 'read-only')
   @Get('reconciliations/:id')
-  async getReconciliation(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reconciliation.getRun(id);
+  async getReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.getRun(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.create', 'editable')
   @Post('reconciliations')
-  async runReconciliation(@Body() dto: RunReconciliationDto, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.reconcile(dto, req.user.id);
+  async runReconciliation(@Body() dto: RunReconciliationDto, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.reconcile(dto, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.create', 'editable')
   @Post('reconciliations/:id/close')
-  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.reconciliation.closeRun(id, req.user.id);
+  async closeReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.reconciliation.closeRun(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.view', 'read-only')
   @Get('statement')
-  async apStatement(@Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.reconciliation.apStatement({ from, to, orgUnitId: orgUnitId ?? null });
+  async apStatement(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+    return this.reconciliation.apStatement({ from, to, orgUnitId: orgUnitId ?? null }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.adjust', 'editable')
   @Post('adjustments')
-  async submitAdjustment(@Body() dto: SubmitApAdjustmentDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.submitAdjustment(dto as never, req.user.id);
+  async submitAdjustment(@Body() dto: SubmitApAdjustmentDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.submitAdjustment(dto as never, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ap.approve', 'editable')
   @Post('approvals/:id/decide')
-  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: AuthenticatedRequest) {
-    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note);
+  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideDto, @Req() req: CompanyScopedRequest) {
+    return this.adjustments.decide(id, req.user.id, dto.decision as 'approved' | 'rejected', dto.note, req.companyContext!.dataSource.manager);
   }
 }

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Warehouse {
   id: string;
@@ -88,16 +89,25 @@ export function WorkOrderDetail() {
   const [returnQty, setReturnQty] = useState<Record<string, string>>({});
   const [outputQty, setOutputQty] = useState('');
 
+  const [loadError, setLoadError] = useState<unknown>(null);
+
   const load = useCallback(async () => {
     if (!id) return;
-    const [detail, prod, wh] = await Promise.all([
-      api.get<WorkOrderDetail>(`/manufacturing/work-orders/${id}`),
-      api.get<Product[]>('/products/all'),
-      api.get<Warehouse[]>('/inventory/warehouses'),
-    ]);
-    setWo(detail);
-    setProducts(prod);
-    setWarehouses(wh);
+    setLoadError(null);
+    try {
+      const [detail, prod, wh] = await Promise.all([
+        api.get<WorkOrderDetail>(`/manufacturing/work-orders/${id}`),
+        api.get<Product[]>('/products/all'),
+        api.get<Warehouse[]>('/inventory/warehouses'),
+      ]);
+      setWo(detail);
+      setProducts(prod);
+      setWarehouses(wh);
+    } catch (err) {
+      // Foundation fix: this load had no error handling — the page was
+      // stuck on "Loading…" forever on failure.
+      setLoadError(err);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -207,6 +217,7 @@ export function WorkOrderDetail() {
   const productName = (pid: string) => products.find((p) => p.id === pid)?.name ?? pid.slice(0, 8);
   const warehouseName = (wid: string) => warehouses.find((w) => w.id === wid)?.name ?? wid.slice(0, 8);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={load} />;
   if (!wo) return <div className="empty-state">Loading…</div>;
 
   const canIssue = wo.state === 'released' || wo.state === 'in_progress';

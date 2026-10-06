@@ -1,0 +1,54 @@
+{
+  "migrationsAtStart": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "companyAdminWithCompanyContext": "allowed",
+  "companyAdminCoreNodesInCompanyDb": [
+    "core.approval",
+    "core.company.audit.view",
+    "core.company.backup.manage",
+    "core.company.members.manage",
+    "core.config",
+    "core.entitlement",
+    "core.limit"
+  ],
+  "platformSideCheck": {
+    "allowed": false,
+    "max": 1,
+    "current": 0,
+    "remaining": 1
+  },
+  "companyASideCheck": {
+    "allowed": true,
+    "max": null,
+    "current": null,
+    "remaining": null
+  },
+  "companyAConsume": {
+    "allowed": true,
+    "max": null,
+    "current": null,
+    "remaining": null
+  },
+  "sourceHashesBefore": {
+    "src/foundation/limit-engine/limit.service.ts": "77f2208e2d7cc9fa",
+    "src/foundation/limit-engine/limit.controller.ts": "9b5e1ef6488121c0",
+    "src/foundation/permission/permission.guard.ts": "ed36e1c6255ae26f",
+    "src/foundation/permission/permission.service.ts": "905d6c674d3cc020",
+    "src/foundation/testing/two-company-real-pg-harness.ts": "6af6841dc480eed3"
+  },
+  "sourceHashesAfter": {
+    "src/foundation/limit-engine/limit.service.ts": "77f2208e2d7cc9fa",
+    "src/foundation/limit-engine/limit.controller.ts": "9b5e1ef6488121c0",
+    "src/foundation/permission/permission.guard.ts": "ed36e1c6255ae26f",
+    "src/foundation/permission/permission.service.ts": "905d6c674d3cc020",
+    "src/foundation/testing/two-company-real-pg-harness.ts": "6af6841dc480eed3"
+  },
+  "residue": [],
+  "migrationsAtEnd": {
+    "src": "140cc986cd46b031",
+    "dist": "a2f3ffcf266621dd"
+  },
+  "cwd": "C:\\Users\\chem_\\AppData\\Local\\Temp\\claude\\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\\84e7fca6-9da1-46cc-b1ed-3e8f7620e909\\scratchpad\\wp05_root"
+}

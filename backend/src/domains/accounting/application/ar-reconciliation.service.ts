@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ArReconciliationRun } from '../infrastructure/ar-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
@@ -34,40 +34,44 @@ export class ArReconciliationService {
     @Inject(FINANCE_CUSTOMER_LEDGER_CONTRACT) private readonly customerLedger: FinanceCustomerLedgerContract,
   ) {}
 
-  async listRuns(filter?: { status?: string; from?: string; to?: string }): Promise<ArReconciliationRun[]> {
-    const qb = this.dataSource.getRepository(ArReconciliationRun).createQueryBuilder('r');
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async listRuns(filter?: { status?: string; from?: string; to?: string }, manager?: EntityManager): Promise<ArReconciliationRun[]> {
+    const qb = this.em(manager).getRepository(ArReconciliationRun).createQueryBuilder('r');
     if (filter?.status) qb.andWhere('r.status = :s', { s: filter.status });
     if (filter?.from) qb.andWhere('r."asOfDate" >= :f', { f: filter.from });
     if (filter?.to) qb.andWhere('r."asOfDate" <= :t', { t: filter.to });
     return qb.orderBy('r."createdAt"', 'DESC').getMany();
   }
 
-  async getRun(id: string): Promise<ArReconciliationRun> {
-    const run = await this.dataSource.getRepository(ArReconciliationRun).findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<ArReconciliationRun> {
+    const run = await this.em(manager).getRepository(ArReconciliationRun).findOne({ where: { id } });
     if (!run) throw new NotFoundException(`AR reconciliation run "${id}" not found.`);
     return run;
   }
 
-  private async arAccount(): Promise<GLAccount> {
-    const acc = await this.dataSource.getRepository(GLAccount).findOne({ where: { controlFunction: 'ar', isActive: true } });
+  private async arAccount(manager?: EntityManager): Promise<GLAccount> {
+    const acc = await this.em(manager).getRepository(GLAccount).findOne({ where: { controlFunction: 'ar', isActive: true } });
     if (!acc) throw new ConflictException('No active `ar` control account in the chart of accounts — assign controlFunction "ar" to an account first.');
     return acc;
   }
 
-  async reconcile(input: ReconcileInput, actorUserId: string): Promise<ArReconciliationRun> {
+  async reconcile(input: ReconcileInput, actorUserId: string, manager?: EntityManager): Promise<ArReconciliationRun> {
     const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
-    const ar = await this.arAccount();
+    const ar = await this.arAccount(manager);
 
     // subledger side (read contract, no raw table access — ADR-036 D11)
-    const sub = await this.customerLedger.getAllCustomerBalances(asOfDate);
+    const sub = await this.customerLedger.getAllCustomerBalances(asOfDate, manager);
     const subledgerTotalBase = sub.total;
 
     // GL side — the `ar` control account's closing balance as of the date
-    const gl = await this.ledger.getAccountLedger(ar.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined });
+    const gl = await this.ledger.getAccountLedger(ar.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
     const glBalanceBase = gl.closingBalanceBase;
 
     // drift in SQL NUMERIC (never JS float)
-    const [d] = (await this.dataSource.query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
+    const [d] = (await this.em(manager).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
       subledgerTotalBase,
       glBalanceBase,
     ])) as Array<{ drift: string }>;
@@ -86,7 +90,7 @@ export class ArReconciliationService {
       };
     }
 
-    const repo = this.dataSource.getRepository(ArReconciliationRun);
+    const repo = this.em(manager).getRepository(ArReconciliationRun);
     let saved: ArReconciliationRun;
     try {
       saved = await repo.save(
@@ -120,16 +124,16 @@ export class ArReconciliationService {
       result: 'success',
       correlationId: null,
       after: { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status },
-    });
+    }, manager);
     return saved;
   }
 
-  async closeRun(id: string, actorUserId: string): Promise<ArReconciliationRun> {
-    const run = await this.getRun(id);
+  async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<ArReconciliationRun> {
+    const run = await this.getRun(id, manager);
     if (run.status === 'closed') return run;
     run.status = 'closed';
     run.closedAt = new Date();
-    const saved = await this.dataSource.getRepository(ArReconciliationRun).save(run);
+    const saved = await this.em(manager).getRepository(ArReconciliationRun).save(run);
     await this.audit.record({
       actorUserId,
       organizationId: null,
@@ -138,18 +142,18 @@ export class ArReconciliationService {
       resourceId: id,
       result: 'success',
       correlationId: null,
-    });
+    }, manager);
     return saved;
   }
 
   /** F04's accounting/reconciliation customer statement (Decision D-12): the subledger ledger + the GL ar-account movement side-by-side. */
-  async customerStatement(customerId: string, filter?: { from?: string; to?: string }): Promise<{
+  async customerStatement(customerId: string, filter?: { from?: string; to?: string }, manager?: EntityManager): Promise<{
     customerId: string;
     subledger: unknown[];
     creditSummary: { balance: string; creditLimit: string | null; availableCredit: string | null; overdueAmount: string };
   }> {
-    const subledger = await this.customerLedger.listLedger(customerId, { from: filter?.from, to: filter?.to });
-    const creditSummary = await this.customerLedger.getCreditSummary(customerId);
+    const subledger = await this.customerLedger.listLedger(customerId, { from: filter?.from, to: filter?.to }, manager);
+    const creditSummary = await this.customerLedger.getCreditSummary(customerId, manager);
     return { customerId, subledger, creditSummary };
   }
 }

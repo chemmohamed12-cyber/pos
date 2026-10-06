@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
 import { ProductCombobox } from '../components/ProductCombobox';
 import type { ProductOption } from '../components/ProductCombobox';
+import { ErrorState } from '../components/ErrorState';
 
 interface Warehouse {
   id: string;
@@ -14,6 +15,8 @@ interface Warehouse {
   name: string;
 }
 interface InventoryRow {
+  /** D1 — whether the item is assigned to this warehouse (false = it still holds stock here but is not assigned). */
+  assigned: boolean;
   productId: string;
   sku: string;
   name: string;
@@ -54,7 +57,12 @@ export function Inventory() {
   const [sortBy, setSortBy] = useState<SortColumn>('sku');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [data, setData] = useState<InventoryPage | null>(null);
+  // D1 — default: this warehouse's assigned items (plus any item still holding stock); 'all' = the whole catalogue
+  const [scope, setScope] = useState<'assigned' | 'all'>('assigned');
+  const [assignSearch, setAssignSearch] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'nav.inventory',
@@ -68,6 +76,14 @@ export function Inventory() {
     'field.available',
     'field.status',
     'field.last_movement',
+    'field.item_scope',
+    'value.item_scope.assigned',
+    'value.item_scope.all',
+    'field.assigned',
+    'value.assigned.yes',
+    'value.assigned.no',
+    'panel.assign_item_to_warehouse',
+    'action.remove_from_warehouse',
     'field.search_product_placeholder',
     'panel.no_matching_products',
     'panel.no_inventory_rows',
@@ -87,12 +103,18 @@ export function Inventory() {
 
   useEffect(() => {
     (async () => {
-      const [wh, prod] = await Promise.all([api.get<Warehouse[]>('/inventory/warehouses'), api.get<ProductOption[]>('/products/all')]);
-      setWarehouses(wh);
-      setProducts(prod);
-      const fromUrl = searchParams.get('warehouseId');
-      if (fromUrl && wh.some((w) => w.id === fromUrl)) setWarehouseId(fromUrl);
-      else if (wh[0]) setWarehouseId(wh[0].id);
+      try {
+        const [wh, prod] = await Promise.all([api.get<Warehouse[]>('/inventory/warehouses'), api.get<ProductOption[]>('/products/all')]);
+        setWarehouses(wh);
+        setProducts(prod);
+        const fromUrl = searchParams.get('warehouseId');
+        if (fromUrl && wh.some((w) => w.id === fromUrl)) setWarehouseId(fromUrl);
+        else if (wh[0]) setWarehouseId(wh[0].id);
+      } catch (err) {
+        // Foundation fix: no warehouse ever gets selected on failure, so
+        // the grid silently never loads — surface it as a real Error state.
+        setLoadError(err);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -105,7 +127,7 @@ export function Inventory() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, warehouseId]);
+  }, [debouncedSearch, warehouseId, scope]);
 
   async function load() {
     if (!warehouseId) return;
@@ -116,6 +138,7 @@ export function Inventory() {
         pageSize: String(PAGE_SIZE),
         sortBy,
         sortDir,
+        scope,
       });
       if (debouncedSearch) params.set('search', debouncedSearch);
       const result = await api.get<InventoryPage>(`/inventory/warehouses/${warehouseId}/inventory?${params.toString()}`);
@@ -128,7 +151,32 @@ export function Inventory() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warehouseId, debouncedSearch, page, sortBy, sortDir]);
+  }, [warehouseId, debouncedSearch, page, sortBy, sortDir, scope]);
+
+  async function assignItem(productId: string) {
+    if (!warehouseId) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post(`/inventory/warehouses/${warehouseId}/items`, { productIds: [productId] });
+      setAssignSearch('');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to assign the item.');
+    }
+  }
+
+  async function removeItem(productId: string) {
+    if (!warehouseId) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.delete(`/inventory/warehouses/${warehouseId}/items/${productId}`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to remove the item.');
+    }
+  }
 
   function onSelectWarehouse(id: string) {
     setWarehouseId(id);
@@ -151,6 +199,17 @@ export function Inventory() {
     return sortDir === 'asc' ? ' ▲' : ' ▼';
   }
 
+  if (loadError) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('nav.inventory')}</h1>
+        </div>
+        <ErrorState error={loadError} onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -169,6 +228,26 @@ export function Inventory() {
               ))}
             </select>
           </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label>{t('field.item_scope')}</label>
+            <select value={scope} onChange={(e) => setScope(e.target.value as 'assigned' | 'all')}>
+              <option value="assigned">{t('value.item_scope.assigned')}</option>
+              <option value="all">{t('value.item_scope.all')}</option>
+            </select>
+          </div>
+          {hasRole('admin') && warehouseId && (
+            <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
+              <label>{t('panel.assign_item_to_warehouse')}</label>
+              <ProductCombobox
+                products={products}
+                value={assignSearch}
+                onValueChange={setAssignSearch}
+                onSelect={(p) => assignItem(p.id)}
+                placeholder={t('field.search_product_placeholder')}
+                clearOnSelect
+              />
+            </div>
+          )}
           <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
             <label>{t('field.search_product_placeholder')}</label>
             <ProductCombobox
@@ -204,6 +283,7 @@ export function Inventory() {
       )}
 
       {error && <div className="error-text">{error}</div>}
+      {notice && <div style={{ color: '#166534', marginBottom: 8 }}>{notice}</div>}
 
       {data === null ? (
         <div className="empty-state">Loading…</div>
@@ -224,6 +304,7 @@ export function Inventory() {
                     {sortIndicator('name')}
                   </th>
                   <th>{t('field.unit')}</th>
+                  <th>{t('field.assigned')}</th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('onHand')}>
                     {t('field.on_hand')}
                     {sortIndicator('onHand')}
@@ -253,6 +334,20 @@ export function Inventory() {
                     <td>{r.sku}</td>
                     <td>{r.name}</td>
                     <td>{r.unit ?? '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.assigned ? (
+                        <>
+                          <span style={{ color: '#166534' }}>{t('value.assigned.yes')}</span>
+                          {hasRole('admin') && (
+                            <button className="btn btn-secondary" style={{ marginInlineStart: 8 }} title={t('action.remove_from_warehouse')} onClick={() => removeItem(r.productId)}>
+                              ×
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span style={{ color: '#b45309' }}>{t('value.assigned.no')}</span>
+                      )}
+                    </td>
                     <td>{r.onHand}</td>
                     <td>{r.preliminaryHold}</td>
                     <td>{r.reserved}</td>

@@ -16,6 +16,8 @@ import { AuthenticationModule } from '../../foundation/authentication/authentica
 import { IdentityModule } from '../../foundation/identity/identity.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { SALES_ORDERS_READ_CONTRACT } from '../../foundation/module-registry/contracts/sales.contract';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { CompanyModule } from '../../foundation/company/company.module';
 
 /**
  * Consumes Commerce and CRM only through their exported services
@@ -37,6 +39,10 @@ import { SALES_ORDERS_READ_CONTRACT } from '../../foundation/module-registry/con
     AuthenticationModule,
     IdentityModule,
     InventoryWarehouseModule,
+    DatabaseRegistryModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard`, added to `SalesOrdersController`.
+    CompanyModule,
   ],
   controllers: [SalesOrdersController],
   providers: [

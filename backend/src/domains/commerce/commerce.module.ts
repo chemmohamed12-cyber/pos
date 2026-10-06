@@ -19,6 +19,8 @@ import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { EventsModule } from '../../foundation/events/events.module';
 import { SALES_PRODUCTS_CONTRACT, SALES_BOM_CONTRACT } from '../../foundation/module-registry/contracts/sales.contract';
 import { PermissionModule } from '../../foundation/permission/permission.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -30,6 +32,13 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
     NumberingModule,
     EventsModule,
     PermissionModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for `CompanyContextGuard`.
+    // `DatabaseRegistryModule` alongside it — `CompanyContextGuard` needs
+    // `CompanyConnectionManagerService` resolvable in THIS module's own
+    // scope too (same shape `SalesOrdersModule`'s own retrofit already
+    // required and confirmed works).
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [ProductsController, PriceListsController, BomController],
   providers: [

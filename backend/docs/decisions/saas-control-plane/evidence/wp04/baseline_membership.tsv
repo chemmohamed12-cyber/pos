@@ -1,0 +1,581 @@
+path	status	membership	reason	area21_shared
+backend/.env.example	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/acceptance/AREA21_CLOSURE_2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/acceptance/ISOLATED_TEST_ENVIRONMENT.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/acceptance/MODULE_ENFORCEMENT_COVERAGE.md	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/acceptance/MULTI_COMPANY_UI_ACCEPTANCE_2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/ADR-073-multicompany-company-db-user-identity-fk-contradiction-PENDING.md	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/ADR-074-multicompany-company-datasource-entity-registration-PENDING.md	HISTORICAL / ALREADY VERIFIED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/ADR-075-event-engine-company-context.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/AREA21-CONTROLLER-TEST-SPECS.md	HISTORICAL / ALREADY VERIFIED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/AREA21-RETROFIT-MATRIX.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D1-ITEM-WAREHOUSE-ASSIGNMENT-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D2-TREASURY-BANK-LEG-POLICY-2026-10-04.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D3-INVENTORY-POSTING-POLICY-2026-10-04.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D4-RETURNS-ACCOUNTING-POLICY-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D5-PPV-INPUT-VAT-AUDIT-NOTES-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D5-PPV-INPUT-VAT-POLICY-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D6-RFQ-AWARD-VISIBILITY-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D7-NEW-ITEM-REQUEST-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D8-FIXED-ASSET-ACQUISITION-LINK-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/D9-SUPPLIER-MASTER-EDIT-AUTONUMBER-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/ERP-AUDIT-DECISION-REGISTER-AND-T0-PACKAGE-2026-10-04.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/ERP-FUNCTIONAL-INTEGRITY-AUDIT-2026-10-04.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/NAVIGATION-REGISTRY-VERIFICATION-2026-09-26.md	HISTORICAL / ALREADY VERIFIED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/P0-MULTI-COMPANY-CONTROL-PLANE-API.md	HISTORICAL / ALREADY VERIFIED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/P2-UI-BATCH-SHR01-COA01-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/PRC-01-PROCUREMENT-STOCK-VISIBILITY-2026-10-05.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/T0-CLEAN-COMPANY-BASELINE-2026-10-04.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/AREA21-DECISION-PACKAGES.md	HISTORICAL / ALREADY VERIFIED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/AREA21-GL-RATIFICATION-PACKAGE.md	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/GL-RATIFICATION.patch	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/snapshots/S1-ANCHOR-HASH.txt	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/snapshots/S1-PINNED-MANIFEST-20261004-1821.sha256	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/snapshots/TREE-HEAD-20261004-180452.txt	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/area21/snapshots/TREE-MANIFEST-20261004-180452.sha256	UNATTRIBUTED	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/docs/decisions/saas-control-plane/BATCH-A-DECISION-PACKAGE-DP8-DP4-DP1.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/BATCH-B-CONSOLIDATED-PACKAGE-FOR-CTO-RULING.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/BATCH-B-DECISION-PACKAGE-DP6-DP5-DP7.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/BATCH-C-DECISION-PACKAGE-DP3-DP2.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/CD-1-ARCHITECTURE-RISK-DOCKET.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/DP-9-SUSPENSION-ENFORCEMENT-DECISION-RECORD.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/FINAL-CLOSURE-PACKAGE.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/LA-1-LIFECYCLE-ADMISSION-BOUNDARY-PACKAGE.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/SAAS-CONTROL-PLANE-COMPLETE-DECISION-PACKAGE.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/SAAS-CONTROL-PLANE-COMPLETE-DECISION-PACKAGE.zip	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/SAAS-CONTROL-PLANE-DECISION-DOSSIER-DP1-DP8.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/SAAS-CONTROL-PLANE-MASTER-EXECUTION-BLUEPRINT.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/WP-0.4-STABLE-SOURCE-EVIDENCE.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/WP-0.5-CHARACTERIZATION-RESULTS.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/WP-1.1-COMMERCIAL-AND-AUTHORITY-ARCHITECTURE-CONTRACT.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/WP-1.2-VERIFICATION-AND-ACCEPTANCE-PLAN.md	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/T0-manifest-20261005-0530.sha256	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/T0-to-T1-changed-files.txt	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/T1-manifest-20261005-0551.sha256	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/snapshot-anchor-20261005-0541.sha256	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/snapshot-anchor-hash.txt	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/wp05a.recorded.json	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/wp05b.recorded.json	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/wp05c.recorded.json	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/decisions/saas-control-plane/evidence/wp05d.recorded.json	OWNED / VERIFIED	INCLUDED	owned & verified	False
+backend/docs/studies/SAAS_DP1_RUNTIME_ENTITLEMENT_RESOLUTION_DECISION_BRIEF.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	True
+backend/docs/studies/SAAS_DP9_SUSPENSION_ENFORCEMENT_DECISION_BRIEF.md	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/src/app.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/database/migrations/attendance/1789730500000-SeedNavGroupAttendanceTerminology.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/commission/1789751500000-SeedNavGroupCommissionTerminology.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/core/1789780000000-CreateCompanies.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789790000000-CreateDatabaseRegistry.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789800000000-CreateUserCompanyMemberships.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789810000000-AddCompanyIdToRefreshTokens.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/core/1789820000000-CreateMembershipOperations.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/core/1789830000000-AddCompanyBackupSupport.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/core/1789840000000-SeedControlPlaneTerminology.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789850000000-SeedTreasuryGlMappingTerminology.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789870000000-SeedManualReceiptTerminology.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789890000000-CreatePlansAndCompanyAssignments.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/core/1789920000000-SeedSupplierInvoiceVatTerminology.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/core/1789930000000-SeedRfqAwardVisibilityTerminology.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/core/1789950000000-SeedWarehouseItemAssignmentTerminology.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/core/1789960000000-SeedFixedAssetAcquisitionLinkTerminology.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/core/1789970000000-SeedSupplierEditTerminology.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/core/1789990000000-SeedNewItemRequestTerminology.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/inventory/1789860000000-AddManualReceiptCostAndReasonCode.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/inventory/1789940000000-CreateWarehouseItems.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/database/migrations/logistics/1789900000000-AddReturnFinancialSnapshot.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/manufacturing/1789734100000-SeedNavGroupManufacturingTerminology.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/payroll/1789740300000-SeedNavGroupPayrollTerminology.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/database/migrations/procurement/1789910000000-AddSupplierInvoiceTaxAndVariance.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/procurement/1789980000000-CreateProductItemRequests.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/database/migrations/targets/1789750300000-SeedNavGroupTargetsTerminology.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/accounting/accounting-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/accounting.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/ap-adjustment.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/ap-reconciliation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/ar-adjustment.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/ar-reconciliation.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/cash-bank-adjustment.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/cash-bank-reconciliation.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/closing-audit.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/closing-exception.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/application/closing-snapshot.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/accounting/application/closing-snapshot.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/currency.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/depreciation.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/financial-dimension.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/financial-events/finance-handlers.bank-leg.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-events/finance-handlers.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-events/financial-event.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-events/handler-registry.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-events/inventory-costing-handler.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-events/supplier-invoice.handler.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/financial-reporting.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/accounting/application/fiscal-period.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/fixed-asset-disposal.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/fixed-asset-reconciliation.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/fixed-asset.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/gl-account.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/grni-reconciliation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/inventory-adjustment.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/inventory-posting-policy.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/inventory-reconciliation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/application/journal-entry.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/accounting/application/ledger.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/tax-code.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/tax-engine.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/tax-period.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/accounting/application/wip-reconciliation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/interface/accounting.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/accounting.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/ap.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/ar.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/cash-bank.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/closing-exception-visibility.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/interface/event-engine.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/fixed-asset.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/general-ledger.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/accounting/interface/general-ledger.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/accounting/interface/grni.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/accounting/interface/grni.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/inventory-accounting.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/accounting/interface/t0-clean-company-baseline.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/accounting/interface/wip.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/accounting/interface/wip.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/attendance/application/attendance.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/attendance/attendance-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/attendance/attendance.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/attendance/interface/attendance.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/attendance/interface/attendance.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/commerce/application/bom.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/commerce/application/price-lists.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/commerce/application/products.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/commerce/commerce-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/commerce.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/commerce/interface/bom.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/interface/bom.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/interface/price-lists.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/interface/price-lists.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/interface/products.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commerce/interface/products.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/commission/application/commission.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/commission/commission-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/commission/commission.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/commission/interface/commission.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/commission/interface/commission.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/crm/application/customers.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/crm/crm-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/crm/crm.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/crm/interface/customers.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/crm/interface/customers.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/customer-finance/application/customer-ledger.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/customer-finance/application/invoices.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/customer-finance/application/payments.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/customer-finance/customer-finance-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/customer-finance/customer-finance.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/customer-finance/interface/customer-ledger.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/customer-finance/interface/invoices.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/customer-finance/interface/invoices.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/customer-finance/interface/payments.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/customer-finance/interface/payments.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/delivery/application/delivery.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/delivery/delivery-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/delivery/delivery.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/delivery/interface/delivery.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/delivery/interface/delivery.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/deposit-control/application/deposits.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/deposit-control/deposit-control-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/deposit-control/deposit-control.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/deposit-control/interface/deposits.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/deposit-control/interface/deposits.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/fulfillment/application/fulfillment.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/fulfillment/fulfillment-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/fulfillment/fulfillment.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/fulfillment/interface/fulfillment.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/hr/application/hr.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/hr/hr-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/hr/hr.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/hr/interface/hr.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/hr/interface/hr.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/inventory-valuation/domain/cost-engine.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/inventory-valuation/inventory-valuation-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/inventory-valuation/inventory-valuation.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/inventory-warehouse/application/inventory.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/inventory-warehouse/infrastructure/warehouse-item.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/inventory-warehouse/infrastructure/warehouse-transaction-line.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/inventory-warehouse/infrastructure/warehouse-transaction.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/inventory-warehouse/interface/inventory.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/inventory-warehouse/inventory-warehouse-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/inventory-warehouse/inventory-warehouse.module.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/manufacturing/application/manufacturing-wip-ledger.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/manufacturing/application/work-order.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/manufacturing/interface/work-order.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/manufacturing/interface/work-order.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/manufacturing/manufacturing-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/manufacturing/manufacturing.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/payroll/application/payroll.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/payroll/interface/payroll.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/payroll/interface/payroll.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/payroll/payroll-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/payroll/payroll.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/goods-receipt.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/grni-ledger.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/new-item-request.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/product-lifecycle-gate.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/purchase-order.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/purchase-request.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/rfq.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/supplier-invoice.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/supplier-ledger.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/supplier-payment.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/application/supplier.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/infrastructure/product-item-request.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/infrastructure/supplier-invoice.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/procurement/interface/goods-receipt.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/new-item-request.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/new-item-request.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/product-lifecycle-gate.test-helper.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/procurement/interface/purchase-order.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/procurement/interface/purchase-order.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/purchase-request.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/procurement/interface/purchase-request.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/rfq.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-invoice.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-master.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-payment.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier-payment.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/interface/supplier.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/procurement/procurement-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/procurement/procurement.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/reports/application/customer-accounts.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/reports/application/reports.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/reports/interface/reports.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/reports/interface/reports.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/reports/reports.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/returns/application/return-financials.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/returns/application/returns.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/application/sales-returns.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/application/shipment-returns.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/returns/infrastructure/sales-return-line.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/infrastructure/sales-return.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/infrastructure/shipment-return-line.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/infrastructure/shipment-return.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/returns/interface/returns-accounting.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/returns/interface/returns.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/returns/interface/returns.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/returns/interface/sales-returns.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/returns/interface/sales-returns.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/returns/interface/shipment-returns.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/returns/interface/shipment-returns.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/returns/returns-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/returns/returns.module.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/sales-orders/application/sales-orders.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/sales-orders/interface/sales-orders.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/sales-orders/sales-orders-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/sales-orders/sales-orders.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/domains/sales/application/sales.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/sales/interface/sales.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/sales/interface/sales.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/sales/sales-company-entities.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/sales/sales.module.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending)	False
+backend/src/domains/shipment/application/shipment.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/shipment/interface/shipment.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/shipment/interface/shipment.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/shipment/shipment-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/shipment/shipment.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/targets/application/target.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/targets/interface/target.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/targets/interface/targets.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/targets/targets-company-entities.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/targets/targets.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/treasury/application/treasury.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/domains/treasury/interface/treasury.company-isolation.spec.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/domains/treasury/interface/treasury.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/treasury/treasury-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/domains/treasury/treasury.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/approval-engine/approval-engine.company-isolation.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/approval-engine/approval-engine.module.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/approval-engine/approval-engine.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/approval-engine/approval-expiry.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/approval-engine/approval-expiry.scheduler.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/approval-engine/approval.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/audit/area14-company-audit.real-pg.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/audit/audit.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/audit/audit.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/audit/company-audit-access.real-pg.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/audit/company-audit.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/audit/installation-audit.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/authentication/area5-company-context-lifecycle.verification.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authentication/auth.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authentication/auth.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authentication/auth.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authentication/authentication.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/authentication/jwt-auth.guard.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authentication/refresh-token.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authorization/authorization.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authorization/authorization.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/authorization/roles.guard.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/authorization/roles.guard.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/area6-company-isolation.acceptance.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-activation.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-activation.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-admin-role-seeding.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-authorization-schema-adjustment.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/company/company-context.guard.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-context.guard.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-entitlement-provisioning.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-entitlement-provisioning.unit.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-membership-provisioning.real-pg.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-membership-provisioning.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-membership-provisioning.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-membership.controller.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-membership.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-registry.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/company-registry.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-registry.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-role-seeding.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-role-seeding.unit.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-status.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-status.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company-suspension-access-path.characterization.spec.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	True
+backend/src/foundation/company/company.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/company.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/core-company-entities.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/installation-membership.controller.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/installation-membership.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-operation.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-operation.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-operation.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-reconciliation.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-reconciliation.scheduler.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/membership-role-provisioning.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/membership-role-provisioning.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/membership.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/membership.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/membership.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/company/memberships-mine.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/memberships-mine.real-pg.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/company/permission-path-company-isolation.acceptance.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/configuration/app-config.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/configuration/configuration.schema.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/database-provisioning/database-provisioning.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-provisioning/database-provisioning.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-provisioning/database-provisioning.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-provisioning/database-provisioning.service.unit.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-provisioning/module-add-existing-company.characterization.spec.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	True
+backend/src/foundation/database-provisioning/provisioning-lifecycle.characterization.spec.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	True
+backend/src/foundation/database-provisioning/ui-created-company-admin.characterization.spec.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	True
+backend/src/foundation/database-registry/company-connection-manager.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/company-connection-manager.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/company-datasource-factory.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/company-datasource-registry-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/company-entity-registry.completeness.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/company-entity-registry.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/database-registry/database-credential-cipher.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-credential-cipher.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-credential.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-registry.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-registry.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-registry.service.getConnectionConfigForCompany.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/database-registry/database-registry.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/database-registry/database-registry.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/entitlement/entitlement.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/error-contract/all-exceptions.filter.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/error-contract/all-exceptions.filter.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/error-contract/idempotency.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/events/company-event-dispatcher.scheduler.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/events/event-bus.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/events/event-bus.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/events/event-outbox.entity.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/events/events.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/inventory-posting-policy/inventory-posting-policy.registry.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/limit-engine/limit.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/limit-engine/limits-scope.characterization.spec.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	True
+backend/src/foundation/module-registry/company-aware-guards.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/ap-events.contract.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/ar-events.contract.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/contracts/finance.contract.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/grni-events.contract.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/inventory-events.contract.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/inventory.contract.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/contracts/logistics.contract.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/module-registry/contracts/manufacturing-wip.contract.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/contracts/sales.contract.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/contracts/tax-engine.contract.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/entitlement-resolver.token.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/manifests/accounting.manifest.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/manifests/logistics.manifest.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/module-registry/require-feature.decorator.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/module-registry/require-module.decorator.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/navigation/navigation-registry.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/navigation/navigation.controller.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/navigation/navigation.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/navigation/navigation.service.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/numbering/numbering.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/organization/organization.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/permission/permission.guard.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/permission/permission.guard.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/permission/permission.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/permission/permission.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/plans/company-entitlement.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/company-entitlement.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/company-package.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/company-packages.real-pg.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/company-view-context.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/module-enforcement-coverage.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/plan.entity.ts	UNATTRIBUTED	EXCLUDED	unattributed (ownership attestation pending); Area21/shared re-proof queue	True
+backend/src/foundation/plans/plan.service.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/plan.service.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/plans.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/plans/plans.module.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	True
+backend/src/foundation/release-orchestration/company-migration-runner.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/release-orchestration/company-migration-runner.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/release-orchestration/company-migration-runner.unit.spec.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/release/backup-manager.company-scoped.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-manager.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-operation-status.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-operation.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-operation.service.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-operation.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-reconciliation.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-reconciliation.scheduler.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/release/backup-run.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/backup-trigger.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/company-backup-settings.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/company-backup.controller.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/company-backup.controller.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/company-baseline-backup.scheduler.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/company-baseline-backup.scheduler.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	True
+backend/src/foundation/release/release.controller.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/release/release.module.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/restore-manager.company-isolation.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/restore-manager.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/release/restore-operation.entity.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/scope/scope-resolver.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/scope/scope.service.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/testing/ambient-test-datasource.ts	FOREIGN / NEEDS RE-PROOF	EXCLUDED	foreign / needs re-proof	False
+backend/src/foundation/testing/saas-characterization.helpers.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	False
+backend/src/foundation/testing/saas-provisioning-kit.ts	TEST-ONLY	EXCLUDED	test-only artifact; not production baseline	False
+backend/src/foundation/testing/two-company-real-pg-harness.spec.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/src/foundation/testing/two-company-real-pg-harness.ts	HISTORICAL / ALREADY VERIFIED	EXCLUDED	historical: previously verified under its own closure; not re-verified in this baseline	False
+backend/tools/maintenance/relax-company-user-fks.js	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/tools/testing/provision-isolated-ambient-db.js	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+backend/tools/validation/module-enforcement-coverage.js	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/App.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/components/CompanySwitcher.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/components/ErrorState.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/components/Layout.css	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/components/Layout.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/components/StockAvailability.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/context/AuthContext.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/lib/api.ts	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/lib/companyScope.ts	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/lib/errors.ts	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Admin.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Approvals.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/CollectionSettlements.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/CustodianDetail.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/CustodyReturns.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Fulfillment.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Inventory.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Products.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Returns.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/SalesReturns.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/ShipmentReturns.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/Shipments.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/ShippingMethods.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/TreasuryAccounts.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/TreasuryLedger.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/accounting/ChartOfAccounts.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/accounting/FixedAssets.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/attendance/AttendanceConnectors.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/attendance/AttendanceDays.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/commission/CommissionPolicies.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/commission/CommissionResults.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/CompanyDetails.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/CompanyMembers.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/CompanyPackage.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/CompanyRegistry.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/CreateCompany.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/control-plane/Plans.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/AccountingCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/AdminCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/AttendanceCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/CatalogCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/CommissionCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/CustomersAccountsCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/FulfillmentCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/HrCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/PayrollCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/ProcurementCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/ReportsCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/SalesCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/ShippingCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/TargetsCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/covers/TreasuryCover.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/manufacturing/WorkOrderDetail.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/manufacturing/WorkOrders.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/payroll/PayrollCompensation.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/payroll/PayrollRunDetail.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/payroll/PayrollRuns.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/CollectionReceiptPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/CustodyStatementPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/CustomerPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/CustomerStatementPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/DeliveryPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/DepositReceiptPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/InventoryMovementPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/InvoicePrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/PackListPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/PaymentReceiptPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/PickListPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/PriceListPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/ProductListPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/ReportPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/ReturnPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/SalesOrderPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/WarehouseTransactionPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/print/WaybillPrint.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/procurement/PurchaseOrders.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/procurement/PurchaseRequests.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/procurement/Rfqs.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/procurement/SupplierInvoices.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/procurement/Suppliers.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/sales-orders/SalesOrdersCreate.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/targets/Targets.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/MovementCenter.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/StockCountEntry.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/StockCountStart.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/WarehouseOverview.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/WarehouseTransactionDetail.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/pages/warehouse/WarehouseTransactionForm.tsx	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False
+frontend/src/styles/ui.css	FOREIGN / NEEDS RE-PROOF	OUT-OF-SCOPE	not part of this baseline scope	False

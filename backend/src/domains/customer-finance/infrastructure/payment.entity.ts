@@ -14,9 +14,14 @@ export class Payment {
   @Column('uuid')
   customerId!: string;
 
+  /** CUS-01 — NULL for an on-account / advance payment (received before an invoice exists); applied to an invoice later through the Customer Ledger. */
   @Index()
-  @Column('uuid')
-  invoiceId!: string;
+  @Column({ type: 'uuid', nullable: true })
+  invoiceId!: string | null;
+
+  /** CUS-01 — optional sales order an on-account payment is earmarked for (enables the automatic sweep when that order's invoice is posted). */
+  @Column({ type: 'uuid', nullable: true })
+  salesOrderId!: string | null;
 
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount!: string;

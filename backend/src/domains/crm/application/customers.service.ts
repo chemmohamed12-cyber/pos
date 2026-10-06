@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Customer } from '../infrastructure/customer.entity';
 import { CustomerAssignment } from '../infrastructure/customer-assignment.entity';
 import { canTransitionCustomerStatus, CustomerStatus } from '../domain/customer-status';
@@ -137,16 +137,16 @@ export class CustomersService implements SalesCustomersContract {
    * (unlimited), confirmed 2026-09-06 — zero behavior change until an
    * Edition or admin actually sets a cap.
    */
-  async createCustomer(input: CreateCustomerInput, createdByUserId: string | null): Promise<Customer> {
-    const gate = await this.limits.check('sales.max_customers');
+  async createCustomer(input: CreateCustomerInput, createdByUserId: string | null, manager?: EntityManager): Promise<Customer> {
+    const gate = await this.limits.check('sales.max_customers', 1, manager);
     if (!gate.allowed) {
       throw new ConflictException(`Customer limit reached (${gate.max}) — cannot create another customer.`);
     }
 
-    const code = await this.numbering.getNextNumber('customer');
+    const code = await this.numbering.getNextNumber('customer', manager);
 
-    const customer = await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(Customer);
+    const customer = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const repo = txManager.getRepository(Customer);
       const saved = await repo.save(
         repo.create({
           code,
@@ -171,7 +171,7 @@ export class CustomersService implements SalesCustomersContract {
         }),
       );
 
-      const consumed = await this.limits.consume('sales.max_customers', 1, manager);
+      const consumed = await this.limits.consume('sales.max_customers', 1, txManager);
       if (!consumed.allowed) {
         // Lost a race against a concurrent create between the pre-check
         // above and here — throwing inside the transaction rolls back
@@ -180,7 +180,7 @@ export class CustomersService implements SalesCustomersContract {
         throw new ConflictException(`Customer limit reached (${consumed.max}) — cannot create another customer.`);
       }
 
-      await this.events.publish(manager, 'crm.customer.created', {
+      await this.events.publish(txManager, 'crm.customer.created', {
         customerId: saved.id,
         code: saved.code,
         name: saved.name,
@@ -193,16 +193,19 @@ export class CustomersService implements SalesCustomersContract {
     // committed fact, not a condition of the write succeeding, same as
     // Scope in assignSalesRep() below (a failure here is an operational
     // alerting concern, not grounds to roll back a valid customer record).
-    await this.audit.record({
-      actorUserId: createdByUserId,
-      organizationId: null,
-      action: 'crm.customer.created',
-      resource: 'customer',
-      resourceId: customer.id,
-      result: 'success',
-      correlationId: null,
-      after: { code: customer.code, name: customer.name, status: customer.status },
-    });
+    await this.audit.record(
+      {
+        actorUserId: createdByUserId,
+        organizationId: null,
+        action: 'crm.customer.created',
+        resource: 'customer',
+        resourceId: customer.id,
+        result: 'success',
+        correlationId: null,
+        after: { code: customer.code, name: customer.name, status: customer.status },
+      },
+      manager,
+    );
 
     return customer;
   }
@@ -212,12 +215,13 @@ export class CustomersService implements SalesCustomersContract {
     salesRepUserId: string,
     assignmentType: 'primary' | 'secondary',
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<CustomerAssignment> {
-    const assignment = await this.dataSource.transaction(async (manager) => {
-      const assignmentRepo = manager.getRepository(CustomerAssignment);
+    const assignment = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const assignmentRepo = txManager.getRepository(CustomerAssignment);
 
       // End any existing active assignment of the same type — history preserved, never overwritten.
-      await manager.query(
+      await txManager.query(
         'UPDATE customer_assignments SET status = $1, "endDate" = now() WHERE "customerId" = $2 AND "assignmentType" = $3 AND status = $4',
         ['ended', customerId, assignmentType, 'active'],
       );
@@ -226,7 +230,7 @@ export class CustomersService implements SalesCustomersContract {
         assignmentRepo.create({ customerId, salesRepUserId, assignmentType, status: 'active' }),
       );
 
-      await this.events.publish(manager, 'crm.customer.assigned', {
+      await this.events.publish(txManager, 'crm.customer.assigned', {
         customerId,
         salesRepUserId,
         assignmentType,
@@ -239,18 +243,21 @@ export class CustomersService implements SalesCustomersContract {
     // failure must not silently roll back a valid assignment record; if
     // this fails, it is a real operational issue (retried/alerted at the
     // infrastructure layer), not swallowed here.
-    await this.scope.assign(salesRepUserId, 'customer', customerId);
+    await this.scope.assign(salesRepUserId, 'customer', customerId, manager);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.assigned',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      after: { salesRepUserId, assignmentType },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.assigned',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        after: { salesRepUserId, assignmentType },
+      },
+      manager,
+    );
 
     return assignment;
   }
@@ -276,6 +283,7 @@ export class CustomersService implements SalesCustomersContract {
   async importRows(
     rows: CustomerImportRow[],
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ succeeded: Customer[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: Customer[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
@@ -324,13 +332,14 @@ export class CustomersService implements SalesCustomersContract {
             locationUrl: raw.locationUrl.trim() || null,
           },
           actorUserId,
+          manager,
         );
         if (raw.classification.trim()) {
-          await this.setClassification(customer.id, raw.classification.trim(), actorUserId);
+          await this.setClassification(customer.id, raw.classification.trim(), actorUserId, manager);
           customer.classification = raw.classification.trim();
         }
         if (salesRepUserId) {
-          await this.assignSalesRep(customer.id, salesRepUserId, 'primary', actorUserId);
+          await this.assignSalesRep(customer.id, salesRepUserId, 'primary', actorUserId, manager);
         }
         succeeded.push(customer);
       } catch (err) {
@@ -341,8 +350,8 @@ export class CustomersService implements SalesCustomersContract {
     return { succeeded, rejected };
   }
 
-  async setStatus(customerId: string, newStatus: CustomerStatus, actorUserId: string | null): Promise<Customer> {
-    const repo = this.dataSource.getRepository(Customer);
+  async setStatus(customerId: string, newStatus: CustomerStatus, actorUserId: string | null, manager?: EntityManager): Promise<Customer> {
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
     const customer = await repo.findOneOrFail({ where: { id: customerId } });
     if (!canTransitionCustomerStatus(customer.status, newStatus)) {
       throw new ConflictException(`Cannot transition customer from "${customer.status}" to "${newStatus}".`);
@@ -351,17 +360,20 @@ export class CustomersService implements SalesCustomersContract {
     customer.status = newStatus;
     const saved = await repo.save(customer);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.status_changed',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { status: newStatus },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.status_changed',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { status: newStatus },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -378,8 +390,9 @@ export class CustomersService implements SalesCustomersContract {
     customerId: string,
     policy: OrderWorkflowPolicy,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<Customer> {
-    const repo = this.dataSource.getRepository(Customer);
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
     const customer = await repo.findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
 
@@ -387,17 +400,20 @@ export class CustomersService implements SalesCustomersContract {
     customer.orderWorkflowPolicy = policy;
     const saved = await repo.save(customer);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.workflow_policy_changed',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { orderWorkflowPolicy: policy },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.workflow_policy_changed',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { orderWorkflowPolicy: policy },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -412,8 +428,9 @@ export class CustomersService implements SalesCustomersContract {
    * enforced Scope on `customerId` via `ScopeService.assertAccess` before
    * calling this.
    */
-  async getWorkflowPolicySnapshot(customerId: string): Promise<OrderWorkflowPolicy> {
-    const customer = await this.dataSource.getRepository(Customer).findOne({ where: { id: customerId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — Customer is Company-owned, called from Company-scoped flows (e.g. `SalesOrdersService.createOrder`). */
+  async getWorkflowPolicySnapshot(customerId: string, manager?: EntityManager): Promise<OrderWorkflowPolicy> {
+    const customer = await (manager ?? this.dataSource).getRepository(Customer).findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
     return isValidOrderWorkflowPolicy(customer.orderWorkflowPolicy) ? customer.orderWorkflowPolicy : 'standard';
   }
@@ -430,8 +447,8 @@ export class CustomersService implements SalesCustomersContract {
    * (`PriceListsService.getOverridePrice` returns null for either case),
    * never a hard failure on the assignment call itself.
    */
-  async setPriceList(customerId: string, priceListId: string | null, actorUserId: string | null): Promise<Customer> {
-    const repo = this.dataSource.getRepository(Customer);
+  async setPriceList(customerId: string, priceListId: string | null, actorUserId: string | null, manager?: EntityManager): Promise<Customer> {
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
     const customer = await repo.findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
 
@@ -439,17 +456,20 @@ export class CustomersService implements SalesCustomersContract {
     customer.priceListId = priceListId;
     const saved = await repo.save(customer);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.price_list_changed',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { priceListId },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.price_list_changed',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { priceListId },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -461,8 +481,8 @@ export class CustomersService implements SalesCustomersContract {
    * Same shape as `setPriceList`/`setOrderWorkflowPolicy`; completes the
    * existing data model rather than adding a new one.
    */
-  async setClassification(customerId: string, classification: string | null, actorUserId: string | null): Promise<Customer> {
-    const repo = this.dataSource.getRepository(Customer);
+  async setClassification(customerId: string, classification: string | null, actorUserId: string | null, manager?: EntityManager): Promise<Customer> {
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
     const customer = await repo.findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
 
@@ -470,17 +490,20 @@ export class CustomersService implements SalesCustomersContract {
     customer.classification = classification;
     const saved = await repo.save(customer);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.classification_changed',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { classification },
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.classification_changed',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { classification },
+      },
+      manager,
+    );
 
     return saved;
   }
@@ -496,8 +519,9 @@ export class CustomersService implements SalesCustomersContract {
     customerId: string,
     updates: { creditLimit?: string | null; paymentTermsDays?: number | null; accountType?: 'cash' | 'credit'; financialStatus?: 'active' | 'on_hold' | 'suspended' },
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<Customer> {
-    const repo = this.dataSource.getRepository(Customer);
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
     const customer = await repo.findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
 
@@ -513,24 +537,27 @@ export class CustomersService implements SalesCustomersContract {
     if (updates.financialStatus !== undefined) customer.financialStatus = updates.financialStatus;
     const saved = await repo.save(customer);
 
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'crm.customer.financial_settings_changed',
-      resource: 'customer',
-      resourceId: customerId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: updates,
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'crm.customer.financial_settings_changed',
+        resource: 'customer',
+        resourceId: customerId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: updates,
+      },
+      manager,
+    );
 
     return saved;
   }
 
   /** Cross-domain read contract for Sales Orders — same pattern as `getWorkflowPolicySnapshot`. */
-  async getPriceListId(customerId: string): Promise<string | null> {
-    const customer = await this.dataSource.getRepository(Customer).findOne({ where: { id: customerId } });
+  async getPriceListId(customerId: string, manager?: EntityManager): Promise<string | null> {
+    const customer = await (manager ?? this.dataSource).getRepository(Customer).findOne({ where: { id: customerId } });
     if (!customer) throw new NotFoundException(`Customer "${customerId}" not found.`);
     return customer.priceListId;
   }
@@ -548,9 +575,9 @@ export class CustomersService implements SalesCustomersContract {
     return this.dataSource.getRepository(Customer).findOne({ where: { phone } });
   }
 
-  /** Same unscoped system-lookup precedent as `findByPhone` — Returns Engine Phase B's "search by Customer Code" facet (shipping/vehicle custody return search). */
-  async findByCode(code: string): Promise<Customer | null> {
-    return this.dataSource.getRepository(Customer).findOne({ where: { code } });
+  /** Same unscoped system-lookup precedent as `findByPhone` — Returns Engine Phase B's "search by Customer Code" facet (shipping/vehicle custody return search). Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — called cross-domain from `ShipmentService.searchCustodyShipments`. */
+  async findByCode(code: string, manager?: EntityManager): Promise<Customer | null> {
+    return (manager ?? this.dataSource).getRepository(Customer).findOne({ where: { code } });
   }
 
   /**
@@ -562,8 +589,9 @@ export class CustomersService implements SalesCustomersContract {
    */
   async getCustomerSnapshot(
     customerId: string,
+    manager?: EntityManager,
   ): Promise<{ id: string; code: string; name: string; phone: string | null; address: string | null; governorate: string | null } | null> {
-    const customer = await this.dataSource.getRepository(Customer).findOne({ where: { id: customerId } });
+    const customer = await (manager ?? this.dataSource).getRepository(Customer).findOne({ where: { id: customerId } });
     if (!customer) return null;
     return {
       id: customer.id,
@@ -586,8 +614,9 @@ export class CustomersService implements SalesCustomersContract {
    * the caller has already authorized access to the LEDGER/CUSTOMER
    * ACCOUNT, which is the real boundary, not a second Scope check here.
    */
-  async getCreditLimit(customerId: string): Promise<string | null> {
-    const customer = await this.dataSource.getRepository(Customer).findOne({ where: { id: customerId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — Customer is Company-owned, called from `CustomerLedgerService.getCreditSummary` via the Company-scoped `customer-ledger.controller.ts`. */
+  async getCreditLimit(customerId: string, manager?: EntityManager): Promise<string | null> {
+    const customer = await (manager ?? this.dataSource).getRepository(Customer).findOne({ where: { id: customerId } });
     return customer?.creditLimit ?? null;
   }
 
@@ -598,9 +627,9 @@ export class CustomersService implements SalesCustomersContract {
    * so export needs this one join, done once for the whole batch rather
    * than per-row.
    */
-  async getPrimaryRepNamesByCustomerId(customerIds: string[]): Promise<Map<string, string>> {
+  async getPrimaryRepNamesByCustomerId(customerIds: string[], manager?: EntityManager): Promise<Map<string, string>> {
     if (customerIds.length === 0) return new Map();
-    const rows: Array<{ customerId: string; fullName: string }> = await this.dataSource.query(
+    const rows: Array<{ customerId: string; fullName: string }> = await (manager ?? this.dataSource).query(
       `SELECT ca."customerId" as "customerId", u."fullName" as "fullName"
        FROM customer_assignments ca
        JOIN users u ON u.id = ca."salesRepUserId"
@@ -611,12 +640,12 @@ export class CustomersService implements SalesCustomersContract {
   }
 
   /** Scope-checked detail read — 404s (never 403s) for a customer outside the caller's scope. Reviewer roles bypass Scope (see REVIEWER_ROLES doc comment). */
-  async getCustomer(customerId: string, requestingUserId: string): Promise<Customer> {
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId);
+  async getCustomer(customerId: string, requestingUserId: string, manager?: EntityManager): Promise<Customer> {
+    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
     if (!roles.some((r) => REVIEWER_ROLES.includes(r))) {
-      await this.scope.assertAccess(requestingUserId, 'customer', customerId);
+      await this.scope.assertAccess(requestingUserId, 'customer', customerId, manager);
     }
-    return this.dataSource.getRepository(Customer).findOneOrFail({ where: { id: customerId } });
+    return (manager ?? this.dataSource).getRepository(Customer).findOneOrFail({ where: { id: customerId } });
   }
 
   /**
@@ -626,11 +655,11 @@ export class CustomersService implements SalesCustomersContract {
    * requirement, applied here as the reference implementation). Reviewer
    * roles see the full list (see REVIEWER_ROLES doc comment).
    */
-  async listCustomers(requestingUserId: string): Promise<Customer[]> {
-    const repo = this.dataSource.getRepository(Customer);
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId);
+  async listCustomers(requestingUserId: string, manager?: EntityManager): Promise<Customer[]> {
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
+    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
     if (roles.some((r) => REVIEWER_ROLES.includes(r))) return repo.find();
-    const allowedIds = await this.scope.getAssignedResourceIds(requestingUserId, 'customer');
+    const allowedIds = await this.scope.getAssignedResourceIds(requestingUserId, 'customer', manager);
     if (allowedIds === 'ALL') return repo.find();
     if (allowedIds.length === 0) return [];
     return repo.find({ where: { id: In(allowedIds) } });
@@ -654,17 +683,17 @@ export class CustomersService implements SalesCustomersContract {
    * (directive: "must be technically unable... through a direct API
    * call").
    */
-  async listCustomersForRep(requestingUserId: string, targetSalesRepUserId?: string): Promise<Customer[]> {
-    if (!targetSalesRepUserId) return this.listCustomers(requestingUserId);
+  async listCustomersForRep(requestingUserId: string, targetSalesRepUserId?: string, manager?: EntityManager): Promise<Customer[]> {
+    if (!targetSalesRepUserId) return this.listCustomers(requestingUserId, manager);
 
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId);
+    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
     const isReviewer = roles.some((r) => REVIEWER_ROLES.includes(r));
     if (!isReviewer && targetSalesRepUserId !== requestingUserId) {
       throw new ForbiddenException("Only a sales manager/supervisor/admin may view another Sales Representative's customers.");
     }
 
-    const repo = this.dataSource.getRepository(Customer);
-    const allowedIds = await this.scope.getAssignedResourceIds(targetSalesRepUserId, 'customer');
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
+    const allowedIds = await this.scope.getAssignedResourceIds(targetSalesRepUserId, 'customer', manager);
     if (allowedIds === 'ALL') return repo.find();
     if (allowedIds.length === 0) return [];
     return repo.find({ where: { id: In(allowedIds) } });
@@ -686,9 +715,10 @@ export class CustomersService implements SalesCustomersContract {
   async listCustomersPage(
     requestingUserId: string,
     options: { salesRepUserId?: string; search?: string; page: number; pageSize: number },
+    manager?: EntityManager,
   ): Promise<{ rows: Customer[]; total: number }> {
-    const repo = this.dataSource.getRepository(Customer);
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId);
+    const repo = (manager ?? this.dataSource).getRepository(Customer);
+    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
     const isReviewer = roles.some((r) => REVIEWER_ROLES.includes(r));
 
     let allowedIds: 'ALL' | string[];
@@ -696,11 +726,11 @@ export class CustomersService implements SalesCustomersContract {
       if (!isReviewer && options.salesRepUserId !== requestingUserId) {
         throw new ForbiddenException("Only a sales manager/supervisor/admin may view another Sales Representative's customers.");
       }
-      allowedIds = await this.scope.getAssignedResourceIds(options.salesRepUserId, 'customer');
+      allowedIds = await this.scope.getAssignedResourceIds(options.salesRepUserId, 'customer', manager);
     } else if (isReviewer) {
       allowedIds = 'ALL';
     } else {
-      allowedIds = await this.scope.getAssignedResourceIds(requestingUserId, 'customer');
+      allowedIds = await this.scope.getAssignedResourceIds(requestingUserId, 'customer', manager);
     }
 
     if (allowedIds !== 'ALL' && allowedIds.length === 0) {

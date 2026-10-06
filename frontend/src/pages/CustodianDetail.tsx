@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
@@ -123,29 +123,36 @@ export function CustodianDetail() {
   useEffect(() => {
     (async () => {
       if (!type || !id) return;
-      const [overviewData, products, users, results] = await Promise.all([
-        api.get<CustodianOverview>(`/shipments/${isVehicle ? 'vehicles' : 'shipping-companies'}/${id}/overview`),
-        api.get<Product[]>('/products/all'),
-        api.get<AdminUser[]>('/admin/users').catch(() => []),
-        api
-          .get<CustodyShipmentSearchResult[]>(`/shipments/custody-search?${isVehicle ? 'vehicleId' : 'shippingCompanyId'}=${id}`)
-          .catch(() => []),
-      ]);
-      setOverview(overviewData);
-      setProducts(products);
-      setUsers(users);
-      setShipmentResults(results);
+      try {
+        const [overviewData, products, users, results] = await Promise.all([
+          api.get<CustodianOverview>(`/shipments/${isVehicle ? 'vehicles' : 'shipping-companies'}/${id}/overview`),
+          api.get<Product[]>('/products/all'),
+          api.get<AdminUser[]>('/admin/users').catch(() => []),
+          api
+            .get<CustodyShipmentSearchResult[]>(`/shipments/custody-search?${isVehicle ? 'vehicleId' : 'shippingCompanyId'}=${id}`)
+            .catch(() => []),
+        ]);
+        setOverview(overviewData);
+        setProducts(products);
+        setUsers(users);
+        setShipmentResults(results);
 
-      if (isVehicle) {
-        const vehicles = await api.get<Vehicle[]>('/shipments/vehicles');
-        const vehicle = vehicles.find((v) => v.id === id);
-        setCustodianLabel(vehicle ? `${vehicle.code} — ${vehicle.plateNumber}` : id);
-        const wh = await api.get<MainWarehouse[]>('/inventory/warehouses').catch(() => []);
-        setWarehouses(wh.filter((w) => w.kind === 'main'));
-      } else {
-        const companies = await api.get<ShippingCompany[]>('/shipments/shipping-companies');
-        const company = companies.find((c) => c.id === id);
-        setCustodianLabel(company ? `${company.code} — ${company.name}` : id);
+        if (isVehicle) {
+          const vehicles = await api.get<Vehicle[]>('/shipments/vehicles');
+          const vehicle = vehicles.find((v) => v.id === id);
+          setCustodianLabel(vehicle ? `${vehicle.code} — ${vehicle.plateNumber}` : id);
+          const wh = await api.get<MainWarehouse[]>('/inventory/warehouses').catch(() => []);
+          setWarehouses(wh.filter((w) => w.kind === 'main'));
+        } else {
+          const companies = await api.get<ShippingCompany[]>('/shipments/shipping-companies');
+          const company = companies.find((c) => c.id === id);
+          setCustodianLabel(company ? `${company.code} — ${company.name}` : id);
+        }
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling — the page
+        // was stuck on "Loading…" forever on failure (the core overview
+        // call is not defensively .catch()'d like its siblings).
+        setError(err instanceof ApiError ? err.message : 'Failed to load custodian detail.');
       }
     })();
   }, [type, id, isVehicle]);

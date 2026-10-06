@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError, uploadFile } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Customer {
   id: string;
@@ -141,6 +142,8 @@ export function SalesOrdersCreate() {
   const [depositFile, setDepositFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
   // Returns Engine (CTO directive §6) — the customer's active Return Credits, shown below the line items.
   const [availableCredits, setAvailableCredits] = useState<AvailableCredit[]>([]);
   const [selectedCreditIds, setSelectedCreditIds] = useState<Set<string>>(new Set());
@@ -148,40 +151,51 @@ export function SalesOrdersCreate() {
 
   useEffect(() => {
     (async () => {
-      const [p, pl, wh] = await Promise.all([
-        api.get<Product[]>('/products'),
-        api.get<PriceListRef[]>('/price-lists'),
-        api.get<Warehouse[]>('/inventory/warehouses'),
-      ]);
-      setProducts(p.filter((prod) => prod.status === 'active'));
-      setPriceLists(pl);
-      setWarehouses(wh);
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [p, pl, wh] = await Promise.all([
+          api.get<Product[]>('/products'),
+          api.get<PriceListRef[]>('/price-lists'),
+          api.get<Warehouse[]>('/inventory/warehouses'),
+        ]);
+        setProducts(p.filter((prod) => prod.status === 'active'));
+        setPriceLists(pl);
+        setWarehouses(wh);
 
-      // Hotfix 3 (post-v1.0.2) — Main/General tier items for the preview,
-      // fetched once here (unlike the customer-list tier below, these
-      // don't change with which customer is selected).
-      const mainList = pl.find((x) => x.role === 'main');
-      const generalList = pl.find((x) => x.role === 'general');
-      if (mainList) {
-        const items = await api.get<Array<{ productId: string; price: string }>>(`/price-lists/${mainList.id}/items`);
-        setMainListItems(new Map(items.map((i) => [i.productId, i.price])));
-      }
-      if (generalList) {
-        const items = await api.get<Array<{ productId: string; price: string }>>(`/price-lists/${generalList.id}/items`);
-        setGeneralListItems(new Map(items.map((i) => [i.productId, i.price])));
-      }
-      const firstActive = wh.find((w) => w.status === 'active');
-      if (firstActive) setWarehouseId(firstActive.id);
-      // CTO instruction: a manager MAY build/adjust an order under a
-      // different rep's name (the only way a managerPrice can ever be
-      // set — see SalesOrdersService.createOrder). Reps themselves never
-      // see this selector; their own order is implicit (server defaults
-      // to the caller when salesRepUserId is omitted). `/admin/sales-reps`
-      // (not `/admin/users`) — narrower on purpose: only sales_rep
-      // holders, not the whole user table.
-      if (canSetManagerPrice) {
-        const salesReps = await api.get<AdminUser[]>('/admin/sales-reps');
-        setReps(salesReps);
+        // Hotfix 3 (post-v1.0.2) — Main/General tier items for the preview,
+        // fetched once here (unlike the customer-list tier below, these
+        // don't change with which customer is selected).
+        const mainList = pl.find((x) => x.role === 'main');
+        const generalList = pl.find((x) => x.role === 'general');
+        if (mainList) {
+          const items = await api.get<Array<{ productId: string; price: string }>>(`/price-lists/${mainList.id}/items`);
+          setMainListItems(new Map(items.map((i) => [i.productId, i.price])));
+        }
+        if (generalList) {
+          const items = await api.get<Array<{ productId: string; price: string }>>(`/price-lists/${generalList.id}/items`);
+          setGeneralListItems(new Map(items.map((i) => [i.productId, i.price])));
+        }
+        const firstActive = wh.find((w) => w.status === 'active');
+        if (firstActive) setWarehouseId(firstActive.id);
+        // CTO instruction: a manager MAY build/adjust an order under a
+        // different rep's name (the only way a managerPrice can ever be
+        // set — see SalesOrdersService.createOrder). Reps themselves never
+        // see this selector; their own order is implicit (server defaults
+        // to the caller when salesRepUserId is omitted). `/admin/sales-reps`
+        // (not `/admin/users`) — narrower on purpose: only sales_rep
+        // holders, not the whole user table.
+        if (canSetManagerPrice) {
+          const salesReps = await api.get<AdminUser[]>('/admin/sales-reps');
+          setReps(salesReps);
+        }
+      } catch (err) {
+        // Foundation fix: this load had no error handling at all — a
+        // failure here left the form silently unusable (empty selects,
+        // no explanation) instead of a real Error state.
+        setLoadError(err);
+      } finally {
+        setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,10 +210,14 @@ export function SalesOrdersCreate() {
   // unchanged from before).
   useEffect(() => {
     (async () => {
-      const qs = salesRepUserId ? `?salesRepUserId=${salesRepUserId}` : '';
-      const c = await api.get<Customer[]>(`/customers${qs}`);
-      setCustomers(c);
-      setCustomerId((prev) => (c.some((x) => x.id === prev) ? prev : ''));
+      try {
+        const qs = salesRepUserId ? `?salesRepUserId=${salesRepUserId}` : '';
+        const c = await api.get<Customer[]>(`/customers${qs}`);
+        setCustomers(c);
+        setCustomerId((prev) => (c.some((x) => x.id === prev) ? prev : ''));
+      } catch (err) {
+        setLoadError(err);
+      }
     })();
   }, [salesRepUserId]);
 
@@ -441,6 +459,28 @@ export function SalesOrdersCreate() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('nav.sales_orders')}</h1>
+        </div>
+        <div className="empty-state">Loading…</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>{t('nav.sales_orders')}</h1>
+        </div>
+        <ErrorState error={loadError} onRetry={() => window.location.reload()} />
+      </div>
+    );
   }
 
   return (

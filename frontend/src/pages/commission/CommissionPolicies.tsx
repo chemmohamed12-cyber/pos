@@ -82,7 +82,12 @@ export function CommissionPolicies() {
   ]);
 
   async function loadEmployees() {
-    setEmployees(await api.get<Employee[]>('/hr/employees'));
+    try {
+      setEmployees(await api.get<Employee[]>('/hr/employees'));
+    } catch (err) {
+      // Foundation fix: no error handling — employee selects/labels silently stayed empty.
+      setError(err instanceof ApiError ? err.message : 'Failed to load employees.');
+    }
   }
   async function loadCustomers() {
     try {

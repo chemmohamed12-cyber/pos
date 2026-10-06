@@ -19,6 +19,10 @@ export class RefreshToken {
   @Column('uuid')
   family!: string;
 
+  /** Multi-Company Area 5 (2026-09-23) — the Company claim carried by the access token this refresh token can mint, preserved across `refresh()` rotations. A transport carrier only, never authorization proof by itself; see `AuthService.selectCompany`. */
+  @Column({ type: 'uuid', nullable: true })
+  companyId!: string | null;
+
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 64 })
   tokenHash!: string;

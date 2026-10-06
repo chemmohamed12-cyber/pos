@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
 
 interface Supplier {
@@ -83,7 +84,14 @@ export function PurchaseOrders() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // PRC-01 — official on-hand / reserved / available for the order's warehouse (read-only, informational)
+  const draftStock = useStockAvailability(warehouseId, draftLines.map((l) => l.productId));
+  const detailStock = useStockAvailability(detail?.purchaseOrder.warehouseId, (detail?.lines ?? []).map((l) => l.productId));
+
   preload([
+    'field.on_hand',
+    'field.reserved',
+    'field.available',
     'nav.purchase_orders',
     'field.po_number',
     'field.gr_number',
@@ -141,12 +149,17 @@ export function PurchaseOrders() {
 
   async function loadDetail(id: string) {
     setSelectedId(id);
-    const [d, gr] = await Promise.all([
-      api.get<PurchaseOrderDetail>(`/procurement/purchase-orders/${id}`),
-      api.get<GoodsReceipt[]>(`/procurement/goods-receipts/by-purchase-order/${id}`),
-    ]);
-    setDetail(d);
-    setReceipts(gr);
+    try {
+      const [d, gr] = await Promise.all([
+        api.get<PurchaseOrderDetail>(`/procurement/purchase-orders/${id}`),
+        api.get<GoodsReceipt[]>(`/procurement/goods-receipts/by-purchase-order/${id}`),
+      ]);
+      setDetail(d);
+      setReceipts(gr);
+    } catch (err) {
+      // Foundation fix: called directly from a row onClick with no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load purchase order detail.');
+    }
     setReceiveQty({});
   }
 
@@ -281,6 +294,7 @@ export function PurchaseOrders() {
                   <tr>
                     <th>{t('field.product')}</th>
                     <th>{t('field.quantity')}</th>
+                    <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
                     <th>{t('field.unit_cost')}</th>
                     <th>{t('field.line_total')}</th>
                     <th></th>
@@ -291,6 +305,7 @@ export function PurchaseOrders() {
                     <tr key={i}>
                       <td>{l.productName}</td>
                       <td>{l.quantity}</td>
+                      <StockCell stock={draftStock[l.productId]} />
                       <td>{l.unitCostBase}</td>
                       <td>{(Number(l.quantity) * Number(l.unitCostBase)).toFixed(2)}</td>
                       <td>
@@ -301,7 +316,7 @@ export function PurchaseOrders() {
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={3} style={{ textAlign: 'end', fontWeight: 600 }}>
+                    <td colSpan={4} style={{ textAlign: 'end', fontWeight: 600 }}>
                       {t('field.total_amount')}
                     </td>
                     <td style={{ fontWeight: 600 }}>{draftTotal.toFixed(2)}</td>
@@ -392,6 +407,7 @@ export function PurchaseOrders() {
                   <th>{t('field.product')}</th>
                   <th>{t('field.quantity_ordered')}</th>
                   <th>{t('field.quantity_received')}</th>
+                  <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
                   {(detail.state === 'approved' || detail.state === 'partially_received') && <th>{t('action.post_goods_receipt')}</th>}
                 </tr>
               </thead>
@@ -403,6 +419,7 @@ export function PurchaseOrders() {
                       <td>{productName(l.productId)}</td>
                       <td>{l.quantity}</td>
                       <td>{l.quantityReceived}</td>
+                      <StockCell stock={detailStock[l.productId]} />
                       {(detail.state === 'approved' || detail.state === 'partially_received') && (
                         <td>
                           {remaining > 0 && hasRole('admin') && (

@@ -23,6 +23,21 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** FA-02 (2026-10-06, CTO) — two SEPARATE configured accounts; the result of the disposal decides which one is used. */
+export const DISPOSAL_GAIN_ACCOUNT_CONFIG_KEY = 'accounting.fixed_asset_gain_on_disposal_account_code';
+export const DISPOSAL_LOSS_ACCOUNT_CONFIG_KEY = 'accounting.fixed_asset_loss_on_disposal_account_code';
+
+/**
+ * proceeds + accumulated depreciation − cost. Positive = gain (Cr gain account), negative = loss (Dr loss account). The ONE
+ * calculation shared by the posting handler and the pre-mutation pre-flight, so they can never disagree.
+ */
+export function disposalGainLoss(proceeds: string | number, accumulatedDepreciation: string | number, cost: string | number): { gainLoss: number; side: 'gain' | 'loss' | 'none' } {
+  const gainLoss = num(proceeds) + num(accumulatedDepreciation) - num(cost);
+  const plug = Math.abs(gainLoss).toFixed(4);
+  if (Number(plug) === 0) return { gainLoss, side: 'none' };
+  return { gainLoss, side: gainLoss > 0 ? 'gain' : 'loss' };
+}
+
 export async function handleFixedAssetDisposalApproved(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
   const p = event.payload;
   const fixedAssetId = str(p.fixedAssetId);
@@ -39,14 +54,9 @@ export async function handleFixedAssetDisposalApproved(event: FinancialEvent, ct
     return { kind: 'rejected', reason: 'fixed asset disposal: proceeds > 0 but no proceedsAccountId' };
   }
 
-  // ADR-045 D10 — gain/loss accounts resolved HERE, at posting time, fail-closed, never a hard-coded
-  // fallback (reuses the exact `resolveConfiguredPostableAccount` mechanism F06/F10 already built).
-  const gain = await ctx.resolveConfiguredPostableAccount('accounting.fixed_asset_gain_on_disposal_account_code');
-  if (!gain.ok) return { kind: 'rejected', reason: `fixed asset disposal: gain-on-disposal account unresolved (${gain.reason})` };
-  const loss = await ctx.resolveConfiguredPostableAccount('accounting.fixed_asset_loss_on_disposal_account_code');
-  if (!loss.ok) return { kind: 'rejected', reason: `fixed asset disposal: loss-on-disposal account unresolved (${loss.reason})` };
-  const gainAccountId = gain.id;
-  const lossAccountId = loss.id;
+  // ADR-045 D10 / FA-02 — the accounts are resolved HERE, at posting time, fail-closed, never a hard-coded fallback (the exact
+  // `resolveConfiguredPostableAccount` mechanism F06/F10 built). Only the account the RESULT needs is required (a gain disposal does
+  // not need the loss account configured, and vice-versa) — resolved after the fresh accumulated depreciation is known, below.
 
   // Accumulated depreciation to date, fetched FRESH at this exact posting moment — not a stale
   // submission-time snapshot (ADR-045 D10). A Depreciation Run posted between submission and approval
@@ -57,7 +67,14 @@ export async function handleFixedAssetDisposalApproved(event: FinancialEvent, ct
   )) as Array<{ total: string }>;
   const accumulatedDepreciationToDate = row.total;
 
-  const gainLoss = num(proceeds) + num(accumulatedDepreciationToDate) - num(cost);
+  const { gainLoss, side } = disposalGainLoss(proceeds, accumulatedDepreciationToDate, cost);
+  let plugAccountId: string | null = null;
+  if (side !== 'none') {
+    const key = side === 'gain' ? DISPOSAL_GAIN_ACCOUNT_CONFIG_KEY : DISPOSAL_LOSS_ACCOUNT_CONFIG_KEY;
+    const plugAccount = await ctx.resolveConfiguredPostableAccount(key);
+    if (!plugAccount.ok) return { kind: 'rejected', reason: `fixed asset disposal: ${side}-on-disposal account unresolved (${plugAccount.reason}) — configure "${key}"` };
+    plugAccountId = plugAccount.id;
+  }
 
   const lines: JournalDraftLine[] = [];
   if (Number(accumulatedDepreciationToDate) > 0) {
@@ -69,11 +86,11 @@ export async function handleFixedAssetDisposalApproved(event: FinancialEvent, ct
   lines.push({ accountId: costAccountId, credit: cost, description: 'Asset cost removed on disposal' });
 
   const plugAmount = Math.abs(gainLoss).toFixed(4);
-  if (Number(plugAmount) > 0) {
+  if (Number(plugAmount) > 0 && plugAccountId) {
     if (gainLoss > 0) {
-      lines.push({ accountId: gainAccountId, credit: plugAmount, description: 'Gain on disposal' });
+      lines.push({ accountId: plugAccountId, credit: plugAmount, description: 'Gain on disposal' });
     } else {
-      lines.push({ accountId: lossAccountId, debit: plugAmount, description: 'Loss on disposal' });
+      lines.push({ accountId: plugAccountId, debit: plugAmount, description: 'Loss on disposal' });
     }
   }
 

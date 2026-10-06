@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
+import { ErrorState } from '../../components/ErrorState';
 
 interface OrderLine {
   productId: string;
@@ -38,6 +39,7 @@ export function SalesOrderPrint() {
   const { id } = useParams<{ id: string }>();
   const { t, lang, preload } = useLanguage();
   const [data, setData] = useState<SalesOrderPrintData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   preload([
     'document.sales_order_title', 'field.customer', 'field.governorate', 'field.address',
@@ -47,18 +49,24 @@ export function SalesOrderPrint() {
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [order, customers, products, deposit] = await Promise.all([
-        api.get<Order>(`/sales-orders/${id}`),
-        api.get<Array<{ id: string; name: string; phone: string | null }>>('/customers'),
-        api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
-        api.get<Deposit | null>(`/deposits?salesOrderId=${id}`).catch(() => null),
-      ]);
-      const customer = customers.find((c) => c.id === order.customerId);
+      try {
+        const [order, customers, products, deposit] = await Promise.all([
+          api.get<Order>(`/sales-orders/${id}`),
+          api.get<Array<{ id: string; name: string; phone: string | null }>>('/customers'),
+          api.get<Array<{ id: string; name: string; sku: string }>>('/products/all'),
+          api.get<Deposit | null>(`/deposits?salesOrderId=${id}`).catch(() => null),
+        ]);
+        const customer = customers.find((c) => c.id === order.customerId);
 
-      setData({ order, customer, products, deposit });
+        setData({ order, customer, products, deposit });
+      } catch (err) {
+        // Foundation fix: mount-time load had no error handling.
+        setLoadError(err);
+      }
     })();
   }, [id]);
 
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
   if (!data) return <div className="empty-state">Loading…</div>;
   const { order, customer, products, deposit } = data;
   const productName = (pid: string) => {

@@ -20,10 +20,14 @@ import { INVENTORY_RESERVATION_CONTRACT, INVENTORY_LOGISTICS_CONTRACT } from '..
 import { PermissionModule } from '../../foundation/permission/permission.module';
 import { EventsModule } from '../../foundation/events/events.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+
+import { WarehouseItem } from './infrastructure/warehouse-item.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Warehouse, StockMovement, StockReservation, WarehouseTransaction, WarehouseTransactionLine]),
+    TypeOrmModule.forFeature([Warehouse, StockMovement, StockReservation, WarehouseTransaction, WarehouseTransactionLine, WarehouseItem]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -39,6 +43,13 @@ import { InventoryValuationModule } from '../inventory-valuation/inventory-valua
     // so the one approved opening-stock/receipt cost-input flow (D3/D7/D20) can reach F08's
     // valuation state. No import from `domains/inventory-valuation`'s own classes — DI token only.
     InventoryValuationModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard` on `InventoryController` only
+    // (`WarehouseTransactionsController`, also in this module, is Tier 2
+    // and unaffected). `DatabaseRegistryModule` alongside it, the same
+    // required pairing discovered during `products.controller.ts`'s retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [InventoryController, WarehouseTransactionsController],
   providers: [

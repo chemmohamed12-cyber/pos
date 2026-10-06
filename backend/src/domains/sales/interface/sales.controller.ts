@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
 import { SalesService } from '../application/sales.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -16,7 +17,7 @@ class CreateSalesRepDto {
 }
 
 @Controller('sales/reps')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('sales')
 export class SalesController {
   constructor(private readonly sales: SalesService) {}
@@ -31,12 +32,12 @@ export class SalesController {
   @UseGuards(PermissionGuard)
   @RequirePermission('sales.rep.assign', 'editable')
   @Post()
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateSalesRepDto) {
-    return this.sales.createSalesRepProfile(dto.userId, dto.territory ?? null, req.user.id);
+  async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateSalesRepDto) {
+    return this.sales.createSalesRepProfile(dto.userId, dto.territory ?? null, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @Get(':userId')
-  async get(@Param('userId') userId: string) {
-    return this.sales.getSalesRepProfile(userId);
+  async get(@Param('userId') userId: string, @Req() req: CompanyScopedRequest) {
+    return this.sales.getSalesRepProfile(userId, req.companyContext!.dataSource.manager);
   }
 }

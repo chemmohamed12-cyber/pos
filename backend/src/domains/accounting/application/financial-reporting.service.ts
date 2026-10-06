@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { TaxPeriod } from '../infrastructure/tax-period.entity';
 
 export interface ReportQuery {
@@ -119,6 +119,7 @@ export class FinancialReportingService {
     accountTypes: string[] | null,
     controlFunctions: string[] | null,
     opts: { orgUnitId?: string; from?: string; toInclusive?: string; beforeExclusive?: string },
+    manager?: EntityManager,
   ): Promise<{ rows: SectionAccountRow[]; total: string }> {
     const params: unknown[] = [];
     const conds: string[] = [this.postedFilter];
@@ -151,7 +152,7 @@ export class FinancialReportingService {
     }
     const acctWhere = acctConds.length ? `WHERE ${acctConds.join(' AND ')}` : '';
 
-    const rows = (await this.dataSource.query(
+    const rows = (await (manager ?? this.dataSource).query(
       `SELECT a.id AS "accountId", a.code, a.name, a."nameAr", a."accountType", a."normalBalance",
               (CASE WHEN a."normalBalance" = 'debit' THEN net ELSE -net END)::numeric(20,4) AS balance,
               COALESCE(SUM(CASE WHEN a."normalBalance" = 'debit' THEN net ELSE -net END) OVER (), 0)::numeric(20,4) AS "sectionTotal"
@@ -184,27 +185,27 @@ export class FinancialReportingService {
    * excludes whatever has already been closed into the stored `retained_earnings` balance this
    * formula already reads. `retained_earnings` is never written to by this service.
    */
-  async getBalanceSheet(query: { orgUnitId?: string; asOfDate: string }): Promise<BalanceSheet> {
+  async getBalanceSheet(query: { orgUnitId?: string; asOfDate: string }, manager?: EntityManager): Promise<BalanceSheet> {
     const { orgUnitId, asOfDate } = query;
-    const assets = await this.accountSection(['asset'], null, { orgUnitId, toInclusive: asOfDate });
-    const liabilities = await this.accountSection(['liability'], null, { orgUnitId, toInclusive: asOfDate });
-    const equity = await this.accountSection(['equity'], null, { orgUnitId, toInclusive: asOfDate });
-    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, toInclusive: asOfDate });
-    const expenses = await this.accountSection(['expense'], null, { orgUnitId, toInclusive: asOfDate });
+    const assets = await this.accountSection(['asset'], null, { orgUnitId, toInclusive: asOfDate }, manager);
+    const liabilities = await this.accountSection(['liability'], null, { orgUnitId, toInclusive: asOfDate }, manager);
+    const equity = await this.accountSection(['equity'], null, { orgUnitId, toInclusive: asOfDate }, manager);
+    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, toInclusive: asOfDate }, manager);
+    const expenses = await this.accountSection(['expense'], null, { orgUnitId, toInclusive: asOfDate }, manager);
 
-    const [uni] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+    const [uni] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
       revenue.total,
       expenses.total,
     ])) as Array<{ v: string }>;
     const unclosedNetIncome = uni.v;
 
-    const [eq] = (await this.dataSource.query(`SELECT ($1::numeric + $2::numeric)::numeric(20,4) AS v`, [
+    const [eq] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric + $2::numeric)::numeric(20,4) AS v`, [
       equity.total,
       unclosedNetIncome,
     ])) as Array<{ v: string }>;
     const equityTotal = eq.v;
 
-    const [bal] = (await this.dataSource.query(
+    const [bal] = (await (manager ?? this.dataSource).query(
       `SELECT ($1::numeric = ($2::numeric + $3::numeric)) AS balanced`,
       [assets.total, liabilities.total, equityTotal],
     )) as Array<{ balanced: boolean }>;
@@ -225,11 +226,11 @@ export class FinancialReportingService {
 
   /** ADR-047 D1. Ordinary, date-range-bounded P&L — NOT the same as the Balance Sheet's unbounded
    * `unclosedNetIncome` (D3), though both reuse the same `accountSection` primitive. */
-  async getProfitAndLoss(query: { orgUnitId?: string; from: string; to: string }): Promise<ProfitAndLoss> {
+  async getProfitAndLoss(query: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<ProfitAndLoss> {
     const { orgUnitId, from, to } = query;
-    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, from, toInclusive: to });
-    const expenses = await this.accountSection(['expense'], null, { orgUnitId, from, toInclusive: to });
-    const [ni] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+    const revenue = await this.accountSection(['revenue'], null, { orgUnitId, from, toInclusive: to }, manager);
+    const expenses = await this.accountSection(['expense'], null, { orgUnitId, from, toInclusive: to }, manager);
+    const [ni] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
       revenue.total,
       expenses.total,
     ])) as Array<{ v: string }>;
@@ -244,10 +245,10 @@ export class FinancialReportingService {
     };
   }
 
-  private async controlFunctionDelta(controlFunction: string, opts: { orgUnitId?: string; from: string; to: string }): Promise<string> {
-    const opening = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, beforeExclusive: opts.from })).total;
-    const closing = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, toInclusive: opts.to })).total;
-    const [row] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [closing, opening])) as Array<{
+  private async controlFunctionDelta(controlFunction: string, opts: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<string> {
+    const opening = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, beforeExclusive: opts.from }, manager)).total;
+    const closing = (await this.accountSection(null, [controlFunction], { orgUnitId: opts.orgUnitId, toInclusive: opts.to }, manager)).total;
+    const [row] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [closing, opening])) as Array<{
       v: string;
     }>;
     return row.v;
@@ -264,10 +265,10 @@ export class FinancialReportingService {
    * `UPDATE` after `ingest()` returns (`depreciation.service.ts`), so a rare crash in that window could
    * leave a genuinely-posted row with a still-`NULL` `journalEntryId`.
    */
-  private async getDepreciationAddBack(from: string, to: string): Promise<string> {
+  private async getDepreciationAddBack(from: string, to: string, manager?: EntityManager): Promise<string> {
     const fromYm = from.slice(0, 7);
     const toYm = to.slice(0, 7);
-    const [row] = (await this.dataSource.query(
+    const [row] = (await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM("calculatedAmount"),0)::numeric(20,4) AS total FROM accounting_depreciation_run_lines
        WHERE "depreciationPeriod" >= $1 AND "depreciationPeriod" <= $2`,
       [fromYm, toYm],
@@ -291,14 +292,14 @@ export class FinancialReportingService {
     orgUnitId?: string;
     from: string;
     to: string;
-  }): Promise<{ acquisitionsCashOutflow: string; disposalsCashInflow: string; total: string }> {
+  }, manager?: EntityManager): Promise<{ acquisitionsCashOutflow: string; disposalsCashInflow: string; total: string }> {
     const acqParams: unknown[] = [opts.from, opts.to];
     let acqOrgCond = '';
     if (opts.orgUnitId) {
       acqParams.push(opts.orgUnitId);
       acqOrgCond = `AND fa."orgUnitId" = $${acqParams.length}`;
     }
-    const [acqRow] = (await this.dataSource.query(
+    const [acqRow] = (await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM(jl."creditBase"),0)::numeric(20,4) AS total
        FROM accounting_fixed_assets fa
        JOIN accounting_journal_lines jl ON jl."journalEntryId" = fa."acquisitionJournalEntryId"
@@ -316,7 +317,7 @@ export class FinancialReportingService {
       dispParams.push(opts.orgUnitId);
       dispOrgCond = `AND fa."orgUnitId" = $${dispParams.length}`;
     }
-    const [dispRow] = (await this.dataSource.query(
+    const [dispRow] = (await (manager ?? this.dataSource).query(
       `SELECT COALESCE(SUM(d.proceeds),0)::numeric(20,4) AS total
        FROM accounting_fixed_asset_disposals d
        JOIN accounting_fixed_assets fa ON fa.id = d."fixedAssetId"
@@ -329,7 +330,7 @@ export class FinancialReportingService {
       dispParams,
     )) as Array<{ total: string }>;
 
-    const [totalRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+    const [totalRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
       dispRow.total,
       acqRow.total,
     ])) as Array<{ v: string }>;
@@ -347,39 +348,39 @@ export class FinancialReportingService {
    * computed Ending-Beginning change — any variance surfaces honestly rather than being silently
    * absorbed into any one section.
    */
-  async getCashFlowStatement(query: { orgUnitId?: string; from: string; to: string }): Promise<CashFlowStatement> {
+  async getCashFlowStatement(query: { orgUnitId?: string; from: string; to: string }, manager?: EntityManager): Promise<CashFlowStatement> {
     const { orgUnitId, from, to } = query;
 
-    const beginningCash = (await this.accountSection(null, ['bank'], { orgUnitId, beforeExclusive: from })).total;
-    const endingCash = (await this.accountSection(null, ['bank'], { orgUnitId, toInclusive: to })).total;
-    const [netChangeRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+    const beginningCash = (await this.accountSection(null, ['bank'], { orgUnitId, beforeExclusive: from }, manager)).total;
+    const endingCash = (await this.accountSection(null, ['bank'], { orgUnitId, toInclusive: to }, manager)).total;
+    const [netChangeRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
       endingCash,
       beginningCash,
     ])) as Array<{ v: string }>;
     const netChangeActual = netChangeRow.v;
 
-    const pnl = await this.getProfitAndLoss({ orgUnitId, from, to });
+    const pnl = await this.getProfitAndLoss({ orgUnitId, from, to }, manager);
     const periodNetIncome = pnl.netIncome;
-    const depreciationAddBack = await this.getDepreciationAddBack(from, to);
-    const arDelta = await this.controlFunctionDelta('ar', { orgUnitId, from, to });
-    const apDelta = await this.controlFunctionDelta('ap', { orgUnitId, from, to });
-    const inventoryDelta = await this.controlFunctionDelta('inventory', { orgUnitId, from, to });
+    const depreciationAddBack = await this.getDepreciationAddBack(from, to, manager);
+    const arDelta = await this.controlFunctionDelta('ar', { orgUnitId, from, to }, manager);
+    const apDelta = await this.controlFunctionDelta('ap', { orgUnitId, from, to }, manager);
+    const inventoryDelta = await this.controlFunctionDelta('inventory', { orgUnitId, from, to }, manager);
 
     // Indirect method: net income + depreciation add-back − increase in AR − increase in Inventory + increase in AP.
-    const [operatingRow] = (await this.dataSource.query(
+    const [operatingRow] = (await (manager ?? this.dataSource).query(
       `SELECT ($1::numeric + $2::numeric - $3::numeric - $4::numeric + $5::numeric)::numeric(20,4) AS v`,
       [periodNetIncome, depreciationAddBack, arDelta, inventoryDelta, apDelta],
     )) as Array<{ v: string }>;
     const operatingTotal = operatingRow.v;
 
-    const investing = await this.getInvestingActivity({ orgUnitId, from, to });
+    const investing = await this.getInvestingActivity({ orgUnitId, from, to }, manager);
     const financingTotal = '0.0000';
 
-    const [explainedRow] = (await this.dataSource.query(
+    const [explainedRow] = (await (manager ?? this.dataSource).query(
       `SELECT ($1::numeric + $2::numeric + $3::numeric)::numeric(20,4) AS v`,
       [operatingTotal, investing.total, financingTotal],
     )) as Array<{ v: string }>;
-    const [unclassifiedRow] = (await this.dataSource.query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
+    const [unclassifiedRow] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric - $2::numeric)::numeric(20,4) AS v`, [
       netChangeActual,
       explainedRow.v,
     ])) as Array<{ v: string }>;
@@ -403,15 +404,15 @@ export class FinancialReportingService {
   }
 
   /** ADR-047 D4 — a small, separately-approvable report consuming F10's `accounting_tax_periods`. */
-  async getTaxPeriodSummary(taxPeriodId: string): Promise<TaxPeriodSummary> {
-    const taxPeriod = await this.dataSource.getRepository(TaxPeriod).findOne({ where: { id: taxPeriodId } });
+  async getTaxPeriodSummary(taxPeriodId: string, manager?: EntityManager): Promise<TaxPeriodSummary> {
+    const taxPeriod = await (manager ?? this.dataSource).getRepository(TaxPeriod).findOne({ where: { id: taxPeriodId } });
     if (!taxPeriod) throw new NotFoundException(`Tax period "${taxPeriodId}" not found.`);
 
     const taxPayableMovement = (
-      await this.accountSection(null, ['tax_payable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate })
+      await this.accountSection(null, ['tax_payable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate }, manager)
     ).total;
     const taxReceivableMovement = (
-      await this.accountSection(null, ['tax_receivable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate })
+      await this.accountSection(null, ['tax_receivable'], { from: taxPeriod.startDate, toInclusive: taxPeriod.endDate }, manager)
     ).total;
 
     return {

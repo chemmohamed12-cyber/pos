@@ -95,23 +95,28 @@ export function ShippingMethods() {
 
   async function loadAll() {
     if (!canView) return;
-    const [companies, vehicleData, users] = await Promise.all([
-      api.get<ShippingCompany[]>('/shipments/shipping-companies'),
-      api.get<Vehicle[]>('/shipments/vehicles'),
-      api.get<AdminUser[]>('/admin/users'),
-    ]);
-    setShippingCompanies(companies);
-    setVehicles(vehicleData);
-    setDrivers(users);
+    try {
+      const [companies, vehicleData, users] = await Promise.all([
+        api.get<ShippingCompany[]>('/shipments/shipping-companies'),
+        api.get<Vehicle[]>('/shipments/vehicles'),
+        api.get<AdminUser[]>('/admin/users'),
+      ]);
+      setShippingCompanies(companies);
+      setVehicles(vehicleData);
+      setDrivers(users);
 
-    // CTO directive §8/§11 — "البضاعة تحت العهدة + الأموال تحت العهدته" per
-    // custodian. One overview call per custodian (small-N precedent already
-    // established elsewhere in this codebase, e.g. Reports).
-    const overviewEntries = await Promise.all([
-      ...companies.map(async (c) => [c.id, await api.get<CustodianOverview>(`/shipments/shipping-companies/${c.id}/overview`)] as const),
-      ...vehicleData.map(async (v) => [v.id, await api.get<CustodianOverview>(`/shipments/vehicles/${v.id}/overview`)] as const),
-    ]);
-    setCustodyOverviews(Object.fromEntries(overviewEntries));
+      // CTO directive §8/§11 — "البضاعة تحت العهدة + الأموال تحت العهدته" per
+      // custodian. One overview call per custodian (small-N precedent already
+      // established elsewhere in this codebase, e.g. Reports).
+      const overviewEntries = await Promise.all([
+        ...companies.map(async (c) => [c.id, await api.get<CustodianOverview>(`/shipments/shipping-companies/${c.id}/overview`)] as const),
+        ...vehicleData.map(async (v) => [v.id, await api.get<CustodianOverview>(`/shipments/vehicles/${v.id}/overview`)] as const),
+      ]);
+      setCustodyOverviews(Object.fromEntries(overviewEntries));
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load shipping methods.');
+    }
   }
 
   useEffect(() => {

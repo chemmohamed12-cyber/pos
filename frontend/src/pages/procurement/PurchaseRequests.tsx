@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
 
 interface Warehouse {
@@ -28,6 +29,15 @@ interface PurchaseRequestLine {
   productId: string;
   quantity: string;
 }
+interface ItemRequestRow {
+  id: string;
+  sku: string | null;
+  name: string | null;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  productStatus: string | null;
+  createdAt: string;
+}
 interface DraftLine {
   productId: string;
   productName: string;
@@ -43,7 +53,12 @@ export function PurchaseRequests() {
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [products, setProducts] = useState<Array<ProductOption & { status?: string }>>([]);
+  // D7 — New Item Request: the requested item is a draft product until its approval (Approvals screen, sales.catalog.edit).
+  const [itemRequests, setItemRequests] = useState<ItemRequestRow[]>([]);
+  const [newItem, setNewItem] = useState({ name: '', unit: '', reason: '' });
+  const [requestingItem, setRequestingItem] = useState(false);
+  const [itemNotice, setItemNotice] = useState<string | null>(null);
   const [requests, setRequests] = useState<PurchaseRequestRow[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ purchaseRequest: PurchaseRequestRow; state: string; lines: PurchaseRequestLine[] } | null>(null);
@@ -59,7 +74,14 @@ export function PurchaseRequests() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // PRC-01 — official on-hand / reserved / available for the request's warehouse (read-only, informational)
+  const draftStock = useStockAvailability(warehouseId, draftLines.map((l) => l.productId));
+  const detailStock = useStockAvailability(detail?.purchaseRequest.warehouseId, (detail?.lines ?? []).map((l) => l.productId));
+
   preload([
+    'field.on_hand',
+    'field.reserved',
+    'field.available',
     'nav.purchase_requests',
     'field.pr_number',
     'field.warehouse',
@@ -75,6 +97,17 @@ export function PurchaseRequests() {
     'action.reject',
     'action.cancel',
     'action.create_rfq',
+    'action.request_new_item',
+    'panel.new_item_request_hint',
+    'panel.new_item_request_submitted',
+    'panel.item_pending_approval',
+    'field.item_name',
+    'field.unit',
+    'field.reason',
+    'field.item_request_status',
+    'value.item_request_status.pending',
+    'value.item_request_status.approved',
+    'value.item_request_status.rejected',
     'panel.no_purchase_requests_yet',
     'purchase_request_lifecycle.state.draft',
     'purchase_request_lifecycle.state.submitted',
@@ -86,12 +119,14 @@ export function PurchaseRequests() {
 
   async function load() {
     try {
-      const [pr, wh, sup, prod] = await Promise.all([
+      const [pr, wh, sup, prod, itemReqs] = await Promise.all([
         api.get<PurchaseRequestRow[]>('/procurement/purchase-requests'),
         api.get<Warehouse[]>('/inventory/warehouses'),
         api.get<Supplier[]>('/procurement/suppliers/all'),
-        api.get<ProductOption[]>('/products/all'),
+        api.get<Array<ProductOption & { status?: string }>>('/products/all'),
+        api.get<ItemRequestRow[]>('/procurement/item-requests').catch(() => [] as ItemRequestRow[]),
       ]);
+      setItemRequests(itemReqs);
       setRequests(pr);
       setWarehouses(wh);
       setSuppliers(sup);
@@ -108,8 +143,13 @@ export function PurchaseRequests() {
 
   async function loadDetail(id: string) {
     setSelectedId(id);
-    const d = await api.get<{ purchaseRequest: PurchaseRequestRow; state: string; lines: PurchaseRequestLine[] }>(`/procurement/purchase-requests/${id}`);
-    setDetail(d);
+    try {
+      const d = await api.get<{ purchaseRequest: PurchaseRequestRow; state: string; lines: PurchaseRequestLine[] }>(`/procurement/purchase-requests/${id}`);
+      setDetail(d);
+    } catch (err) {
+      // Foundation fix: called directly from a row onClick with no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load purchase request detail.');
+    }
     setInvitedSupplierIds([]);
   }
 
@@ -141,6 +181,27 @@ export function PurchaseRequests() {
       setError(err instanceof ApiError ? err.message : 'Failed to create purchase request.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function onRequestItem(e: FormEvent) {
+    e.preventDefault();
+    setRequestingItem(true);
+    setError(null);
+    setItemNotice(null);
+    try {
+      const created = await api.post<{ sku: string }>('/procurement/item-requests', {
+        name: newItem.name,
+        unit: newItem.unit.trim() || undefined,
+        reason: newItem.reason,
+      });
+      setNewItem({ name: '', unit: '', reason: '' });
+      setItemNotice(created.sku);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to submit the new item request.');
+    } finally {
+      setRequestingItem(false);
     }
   }
 
@@ -179,6 +240,7 @@ export function PurchaseRequests() {
 
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
+  const isDraftItem = (id: string) => products.find((p) => p.id === id)?.status === 'draft';
 
   return (
     <div>
@@ -221,6 +283,7 @@ export function PurchaseRequests() {
                   <tr>
                     <th>{t('field.product')}</th>
                     <th>{t('field.quantity')}</th>
+                    <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -229,6 +292,7 @@ export function PurchaseRequests() {
                     <tr key={i}>
                       <td>{l.productName}</td>
                       <td>{l.quantity}</td>
+                      <StockCell stock={draftStock[l.productId]} />
                       <td>
                         <button type="button" className="btn btn-secondary" onClick={() => removeDraftLine(i)}>
                           ×
@@ -244,6 +308,53 @@ export function PurchaseRequests() {
               {t('action.create_purchase_request')}
             </button>
           </form>
+        </div>
+      )}
+
+      {hasRole('admin') && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>{t('action.request_new_item')}</h3>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>{t('panel.new_item_request_hint')}</div>
+          <form onSubmit={onRequestItem} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
+              <label>{t('field.item_name')}</label>
+              <input value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} required maxLength={255} />
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>{t('field.unit')}</label>
+              <input value={newItem.unit} onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })} maxLength={32} style={{ width: 90 }} />
+            </div>
+            <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
+              <label>{t('field.reason')}</label>
+              <input value={newItem.reason} onChange={(e) => setNewItem({ ...newItem, reason: e.target.value })} required maxLength={500} />
+            </div>
+            <button className="btn btn-secondary" type="submit" disabled={requestingItem}>
+              {t('action.request_new_item')}
+            </button>
+          </form>
+          {itemNotice && <div style={{ marginTop: 8 }}>{t('panel.new_item_request_submitted')} <strong>{itemNotice}</strong></div>}
+          {itemRequests.length > 0 && (
+            <table className="data-table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>{t('field.item_name')}</th>
+                  <th>{t('field.reason')}</th>
+                  <th>{t('field.item_request_status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemRequests.slice(0, 10).map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.sku}</td>
+                    <td>{r.name}</td>
+                    <td>{r.reason}</td>
+                    <td>{t(`value.item_request_status.${r.status}`)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -316,13 +427,18 @@ export function PurchaseRequests() {
                 <tr>
                   <th>{t('field.product')}</th>
                   <th>{t('field.quantity')}</th>
+                  <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
                 </tr>
               </thead>
               <tbody>
                 {detail.lines.map((l) => (
                   <tr key={l.id}>
-                    <td>{productName(l.productId)}</td>
+                    <td>
+                      {productName(l.productId)}
+                      {isDraftItem(l.productId) && <span className="status-badge" style={{ marginInlineStart: 6 }}>{t('panel.item_pending_approval')}</span>}
+                    </td>
                     <td>{l.quantity}</td>
+                    <StockCell stock={detailStock[l.productId]} />
                   </tr>
                 ))}
               </tbody>

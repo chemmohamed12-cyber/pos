@@ -40,6 +40,18 @@ export class SupplierInvoice {
   @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
   priceVarianceAmount!: string;
 
+  /** D5 — the EXPLICIT VAT amount stated by the supplier's invoice. `totalAmount` stays NET; gross = net + taxAmount. */
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  taxAmount!: string;
+
+  /** D5 — what the receipts credited to GRNI for the invoiced quantities (qty × PO unit cost). NULL on pre-D5 invoices. */
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  receiptValueBase!: string | null;
+
+  /** D5 — signed Purchase Price Variance = invoice net − receiptValueBase (positive = invoice higher). NULL on pre-D5 invoices. */
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  ppvBase!: string | null;
+
   @Column('uuid')
   createdByUserId!: string;
 

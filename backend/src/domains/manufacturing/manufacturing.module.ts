@@ -2,6 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkOrder } from './infrastructure/work-order.entity';
 import { WorkOrderComponent } from './infrastructure/work-order-component.entity';
+import { WorkCenter } from './infrastructure/work-center.entity';
+import { Routing } from './infrastructure/routing.entity';
+import { RoutingOperation } from './infrastructure/routing-operation.entity';
+import { WorkOrderOperation } from './infrastructure/work-order-operation.entity';
+import { WorkCenterService } from './application/work-center.service';
+import { RoutingService } from './application/routing.service';
+import { ManufacturingBomController } from './interface/manufacturing-bom.controller';
+import { WorkCenterController } from './interface/work-center.controller';
+import { RoutingController } from './interface/routing.controller';
 import { WorkOrderService } from './application/work-order.service';
 import { ManufacturingWipLedgerService } from './application/manufacturing-wip-ledger.service';
 import { WorkOrderController } from './interface/work-order.controller';
@@ -16,6 +25,8 @@ import { EventsModule } from '../../foundation/events/events.module';
 import { CommerceModule } from '../commerce/commerce.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
  * ADR-061 — Manufacturing (`depends_on: ['sales', 'inventory']` per the
@@ -27,7 +38,7 @@ import { InventoryValuationModule } from '../inventory-valuation/inventory-valua
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent]),
+    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -38,15 +49,20 @@ import { InventoryValuationModule } from '../inventory-valuation/inventory-valua
     CommerceModule,
     InventoryWarehouseModule,
     InventoryValuationModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for `CompanyContextGuard`.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
-  controllers: [WorkOrderController],
+  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController],
   providers: [
     WorkOrderService,
+    WorkCenterService,
+    RoutingService,
     ManufacturingWipLedgerService,
     // Month-End dependency (independent review, Phase 1) — MANUFACTURING_WIP_CONTRACT's real
     // implementation, mirroring `GRNI_LEDGER_CONTRACT: useExisting: GrniLedgerService` exactly.
     { provide: MANUFACTURING_WIP_CONTRACT, useExisting: ManufacturingWipLedgerService },
   ],
-  exports: [WorkOrderService, MANUFACTURING_WIP_CONTRACT],
+  exports: [WorkOrderService, RoutingService, WorkCenterService, MANUFACTURING_WIP_CONTRACT],
 })
 export class ManufacturingModule {}

@@ -23,8 +23,9 @@ interface SequenceRow {
 export class NumberingService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async registerDocumentType(documentType: string, prefix: string, includeYear = true): Promise<void> {
-    const repo = this.dataSource.getRepository(NumberingSequence);
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — same additive shape as `getNextNumber` below, needed by any Company-scoped caller that registers a per-rep/per-entity document type on the fly (e.g. `SalesOrdersService.createOrder`'s `sales_order_rep_<id>` type). */
+  async registerDocumentType(documentType: string, prefix: string, includeYear = true, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(NumberingSequence);
     const existing = await repo.findOne({ where: { documentType } });
     if (existing) return; // idempotent
     await repo.save(repo.create({ documentType, prefix, includeYear, lastNumber: 0, lastYear: null }));

@@ -30,7 +30,7 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
-export async function apiFetch<T>(method: string, path: string, body?: unknown): Promise<T> {
+export async function apiFetch<T>(method: string, path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
@@ -47,7 +47,12 @@ export async function apiFetch<T>(method: string, path: string, body?: unknown):
     throw new ApiError(res.status, 'NON_JSON_RESPONSE', `Unexpected non-JSON response (status ${res.status}).`);
   }
 
-  if (res.status === 401 && onUnauthorized) onUnauthorized();
+  // `POST /auth/select-company` also answers 401 for "authenticated, but not
+  // a member of this Company" (AuthService.selectCompany) — a normal,
+  // recoverable rejection of ONE action, not proof the current session's
+  // token is invalid. Callers that know this (via `skipUnauthorizedHandler`)
+  // handle that 401 themselves instead of triggering a full logout.
+  if (res.status === 401 && onUnauthorized && !opts?.skipUnauthorizedHandler) onUnauthorized();
 
   if (!json.success) {
     throw new ApiError(res.status, json.error?.code ?? 'UNKNOWN', json.error?.message ?? 'Request failed.');
@@ -76,7 +81,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => apiFetch<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => apiFetch<T>('POST', path, body),
+  post: <T>(path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }) => apiFetch<T>('POST', path, body, opts),
   delete: <T>(path: string) => apiFetch<T>('DELETE', path),
 };
 

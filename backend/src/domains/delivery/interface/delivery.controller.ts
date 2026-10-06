@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { DeliveryService } from '../application/delivery.service';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -36,38 +37,49 @@ class RemitCollectionDto {
   treasuryAccountId?: string;
 }
 
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized,
+ * controller #14). `CompanyContextGuard` added at the class level — every
+ * route threads `req.companyContext.dataSource.manager` into
+ * `DeliveryService`.
+ */
 @Controller('delivery')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class DeliveryController {
   constructor(private readonly delivery: DeliveryService) {}
 
   @Post('outcomes')
-  async recordOutcome(@Req() req: AuthenticatedRequest, @Body() dto: RecordOutcomeDto) {
-    return this.delivery.recordOutcome(dto.shipmentId, dto.outcome, dto.failureReason ?? null, req.user.id);
+  async recordOutcome(@Req() req: CompanyScopedRequest, @Body() dto: RecordOutcomeDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.delivery.recordOutcome(dto.shipmentId, dto.outcome, dto.failureReason ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Post('collections')
-  async recordCollection(@Req() req: AuthenticatedRequest, @Body() dto: RecordCollectionDto) {
-    return this.delivery.recordCollection(dto.shipmentId, dto.amount, dto.method, req.user.id);
+  async recordCollection(@Req() req: CompanyScopedRequest, @Body() dto: RecordCollectionDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.delivery.recordCollection(dto.shipmentId, dto.amount, dto.method, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('outcomes')
-  async getOutcome(@Req() req: AuthenticatedRequest, @Query('shipmentId') shipmentId: string) {
-    return this.delivery.getOutcomeForShipment(shipmentId, req.user.id);
+  async getOutcome(@Req() req: CompanyScopedRequest, @Query('shipmentId') shipmentId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.delivery.getOutcomeForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('collections')
-  async getCollection(@Req() req: AuthenticatedRequest, @Query('shipmentId') shipmentId: string) {
-    return this.delivery.getCollectionForShipment(shipmentId, req.user.id);
+  async getCollection(@Req() req: CompanyScopedRequest, @Query('shipmentId') shipmentId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.delivery.getCollectionForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** CTO directive — "Shipping Company Settlement → Treasury/Financial Posting" queue, finance/admin only (same tier as Treasury's own routes). */
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.collection.view', 'read-only')
   @Get('collections/pending-remittance')
-  async listPendingRemittances() {
-    return this.delivery.listPendingRemittances();
+  async listPendingRemittances(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.delivery.listPendingRemittances(req.companyContext.dataSource.manager);
   }
 
   /**
@@ -84,14 +96,16 @@ export class DeliveryController {
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.collection.view', 'read-only')
   @Get('collections/by-shipment/:shipmentId')
-  async getCollectionForShipmentAsFinance(@Param('shipmentId') shipmentId: string) {
-    return this.delivery.getCollectionForShipmentUnscoped(shipmentId);
+  async getCollectionForShipmentAsFinance(@Req() req: CompanyScopedRequest, @Param('shipmentId') shipmentId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.delivery.getCollectionForShipmentUnscoped(shipmentId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.collection.post', 'editable')
   @Post('collections/:id/remit')
-  async remitCollection(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: RemitCollectionDto) {
-    return this.delivery.remitCollection(id, req.user.id, dto.treasuryAccountId ?? null);
+  async remitCollection(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: RemitCollectionDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.delivery.remitCollection(id, req.user.id, dto.treasuryAccountId ?? null, req.companyContext.dataSource.manager);
   }
 }

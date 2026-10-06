@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { WipReconciliationRun } from '../infrastructure/wip-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
@@ -50,22 +50,22 @@ export class WipReconciliationService {
     @Optional() @Inject(MANUFACTURING_WIP_CONTRACT) private readonly manufacturingWip?: ManufacturingWipContract,
   ) {}
 
-  async listRuns(filter?: { status?: string; from?: string; to?: string }): Promise<WipReconciliationRun[]> {
-    const qb = this.dataSource.getRepository(WipReconciliationRun).createQueryBuilder('r');
+  async listRuns(filter?: { status?: string; from?: string; to?: string }, manager?: EntityManager): Promise<WipReconciliationRun[]> {
+    const qb = (manager ?? this.dataSource).getRepository(WipReconciliationRun).createQueryBuilder('r');
     if (filter?.status) qb.andWhere('r.status = :s', { s: filter.status });
     if (filter?.from) qb.andWhere('r."asOfDate" >= :f', { f: filter.from });
     if (filter?.to) qb.andWhere('r."asOfDate" <= :t', { t: filter.to });
     return qb.orderBy('r."createdAt"', 'DESC').getMany();
   }
 
-  async getRun(id: string): Promise<WipReconciliationRun> {
-    const run = await this.dataSource.getRepository(WipReconciliationRun).findOne({ where: { id } });
+  async getRun(id: string, manager?: EntityManager): Promise<WipReconciliationRun> {
+    const run = await (manager ?? this.dataSource).getRepository(WipReconciliationRun).findOne({ where: { id } });
     if (!run) throw new NotFoundException(`WIP reconciliation run "${id}" not found.`);
     return run;
   }
 
-  private async wipAccount(): Promise<GLAccount | null> {
-    return this.dataSource.getRepository(GLAccount).findOne({ where: { controlFunction: 'wip', isActive: true } });
+  private async wipAccount(manager?: EntityManager): Promise<GLAccount | null> {
+    return (manager ?? this.dataSource).getRepository(GLAccount).findOne({ where: { controlFunction: 'wip', isActive: true } });
   }
 
   /**
@@ -77,10 +77,10 @@ export class WipReconciliationService {
    * (`SeedManufacturingTerminology`/the live test both create one lazily;
    * a fresh chart otherwise has none).
    */
-  async reconcile(input: WipReconcileInput, actorUserId: string): Promise<WipReconciliationRun> {
+  async reconcile(input: WipReconcileInput, actorUserId: string, manager?: EntityManager): Promise<WipReconciliationRun> {
     const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
-    const wip = await this.wipAccount();
-    const repo = this.dataSource.getRepository(WipReconciliationRun);
+    const wip = await this.wipAccount(manager);
+    const repo = (manager ?? this.dataSource).getRepository(WipReconciliationRun);
 
     if (!wip) {
       const saved = await this.save(repo, {
@@ -97,11 +97,11 @@ export class WipReconciliationService {
         },
         actorUserId,
       });
-      await this.recordAudit(actorUserId, saved, { asOfDate, status: 'no_subledger_source', reason: 'no_wip_account_configured' });
+      await this.recordAudit(actorUserId, saved, { asOfDate, status: 'no_subledger_source', reason: 'no_wip_account_configured' }, manager);
       return saved;
     }
 
-    const gl = await this.ledger.getAccountLedger(wip.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined });
+    const gl = await this.ledger.getAccountLedger(wip.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
     const glBalanceBase = gl.closingBalanceBase;
 
     if (!this.manufacturingWip) {
@@ -122,15 +122,15 @@ export class WipReconciliationService {
         },
         actorUserId,
       });
-      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_subledger_source' });
+      await this.recordAudit(actorUserId, saved, { asOfDate, glBalanceBase, status: 'no_subledger_source' }, manager);
       return saved;
     }
 
-    const sub = await this.manufacturingWip.getAllWipBalances(asOfDate);
+    const sub = await this.manufacturingWip.getAllWipBalances(asOfDate, manager);
     const subledgerTotalBase = sub.total;
     // `wip` is an asset control account (debit-normal, same as `inventory`) — no sign flip needed,
     // unlike GRNI's credit-normal liability comparison.
-    const [d] = (await this.dataSource.query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
+    const [d] = (await (manager ?? this.dataSource).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS drift`, [
       subledgerTotalBase,
       glBalanceBase,
     ])) as Array<{ drift: string }>;
@@ -157,25 +157,28 @@ export class WipReconciliationService {
       driftBreakdown,
       actorUserId,
     });
-    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status });
+    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status }, manager);
     return saved;
   }
 
-  async closeRun(id: string, actorUserId: string): Promise<WipReconciliationRun> {
-    const run = await this.getRun(id);
+  async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<WipReconciliationRun> {
+    const run = await this.getRun(id, manager);
     if (run.status === 'closed') return run;
     run.status = 'closed';
     run.closedAt = new Date();
-    const saved = await this.dataSource.getRepository(WipReconciliationRun).save(run);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'accounting.wip_reconciliation.closed',
-      resource: 'wip_reconciliation_run',
-      resourceId: id,
-      result: 'success',
-      correlationId: null,
-    });
+    const saved = await (manager ?? this.dataSource).getRepository(WipReconciliationRun).save(run);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'accounting.wip_reconciliation.closed',
+        resource: 'wip_reconciliation_run',
+        resourceId: id,
+        result: 'success',
+        correlationId: null,
+      },
+      manager,
+    );
     return saved;
   }
 
@@ -216,16 +219,19 @@ export class WipReconciliationService {
     }
   }
 
-  private async recordAudit(actorUserId: string, saved: WipReconciliationRun, after: Record<string, unknown>): Promise<void> {
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'accounting.wip_reconciliation.run',
-      resource: 'wip_reconciliation_run',
-      resourceId: saved.id,
-      result: 'success',
-      correlationId: null,
-      after,
-    });
+  private async recordAudit(actorUserId: string, saved: WipReconciliationRun, after: Record<string, unknown>, manager?: EntityManager): Promise<void> {
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'accounting.wip_reconciliation.run',
+        resource: 'wip_reconciliation_run',
+        resourceId: saved.id,
+        result: 'success',
+        correlationId: null,
+        after,
+      },
+      manager,
+    );
   }
 }

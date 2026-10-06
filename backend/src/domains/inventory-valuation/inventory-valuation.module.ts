@@ -9,6 +9,8 @@ import { InventoryValuationController } from './interface/inventory-valuation.co
 import { INVENTORY_VALUATION_CONTRACT } from '../../foundation/module-registry/contracts/inventory-events.contract';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { PermissionModule } from '../../foundation/permission/permission.module';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
  * F08 — Inventory Valuation (ADR-041 D1). Ships under the EXISTING
@@ -19,7 +21,17 @@ import { PermissionModule } from '../../foundation/permission/permission.module'
  * binding, consumed via DI token, never a direct class import (D18/D18a).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([InventoryValuationState, InventoryValuationMovement]), AuthenticationModule, PermissionModule],
+  imports: [
+    TypeOrmModule.forFeature([InventoryValuationState, InventoryValuationMovement]),
+    AuthenticationModule,
+    PermissionModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard`; `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
+  ],
   controllers: [InventoryValuationController],
   providers: [
     { provide: COST_ENGINE, useClass: MovingAverageCostEngine },

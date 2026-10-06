@@ -14,6 +14,8 @@ import { AuthenticationModule } from '../../foundation/authentication/authentica
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { FULFILLMENT_CONTRACT } from '../../foundation/module-registry/contracts/inventory.contract';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -25,6 +27,12 @@ import { FULFILLMENT_CONTRACT } from '../../foundation/module-registry/contracts
     AuthenticationModule,
     InventoryWarehouseModule,
     NumberingModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for
+    // `CompanyContextGuard`. `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [FulfillmentController],
   providers: [FulfillmentService, { provide: FULFILLMENT_CONTRACT, useExisting: FulfillmentService }],

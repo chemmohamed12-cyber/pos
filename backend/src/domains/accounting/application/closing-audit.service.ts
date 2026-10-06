@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Between, DataSource, In } from 'typeorm';
+import { Between, DataSource, In, EntityManager } from 'typeorm';
 import { ClosingAuditRun } from '../infrastructure/closing-audit-run.entity';
 import { ClosingException } from '../infrastructure/closing-exception.entity';
 import { ClosingExceptionFinding } from '../domain/closing-exception';
@@ -49,22 +49,26 @@ export class ClosingAuditService {
     private readonly wipReconciliation: WipReconciliationService,
   ) {}
 
-  async listRuns(fiscalPeriodId: string): Promise<ClosingAuditRun[]> {
-    return this.dataSource
+  private em(manager?: EntityManager): EntityManager {
+    return manager ?? this.dataSource.manager;
+  }
+
+  async listRuns(fiscalPeriodId: string, manager?: EntityManager): Promise<ClosingAuditRun[]> {
+    return this.em(manager)
       .getRepository(ClosingAuditRun)
       .find({ where: { fiscalPeriodId }, order: { createdAt: 'DESC' } });
   }
 
-  async run(fiscalPeriodId: string, actorUserId: string): Promise<ClosingAuditRun> {
-    const period = await this.dataSource.getRepository(FiscalPeriod).findOne({ where: { id: fiscalPeriodId } });
+  async run(fiscalPeriodId: string, actorUserId: string, manager?: EntityManager): Promise<ClosingAuditRun> {
+    const period = await this.em(manager).getRepository(FiscalPeriod).findOne({ where: { id: fiscalPeriodId } });
     if (!period) throw new NotFoundException(`Fiscal period "${fiscalPeriodId}" not found.`);
-    const year = await this.dataSource.getRepository(FiscalYear).findOne({ where: { id: period.fiscalYearId } });
+    const year = await this.em(manager).getRepository(FiscalYear).findOne({ where: { id: period.fiscalYearId } });
     const orgUnitId = year?.orgUnitId ?? null;
     const asOfDate = period.endDate;
 
     const findings: ClosingExceptionFinding[] = [];
 
-    const ar = await this.arReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const ar = await this.arReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     const arClass = classifyReconciliationStatus(ar.status);
     if (arClass) {
       findings.push({
@@ -82,7 +86,7 @@ export class ClosingAuditService {
       });
     }
 
-    const ap = await this.apReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const ap = await this.apReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     const apClass = classifyReconciliationStatus(ap.status);
     if (apClass) {
       findings.push({
@@ -103,7 +107,7 @@ export class ClosingAuditService {
       });
     }
 
-    const cashBankRuns = await this.cashBankReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const cashBankRuns = await this.cashBankReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     for (const cbRun of cashBankRuns) {
       const cbClass = classifyReconciliationStatus(cbRun.status);
       if (cbClass) {
@@ -123,7 +127,7 @@ export class ClosingAuditService {
       }
     }
 
-    const inventory = await this.inventoryReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const inventory = await this.inventoryReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     const invClass = classifyReconciliationStatus(inventory.status);
     if (invClass) {
       findings.push({
@@ -144,7 +148,7 @@ export class ClosingAuditService {
       });
     }
 
-    const { pairs } = await this.fixedAssetReconciliation.reconcile(asOfDate, orgUnitId ?? undefined);
+    const { pairs } = await this.fixedAssetReconciliation.reconcile(asOfDate, orgUnitId ?? undefined, manager);
     for (const pair of pairs) {
       if (!pair.costMatched || !pair.accumulatedDepreciationMatched || !pair.netBookValueMatched) {
         findings.push({
@@ -169,7 +173,7 @@ export class ClosingAuditService {
     // binds GRNI_LEDGER_CONTRACT. Confirmed by direct search: no such binding exists in this
     // codebase yet — this is a real, honest "structurally ready but not yet lit up" state, not a
     // mock (ADR-056's explicit instruction).
-    const grni = await this.grniReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const grni = await this.grniReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     const grniClass = classifyReconciliationStatus(grni.status);
     if (grniClass) {
       findings.push({
@@ -194,7 +198,7 @@ export class ClosingAuditService {
     // finding — the seventh reconciliation type. Structurally IDENTICAL to the GRNI block above
     // (same dormant/@Optional() contract shape): reports 'no_subledger_source' until the
     // `manufacturing` module is installed and binds MANUFACTURING_WIP_CONTRACT.
-    const wip = await this.wipReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId);
+    const wip = await this.wipReconciliation.reconcile({ fiscalPeriodId, asOfDate, orgUnitId }, actorUserId, manager);
     const wipClass = classifyReconciliationStatus(wip.status);
     if (wipClass) {
       findings.push({
@@ -215,7 +219,7 @@ export class ClosingAuditService {
       });
     }
 
-    const rejectedEvents = await this.dataSource.getRepository(FinancialEvent).find({
+    const rejectedEvents = await this.em(manager).getRepository(FinancialEvent).find({
       where: { status: 'REJECTED', businessDate: Between(period.startDate, period.endDate) },
     });
     for (const event of rejectedEvents) {
@@ -238,8 +242,8 @@ export class ClosingAuditService {
 
     const status: ClosingAuditRun['status'] = findings.some((f) => f.severity === 'blocking') ? 'exceptions_found' : 'clean';
 
-    const savedRun = await this.dataSource.getRepository(ClosingAuditRun).save(
-      this.dataSource.getRepository(ClosingAuditRun).create({
+    const savedRun = await this.em(manager).getRepository(ClosingAuditRun).save(
+      this.em(manager).getRepository(ClosingAuditRun).create({
         fiscalPeriodId,
         asOfDate,
         orgUnitId,
@@ -249,7 +253,7 @@ export class ClosingAuditService {
       }),
     );
 
-    await this.reconcileExceptionRows(fiscalPeriodId, savedRun.id, asOfDate, findings);
+    await this.reconcileExceptionRows(fiscalPeriodId, savedRun.id, asOfDate, findings, manager);
 
     await this.audit.record({
       actorUserId,
@@ -260,7 +264,7 @@ export class ClosingAuditService {
       result: 'success',
       correlationId: null,
       after: { fiscalPeriodId, status, findingCount: findings.length },
-    });
+    }, manager);
 
     return savedRun;
   }
@@ -290,9 +294,8 @@ export class ClosingAuditService {
     fiscalPeriodId: string,
     closingAuditRunId: string,
     asOfDate: string,
-    findings: ClosingExceptionFinding[],
-  ): Promise<void> {
-    const repo = this.dataSource.getRepository(ClosingException);
+    findings: ClosingExceptionFinding[], manager?: EntityManager): Promise<void> {
+    const repo = this.em(manager).getRepository(ClosingException);
     const signatureOf = (f: { module: string; source: string; documentId: string | null; accountOrSubledgerRef: string | null }) =>
       `${f.module}::${f.source}::${f.documentId ?? ''}::${f.accountOrSubledgerRef ?? ''}`;
 
@@ -339,9 +342,9 @@ export class ClosingAuditService {
    * `ClosingAuditRun` (Phase 3's `ClosingWorkflowRun.finalReconciliationRunId`
    * references it) when the period IS clean.
    */
-  async assertCleanForClose(fiscalPeriodId: string, actorUserId: string): Promise<ClosingAuditRun> {
-    const freshRun = await this.run(fiscalPeriodId, actorUserId);
-    const blocking = await this.dataSource
+  async assertCleanForClose(fiscalPeriodId: string, actorUserId: string, manager?: EntityManager): Promise<ClosingAuditRun> {
+    const freshRun = await this.run(fiscalPeriodId, actorUserId, manager);
+    const blocking = await this.em(manager)
       .getRepository(ClosingException)
       .find({ where: { fiscalPeriodId, severity: 'blocking', status: In(['open', 'acknowledged']) } });
     if (blocking.length > 0) {

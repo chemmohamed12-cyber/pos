@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, EntityManager, Like } from 'typeorm';
 import { StockMovement } from '../infrastructure/stock-movement.entity';
 import { StockReservation, ReservationStatus, ReservationReferenceType } from '../infrastructure/stock-reservation.entity';
@@ -15,18 +15,33 @@ import {
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { InventoryReservationContract, InventoryLogisticsContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
-import { INVENTORY_EVENT_TOPICS, INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { INVENTORY_EVENT_TOPICS, INVENTORY_VALUATION_CONTRACT, InventoryGlKind, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 
 /**
- * F07 — Inventory Accounting (ADR-040 D2). The V1 allow-list of
- * `MovementType`s that publish `inventory.movement.recorded` to
- * `accounting`. Every other movement type (`receipt`, `transfer_in/out`,
- * `adjustment`, `return_in`, `assembly_consumption/output`) is
- * deliberately NOT published — no accounting mapping is defined for them
- * yet (F07 Blueprint §7 / ADR-040 D2). Extending this set is a later
- * decision, not something to change silently inside `recordMovement`.
+ * F07 — Inventory Accounting (ADR-040 D2), extended by D3 (2026-10-04, CTO-approved posting policy —
+ * `D3-INVENTORY-POSTING-POLICY-2026-10-04.md`). Which stock movements publish `inventory.movement.recorded`, and
+ * the `glKind` the accounting handler routes on:
+ *   dispatch                                → 'dispatch'      Dr COGS / Cr Inventory (unchanged)
+ *   receipt + referenceType 'excel_import'  → 'opening_stock' Dr Inventory / Cr configured Opening Balance (only with a supplied cost)
+ *   adjustment                              → 'adjustment'    Dr Inventory / Cr Adjustment Gain  |  Dr Adjustment Loss / Cr Inventory
+ *   return_in                               → 'return_in'     D4: carries the ORIGINAL cost → Dr Inventory / Cr COGS (via `recordSaleReturnIn`); without a carried cost the handler REJECTS
+ *   receipt + referenceType 'manual_receipt' → 'manual_receipt' Dr Inventory / Cr the offset account CONFIGURED for the receipt's reason code (D3-B;
+ *                                              only `recordManualReceipt` produces this referenceType, and it demands cost + reason)
+ * A Goods Receipt (`receipt` + 'goods_receipt') is NOT published here — its own GRNI event already posts it.
+ * Transfers never post to GL (Model A — one central Inventory control account).
  */
-const INVENTORY_GL_MOVEMENT_TYPES: ReadonlySet<MovementType> = new Set<MovementType>(['dispatch']);
+/** D3-B — reserved `stock_movements.referenceType` of a policy-validated manual receipt (set only by `recordManualReceipt`). */
+export const MANUAL_RECEIPT_REFERENCE_TYPE = 'manual_receipt';
+
+function glKindFor(movementType: MovementType, referenceType: string | null, unitCostBase: string | null | undefined): InventoryGlKind | null {
+  if (movementType === 'dispatch') return 'dispatch';
+  if (movementType === 'adjustment') return 'adjustment';
+  if (movementType === 'return_in') return 'return_in';
+  if (movementType === 'receipt' && referenceType === 'excel_import' && unitCostBase != null && unitCostBase !== '') return 'opening_stock';
+  if (movementType === 'receipt' && referenceType === MANUAL_RECEIPT_REFERENCE_TYPE && unitCostBase != null && unitCostBase !== '') return 'manual_receipt';
+  return null;
+}
 
 /**
  * Inventory & Warehouse — Stage 2 build-order item 27. The concurrency-
@@ -56,6 +71,9 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // `@Optional()` — F08 may not be entitled/wired in every installation; when unbound, `recordMovement`
     // behaves exactly as before (a supplied `unitCostBase` is simply never applied).
     @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
+    // D3-B — the manual-receipt pre-mutation gate, bound by `accounting` (foundation holder; no module cycle).
+    // Unbound ⇒ no accounting installed ⇒ a manual receipt cannot be validated and is rejected (fail-closed).
+    @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
   ) {}
 
   /**
@@ -74,49 +92,55 @@ export class InventoryService implements InventoryReservationContract, Inventory
     responsibleUserId: string | null = null,
     parentWarehouseId: string | null = null,
     kind: 'main' | 'operational' = 'main',
+    manager?: EntityManager,
   ): Promise<Warehouse> {
-    const repo = this.dataSource.getRepository(Warehouse);
+    const repo = (manager ?? this.dataSource).getRepository(Warehouse);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Warehouse with code "${code}" already exists.`);
     return repo.save(repo.create({ code, name, location, responsibleUserId, parentWarehouseId, kind, status: 'active' }));
   }
 
-  async listWarehouses(): Promise<Warehouse[]> {
-    return this.dataSource.getRepository(Warehouse).find();
+  async listWarehouses(manager?: EntityManager): Promise<Warehouse[]> {
+    return (manager ?? this.dataSource).getRepository(Warehouse).find();
   }
 
-  async getWarehouse(warehouseId: string): Promise<Warehouse> {
-    const warehouse = await this.dataSource.getRepository(Warehouse).findOne({ where: { id: warehouseId } });
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
+  async getWarehouse(warehouseId: string, manager?: EntityManager): Promise<Warehouse> {
+    const warehouse = await (manager ?? this.dataSource).getRepository(Warehouse).findOne({ where: { id: warehouseId } });
     if (!warehouse) throw new NotFoundException(`Warehouse "${warehouseId}" not found.`);
     return warehouse;
   }
 
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — active/inactive toggle, audited like every other status change in this codebase. */
-  async setWarehouseStatus(warehouseId: string, status: WarehouseStatus, actorUserId: string | null): Promise<Warehouse> {
-    const warehouse = await this.getWarehouse(warehouseId);
+  async setWarehouseStatus(warehouseId: string, status: WarehouseStatus, actorUserId: string | null, manager?: EntityManager): Promise<Warehouse> {
+    const warehouse = await this.getWarehouse(warehouseId, manager);
     if (!canTransitionWarehouseStatus(warehouse.status, status)) {
       throw new ConflictException(`Cannot transition warehouse from "${warehouse.status}" to "${status}".`);
     }
     const before = { status: warehouse.status };
     warehouse.status = status;
-    const saved = await this.dataSource.getRepository(Warehouse).save(warehouse);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'inventory.warehouse.status_changed',
-      resource: 'warehouse',
-      resourceId: warehouseId,
-      result: 'success',
-      correlationId: null,
-      before,
-      after: { status },
-    });
+    const saved = await (manager ?? this.dataSource).getRepository(Warehouse).save(warehouse);
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'inventory.warehouse.status_changed',
+        resource: 'warehouse',
+        resourceId: warehouseId,
+        result: 'success',
+        correlationId: null,
+        before,
+        after: { status },
+      },
+      manager,
+    );
     return saved;
   }
 
   /** Excel import (CTO finalization directive §3/§4) — enters through the same `createWarehouse` call the UI uses, per row. */
   async importWarehouseRows(
     rows: Array<{ code: string; name: string }>,
+    manager?: EntityManager,
   ): Promise<{ succeeded: Warehouse[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: Warehouse[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
@@ -138,7 +162,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
       seenCodesInFile.add(code);
 
       try {
-        succeeded.push(await this.createWarehouse(code, name));
+        succeeded.push(await this.createWarehouse(code, name, null, null, null, 'main', manager));
       } catch (err) {
         rejected.push({ row: rowNumber, errors: [err instanceof Error ? err.message : 'Unknown error creating warehouse.'] });
       }
@@ -172,6 +196,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // dispatch's cost is ALWAYS sourced from the running weighted average, never a caller-supplied
     // value — that rule is structural, `CostEngine.applyIssue` takes no cost parameter at all).
     unitCostBase?: string | null,
+    // D3-B — carried on the event of a 'manual_receipt' only (set by `recordManualReceipt`).
+    reasonCode?: string | null,
   ): Promise<StockMovement> {
     // F07-H1 (ADR-040 D9, CTO Mandatory Condition 4) — when the caller
     // supplies no transaction of its own, open one here so the
@@ -184,7 +210,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // `manager`) keeps that same atomicity unchanged.
     if (!manager) {
       return this.dataSource.transaction((txManager) =>
-        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase),
+        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode),
       );
     }
 
@@ -210,7 +236,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // StockMovement insert above (atomic); never posts to GL (D7/D20 — a receipt has no accounting
     // entry, only a valuation-subledger one). Silently a no-op when F08 is not bound or no cost was
     // supplied — zero behavior change from before this field existed.
-    if (movementType === 'receipt' && unitCostBase != null && this.valuation) {
+    if ((movementType === 'receipt' || movementType === 'return_in') && unitCostBase != null && this.valuation) {
       await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unitCostBase, `inventory-valuation:receipt:${movement.id}`, manager);
     }
 
@@ -219,7 +245,10 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // THIS payload stay always null even after F08 (ADR-041 D18/D18a) — F08's handler bridge
     // (`InventoryCostingHandlerService`) sources cost independently via `INVENTORY_VALUATION_CONTRACT`
     // at ingest time, never from this payload; fail-closed (`no_valuation_source`) when unavailable.
-    if (INVENTORY_GL_MOVEMENT_TYPES.has(movementType)) {
+    const glKind = glKindFor(movementType, referenceType, unitCostBase);
+    // The kinds whose COST is an input resolved BEFORE the movement (every other kind resolves cost from the valuation engine at ingest).
+    const carriesCost = glKind === 'opening_stock' || glKind === 'manual_receipt' || (glKind === 'return_in' && unitCostBase != null && unitCostBase !== '');
+    if (glKind) {
       await this.events.publish(manager, INVENTORY_EVENT_TOPICS.movementRecorded, {
         idempotencyKey: `inventory:movement:${movement.id}:recorded`,
         businessDate: new Date().toISOString().slice(0, 10),
@@ -229,17 +258,142 @@ export class InventoryService implements InventoryReservationContract, Inventory
         externalDocument: null,
         payloadVersion: 1,
         movementType,
+        glKind,
         productId,
         warehouseId,
         quantity,
         referenceType,
         referenceId,
-        unitCostBase: null,
-        totalCostBase: null,
+        // opening stock only: the maker-SUPPLIED cost (an input); every other kind resolves cost from the valuation engine at ingest.
+        unitCostBase: carriesCost ? String(unitCostBase) : null,
+        totalCostBase: carriesCost ? (Number(quantity) * Number(unitCostBase)).toFixed(4) : null,
+        reasonCode: glKind === 'manual_receipt' ? (reasonCode ?? null) : null,
       });
     }
 
     return movement;
+  }
+
+  /**
+   * D3-B (2026-10-04, CTO-approved Manual Receipt policy) — the ONLY way a manual receipt enters stock. It needs an
+   * explicit positive `unitCostBase` (no moving-average / last-purchase / estimated fallback) and a controlled
+   * `reasonCode` whose configured offset GL account is valid. EVERYTHING is validated before the first write, so a
+   * rejection leaves stock, valuation and the outbox untouched. Valuation is bootstrapped at the supplied cost and the
+   * event posts Dr Inventory / Cr the reason-configured account for quantity × unit cost.
+   */
+  async recordManualReceipt(
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+    unitCostBase: string | number | null | undefined,
+    reasonCode: string | null | undefined,
+    referenceId: string | null,
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<StockMovement> {
+    if (!manager) {
+      return this.dataSource.transaction((tx) =>
+        this.recordManualReceipt(warehouseId, productId, quantity, unitCostBase, reasonCode, referenceId, actorUserId, tx),
+      );
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A manual receipt quantity must be a positive number');
+    const cost = unitCostBase == null || String(unitCostBase).trim() === '' ? NaN : Number(unitCostBase);
+    if (!Number.isFinite(cost) || cost <= 0) {
+      throw new BadRequestException('A manual receipt requires an explicit unit cost greater than zero (no fallback cost is used)');
+    }
+    const code = (reasonCode ?? '').trim();
+    if (!code) throw new BadRequestException('A manual receipt requires a reason code');
+    const policy = this.postingPolicy?.get();
+    if (!policy) throw new ConflictException('Manual receipts cannot be validated: the accounting posting policy is not available');
+    await policy.assertManualReceiptReason(code, manager);
+    return this.recordMovement(
+      warehouseId,
+      productId,
+      quantity,
+      'receipt',
+      MANUAL_RECEIPT_REFERENCE_TYPE,
+      referenceId,
+      actorUserId,
+      manager,
+      cost.toFixed(4),
+      code,
+    );
+  }
+
+  /**
+   * D4 (2026-10-05) — the ORIGINAL cost of a sold product: the cost the order's dispatch movements were actually charged
+   * (`inventory_valuation_movements` `issue` rows, looked up by the dispatch event's idempotency key). Returns
+   * `unitCostBase` = Σ issue value ÷ Σ issue quantity. `null` — and the caller must FAIL CLOSED — when the order has no
+   * dispatch of that product, when valuation is not bound, or when ANY of those dispatches has no costed issue row yet
+   * (its GL event was rejected / is still pending). Never a current average, never a last purchase cost.
+   */
+  async resolveOriginalSaleCost(salesOrderId: string, productId: string, manager?: EntityManager): Promise<{ unitCostBase: string; quantity: number } | null> {
+    if (!this.valuation) return null;
+    const runner = manager ?? this.dataSource;
+    const dispatches: Array<{ id: string }> = await runner.query(
+      `SELECT "id" FROM "stock_movements"
+        WHERE "movementType" = 'dispatch' AND "referenceType" = 'sales_order' AND "referenceId"::text = $1 AND "productId"::text = $2`,
+      [salesOrderId, productId],
+    );
+    if (dispatches.length === 0) return null;
+    const keys = dispatches.map((d) => `inventory:movement:${d.id}:recorded`);
+    const costs = await this.valuation.getIssueCostsByKeys(keys, manager);
+    if (costs.length !== keys.length) return null; // at least one dispatch was never (successfully) costed
+    const quantity = costs.reduce((s, c) => s + c.quantity, 0);
+    const value = costs.reduce((s, c) => s + Number(c.valueBase), 0);
+    if (!(quantity > 0) || !(value > 0)) return null;
+    return { unitCostBase: (value / quantity).toFixed(4), quantity };
+  }
+
+  /**
+   * D4 (2026-10-05) — the ONLY way returned stock re-enters the ledger financially: a `return_in` at the ORIGINAL cost
+   * (resolved by the caller BEFORE any write). Valuation is restored at that unit cost and the movement event carries the
+   * cost so the GL posts `Dr Inventory / Cr COGS`. A missing/non-positive cost is rejected — no fallback cost.
+   */
+  async recordSaleReturnIn(
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+    unitCostBase: string,
+    referenceType: 'sales_return' | 'shipment_return',
+    referenceId: string,
+    actorUserId: string | null,
+    manager?: EntityManager,
+  ): Promise<StockMovement> {
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A sale-return quantity must be a positive number');
+    if (!(Number(unitCostBase) > 0)) throw new BadRequestException('A sale return requires the original unit cost (no fallback cost is used)');
+    return this.recordMovement(warehouseId, productId, quantity, 'return_in', referenceType, referenceId, actorUserId, manager, Number(unitCostBase).toFixed(4));
+  }
+
+  /** D3-B — the reason codes that currently have a configured offset account (what a UI may offer). */
+  listManualReceiptReasons(): string[] {
+    return this.postingPolicy?.get()?.listManualReceiptReasons() ?? [];
+  }
+
+  /**
+   * D3 (2026-10-04) — THE paired transfer: `transfer_out` + `transfer_in` + valuation carry. Model A (one central
+   * Inventory control account): NO GL journal — value moves between warehouse valuation ledgers at the SOURCE's
+   * moving-average cost, so total company valuation is unchanged. If the source has no usable valuation state the
+   * physical transfer still proceeds and no cost is carried (never blocks an operational move). `manager` must be the
+   * caller's open transaction.
+   */
+  async recordTransfer(
+    fromWarehouseId: string,
+    toWarehouseId: string,
+    productId: string,
+    quantity: number,
+    referenceType: string | null,
+    referenceId: string | null,
+    actorUserId: string | null,
+    manager: EntityManager,
+  ): Promise<void> {
+    const out = await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, manager);
+    await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, manager);
+    if (!this.valuation) return;
+    const consumed = await this.valuation.consumeIssueCost(productId, fromWarehouseId, quantity, `inventory-valuation:transfer-out:${out.id}`, manager);
+    if (consumed && !('rejected' in consumed)) {
+      await this.valuation.recordReceiptCost(productId, toWarehouseId, quantity, consumed.unitCostBase, `inventory-valuation:transfer-in:${out.id}`, manager);
+    }
   }
 
   /**
@@ -282,8 +436,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /** Backs the Inventory Movement print document — single-movement read, didn't exist before (movements were only ever summed, never fetched individually). */
-  async getMovement(movementId: string): Promise<StockMovement> {
-    const movement = await this.dataSource.getRepository(StockMovement).findOne({ where: { id: movementId } });
+  async getMovement(movementId: string, manager?: EntityManager): Promise<StockMovement> {
+    const movement = await (manager ?? this.dataSource).getRepository(StockMovement).findOne({ where: { id: movementId } });
     if (!movement) throw new NotFoundException(`Stock movement "${movementId}" not found.`);
     return movement;
   }
@@ -295,13 +449,16 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * available, matching `getStock`'s existing policy (no role gate
    * beyond authentication).
    */
-  async listMovements(filters: {
-    warehouseId?: string;
-    productId?: string;
-    movementType?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }): Promise<StockMovement[]> {
+  async listMovements(
+    filters: {
+      warehouseId?: string;
+      productId?: string;
+      movementType?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    },
+    manager?: EntityManager,
+  ): Promise<StockMovement[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
     const addCondition = (column: string, value: string | undefined) => {
@@ -322,7 +479,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    return this.dataSource.query(
+    return (manager ?? this.dataSource).query(
       `SELECT * FROM stock_movements ${where} ORDER BY "createdAt" DESC`,
       params,
     );
@@ -338,14 +495,15 @@ export class InventoryService implements InventoryReservationContract, Inventory
    */
   async getStockReport(
     warehouseId?: string,
+    manager?: EntityManager,
   ): Promise<Array<{ warehouseId: string; productId: string; onHand: number; reserved: number; available: number }>> {
-    const onHandRows: Array<{ warehouseId: string; productId: string; sum: string }> = await this.dataSource.query(
+    const onHandRows: Array<{ warehouseId: string; productId: string; sum: string }> = await (manager ?? this.dataSource).query(
       `SELECT "warehouseId", "productId", SUM(quantity) as sum FROM stock_movements
        ${warehouseId ? 'WHERE "warehouseId" = $1' : ''}
        GROUP BY "warehouseId", "productId"`,
       warehouseId ? [warehouseId] : [],
     );
-    const reservedRows: Array<{ warehouseId: string; productId: string; sum: string }> = await this.dataSource.query(
+    const reservedRows: Array<{ warehouseId: string; productId: string; sum: string }> = await (manager ?? this.dataSource).query(
       `SELECT "warehouseId", "productId", SUM(quantity) as sum FROM stock_reservations
        WHERE status IN ('active', 'preliminary') ${warehouseId ? 'AND "warehouseId" = $1' : ''}
        GROUP BY "warehouseId", "productId"`,
@@ -382,9 +540,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
    */
   async getWarehouseInventoryPage(
     warehouseId: string,
-    options: { search?: string; page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc' },
+    options: { search?: string; page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; scope?: 'assigned' | 'all' },
+    manager?: EntityManager,
   ): Promise<{
     rows: Array<{
+      /** D1 — whether the item is assigned to this warehouse (an unassigned row only appears in the `assigned` scope when it still holds stock/reservations). */
+      assigned: boolean;
       productId: string;
       sku: string;
       name: string;
@@ -412,8 +573,16 @@ export class InventoryService implements InventoryReservationContract, Inventory
     const search = options.search?.trim() || null;
     const offset = (options.page - 1) * options.pageSize;
 
+    // D1 (2026-10-05) — scope. `assigned` (default): the items assigned to this warehouse PLUS any item that still has a
+    // non-zero stock/reservation row here (flagged `assigned = false` — stock is never silently hidden). `all`: the whole catalogue.
+    const scopeClause =
+      options.scope === 'all'
+        ? ''
+        : `AND (wi.id IS NOT NULL OR COALESCE(m.on_hand, 0) <> 0 OR COALESCE(r.preliminary_hold, 0) + COALESCE(r.reserved, 0) <> 0)`;
+
     const fromAndWhere = `
       FROM products p
+      LEFT JOIN "warehouse_items" wi ON wi."productId" = p.id AND wi."warehouseId" = $1
       LEFT JOIN (
         SELECT "productId", SUM(quantity) as on_hand, MAX("createdAt") as last_movement_at
         FROM stock_movements WHERE "warehouseId" = $1
@@ -427,11 +596,13 @@ export class InventoryService implements InventoryReservationContract, Inventory
         GROUP BY "productId"
       ) r ON r."productId" = p.id
       WHERE ($2::text IS NULL OR p.sku ILIKE '%' || $2 || '%' OR p.name ILIKE '%' || $2 || '%')
+      ${scopeClause}
     `;
 
-    const countRows: Array<{ count: string }> = await this.dataSource.query(`SELECT COUNT(*) as count ${fromAndWhere}`, [warehouseId, search]);
+    const countRows: Array<{ count: string }> = await (manager ?? this.dataSource).query(`SELECT COUNT(*) as count ${fromAndWhere}`, [warehouseId, search]);
 
     const rows: Array<{
+      assigned: boolean;
       productId: string;
       sku: string;
       name: string;
@@ -442,8 +613,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
       reserved: string;
       available: string;
       lastMovementAt: string | null;
-    }> = await this.dataSource.query(
-      `SELECT p.id as "productId", p.sku, p.name, p.unit, p.status,
+    }> = await (manager ?? this.dataSource).query(
+      `SELECT p.id as "productId", p.sku, p.name, p.unit, p.status, (wi.id IS NOT NULL) as assigned,
               COALESCE(m.on_hand, 0) as "onHand",
               COALESCE(r.preliminary_hold, 0) as "preliminaryHold",
               COALESCE(r.reserved, 0) as reserved,
@@ -458,6 +629,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return {
       total: Number(countRows[0]?.count ?? 0),
       rows: rows.map((r) => ({
+        assigned: r.assigned === true,
         productId: r.productId,
         sku: r.sku,
         name: r.name,
@@ -472,16 +644,65 @@ export class InventoryService implements InventoryReservationContract, Inventory
     };
   }
 
-  async getOnHand(warehouseId: string, productId: string): Promise<number> {
-    const result: Array<{ sum: string | null }> = await this.dataSource.query(
+  /**
+   * D1 (2026-10-05, CTO policy: Default/Origin Warehouse, transferable) — mark items as belonging to a warehouse as their
+   * DEFAULT / ORIGIN (master data; bulk, idempotent). It is NOT a restriction and NOT evidence that the item is there now: where
+   * stock is, is always `SUM(stock_movements)` and items move freely by Transfer. Unknown warehouse/product ⇒ rejected before any write.
+   */
+  async assignItems(warehouseId: string, productIds: string[], actorUserId: string | null, manager?: EntityManager): Promise<{ requested: number; assigned: number; alreadyAssigned: number }> {
+    const unique = [...new Set(productIds)];
+    if (unique.length === 0) throw new BadRequestException('At least one item is required.');
+    const runner = manager ?? this.dataSource;
+    await this.getWarehouse(warehouseId, manager);
+    const found: Array<{ id: string }> = await runner.query(`SELECT id FROM "products" WHERE id = ANY($1::uuid[])`, [unique]);
+    if (found.length !== unique.length) {
+      const known = new Set(found.map((f) => f.id));
+      throw new NotFoundException(`Unknown item(s): ${unique.filter((id) => !known.has(id)).join(', ')}`);
+    }
+    const inserted: Array<{ id: string }> = await runner.query(
+      `INSERT INTO "warehouse_items" ("warehouseId", "productId", "assignedByUserId")
+       SELECT $1::uuid, x, $3::uuid FROM unnest($2::uuid[]) AS x
+       ON CONFLICT ("warehouseId", "productId") DO NOTHING
+       RETURNING "id"`,
+      [warehouseId, unique, actorUserId],
+    );
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'inventory.warehouse_items.assigned', resource: 'warehouse', resourceId: warehouseId, result: 'success', correlationId: null, after: { requested: unique.length, assigned: inserted.length } },
+      manager,
+    );
+    return { requested: unique.length, assigned: inserted.length, alreadyAssigned: unique.length - inserted.length };
+  }
+
+  /**
+   * D1 — remove an item's default/origin marker. Always allowed: it is metadata, not stock. If the item still holds stock here it
+   * simply shows up in this warehouse's grid as "holds stock, not a default" (the ledger is the truth).
+   */
+  async unassignItem(warehouseId: string, productId: string, actorUserId: string | null, manager?: EntityManager): Promise<{ removed: boolean }> {
+    await this.getWarehouse(warehouseId, manager);
+    // CTE count: a raw DELETE ... RETURNING comes back from the driver as [rows, rowCount], so count explicitly.
+    const [{ n }]: Array<{ n: number }> = await (manager ?? this.dataSource).query(
+      `WITH d AS (DELETE FROM "warehouse_items" WHERE "warehouseId" = $1 AND "productId" = $2 RETURNING "id") SELECT count(*)::int AS n FROM d`,
+      [warehouseId, productId],
+    );
+    if (n > 0) {
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'inventory.warehouse_items.unassigned', resource: 'warehouse', resourceId: warehouseId, result: 'success', correlationId: null, after: { productId } },
+        manager,
+      );
+    }
+    return { removed: n > 0 };
+  }
+
+  async getOnHand(warehouseId: string, productId: string, manager?: EntityManager): Promise<number> {
+    const result: Array<{ sum: string | null }> = await (manager ?? this.dataSource).query(
       'SELECT SUM(quantity) as sum FROM stock_movements WHERE "warehouseId" = $1 AND "productId" = $2',
       [warehouseId, productId],
     );
     return Number(result[0]?.sum ?? 0);
   }
 
-  async getReserved(warehouseId: string, productId: string): Promise<number> {
-    const result: Array<{ sum: string | null }> = await this.dataSource.query(
+  async getReserved(warehouseId: string, productId: string, manager?: EntityManager): Promise<number> {
+    const result: Array<{ sum: string | null }> = await (manager ?? this.dataSource).query(
       `SELECT SUM(quantity) as sum FROM stock_reservations WHERE "warehouseId" = $1 AND "productId" = $2 AND status IN ('active', 'preliminary')`,
       [warehouseId, productId],
     );
@@ -509,10 +730,10 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return Number(onHandRows[0]?.sum ?? 0) - Number(reservedRows[0]?.sum ?? 0);
   }
 
-  async getAvailable(warehouseId: string, productId: string): Promise<number> {
+  async getAvailable(warehouseId: string, productId: string, manager?: EntityManager): Promise<number> {
     const [onHand, reserved] = await Promise.all([
-      this.getOnHand(warehouseId, productId),
-      this.getReserved(warehouseId, productId),
+      this.getOnHand(warehouseId, productId, manager),
+      this.getReserved(warehouseId, productId, manager),
     ]);
     return onHand - reserved;
   }
@@ -719,9 +940,10 @@ export class InventoryService implements InventoryReservationContract, Inventory
     salesOrderId: string,
     actorUserId: string | null,
     status: ReservationStatus = 'active',
+    manager?: EntityManager,
   ): Promise<StockReservation> {
-    return this.dataSource.transaction((manager) =>
-      this.reserveStockInTransaction(manager, warehouseId, productId, quantity, salesOrderId, actorUserId, status),
+    return (manager ?? this.dataSource).transaction((txManager) =>
+      this.reserveStockInTransaction(txManager, warehouseId, productId, quantity, salesOrderId, actorUserId, status),
     );
   }
 
@@ -768,10 +990,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
   async importOpeningStockRows(
     rows: Array<{ warehouseCode: string; productSku: string; quantity: string; unitCost: string }>,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ succeeded: StockMovement[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: StockMovement[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
-    const warehouses = await this.dataSource.getRepository(Warehouse).find();
+    const warehouses = await (manager ?? this.dataSource).getRepository(Warehouse).find();
 
     for (let i = 0; i < rows.length; i++) {
       const rowNumber = i + 2;
@@ -782,7 +1005,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
       const errors: string[] = [];
 
       const warehouse = warehouses.find((w) => w.code === warehouseCode);
-      const product = productSku ? await this.products.getProductSnapshotBySku(productSku) : null;
+      const product = productSku ? await this.products.getProductSnapshotBySku(productSku, manager) : null;
       if (!warehouseCode) errors.push('Warehouse Code is required.');
       else if (!warehouse) errors.push(`Warehouse Code "${warehouseCode}" was not found.`);
       if (!productSku) errors.push('Product SKU is required.');
@@ -804,8 +1027,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
 
       try {
         succeeded.push(
-          await this.dataSource.transaction(async (manager) => {
-            const existing = await manager.getRepository(StockMovement).findOne({
+          await (manager ?? this.dataSource).transaction(async (txManager) => {
+            const existing = await txManager.getRepository(StockMovement).findOne({
               where: { warehouseId: warehouse!.id, productId: product!.id, movementType: 'receipt', referenceType: 'excel_import' },
             });
             if (existing) {
@@ -822,7 +1045,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
               'excel_import',
               null,
               actorUserId,
-              manager,
+              txManager,
               unitCostText,
             );
           }),
@@ -843,8 +1066,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * fulfillment order's warehouse from these (see FulfillmentService)
    * and fulfills every one of them at pack-verification time.
    */
-  async getActiveReservationsForOrder(salesOrderId: string): Promise<StockReservation[]> {
-    return this.dataSource
+  async getActiveReservationsForOrder(salesOrderId: string, manager?: EntityManager): Promise<StockReservation[]> {
+    return (manager ?? this.dataSource)
       .getRepository(StockReservation)
       .find({ where: { salesOrderId, status: 'active' }, order: { createdAt: 'ASC' } });
   }
@@ -865,23 +1088,27 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * promoted together (an order's lines all confirm atomically, never
    * some lines still on hold while others are reserved).
    */
-  async confirmReservationsForOrder(salesOrderId: string, actorUserId: string | null): Promise<void> {
-    const repo = this.dataSource.getRepository(StockReservation);
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added and threaded into the `audit.record` call, per §14.5's rule. */
+  async confirmReservationsForOrder(salesOrderId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(StockReservation);
     const holds = await repo.find({ where: { salesOrderId, status: 'preliminary' } });
     for (const hold of holds) {
       hold.status = 'active';
       await repo.save(hold);
-      await this.audit.record({
-        actorUserId,
-        organizationId: null,
-        action: 'inventory.reservation.confirmed',
-        resource: 'stock_reservation',
-        resourceId: hold.id,
-        result: 'success',
-        correlationId: null,
-        before: { status: 'preliminary' },
-        after: { status: 'active' },
-      });
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'inventory.reservation.confirmed',
+          resource: 'stock_reservation',
+          resourceId: hold.id,
+          result: 'success',
+          correlationId: null,
+          before: { status: 'preliminary' },
+          after: { status: 'active' },
+        },
+        manager,
+      );
     }
   }
 
@@ -893,23 +1120,26 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * manual release path later — deliberately takes a `reason` so the
    * audit trail always says WHY a hold ended, not just that it did.
    */
-  async releasePreliminaryHoldsForOrder(salesOrderId: string, actorUserId: string | null, reason: string): Promise<void> {
-    const repo = this.dataSource.getRepository(StockReservation);
+  async releasePreliminaryHoldsForOrder(salesOrderId: string, actorUserId: string | null, reason: string, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(StockReservation);
     const holds = await repo.find({ where: { salesOrderId, status: 'preliminary' } });
     for (const hold of holds) {
       hold.status = 'released';
       await repo.save(hold);
-      await this.audit.record({
-        actorUserId,
-        organizationId: null,
-        action: 'inventory.reservation.hold_expired',
-        resource: 'stock_reservation',
-        resourceId: hold.id,
-        result: 'success',
-        correlationId: null,
-        before: { status: 'preliminary' },
-        after: { status: 'released', reason },
-      });
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'inventory.reservation.hold_expired',
+          resource: 'stock_reservation',
+          resourceId: hold.id,
+          result: 'success',
+          correlationId: null,
+          before: { status: 'preliminary' },
+          after: { status: 'released', reason },
+        },
+        manager,
+      );
     }
   }
 
@@ -922,8 +1152,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * in `SalesOrdersService`, which already knows the order's process
    * definition — Inventory never depends on Sales Orders.
    */
-  async findExpiredPreliminaryHoldOrderIds(olderThan: Date): Promise<string[]> {
-    const rows: Array<{ salesOrderId: string }> = await this.dataSource.query(
+  async findExpiredPreliminaryHoldOrderIds(olderThan: Date, manager?: EntityManager): Promise<string[]> {
+    const rows: Array<{ salesOrderId: string }> = await (manager ?? this.dataSource).query(
       `SELECT DISTINCT "salesOrderId" FROM stock_reservations WHERE status = 'preliminary' AND "createdAt" < $1`,
       [olderThan],
     );
@@ -943,8 +1173,9 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * prefix itself is a reliable enough discriminator without a schema
    * change to the shared `Warehouse` entity.
    */
-  async findOperationalSubLocation(parentWarehouseId: string, codePrefix: string): Promise<Warehouse | null> {
-    return this.dataSource.getRepository(Warehouse).findOne({
+  /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — called cross-domain from `ShipmentService`/`ReturnsService` via `InventoryLogisticsContract`. */
+  async findOperationalSubLocation(parentWarehouseId: string, codePrefix: string, manager?: EntityManager): Promise<Warehouse | null> {
+    return (manager ?? this.dataSource).getRepository(Warehouse).findOne({
       where: { parentWarehouseId, kind: 'operational', code: Like(`${codePrefix}%`) },
     });
   }
@@ -1043,8 +1274,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
         await reservationRepo.save(reservationRepo.create({ salesOrderId, productId, warehouseId: toWarehouseId, quantity, status: 'active' }));
       }
 
-      await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, m);
-      await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, m);
+      await this.recordTransfer(fromWarehouseId, toWarehouseId, productId, quantity, referenceType, referenceId, actorUserId, m);
 
       await this.audit.record(
         {
@@ -1064,8 +1294,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return manager ? run(manager) : this.dataSource.transaction(run);
   }
 
-  async releaseReservation(reservationId: string, actorUserId: string | null): Promise<void> {
-    const repo = this.dataSource.getRepository(StockReservation);
+  async releaseReservation(reservationId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(StockReservation);
     const reservation = await repo.findOne({ where: { id: reservationId } });
     if (!reservation) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
     if (reservation.status !== 'active') {
@@ -1073,15 +1303,18 @@ export class InventoryService implements InventoryReservationContract, Inventory
     }
     reservation.status = 'released';
     await repo.save(reservation);
-    await this.audit.record({
-      actorUserId,
-      organizationId: null,
-      action: 'inventory.reservation.released',
-      resource: 'stock_reservation',
-      resourceId: reservationId,
-      result: 'success',
-      correlationId: null,
-    });
+    await this.audit.record(
+      {
+        actorUserId,
+        organizationId: null,
+        action: 'inventory.reservation.released',
+        resource: 'stock_reservation',
+        resourceId: reservationId,
+        result: 'success',
+        correlationId: null,
+      },
+      manager,
+    );
   }
 
   /**
@@ -1303,7 +1536,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     manager?: EntityManager,
   ): Promise<void> {
     const run = async (m: EntityManager): Promise<void> => {
-      const reservations = await this.getActiveReservationsForOrder(salesOrderId);
+      const reservations = await this.getActiveReservationsForOrder(salesOrderId, m);
       for (const reservation of reservations) {
         await this.fulfillReservation(reservation.id, actorUserId, currentWarehouseId, m);
       }
@@ -1330,33 +1563,34 @@ export class InventoryService implements InventoryReservationContract, Inventory
     finishedProductId: string,
     quantity: number,
     actorUserId: string | null,
+    manager?: EntityManager,
   ): Promise<{ assemblyReference: string; finishedGoodMovement: StockMovement; componentMovements: StockMovement[] }> {
     if (!Number.isInteger(quantity) || quantity < 1) {
       throw new ConflictException('Assembly quantity must be a positive whole number.');
     }
 
-    const recipe = await this.bom.getBomForAssembly(finishedProductId);
+    const recipe = await this.bom.getBomForAssembly(finishedProductId, manager);
     if (!recipe || recipe.length === 0) {
       throw new NotFoundException(`No Bill of Materials defined for product "${finishedProductId}".`);
     }
 
-    const assemblyReference = await this.numbering.getNextNumber('assembly');
+    const assemblyReference = await this.numbering.getNextNumber('assembly', manager);
 
-    return this.dataSource.transaction(async (manager) => {
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
       const involvedProductIds = [...new Set([finishedProductId, ...recipe.map((r) => r.componentProductId)])].sort();
       for (const productId of involvedProductIds) {
-        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${warehouseId}:${productId}`]);
+        await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${warehouseId}:${productId}`]);
       }
 
       // Check every component's availability BEFORE writing any movement —
       // an assembly either fully succeeds or writes nothing at all.
       for (const component of recipe) {
         const required = component.quantityPerUnit * quantity;
-        const onHandRows: Array<{ sum: string | null }> = await manager.query(
+        const onHandRows: Array<{ sum: string | null }> = await txManager.query(
           'SELECT SUM(quantity) as sum FROM stock_movements WHERE "warehouseId" = $1 AND "productId" = $2',
           [warehouseId, component.componentProductId],
         );
-        const reservedRows: Array<{ sum: string | null }> = await manager.query(
+        const reservedRows: Array<{ sum: string | null }> = await txManager.query(
           `SELECT SUM(quantity) as sum FROM stock_reservations WHERE "warehouseId" = $1 AND "productId" = $2 AND status IN ('active', 'preliminary')`,
           [warehouseId, component.componentProductId],
         );
@@ -1382,23 +1616,23 @@ export class InventoryService implements InventoryReservationContract, Inventory
       let totalConsumedValue = 0;
       for (const component of recipe) {
         const required = component.quantityPerUnit * quantity;
-        const naturalCost = this.valuation ? await this.valuation.getUnitCost(component.componentProductId, warehouseId, undefined, manager) : null;
+        const naturalCost = this.valuation ? await this.valuation.getUnitCost(component.componentProductId, warehouseId, undefined, txManager) : null;
         if (this.valuation && naturalCost != null) {
           const applied = await this.valuation.consumeIssueCost(
             component.componentProductId,
             warehouseId,
             required,
             `manufacturing:assembly:${assemblyReference}:consumption:${component.componentProductId}`,
-            manager,
+            txManager,
           );
           if (applied && !('rejected' in applied)) totalConsumedValue += Number(applied.totalCostBase);
         }
         componentMovements.push(
-          await this.recordMovement(warehouseId, component.componentProductId, -required, 'assembly_consumption', 'assembly', assemblyReference, actorUserId, manager),
+          await this.recordMovement(warehouseId, component.componentProductId, -required, 'assembly_consumption', 'assembly', assemblyReference, actorUserId, txManager),
         );
       }
 
-      const finishedGoodMovement = await this.recordMovement(warehouseId, finishedProductId, quantity, 'assembly_output', 'assembly', assemblyReference, actorUserId, manager);
+      const finishedGoodMovement = await this.recordMovement(warehouseId, finishedProductId, quantity, 'assembly_output', 'assembly', assemblyReference, actorUserId, txManager);
       if (this.valuation && totalConsumedValue > 0) {
         await this.valuation.recordReceiptCost(
           finishedProductId,
@@ -1406,14 +1640,14 @@ export class InventoryService implements InventoryReservationContract, Inventory
           quantity,
           (totalConsumedValue / quantity).toFixed(4),
           `manufacturing:assembly:${assemblyReference}:output`,
-          manager,
+          txManager,
         );
 
         // ADR-061 §14 — "an instantaneous Work Order": Dr WIP / Cr Inventory on consumption, then
         // Dr Inventory / Cr WIP on output, same transaction, WIP touched and immediately zeroed
         // again — reuses the identical Manufacturing topics/handlers (§13), no new control
         // function or mechanism introduced solely for legacy compatibility.
-        await this.events.publish(manager, 'manufacturing.work_order.material_issued', {
+        await this.events.publish(txManager, 'manufacturing.work_order.material_issued', {
           idempotencyKey: `manufacturing:assembly:${assemblyReference}:consumption`,
           workOrderId: assemblyReference,
           componentProductId: null,
@@ -1421,7 +1655,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
           unitCostBase: null,
           totalValueBase: totalConsumedValue.toFixed(4),
         });
-        await this.events.publish(manager, 'manufacturing.work_order.finished_goods_received', {
+        await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
           idempotencyKey: `manufacturing:assembly:${assemblyReference}:output`,
           workOrderId: assemblyReference,
           finishedProductId,
@@ -1451,14 +1685,14 @@ export class InventoryService implements InventoryReservationContract, Inventory
             components: recipe.map((r) => ({ componentProductId: r.componentProductId, consumed: r.quantityPerUnit * quantity })),
           },
         },
-        manager,
+        txManager,
       );
 
       return { assemblyReference, finishedGoodMovement, componentMovements };
     }).then(async (result) => {
       // Same precedent as `GoodsReceiptService.post` — without this, the outbox rows `events.publish`
       // wrote above would sit `pending` until some unrelated later sweep, an accidental delay.
-      await this.events.dispatchPending();
+      await this.events.dispatchPending(undefined, manager);
       return result;
     });
   }

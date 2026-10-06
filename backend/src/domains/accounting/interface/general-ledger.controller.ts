@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { Type } from 'class-transformer';
@@ -9,7 +9,8 @@ import { FinancialReportingService, SectionAccountRow } from '../application/fin
 import { FinancialEventService } from '../application/financial-events/financial-event.service';
 import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
 import { JOURNAL_SOURCE_TYPES } from '../domain/journal';
-import { JwtAuthGuard, AuthenticatedRequest } from '../../../foundation/authentication/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
@@ -135,8 +136,14 @@ class ReverseJournalEntryDto {
  * `@RequirePermission('accounting.<feature>.<action>')`, the exact guard
  * stack F01/F02 use.
  */
+/**
+ * Area 21 Operational Company Scoping Retrofit (2026-09-28, CTO-authorized).
+ * `CompanyContextGuard` at class level — every route threads
+ * `req.companyContext.dataSource.manager` into the journal/ledger/reporting/
+ * financial-event services.
+ */
 @Controller('accounting')
-@UseGuards(JwtAuthGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('accounting')
 export class GeneralLedgerController {
   constructor(
@@ -153,61 +160,79 @@ export class GeneralLedgerController {
   @RequirePermission('accounting.journal.view', 'read-only')
   @Get('journals')
   async listJournals(
+    @Req() req: CompanyScopedRequest,
     @Query('status') status?: string,
     @Query('sourceType') sourceType?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('accountId') accountId?: string,
   ) {
-    return this.journals.listEntries({
-      status: status as never,
-      sourceType: sourceType as never,
-      from,
-      to,
-      accountId,
-    });
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.listEntries(
+      {
+        status: status as never,
+        sourceType: sourceType as never,
+        from,
+        to,
+        accountId,
+      },
+      manager,
+    );
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.view', 'read-only')
   @Get('journals/:id')
-  async getJournal(@Param('id', ParseUUIDPipe) id: string) {
-    return this.journals.getEntry(id);
+  async getJournal(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.getEntry(id, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.create', 'editable')
   @Post('journals')
-  async createJournal(@Body() dto: CreateJournalEntryDto, @Req() req: AuthenticatedRequest) {
-    return this.journals.createEntry(dto as never, req.user.id);
+  async createJournal(@Body() dto: CreateJournalEntryDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.createEntry(dto as never, req.user.id, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.edit', 'editable')
   @Post('journals/:id')
-  async updateJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateJournalEntryDto, @Req() req: AuthenticatedRequest) {
-    return this.journals.updateEntry(id, dto as never, req.user.id);
+  async updateJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateJournalEntryDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.updateEntry(id, dto as never, req.user.id, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.submit', 'editable')
   @Post('journals/:id/submit')
-  async submitJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.journals.submitEntry(id, req.user.id);
+  async submitJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.submitEntry(id, req.user.id, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.post', 'editable')
   @Post('journals/:id/post')
-  async postJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
-    return this.journals.postEntry(id, req.user.id);
+  async postJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.postEntry(id, req.user.id, {}, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.reverse', 'editable')
   @Post('journals/:id/reverse')
-  async reverseJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseJournalEntryDto, @Req() req: AuthenticatedRequest) {
-    return this.journals.reverseEntry(id, req.user.id, dto);
+  async reverseJournal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseJournalEntryDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.journals.reverseEntry(id, req.user.id, dto, manager);
   }
 
   // ---- Ledger ----
@@ -215,27 +240,34 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ledger.view', 'read-only')
   @Get('ledger')
-  async getLedgerOverview(@Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.ledger.getTrialBalance({ from, to, orgUnitId });
+  async getLedgerOverview(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ledger.view', 'read-only')
   @Get('trial-balance')
-  async getTrialBalance(@Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.ledger.getTrialBalance({ from, to, orgUnitId });
+  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ledger.view', 'read-only')
   @Get('ledger/:accountId')
   async getAccountLedger(
+    @Req() req: CompanyScopedRequest,
     @Param('accountId', ParseUUIDPipe) accountId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('orgUnitId') orgUnitId?: string,
   ) {
-    return this.ledger.getAccountLedger(accountId, { from, to, orgUnitId });
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.ledger.getAccountLedger(accountId, { from, to, orgUnitId }, manager);
   }
 
   // ---- Reports (F14, ADR-047) — a pure read model: these routes never create a Journal Entry, never
@@ -245,16 +277,20 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.report.view', 'read-only')
   @Get('reports/balance-sheet')
-  async getBalanceSheet(@Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.reporting.getBalanceSheet({ asOfDate, orgUnitId });
+  async getBalanceSheet(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reporting.getBalanceSheet({ asOfDate, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.report.export', 'read-only')
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — matches `ReportsController`'s own export throttle
   @Get('reports/balance-sheet/export')
-  async exportBalanceSheet(@Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId: string | undefined, @Res() res: Response) {
-    const bs = await this.reporting.getBalanceSheet({ asOfDate, orgUnitId });
+  async exportBalanceSheet(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate: string, @Query('orgUnitId') orgUnitId: string | undefined, @Res() res: Response) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const bs = await this.reporting.getBalanceSheet({ asOfDate, orgUnitId }, manager);
     const rows = [
       ...bs.assets.map((r) => this.reportRow('Assets', r)),
       { section: 'Assets', code: '', name: 'Total Assets', balance: bs.assetsTotal },
@@ -276,8 +312,10 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.report.view', 'read-only')
   @Get('reports/profit-and-loss')
-  async getProfitAndLoss(@Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.reporting.getProfitAndLoss({ from, to, orgUnitId });
+  async getProfitAndLoss(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reporting.getProfitAndLoss({ from, to, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -285,12 +323,15 @@ export class GeneralLedgerController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('reports/profit-and-loss/export')
   async exportProfitAndLoss(
+    @Req() req: CompanyScopedRequest,
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('orgUnitId') orgUnitId: string | undefined,
     @Res() res: Response,
   ) {
-    const pnl = await this.reporting.getProfitAndLoss({ from, to, orgUnitId });
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const pnl = await this.reporting.getProfitAndLoss({ from, to, orgUnitId }, manager);
     const rows = [
       ...pnl.revenue.map((r) => this.reportRow('Revenue', r)),
       { section: 'Revenue', code: '', name: 'Total Revenue', balance: pnl.revenueTotal },
@@ -310,8 +351,10 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.report.view', 'read-only')
   @Get('reports/cash-flow')
-  async getCashFlowStatement(@Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
-    return this.reporting.getCashFlowStatement({ from, to, orgUnitId });
+  async getCashFlowStatement(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -319,12 +362,15 @@ export class GeneralLedgerController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('reports/cash-flow/export')
   async exportCashFlowStatement(
+    @Req() req: CompanyScopedRequest,
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('orgUnitId') orgUnitId: string | undefined,
     @Res() res: Response,
   ) {
-    const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId });
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
     const rows = [
       { line: 'Beginning Cash', amount: cf.beginningCash },
       { line: 'Operating — Net Income', amount: cf.operating.periodNetIncome },
@@ -353,8 +399,10 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.report.view', 'read-only')
   @Get('reports/tax-period-summary/:taxPeriodId')
-  async getTaxPeriodSummary(@Param('taxPeriodId', ParseUUIDPipe) taxPeriodId: string) {
-    return this.reporting.getTaxPeriodSummary(taxPeriodId);
+  async getTaxPeriodSummary(@Req() req: CompanyScopedRequest, @Param('taxPeriodId', ParseUUIDPipe) taxPeriodId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.reporting.getTaxPeriodSummary(taxPeriodId, manager);
   }
 
   private reportRow(section: string, r: SectionAccountRow): { section: string; code: string; name: string; balance: string } {
@@ -366,21 +414,27 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.financial_event.view', 'read-only')
   @Get('financial-events')
-  async listFinancialEvents(@Query('status') status?: string, @Query('sourceDomain') sourceDomain?: string, @Query('eventType') eventType?: string) {
-    return this.financialEvents.listEvents({ status: status as never, sourceDomain, eventType });
+  async listFinancialEvents(@Req() req: CompanyScopedRequest, @Query('status') status?: string, @Query('sourceDomain') sourceDomain?: string, @Query('eventType') eventType?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.financialEvents.listEvents({ status: status as never, sourceDomain, eventType }, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.financial_event.view', 'read-only')
   @Get('financial-events/:id')
-  async getFinancialEvent(@Param('id', ParseUUIDPipe) id: string) {
-    return this.financialEvents.getEvent(id);
+  async getFinancialEvent(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.financialEvents.getEvent(id, manager);
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.journal.post', 'editable')
   @Post('financial-events/:id/redrive')
-  async redriveFinancialEvent(@Param('id', ParseUUIDPipe) id: string) {
-    return this.financialEvents.redrive(id);
+  async redriveFinancialEvent(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.financialEvents.redrive(id, manager);
   }
 }

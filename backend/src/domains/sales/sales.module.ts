@@ -9,8 +9,10 @@ import { AuditModule } from '../../foundation/audit/audit.module';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { PermissionModule } from '../../foundation/permission/permission.module';
 
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 @Module({
-  imports: [
+  imports: [CompanyModule, DatabaseRegistryModule, 
     TypeOrmModule.forFeature([SalesRepProfile]),
     NumberingModule,
     AuthorizationModule,

@@ -18,6 +18,7 @@ interface ShipmentSummary {
   waybillNumber: string;
   rshNumber: string | null;
   salesOrderNumber: string | null;
+  customerName: string | null;
 }
 interface Product {
   id: string;
@@ -103,14 +104,19 @@ export function ShipmentReturns() {
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
 
   async function loadAll() {
-    const [rowsData, shipmentsData, productsData] = await Promise.all([
-      api.get<ShipmentReturnRow[]>('/shipment-returns'),
-      api.get<ShipmentSummary[]>('/shipments'),
-      api.get<Product[]>('/products/all'),
-    ]);
-    setRows(rowsData);
-    setShipments(shipmentsData);
-    setProducts(productsData);
+    try {
+      const [rowsData, shipmentsData, productsData] = await Promise.all([
+        api.get<ShipmentReturnRow[]>('/shipment-returns'),
+        api.get<ShipmentSummary[]>('/shipments'),
+        api.get<Product[]>('/products/all'),
+      ]);
+      setRows(rowsData);
+      setShipments(shipmentsData);
+      setProducts(productsData);
+    } catch (err) {
+      // Foundation fix: mount-time load had no error handling.
+      setError(err instanceof ApiError ? err.message : 'Failed to load shipment returns.');
+    }
   }
 
   useEffect(() => {
@@ -183,7 +189,8 @@ export function ShipmentReturns() {
     setDetailFor(detail);
   }
 
-  const shipmentLabel = (s: ShipmentSummary) => `${s.rshNumber ?? s.waybillNumber}${s.salesOrderNumber ? ` — ${s.salesOrderNumber}` : ''}`;
+  // SHR-01: the picker names the customer too, so the operator can tell which customer's shipment they are returning.
+  const shipmentLabel = (s: ShipmentSummary) => `${s.rshNumber ?? s.waybillNumber}${s.salesOrderNumber ? ` — ${s.salesOrderNumber}` : ''}${s.customerName ? ` — ${s.customerName}` : ''}`;
 
   return (
     <div>

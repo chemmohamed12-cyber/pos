@@ -79,9 +79,20 @@ export class LimitService implements OnModuleInit {
     await this.seeder.sync();
   }
 
-  /** Non-mutating preview — would `consume(limitKey, delta)` succeed right now. */
-  async check(limitKey: string, delta = 1): Promise<LimitCheckResult> {
-    return this.dataSource.transaction((manager) => this.resolve(manager, limitKey, delta, false));
+  /**
+   * Non-mutating preview — would `consume(limitKey, delta)` succeed right now.
+   *
+   * Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?`
+   * added — `LimitProfile`/`LimitUsageCounter` are Company-owned entities
+   * (`core-company-entities.ts`), so a caller checking a per-Company quota
+   * (e.g. `CustomersService.createCustomer`'s `sales.max_customers`
+   * pre-check) must resolve against that SAME Company's own counters, not
+   * the ambient connection — same optional-external-manager shape already
+   * established by `consume()`/`release()` below.
+   */
+  async check(limitKey: string, delta = 1, manager?: EntityManager): Promise<LimitCheckResult> {
+    const run = (m: EntityManager) => this.resolve(m, limitKey, delta, false);
+    return manager ? run(manager) : this.dataSource.transaction(run);
   }
 
   /**

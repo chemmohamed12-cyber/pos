@@ -84,8 +84,11 @@ import { ExcelModule } from '../../foundation/excel/excel.module';
 import { CustomerFinanceModule } from '../customer-finance/customer-finance.module';
 import { TreasuryModule } from '../treasury/treasury.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
+import { InventoryPostingPolicyService } from './application/inventory-posting-policy.service';
 import { ProcurementModule } from '../procurement/procurement.module';
 import { ManufacturingModule } from '../manufacturing/manufacturing.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { CompanyModule } from '../../foundation/company/company.module';
 
 /**
  * F01 — Financial Foundation (ADR-032). `accounting`'s composition root.
@@ -174,6 +177,13 @@ import { ManufacturingModule } from '../manufacturing/manufacturing.module';
     // `domains/manufacturing`'s own classes anywhere except its module (DI token only, same
     // ProcurementModule/InventoryValuationModule pattern immediately above).
     ManufacturingModule,
+    // Multi-Company Area 9 (2026-09-22) — for CompanyConnectionManagerService,
+    // so ClosingSnapshotRecoveryScheduler can sweep each Company's own
+    // database instead of the ambient one.
+    DatabaseRegistryModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for `CompanyContextGuard`
+    // (the Membership half; `DatabaseRegistryModule` above is the connection half).
+    CompanyModule,
   ],
   controllers: [
     AccountingController,
@@ -208,6 +218,7 @@ import { ManufacturingModule } from '../manufacturing/manufacturing.module';
     InventoryReconciliationService,
     InventoryAdjustmentService,
     InventoryCostingHandlerService,
+    InventoryPostingPolicyService,
     FixedAssetService,
     DepreciationService,
     FixedAssetDisposalService,

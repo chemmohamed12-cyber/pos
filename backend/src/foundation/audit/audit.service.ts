@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditRecord, AuditResult } from './audit-record.entity';
 import { computeAuditHash, GENESIS_HASH } from './audit-hash';
 
@@ -103,28 +103,49 @@ export class AuditService {
 
   /** Walks the whole chain and verifies every record's hash — the backup/restore integrity check (ADR-020 §3). */
   async verifyChain(): Promise<{ valid: boolean; brokenAtSeq: number | null }> {
-    const records = await this.dataSource.getRepository(AuditRecord).find({ order: { seq: 'ASC' } });
-    let expectedPrevHash = GENESIS_HASH;
-    for (const record of records) {
-      const recomputed = computeAuditHash({
-        seq: record.seq,
-        timestamp: record.timestamp.toISOString(),
-        actorUserId: record.actorUserId,
-        organizationId: record.organizationId,
-        action: record.action,
-        resource: record.resource,
-        resourceId: record.resourceId,
-        result: record.result,
-        correlationId: record.correlationId,
-        before: record.before,
-        after: record.after,
-        prevHash: expectedPrevHash,
-      });
-      if (recomputed !== record.hash || record.prevHash !== expectedPrevHash) {
-        return { valid: false, brokenAtSeq: record.seq };
-      }
-      expectedPrevHash = record.hash;
-    }
-    return { valid: true, brokenAtSeq: null };
+    return verifyChainOn(this.dataSource.getRepository(AuditRecord));
   }
+
+  /**
+   * Area 14 (2026-09-25, CTO Implementation Gate). The Company-scoped
+   * equivalent of `verifyChain()` — same integrity semantics, but never
+   * resolves a Company connection itself: it operates ONLY on whatever
+   * `manager` the caller supplies, already validated by that caller's own
+   * `CompanyContextGuard`/Installation-Admin path. No `companyId`
+   * parameter exists here by design — accepting one and using it to pick
+   * a connection would be exactly the client-supplied-identifier bypass
+   * this codebase's dual-path pattern (Track A/D) always refuses. Each
+   * Company DB's chain is fully independent (its own `audit_records`
+   * table, its own `seq`/`prevHash` sequence) — never cross-linked to the
+   * Platform's or another Company's.
+   */
+  async verifyCompanyChain(manager: EntityManager): Promise<{ valid: boolean; brokenAtSeq: number | null }> {
+    return verifyChainOn(manager.getRepository(AuditRecord));
+  }
+}
+
+async function verifyChainOn(repo: Repository<AuditRecord>): Promise<{ valid: boolean; brokenAtSeq: number | null }> {
+  const records = await repo.find({ order: { seq: 'ASC' } });
+  let expectedPrevHash = GENESIS_HASH;
+  for (const record of records) {
+    const recomputed = computeAuditHash({
+      seq: record.seq,
+      timestamp: record.timestamp.toISOString(),
+      actorUserId: record.actorUserId,
+      organizationId: record.organizationId,
+      action: record.action,
+      resource: record.resource,
+      resourceId: record.resourceId,
+      result: record.result,
+      correlationId: record.correlationId,
+      before: record.before,
+      after: record.after,
+      prevHash: expectedPrevHash,
+    });
+    if (recomputed !== record.hash || record.prevHash !== expectedPrevHash) {
+      return { valid: false, brokenAtSeq: record.seq };
+    }
+    expectedPrevHash = record.hash;
+  }
+  return { valid: true, brokenAtSeq: null };
 }

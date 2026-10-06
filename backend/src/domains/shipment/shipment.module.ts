@@ -21,6 +21,8 @@ import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
 import { CrmModule } from '../crm/crm.module';
 import { IdentityModule } from '../../foundation/identity/identity.module';
 import { LOGISTICS_SHIPMENT_CONTRACT } from '../../foundation/module-registry/contracts/logistics.contract';
+import { CompanyModule } from '../../foundation/company/company.module';
+import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 @Module({
   imports: [
@@ -47,6 +49,12 @@ import { LOGISTICS_SHIPMENT_CONTRACT } from '../../foundation/module-registry/co
     // import every other foundation service here already uses directly, no
     // contract indirection needed (ADR-027 only gates domain↔domain imports).
     IdentityModule,
+    // Area 21 Operational Company Scoping Retrofit (2026-09-27) — for
+    // `CompanyContextGuard`. `DatabaseRegistryModule` alongside it, the
+    // same required pairing discovered during `products.controller.ts`'s
+    // retrofit.
+    CompanyModule,
+    DatabaseRegistryModule,
   ],
   controllers: [ShipmentController],
   providers: [ShipmentService, { provide: LOGISTICS_SHIPMENT_CONTRACT, useExisting: ShipmentService }],
