@@ -57,5 +57,7 @@ No new table, no migration other than terminology, no new permission node, no AP
 
 **Notes / limits:** the clearing account is not settled by anything yet — settlement against AP/Bank belongs to those workflows (future). The helper uses the asset's acquisition date as the journal date (a closed/absent period rejects it; use the manual path then). Browser verification developer-level, no screenshots; **UAT pending.** Status: **D8 helper = VERIFIED — UAT READY; Production HOLD.**
 
+**CTO acceptance (2026-10-06):** D8 Acquisition-Journal Helper = VERIFIED / UAT READY; **UAT = PENDING; Production = HOLD.** The helper only RECORDS the acquisition (Dr Fixed Asset Cost / Cr Fixed Asset Acquisition Clearing) and does **not** settle the clearing account — settlement against AP / Bank belongs to those future workflows and **no settlement logic may be added to this helper**. Not to be changed: the manual-JE + link workflow, AP, Treasury, the chart architecture, the clearing-account selection logic (configuration only; no fallback; no account code chosen in code).
+
 ## Status
 **D8 = VERIFIED / CLOSED (manual JE + link) and the Acquisition-Journal Helper = VERIFIED — UAT READY (2026-10-06).**
