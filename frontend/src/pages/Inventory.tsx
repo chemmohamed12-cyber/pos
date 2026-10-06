@@ -345,7 +345,8 @@ export function Inventory() {
                           )}
                         </>
                       ) : (
-                        <span style={{ color: '#b45309' }}>{t('value.assigned.no')}</span>
+                        // 'has stock (not default)' only when it really holds stock here — an unassigned zero-stock row (All items scope) is just not assigned
+                        r.onHand !== 0 ? <span style={{ color: '#b45309' }}>{t('value.assigned.no')}</span> : <span>—</span>
                       )}
                     </td>
                     <td>{r.onHand}</td>

@@ -4,14 +4,47 @@
     {
       "name": "daii-frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5173"
+      ],
       "port": 5173
     },
     {
       "name": "daii-backend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "backend", "run", "start:dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "backend",
+        "run",
+        "start:dev"
+      ],
       "port": 3500
+    },
+    {
+      "name": "bv-backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d backend && set DB_HOST=127.0.0.1&& set DB_PORT=5656&& set DB_USER=d3verify&& set DB_PASSWORD=x&& set DB_NAME=bv_cp&& set PORT=3601&& set NODE_ENV=development&& node dist/main.js"
+      ],
+      "port": 3601
+    },
+    {
+      "name": "bv-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3601&& npm --prefix frontend run dev -- --host 127.0.0.1 --port 5601"
+      ],
+      "port": 5601
     }
   ]
 }
