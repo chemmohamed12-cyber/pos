@@ -38,5 +38,24 @@ Real PostgreSQL (isolated seeded cluster, two real Company databases A/B created
 - Same serial run: 22 suites, 135 passed + 1 skipped, 0 failed (see D7 record §7).
 Status after evidence: **D8 = VERIFIED / CLOSED** (Browser verification: NOT PERFORMED; JE-creation helper still deferred — §5; FA-02 gain-on-disposal account is a separate open accounting decision).
 
+## 8. Acquisition-Journal Helper — CTO decision Option C (2026-10-06) — IMPLEMENTED / REAL-PG VERIFIED / BROWSER-VERIFIED
+**Decision (CTO):** the helper's counter-account is a **Fixed Asset Acquisition Clearing** account — not AP (Acquisition ≠ vendor invoice), not Bank (Acquisition ≠ Payment). `Dr Fixed Asset Cost / Cr Fixed Asset Acquisition Clearing`; the clearing account is settled later by the real workflow (AP integration, payment, transfer). The helper must NOT mix with AP/Treasury, must NOT invent an account code, and the account comes from the existing configuration mechanism, **fail-closed**. The manual-JE + link workflow stays available and unchanged.
+
+**Implementation**
+| Piece | Where |
+|---|---|
+| Config key `accounting.fixed_asset_acquisition_clearing_account_code` (string, default '' = fail-closed; manifest 1.19.0; set through the existing `PUT /config/values/:key`) | `accounting.manifest.ts` |
+| Handler: Dr the asset's cost account / Cr the configured clearing account for exactly the cost; clearing resolved by the existing `resolveConfiguredPostableAccount` (exists, active, postable, NOT a control account) | `financial-events/fixed-asset-acquisition.handler.ts` |
+| `FixedAssetAcquisitionService.createAcquisitionJournal`: asset must be `pending_acquisition`; **pre-flight of the clearing account before any write**; then ONE transaction: ingest the event (business date = the asset's acquisition date, idempotency key per asset) → POSTED journal → the existing unchanged `linkAcquisitionJournalEntry` (re-validates every rule) → audit; any non-POSTED outcome throws and rolls everything back | `application/fixed-asset-acquisition.service.ts` |
+| `POST accounting/fixed-assets/:id/acquisition-journal` (feature `accounting.fixed_assets`, permission `accounting.fixed_asset.edit`) | `fixed-asset.controller.ts`, `accounting.module.ts` |
+| UI: "Create acquisition journal" button + hint in the Link-acquisition panel (server errors shown); terminology core migration `1789994000000` | `FixedAssets.tsx` |
+No new table, no migration other than terminology, no new permission node, no AP/Treasury code touched.
+
+**Verification (real PostgreSQL, isolated seeded cluster)** — spec `fixed-asset-acquisition-helper.company-isolation.spec.ts` **5/5**: (1) clearing account unset / unknown / header / inactive / control-function (AP) each rejected naming the config key with zero journal/event rows and the asset still pending; (2) happy path: Dr cost 12000 / Cr clearing 12000, balanced, event POSTED, asset ACTIVE with the journal linked, GL read-back cost +12000 / clearing −12000, **AP and Bank nets stay 0**; (3) a second call is refused (no longer pending) and creates nothing, and the activated asset is charged by a normal depreciation run (1000); (4) an acquisition date with no open fiscal period → rejected with the engine's reason, nothing persisted, asset stays pending; (5) A/B isolation — B's helper posts only in B against B's chart, A unchanged, B's DataSource never requested for A's calls, the Platform DB holds none of the accounting tables.
+**Live in the real app (isolated environment):** the Fixed Assets screen shows the new button in the link panel; with the key unset one click returns the fail-closed message and the asset stays pending; after setting the key through `PUT /config/values` one click makes the asset **Active** and the GL holds `JV-2026-000002: Dr 1210 6000 / Cr 2900 6000`.
+**Regression (one serial run, isolated PG): 14 suites, 76/76 passed** — fixed-asset ×5 (4+3+5+5+5), general-ledger 9, event-engine 8, journal-numbering 5, accounting.company-isolation 5, subledger-controllers 5, inventory-posting 9, grni-reconciliation 3 (boots the full `AppModule`), fiscal-period-closing 4, module-registry guards 6. Not a full-repository regression. Backend/frontend `tsc` clean, eslint clean on the touched backend files.
+
+**Notes / limits:** the clearing account is not settled by anything yet — settlement against AP/Bank belongs to those workflows (future). The helper uses the asset's acquisition date as the journal date (a closed/absent period rejects it; use the manual path then). Browser verification developer-level, no screenshots; **UAT pending.** Status: **D8 helper = VERIFIED — UAT READY; Production HOLD.**
+
 ## Status
-**D8 = VERIFIED / CLOSED (2026-10-05)** — manual JE + link kept; UI workflow completed; JE-creation helper deferred pending a counter-account policy. Next in the CTO order: D9 (closed), D7 (closed), COA/remaining.
+**D8 = VERIFIED / CLOSED (manual JE + link) and the Acquisition-Journal Helper = VERIFIED — UAT READY (2026-10-06).**

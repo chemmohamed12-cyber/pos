@@ -172,7 +172,9 @@ export const accountingManifest: ModuleManifest = {
   // 1.15.0 — D3 (inventory posting policy, 2026-10-04): +3 config keys
   //          (`accounting.inventory_{opening_balance,adjustment_gain,adjustment_loss}_account_code`), all
   //          default '' = fail-closed. No new table, no new permission node, no migration.
-  manifest_version: '1.18.0',
+  // 1.19.0 — D8 acquisition-journal helper (2026-10-06, CTO Option C): +1 config key
+  //          (`accounting.fixed_asset_acquisition_clearing_account_code`, default '' = fail-closed). No new table, no new node, no migration.
+  manifest_version: '1.19.0',
   title_code: 'module.accounting',
   business_domains: ['accounting'],
   depends_on: ['finance'],
@@ -509,6 +511,10 @@ export const accountingManifest: ModuleManifest = {
     // hard-coded fallback account anywhere in this domain.
     { key: 'accounting.fixed_asset_gain_on_disposal_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.fixed_asset_loss_on_disposal_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // D8 helper (2026-10-06, CTO Option C) — the Fixed Asset Acquisition Clearing account the acquisition-journal helper credits
+    // (Dr asset cost / Cr clearing). Resolved via the existing `resolveConfiguredPostableAccount` at helper pre-flight AND posting time;
+    // unset / unresolvable → rejected before any mutation. No default, no fallback to AP / Bank.
+    { key: 'accounting.fixed_asset_acquisition_clearing_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
   ],
 
   migration_tag: 'accounting',

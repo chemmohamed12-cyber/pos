@@ -3693,6 +3693,19 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Existing data**: none affected (test/disposable environments only) — CTO ruled no replay / repair / recovery. **Status: VERIFIED / CLOSED.**
 
+## §67 — D8 Acquisition-Journal Helper (Option C, Acquisition Clearing) — blast radius (2026-10-06)
+
+**Scope**: `D8-FIXED-ASSET-ACQUISITION-LINK-2026-10-05.md` section 8. One additive route on the (closed) `fixed-asset.controller`, one new service + event handler, one config key (manifest 1.19.0) and a UI button; **no schema/migration other than terminology, no AP/Treasury code. Count unchanged: 27/43.**
+
+| Closed area | D8-helper change | Real-PG proof (green) |
+|---|---|---|
+| `fixed-asset.controller` (`POST :id/acquisition-journal`) | additive | `fixed-asset-acquisition-helper` (5), `fixed-asset` (4), `fixed-asset-acquisition-link` (3) |
+| Event Engine → GL (new event type) | one handler registered | `event-engine` (8), `general-ledger` (9), `journal-numbering` (5) |
+| disposal / depreciation chain on a helper-created asset | unchanged | `fixed-asset-disposal-gain-loss` (5), `fixed-asset-disposal-reconciliation` (5), helper test 3 (depreciation run) |
+| AppModule wiring | new provider | `grni-reconciliation` (3, boots `AppModule`) |
+
+**Regression**: 14 suites, 76/76 in one serial run on the isolated PG (not a full-repository regression). **Status**: VERIFIED — UAT READY; Production HOLD.
+
 ## §15 — What This Document Is Not
 
 Not an implementation. Not a decision on the 5 Mixed/Special. Not a

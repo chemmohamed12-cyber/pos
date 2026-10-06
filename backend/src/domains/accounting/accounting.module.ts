@@ -55,6 +55,7 @@ import { InventoryCostingHandlerService } from './application/financial-events/i
 import { FixedAssetService } from './application/fixed-asset.service';
 import { DepreciationService } from './application/depreciation.service';
 import { FixedAssetDisposalService } from './application/fixed-asset-disposal.service';
+import { FixedAssetAcquisitionService } from './application/fixed-asset-acquisition.service';
 import { FixedAssetReconciliationService } from './application/fixed-asset-reconciliation.service';
 import { ClosingAuditService } from './application/closing-audit.service';
 import { ClosingSnapshotSigningKeyService } from './application/closing-snapshot-signing-key.service';
@@ -222,6 +223,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     FixedAssetService,
     DepreciationService,
     FixedAssetDisposalService,
+    FixedAssetAcquisitionService,
     FixedAssetReconciliationService,
     ClosingAuditService,
     ClosingSnapshotSigningKeyService,

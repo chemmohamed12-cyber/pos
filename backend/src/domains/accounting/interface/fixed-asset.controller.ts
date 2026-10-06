@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsIn, IsInt, IsISO8601, IsNumberString, IsOptional, IsPositive, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { FixedAssetAcquisitionService } from '../application/fixed-asset-acquisition.service';
 import { FixedAssetService } from '../application/fixed-asset.service';
 import { DepreciationService } from '../application/depreciation.service';
 import { FixedAssetDisposalService } from '../application/fixed-asset-disposal.service';
@@ -169,6 +170,7 @@ export class FixedAssetController {
     private readonly depreciation: DepreciationService,
     private readonly disposals: FixedAssetDisposalService,
     private readonly reconciliation: FixedAssetReconciliationService,
+    private readonly acquisitions: FixedAssetAcquisitionService,
   ) {}
 
   // ---- Register ----
@@ -228,6 +230,15 @@ export class FixedAssetController {
   @Post('fixed-assets/:id/link-acquisition')
   async linkAcquisition(@Param('id', ParseUUIDPipe) id: string, @Body() dto: LinkAcquisitionDto, @Req() req: CompanyScopedRequest) {
     return this.assets.linkAcquisitionJournalEntry(id, dto.journalEntryId, req.user.id, req.companyContext!.dataSource.manager);
+  }
+
+  /** D8 helper (CTO Option C) — create + post Dr cost / Cr Fixed Asset Acquisition Clearing and link it, in one transaction. Rejected before mutation when the clearing account is not configured. */
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('accounting.fixed_assets')
+  @RequirePermission('accounting.fixed_asset.edit', 'editable')
+  @Post('fixed-assets/:id/acquisition-journal')
+  async createAcquisitionJournal(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    return this.acquisitions.createAcquisitionJournal(id, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   // ---- Depreciation ----

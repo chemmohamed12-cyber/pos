@@ -76,6 +76,8 @@ const PRELOAD = [
   'panel.link_acquisition_none',
   'field.acquisition_journal',
   'action.open_journals',
+  'action.create_acquisition_journal',
+  'panel.create_acquisition_journal_hint',
 ];
 
 function emptyForm() {
@@ -180,6 +182,21 @@ export function FixedAssets() {
       await loadAssets();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to link the acquisition journal.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** D8 helper (CTO Option C) — one click: Dr asset cost / Cr Fixed Asset Acquisition Clearing, posted and linked; the server rejects it before any change when the clearing account is not configured. */
+  async function createAcquisitionJournal(assetId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/accounting/fixed-assets/${assetId}/acquisition-journal`, {});
+      setLinkId(null);
+      await loadAssets();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to create the acquisition journal.');
     } finally {
       setBusy(false);
     }
@@ -374,6 +391,12 @@ export function FixedAssets() {
               </button>
             </div>
           )}
+          <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" disabled={busy} onClick={() => createAcquisitionJournal(linkId)}>
+              {t('action.create_acquisition_journal')}
+            </button>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>{t('panel.create_acquisition_journal_hint')}</span>
+          </div>
           <div style={{ marginTop: 8 }}>
             <Link to="/accounting/journals">{t('action.open_journals')}</Link>
           </div>
