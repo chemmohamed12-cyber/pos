@@ -35,6 +35,10 @@ import { HrLeaveRequests } from './pages/hr/HrLeaveRequests';
 import { HrCover } from './pages/covers/HrCover';
 import { WorkOrders } from './pages/manufacturing/WorkOrders';
 import { WorkOrderDetail } from './pages/manufacturing/WorkOrderDetail';
+import { ManufacturingBoms } from './pages/manufacturing/ManufacturingBoms';
+import { Routings } from './pages/manufacturing/Routings';
+import { WorkCenters } from './pages/manufacturing/WorkCenters';
+import { Assembly } from './pages/manufacturing/Assembly';
 import { ManufacturingCover } from './pages/covers/ManufacturingCover';
 import { AttendanceConnectors } from './pages/attendance/AttendanceConnectors';
 import { AttendanceImport } from './pages/attendance/AttendanceImport';
@@ -233,6 +237,10 @@ function AppRoutes() {
         <Route path="manufacturing" element={<ManufacturingCover />} />
         <Route path="manufacturing/work-orders" element={<WorkOrders />} />
         <Route path="manufacturing/work-orders/:id" element={<WorkOrderDetail />} />
+        <Route path="manufacturing/boms" element={<ManufacturingBoms />} />
+        <Route path="manufacturing/routings" element={<Routings />} />
+        <Route path="manufacturing/work-centers" element={<WorkCenters />} />
+        <Route path="manufacturing/assembly" element={<Assembly />} />
         <Route path="attendance" element={<AttendanceCover />} />
         <Route path="attendance/connectors" element={<AttendanceConnectors />} />
         <Route path="attendance/import" element={<AttendanceImport />} />

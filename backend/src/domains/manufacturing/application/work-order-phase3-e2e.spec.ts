@@ -70,6 +70,23 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     expect(inventoryBreakdown.some((w) => w.warehouseId === wipWarehouseId)).toBe(false);
   }
 
+  /**
+   * Controlled fixture replacing the old "31 pre-existing rejected events" dependency on the hand-seeded
+   * shared dev DB (ISOLATED_TEST_ENVIRONMENT.md): creates GENUINE, UNRELATED WIP drift on a clean baseline —
+   * a second Work Order whose WIP sub-warehouse carries a valued subledger layer that no Financial Event
+   * ever posted to the GL. Reconciliation must report it (never net it away), and finishing any other Work
+   * Order must not clear it. Returns the drift amount.
+   */
+  async function seedUnrelatedWipDrift(): Promise<number> {
+    const { finishedProductId, componentProductId, warehouseId } = await createFixtures(1);
+    const decoy = await workOrders.createWorkOrder(finishedProductId, 1, warehouseId, null);
+    await inventory.recordMovement(warehouseId, componentProductId, 1, 'receipt', 'e2e_seed', `p3-drift-seed-${decoy.id}`, null, undefined, '7.00');
+    await workOrders.release(decoy.id, null);
+    const decoyWip = (await workOrders.getWorkOrderOrThrow(decoy.id)).wipWarehouseId!;
+    await valuation.recordReceiptCost(componentProductId, decoyWip, 1, '7.0000', `p3-unposted-wip-layer-${decoy.id}`);
+    return 7;
+  }
+
   afterAll(async () => {
     await moduleRef.close();
   });
@@ -396,6 +413,7 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     const { finishedProductId, componentProductId, warehouseId } = await createFixtures(3);
     await inventory.recordMovement(warehouseId, componentProductId, 9, 'receipt', 'e2e_seed', 'p3-recon-seed', null, undefined, '4.00');
 
+    await seedUnrelatedWipDrift();
     const wipBefore = await wipReconciliation.reconcile({}, ADMIN_A);
 
     const wo = await workOrders.createWorkOrder(finishedProductId, 3, warehouseId, null);
@@ -416,9 +434,9 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     const wipAfter = await wipReconciliation.reconcile({}, ADMIN_A);
     expect(Number(wipAfter.driftBase ?? 0) - Number(wipBefore.driftBase ?? 0)).toBeCloseTo(0, 4);
 
-    // Real drift IS surfaced: this shared dev DB carries genuine historical WIP drift (Item 13 — 31
-    // Financial Events rejected before a `wip` GL account existed). A design that netted
-    // Inventory+WIP together would hide this; the split design reports it as non-zero drift.
+    // Real drift IS surfaced: the controlled fixture above left genuine, unrelated WIP drift (an unposted
+    // subledger layer — the clean-baseline equivalent of the old Item 13 historical drift). A design that
+    // netted Inventory+WIP together would hide this; the split design reports it as non-zero drift.
     expect(wipAfter.status).toBe('drift_found');
     expect(Number(wipAfter.driftBase)).not.toBeCloseTo(0, 4);
   }, 60_000);
@@ -435,6 +453,7 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     const year = await fiscalPeriods.createFiscalYear({ code: `P3CLOSE${Date.now().toString().slice(-6)}`, startDate: '2036-01-01', endDate: '2036-01-31' }, ADMIN_A);
     const [period] = await fiscalPeriods.listPeriods(year.id);
 
+    await seedUnrelatedWipDrift();
     const wo = await workOrders.createWorkOrder(finishedProductId, 2, warehouseId, null); // quantityRequired = 4
     await workOrders.release(wo.id, null);
     await workOrders.materialIssue(wo.id, componentProductId, 4, null, 'p3-close-issue');

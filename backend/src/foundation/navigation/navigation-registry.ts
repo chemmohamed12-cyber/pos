@@ -389,23 +389,19 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     ],
   },
   {
-    // CTO-explicit special case (2026-09-26): `work-order.controller.ts`'s list route is gated BOTH
-    // `@RequireFeature('manufacturing.work_orders')` (manifest: `default: false, toggleable: true` —
-    // verified via `EntitlementService.resolve()`: under `unlicensed-full` mode only `default: true`
-    // features are auto-enabled, so this one is genuinely OFF today) AND
-    // `@RequirePermission('manufacturing.work_order.view', 'read-only')`. Both are encoded here so
-    // this group correctly stays hidden until the feature is enabled for an installation — no bypass,
-    // no role-gate substitute, no forcing it visible.
+    // ADR-061 Addendum 1 (A5/A6) — every item gates on the SAME axes its API routes enforce:
+    // `@RequireModule('manufacturing')` + `@RequirePermission('manufacturing.<area>.view')`. The
+    // `manufacturing.work_orders` feature is structural (follows the module's entitlement), so Work Orders
+    // needs no separate feature toggle. Assembly's API is `inventory.assembly.create`; the screen lives in
+    // the Manufacturing workspace and reads the BOM list, so it is gated by the manufacturing module.
     code: 'nav_group.manufacturing',
     coverTo: '/manufacturing',
     items: [
-      {
-        to: '/manufacturing/work-orders',
-        code: 'nav.manufacturing_work_orders',
-        module: 'manufacturing',
-        feature: 'manufacturing.work_orders',
-        permissionNode: 'manufacturing.work_order',
-      },
+      { to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', module: 'manufacturing', feature: 'manufacturing.work_orders', permissionNode: 'manufacturing.work_order' },
+      { to: '/manufacturing/boms', code: 'nav.manufacturing_boms', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
+      { to: '/manufacturing/routings', code: 'nav.manufacturing_routings', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
+      { to: '/manufacturing/work-centers', code: 'nav.manufacturing_work_centers', module: 'manufacturing', permissionNode: 'manufacturing.work_center' },
+      { to: '/manufacturing/assembly', code: 'nav.manufacturing_assembly', module: 'manufacturing', permissionNode: 'inventory.assembly' },
     ],
   },
   {

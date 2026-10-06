@@ -28,8 +28,10 @@ export function ManufacturingCover() {
   const { t, preload } = useLanguage();
   const [kpis, setKpis] = useState<{ total: number; open: number; inProduction: number; wipValue: string } | null>(null);
   const [recent, setRecent] = useState<WorkOrder[]>([]);
+  // Master-data counts — each fetched independently: a user without that area's `view` permission simply gets no tile.
+  const [master, setMaster] = useState<{ boms?: number; routings?: number; workCenters?: number }>({});
 
-  preload(['field.total_work_orders', 'field.open_work_orders', 'field.wip_value', 'field.in_production', 'field.recent_work_orders', ...IN_PRODUCTION_STATES.map((s) => `work_order_lifecycle.state.${s}`)]);
+  preload(['nav.manufacturing_boms', 'nav.manufacturing_routings', 'nav.manufacturing_work_centers', 'nav.manufacturing_assembly', 'mfg.kpi.active_boms', 'mfg.kpi.routings', 'mfg.kpi.work_centers', 'field.total_work_orders', 'field.open_work_orders', 'field.wip_value', 'field.in_production', 'field.recent_work_orders', ...IN_PRODUCTION_STATES.map((s) => `work_order_lifecycle.state.${s}`)]);
 
   useEffect(() => {
     (async () => {
@@ -43,25 +45,44 @@ export function ManufacturingCover() {
         });
         setRecent([...workOrders].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5));
       } catch {
-        // Feature may be disabled for this installation (manufacturing.work_orders default: false) — degrade to no KPIs, not an error.
+        // No `manufacturing.work_order.view` for this user — degrade to no KPIs, not an error (the API is the authority).
       }
+      const [boms, routings, workCenters] = await Promise.allSettled([
+        api.get<Array<{ status: string }>>('/manufacturing/boms'),
+        api.get<unknown[]>('/manufacturing/routings'),
+        api.get<unknown[]>('/manufacturing/work-centers'),
+      ]);
+      setMaster({
+        boms: boms.status === 'fulfilled' ? boms.value.filter((b) => b.status === 'active').length : undefined,
+        routings: routings.status === 'fulfilled' ? routings.value.length : undefined,
+        workCenters: workCenters.status === 'fulfilled' ? workCenters.value.length : undefined,
+      });
     })();
   }, []);
 
   return (
     <SectionCover
       titleCode="module.manufacturing"
-      shortcuts={[{ to: '/manufacturing/work-orders', labelCode: 'nav.manufacturing_work_orders' }]}
-      kpis={
-        kpis
+      shortcuts={[
+        { to: '/manufacturing/work-orders', labelCode: 'nav.manufacturing_work_orders' },
+        { to: '/manufacturing/boms', labelCode: 'nav.manufacturing_boms' },
+        { to: '/manufacturing/routings', labelCode: 'nav.manufacturing_routings' },
+        { to: '/manufacturing/work-centers', labelCode: 'nav.manufacturing_work_centers' },
+        { to: '/manufacturing/assembly', labelCode: 'nav.manufacturing_assembly' },
+      ]}
+      kpis={[
+        ...(kpis
           ? [
               { labelCode: 'field.total_work_orders', value: kpis.total, to: '/manufacturing/work-orders' },
               { labelCode: 'field.open_work_orders', value: kpis.open, to: '/manufacturing/work-orders' },
               { labelCode: 'field.in_production', value: kpis.inProduction, to: '/manufacturing/work-orders' },
               { labelCode: 'field.wip_value', value: kpis.wipValue, to: '/manufacturing/work-orders' },
             ]
-          : undefined
-      }
+          : []),
+        ...(master.boms !== undefined ? [{ labelCode: 'mfg.kpi.active_boms', value: master.boms, to: '/manufacturing/boms' }] : []),
+        ...(master.routings !== undefined ? [{ labelCode: 'mfg.kpi.routings', value: master.routings, to: '/manufacturing/routings' }] : []),
+        ...(master.workCenters !== undefined ? [{ labelCode: 'mfg.kpi.work_centers', value: master.workCenters, to: '/manufacturing/work-centers' }] : []),
+      ]}
     >
       {recent.length > 0 && (
         <div className="card">

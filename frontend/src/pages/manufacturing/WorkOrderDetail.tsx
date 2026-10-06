@@ -45,6 +45,16 @@ interface AuditTrailEntry {
   actorUserId: string | null;
   result: string;
 }
+interface WorkOrderOperationRow {
+  id: string;
+  sequence: number;
+  name: string;
+  workCenterCode: string;
+  workCenterName: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  startedAt: string | null;
+  completedAt: string | null;
+}
 interface WorkOrderDetail {
   id: string;
   workOrderNumber: string;
@@ -56,6 +66,7 @@ interface WorkOrderDetail {
   createdAt: string;
   state: string;
   components: WorkOrderComponent[];
+  operations: WorkOrderOperationRow[];
   wipValue: string;
   financialTrail: FinancialTrailEvent[];
   auditTrail: AuditTrailEntry[];
@@ -128,6 +139,17 @@ export function WorkOrderDetail() {
     'field.quantity_issued',
     'field.quantity_remaining',
     'field.actions',
+    'mfg.field.operations',
+    'mfg.field.sequence',
+    'mfg.field.operation',
+    'mfg.field.work_center',
+    'mfg.field.started_at',
+    'mfg.field.completed_at',
+    'mfg.action.start_operation',
+    'mfg.action.complete_operation',
+    'mfg.op.state.pending',
+    'mfg.op.state.in_progress',
+    'mfg.op.state.completed',
     'action.back',
     'action.material_issue',
     'action.material_return',
@@ -148,6 +170,20 @@ export function WorkOrderDetail() {
     ...(wo ? [`work_order_lifecycle.state.${wo.state}`] : []),
     ...(wo ? wo.financialTrail.map((e) => `value.financial_event_status.${e.status.toLowerCase()}`) : []),
   ]);
+
+  async function runOperation(operationId: string, action: 'start' | 'complete') {
+    if (!id) return;
+    setBusy(`op:${operationId}`);
+    setError(null);
+    try {
+      await api.post(`/manufacturing/work-orders/${id}/operations/${operationId}/${action}`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `Failed to ${action} operation.`);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function runAction(action: string) {
     if (!id) return;
@@ -343,6 +379,53 @@ export function WorkOrderDetail() {
           </tbody>
         </table>
       </div>
+
+      {wo.operations && wo.operations.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>{t('mfg.field.operations')}</h3>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t('mfg.field.sequence')}</th>
+                <th>{t('mfg.field.operation')}</th>
+                <th>{t('mfg.field.work_center')}</th>
+                <th>{t('field.status')}</th>
+                <th>{t('mfg.field.started_at')}</th>
+                <th>{t('mfg.field.completed_at')}</th>
+                <th>{t('field.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wo.operations.map((op) => (
+                <tr key={op.id}>
+                  <td>{op.sequence}</td>
+                  <td>{op.name}</td>
+                  <td>
+                    {op.workCenterCode} — {op.workCenterName}
+                  </td>
+                  <td>
+                    <StatusBadge code={`mfg.op.state.${op.status}`} />
+                  </td>
+                  <td>{op.startedAt ? new Date(op.startedAt).toLocaleString() : '—'}</td>
+                  <td>{op.completedAt ? new Date(op.completedAt).toLocaleString() : '—'}</td>
+                  <td>
+                    {(wo.state === 'released' || wo.state === 'in_progress') && op.status === 'pending' && (
+                      <button className="btn btn-secondary" disabled={busy !== null} onClick={() => runOperation(op.id, 'start')}>
+                        {busy === `op:${op.id}` ? '…' : t('mfg.action.start_operation')}
+                      </button>
+                    )}
+                    {(wo.state === 'released' || wo.state === 'in_progress') && op.status === 'in_progress' && (
+                      <button className="btn btn-primary" disabled={busy !== null} onClick={() => runOperation(op.id, 'complete')}>
+                        {busy === `op:${op.id}` ? '…' : t('mfg.action.complete_operation')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {canOutput && (
         <div className="card">

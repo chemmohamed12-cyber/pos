@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { EntityManager } from 'typeorm';
 import { WorkOrderService } from '../application/work-order.service';
+import { RoutingService } from '../application/routing.service';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
 import { BomService } from '../../commerce/application/bom.service';
 import { ProductsService } from '../../commerce/application/products.service';
@@ -104,7 +105,7 @@ describe('WorkOrderController Area 21 retrofit — real-Postgres Company isolati
       },
     } as unknown as InventoryValuationContract;
 
-    service = new WorkOrderService(inert, inventory, numbering, processEngine, audit, events, bom, valuation);
+    service = new WorkOrderService(inert, inventory, numbering, processEngine, audit, events, bom, valuation, new RoutingService(inert, audit, products));
 
     await seedCompanyData(h.companyAId, 'A', 'A', 100);
     await seedCompanyData(h.companyBId, 'B', 'B', 100);

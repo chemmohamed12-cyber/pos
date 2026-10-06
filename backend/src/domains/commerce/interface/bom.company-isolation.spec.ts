@@ -90,7 +90,7 @@ describe('BomController Area 21 retrofit — real-Postgres Company isolation (20
     const bom = await service.getBom(seeded.A.finishedProductId, dsA.manager);
     expect(bom).toBeTruthy();
     expect(bom!.finishedProductSku).toBe('BOM-A-FIN');
-    expect(bom!.components).toEqual([{ componentProductId: seeded.A.componentProductId, quantityPerUnit: 3, sku: 'BOM-A-COMP', productName: 'BOM-A Component Product' }]);
+    expect(bom!.components).toEqual([{ componentProductId: seeded.A.componentProductId, quantityPerUnit: 3, sku: 'BOM-A-COMP', productName: 'BOM-A Component Product', unit: null }]);
   });
 
   it("listBoms via Company A resolves only Company A's own BOM — never Company B's", async () => {

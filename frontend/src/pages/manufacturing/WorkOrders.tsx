@@ -8,6 +8,8 @@ interface Warehouse {
   id: string;
   code: string;
   name: string;
+  /** 'operational' = a Work Order's WIP sub-warehouse (ADR-061 Option A) — never a place to assemble or plan into. */
+  kind?: 'main' | 'operational';
 }
 interface Product {
   id: string;
@@ -34,6 +36,8 @@ export function WorkOrders() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  // ADR-061 Addendum 1 (A3): manufacturable = has an ACTIVE BOM. null = list unavailable to this user -> fall back to all products (the server still enforces at create).
+  const [manufacturableIds, setManufacturableIds] = useState<Set<string> | null>(null);
   const [finishedProductId, setFinishedProductId] = useState('');
   const [quantityPlanned, setQuantityPlanned] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -74,7 +78,13 @@ export function WorkOrders() {
       try {
         const [prod, wh] = await Promise.all([api.get<Product[]>('/products/all'), api.get<Warehouse[]>('/inventory/warehouses')]);
         setProducts(prod);
-        setWarehouses(wh);
+        setWarehouses(wh.filter((w) => w.kind !== 'operational'));
+        try {
+          const boms = await api.get<Array<{ finishedProductId: string; status: string }>>('/manufacturing/boms');
+          setManufacturableIds(new Set(boms.filter((b) => b.status === 'active').map((b) => b.finishedProductId)));
+        } catch {
+          setManufacturableIds(null);
+        }
       } catch (err) {
         // Foundation fix: no error handling — the create-work-order form's
         // product/warehouse selects were silently left empty on failure.
@@ -128,7 +138,7 @@ export function WorkOrders() {
             <label>{t('field.finished_product')}</label>
             <select value={finishedProductId} onChange={(e) => setFinishedProductId(e.target.value)} required>
               <option value="">—</option>
-              {products.map((p) => (
+              {products.filter((p) => !manufacturableIds || manufacturableIds.has(p.id)).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.sku} — {p.name}
                 </option>
