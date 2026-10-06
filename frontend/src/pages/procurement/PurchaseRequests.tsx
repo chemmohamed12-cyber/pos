@@ -19,6 +19,8 @@ interface Supplier {
 }
 interface PurchaseRequestRow {
   id: string;
+  /** ESC-3 (maker != checker): the requester may not approve their own PR — the server refuses it; the screen just does not offer it. */
+  requestedByUserId?: string;
   prNumber: string;
   warehouseId: string;
   state: string;
@@ -48,7 +50,7 @@ const CANCELLABLE_STATES = new Set(['draft', 'submitted', 'approved']);
 
 /** ADR-048 — Path B, step 1: Purchase Request (the internal requisition — no cost, cost comes later from RFQ/Quotations). */
 export function PurchaseRequests() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { t, preload } = useLanguage();
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -94,6 +96,7 @@ export function PurchaseRequests() {
     'action.add_pr_line',
     'action.submit',
     'action.approve',
+    'panel.maker_cannot_decide',
     'action.reject',
     'action.cancel',
     'action.create_rfq',
@@ -406,9 +409,10 @@ export function PurchaseRequests() {
                 )}
                 {detail.state === 'submitted' && (
                   <>
-                    <button className="btn btn-primary" disabled={busyAction === 'approve'} onClick={() => doTransition('approve')}>
+                    <button className="btn btn-primary" disabled={busyAction === 'approve' || (!!user && detail.purchaseRequest.requestedByUserId === user.id)} onClick={() => doTransition('approve')}>
                       {t('action.approve')}
                     </button>
+                    {(!!user && detail.purchaseRequest.requestedByUserId === user.id) && <span style={{ fontSize: 12, opacity: 0.8 }} data-testid="maker-cannot-approve">{t('panel.maker_cannot_decide')}</span>}
                     <button className="btn btn-secondary" disabled={busyAction === 'reject'} onClick={() => doTransition('reject')}>
                       {t('action.reject')}
                     </button>

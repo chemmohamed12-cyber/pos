@@ -6,7 +6,7 @@ Baseline: `FRONTEND-NAVIGATION-AND-OPERATIONAL-FLOW-AUDIT-2026-10-06.md` (NAV-01
 |---|---|
 | NAV-02 Accounting policy configuration | IMPLEMENTED / INTEGRATED / VERIFIED — UAT READY (open escalations ESC-1, ESC-2) |
 | NAV-03 Approval visibility | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
-| NAV-04 Approval governance (PR maker/checker, payments, treasury) | ESCALATED (ESC-3) — no ratified policy; not decided here |
+| NAV-04 Approval governance (PR maker/checker, payments, treasury) | VERIFIED / UAT READY — ESC-3 Option B approved by the CTO and implemented for PR/PO (see Closure Report §1c); payments/treasury unchanged by decision |
 | NAV-01 / NAV-09 Setup & process guidance | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
 | NAV-05 Entry points to buried transactions | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |
 | NAV-07 Accounting traceability on documents | VERIFIED — UAT READY (browser batch, see the Closure Report §1b) |

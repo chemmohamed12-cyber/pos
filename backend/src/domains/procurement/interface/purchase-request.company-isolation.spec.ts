@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { ForbiddenException } from '@nestjs/common';
 import { PurchaseRequestService } from '../application/purchase-request.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
@@ -25,6 +26,7 @@ describe('PurchaseRequestController Area 21 retrofit — real-Postgres Company i
   let h: TwoCompanyHarness;
   let service: PurchaseRequestService;
   const actorUserId = randomUUID();
+  const approverUserId = randomUUID(); // ESC-3 — a DIFFERENT user from the maker approves
 
   const seeded: Record<'A' | 'B', { warehouseId: string; productId: string; supplierId: string; purchaseRequestId: string }> = {
     A: { warehouseId: '', productId: '', supplierId: '', purchaseRequestId: '' },
@@ -83,7 +85,7 @@ describe('PurchaseRequestController Area 21 retrofit — real-Postgres Company i
   it("submit -> approve -> create RFQ for Company A converts only Company A's PR and writes the RFQ into Company A's database", async () => {
     const dsA = await h.connections.getDataSource(h.companyAId);
     expect((await service.transition(seeded.A.purchaseRequestId, 'submit', actorUserId, dsA.manager)).state).toBe('submitted');
-    expect((await service.transition(seeded.A.purchaseRequestId, 'approve', actorUserId, dsA.manager)).state).toBe('approved');
+    expect((await service.transition(seeded.A.purchaseRequestId, 'approve', approverUserId, dsA.manager)).state).toBe('approved');
     const rfq = await service.createRfqFromRequest(seeded.A.purchaseRequestId, [seeded.A.supplierId], null, actorUserId, dsA.manager);
     expect(rfq.purchaseRequestId).toBe(seeded.A.purchaseRequestId);
 
@@ -108,6 +110,28 @@ describe('PurchaseRequestController Area 21 retrofit — real-Postgres Company i
     await expect(service.getById(seeded.A.purchaseRequestId, dsB.manager)).rejects.toThrow(/not found/i);
     await expect(service.transition(seeded.A.purchaseRequestId, 'cancel', actorUserId, dsB.manager)).rejects.toThrow(/not found/i);
     await expect(service.createRfqFromRequest(seeded.A.purchaseRequestId, [seeded.B.supplierId], null, actorUserId, dsB.manager)).rejects.toThrow(/not found/i);
+  });
+
+  it('ESC-3 (maker != checker): the requester cannot approve their own PR — refused before any state change and audited; a DIFFERENT user approves it; Company B is untouched', async () => {
+    const dsA = await h.connections.getDataSource(h.companyAId);
+    const pr = await service.create({ warehouseId: seeded.A.warehouseId, lines: [{ productId: seeded.A.productId, quantity: '1' }] }, actorUserId, dsA.manager);
+    await service.transition(pr.id, 'submit', actorUserId, dsA.manager);
+
+    await expect(service.transition(pr.id, 'approve', actorUserId, dsA.manager)).rejects.toBeInstanceOf(ForbiddenException);
+    expect((await service.getById(pr.id, dsA.manager)).state).toBe('submitted'); // unchanged
+    const denied = await dsA.query(`SELECT result, action FROM audit_records WHERE "resourceId" = $1 AND action = 'purchase_request.approve'`, [pr.id]);
+    expect(denied).toEqual([{ result: 'failure', action: 'purchase_request.approve' }]);
+
+    expect((await service.transition(pr.id, 'approve', approverUserId, dsA.manager)).state).toBe('approved'); // another user, same permission model
+    const dsB = await h.connections.getDataSource(h.companyBId);
+    await expect(service.transition(pr.id, 'approve', approverUserId, dsB.manager)).rejects.toThrow(/not found/i); // A's PR is invisible to B
+  });
+
+  it('ESC-3 scope: only APPROVE is gated — the requester may still submit, and cancel, their own PR (existing workflow unchanged)', async () => {
+    const dsA = await h.connections.getDataSource(h.companyAId);
+    const pr = await service.create({ warehouseId: seeded.A.warehouseId, lines: [{ productId: seeded.A.productId, quantity: '1' }] }, actorUserId, dsA.manager);
+    expect((await service.transition(pr.id, 'submit', actorUserId, dsA.manager)).state).toBe('submitted');
+    expect((await service.transition(pr.id, 'cancel', actorUserId, dsA.manager)).state).toBe('cancelled');
   });
 
   it("Test F — resolving Company A's purchase requests never even requests Company B's DataSource", async () => {

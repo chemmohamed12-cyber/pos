@@ -9,7 +9,7 @@ Closure vocabulary: IMPLEMENTED → INTEGRATED → VERIFIED → UAT READY. **Pro
 |---|---|---|
 | NAV-02 Accounting policy configuration | **VERIFIED — UAT READY** (commit `18b25d8`) | real-PG 8/8, 68/68 affected regression, browser (earlier) + browser again in the batch (§1b) |
 | NAV-03 Approval visibility (`/pending-work` + Dashboard card) | **VERIFIED — UAT READY** | browser batch §1b (isolated env) |
-| NAV-04 Approval governance | **BLOCKED — POLICY DECISION REQUIRED (ESC-3)** | not touched, by design |
+| NAV-04 Approval governance (ESC-3 — CTO APPROVED Option B, 2026-10-06) | **VERIFIED / UAT READY** — PR and PO maker ≠ checker; payments/treasury unchanged by decision | real-PG specs + live API + browser (§1c) |
 | NAV-01 + NAV-09 Setup & process guidance | **VERIFIED — UAT READY** | browser batch §1b |
 | NAV-05 Entry points (Common tasks) | **VERIFIED — UAT READY** (two hint texts corrected by the browser pass, migration `1790001000000`) | browser batch §1b |
 | NAV-07 Financial traceability on documents | **VERIFIED — UAT READY with noted gaps** (Pending state and a Posted *customer-invoice* detail not observed live — §1b item 7) | browser batch §1b |
@@ -50,6 +50,28 @@ Seed (official APIs, Verify Co): PR submitted; PO submitted→approved, GR poste
 
 Findings worth knowing: (a) the goods-receipt and supplier-invoice events being REJECTED is the chart in this throw-away company lacking a GRNI control account — the engine's fail-closed behaviour, now visible on the documents; not a code defect. (b) `daii_dev` / the 5173 backend are behind the code and schema (20+ pending migrations, no NAV-02 routes); its raw terminology keys are a deployment mismatch, not a code defect.
 
+### 1c. NAV-04 / ESC-3 — Option B implemented and verified (CTO decision 2026-10-06)
+
+**Decision implemented (only this):** a Purchase Request's requester may not approve their own PR; a Purchase Order's creator may not approve their own PO. The approver must be another user who already holds the existing approve permission. **Not done, by decision:** no payment/treasury approval or thresholds; the permission model, PermissionGuard/controllers and the Approval Engine are untouched (diff = the two services only).
+
+**Change.** `PurchaseRequestService.transition` / `PurchaseOrderService.transition`: for `approve`, if the actor is the recorded creator (`requestedByUserId` / `createdByUserId`) the call is refused with HTTP 403 *before any state change* and a failure audit record (`purchase_request.approve` / `purchase_order.approve`, `result: failure`, reason `maker_cannot_approve_own_*`) is written in the Company's own database. Only `approve` is gated — the maker can still submit, reject-path and cancel as before. A PO with no recorded creator is not blocked. **Award-created POs** are created by the system actor (RFQ award has its own maker ≠ checker through the Approval Engine), so any authorized user may approve them — unchanged. UI: on the PR and PO screens the Approve button is disabled for the maker with the existing text "لا يمكنك اعتماد طلبك — يلزم مستخدم آخر" (the server remains the enforcement point).
+
+**Tests.** Real-PG (A/B Companies): PO spec 9/9 and PR spec 8/8 — each with the new ESC-3 cases (maker approve → `ForbiddenException`, state unchanged, failure audited; a different user → approved; Company B's PO/PR invisible to the other Company's manager; maker can still submit/cancel). Seven existing specs that approved their own documents (new-item-request, rfq-award-visibility, rfq-supplier, purchase-order, purchase-request, grni-posting, and the T0 baseline spec which is skipped by default) were updated to use a second approver — they relied on the old self-approval, which is the behaviour the CTO decision changes. Affected-area run: **125/125 first run** (procurement ×12 suites, approval-engine isolation, module-registry guards, navigation ×2), 0 failed, 0 skipped. Not a full-repository regression.
+
+**Live verification (isolated env 5601 → 3601 → `bv_cp`/`bv_co`, Verify Co; two existing test users, `bv.admin` = maker, `bv.approver` = checker; the second user's test password set through the same official `AuthService.setPassword` bootstrap in `bv_cp` only).**
+
+| Required check | Observed | Result |
+|---|---|---|
+| Maker creates PR → maker approval attempt | HTTP 403 "Maker/checker: the user who created this Purchase Request cannot approve it…"; PR state stays `submitted` | DENIED ✔ |
+| Different authorized user → PR approval | 201 `{state: approved}` (API and via the screen) | SUCCESS ✔ |
+| Maker creates PO → maker approval attempt | HTTP 403 (PO message); state stays `submitted` | DENIED ✔ |
+| Different authorized user → PO approval | 201 `{state: approved}` (API and via the screen: PO-2026-000004 → "معتمد") | SUCCESS ✔ |
+| Pending Work reflects the state | PR/PO counts showed the maker's unapproved documents (PR 1, PO 1); after the checker approved the PO the PO count went to 0; the checker's own new PR (PR-2026-000004) correctly remained pending (PR 1) | ✔ |
+| UI | Maker's PO screen: Approve disabled + hint; checker's own PR: disabled + hint; someone else's PR: enabled and approved from the screen | ✔ |
+| Existing permissions still enforced | controllers/guards not modified; module-registry guard spec 6/6 | ✔ |
+| Company isolation intact | PO/PR real-PG A/B specs (above) | ✔ |
+| No regression to existing PR/PO workflow | maker submit/cancel still 201; PR→RFQ, award→PO, GR, supplier invoice, supplier payment specs green (12 procurement suites) | ✔ |
+
 ## 2. What changed (all frontend-led; no accounting rule, authorization semantic, company-isolation or approval-policy change)
 
 **Backend (registry + seeds only).** `navigation-registry.ts`: top-level group gains `/pending-work` and `/guide` (ungated — every authenticated user; each source inside keeps its own permission); `/customers` listed once (Sales group; the Customers & Accounts cover still links it); Procurement items reordered PR → RFQ → PO (same items, same gating); `/accounting/dimensions` (`accounting.dimension`) and `/accounting/settings` (`accounting.currency`) added to the Accounting group, each on the node its own list route enforces. Terminology migrations `1789996000000` … `1790001000000` (idempotent upserts; `1790001000000` corrects two Common-tasks hints found by the browser pass; every text ≤ 255 chars; `field.financial_status` is not re-seeded). `nav_group.production` English label "Production" → "Fulfilment" (Arabic "التجهيز" unchanged; Manufacturing stays its own group).
@@ -78,7 +100,7 @@ Findings worth knowing: (a) the goods-receipt and supplier-invoice events being 
 
 ## 5. Escalated decisions (only these)
 
-- **ESC-3 — NAV-04, Approval Governance (BLOCKING for NAV-04 only; not decided).** No ratified maker/checker policy for PR/PO, customer/supplier payments, treasury. *Option A:* keep permission-only approval for PR/PO and no approval on payments/treasury (current behaviour). *Option B:* enforce maker ≠ checker on PR/PO now; payments/treasury only after thresholds are set. Recommendation: B for PR/PO; payments/treasury unchanged until thresholds — **a recommendation, not an approval**. Exact decision required: A or B (and, for B, who sets the payment/treasury thresholds).
+- **ESC-3 — NAV-04, Approval Governance — RESOLVED 2026-10-06: the CTO approved Option B** (implemented and verified, §1c). The original options are kept below for the record. No ratified maker/checker policy for PR/PO, customer/supplier payments, treasury. *Option A:* keep permission-only approval for PR/PO and no approval on payments/treasury (current behaviour). *Option B:* enforce maker ≠ checker on PR/PO now; payments/treasury only after thresholds are set. Recommendation: B for PR/PO; payments/treasury unchanged until thresholds — **a recommendation, not an approval**. Exact decision required: A or B (and, for B, who sets the payment/treasury thresholds).
 - **ESC-4 — NAV-11, Authorization (not blocking, no change made).** The 12 items with neither node nor role (Dashboard, `/customers`, `/sales-orders`, `/returns`, `/products`, `/invoices`, `/payments`, `/ar-aging`, `/customer-accounts`, `/customer-statement`, `/reports-overview`, plus the new ungated pages) mirror API read routes that carry **no** `@RequirePermission` (verified in the controllers; only their writes are gated). Adding a node to the navigation would hide screens the API still serves — an authorization change. *Option A (recommended):* leave as is. *Option B:* first add view permissions to those read routes (a security/authorization decision with seed/role-template impact), then mirror them in the registry. Decision required only if the CTO wants B.
 - **ESC-1 / ESC-2 (from NAV-02)** remain open and non-blocking: Company scope for the Configuration Engine (recommend A now, B before onboarding Companies with different charts); the five unconsumed AR/AP hint keys and the 5299 default.
 - *Decision recorded, not escalated (unchanged):* the canonical BOM screen is Manufacturing's `/manufacturing/boms` (rich lifecycle) — `/bom` is kept, unchanged, for Sales-only Companies and shows a pointer when Manufacturing is reachable. Nothing was removed and no authorization changed.
@@ -87,4 +109,4 @@ Findings worth knowing: (a) the goods-receipt and supplier-invoice events being 
 
 - NAV-02: UAT READY.
 - All other UI gaps except NAV-04/NAV-11: VERIFIED in the browser on the isolated environment — UAT READY (read-only/link layers, no write path added, no gating changed).
-- NAV-04: blocked on ESC-3. **Production = HOLD.** Not pushed.
+- NAV-04: VERIFIED / UAT READY after ESC-3 Option B (§1c); payment/treasury governance remains a separate, later Governance decision. **Production = HOLD.** Not pushed.

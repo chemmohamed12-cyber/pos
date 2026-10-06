@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PurchaseOrder } from '../infrastructure/purchase-order.entity';
 import { PurchaseOrderLine } from '../infrastructure/purchase-order-line.entity';
@@ -132,6 +132,15 @@ export class PurchaseOrderService {
   ): Promise<{ state: string }> {
     const exists = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id } });
     if (!exists) throw new NotFoundException(`Purchase Order "${id}" not found.`);
+    // ESC-3 (CTO, 2026-10-06, Option B) — maker != checker: the user who created the PO may not approve it. The approver must be another user who already
+    // holds the existing approve permission (the permission model is unchanged). Checked BEFORE any state change. A PO with no recorded creator is not blocked.
+    if (action === 'approve' && exists.createdByUserId && exists.createdByUserId === actorUserId) {
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'purchase_order.approve', resource: 'purchase_order', resourceId: id, result: 'failure', correlationId: id, after: { reason: 'maker_cannot_approve_own_order' } },
+        manager,
+      );
+      throw new ForbiddenException('Maker/checker: the user who created this Purchase Order cannot approve it. Another authorized user must approve it.');
+    }
     const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId, manager);
     await this.audit.record(
       {

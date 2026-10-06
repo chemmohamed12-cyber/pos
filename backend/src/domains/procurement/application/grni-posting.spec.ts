@@ -25,6 +25,7 @@ describe('Procurement GRNI posting (ADR-054/ADR-057)', () => {
   let dataSource: DataSource;
 
   const ADMIN_A = 'e1d5fd90-6e1c-4f52-aac7-60dd6265aa80';
+  const ADMIN_B = 'f539302e-9ae7-4cc2-99cf-381f08acab83'; // ESC-3 — a second existing admin fixture approves the PO the first one created
 
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -53,7 +54,7 @@ describe('Procurement GRNI posting (ADR-054/ADR-057)', () => {
 
     const po = await purchaseOrders.create({ supplierId, warehouseId, lines: [{ productId, quantity: '10', unitCostBase: '15.00' }] }, ADMIN_A);
     await purchaseOrders.transition(po.id, 'submit', ADMIN_A);
-    await purchaseOrders.transition(po.id, 'approve', ADMIN_A);
+    await purchaseOrders.transition(po.id, 'approve', ADMIN_B);
 
     const [poLine] = await dataSource.query(`SELECT id FROM purchase_order_lines WHERE "purchaseOrderId" = $1`, [po.id]);
 

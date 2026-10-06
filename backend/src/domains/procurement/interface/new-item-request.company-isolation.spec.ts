@@ -108,14 +108,14 @@ describe('D7 — New Item Request + product lifecycle gate — real-Postgres, A/
     const mA = await mgr(h.companyAId);
     const pr = await requests.create({ warehouseId, lines: [{ productId: activeProductId, quantity: '2' }, { productId: first.productId, quantity: '5' }] }, requester, mA);
     await requests.transition(pr.id, 'submit', requester, mA);
-    await expect(requests.transition(pr.id, 'approve', requester, mA)).rejects.toThrow(/NEW-000001.*draft/);
+    await expect(requests.transition(pr.id, 'approve', checker, mA)).rejects.toThrow(/NEW-000001.*draft/);
     expect((await requests.getById(pr.id, mA)).state).toBe('submitted');
     await expect(requests.createRfqFromRequest(pr.id, [supplierId], null, requester, mA)).rejects.toBeInstanceOf(ConflictException); // not approved
     expect(await count(mA, 'rfqs')).toBe(0);
 
     const ok = await requests.create({ warehouseId, lines: [{ productId: activeProductId, quantity: '3' }] }, requester, mA); // existing flow unaffected
     await requests.transition(ok.id, 'submit', requester, mA);
-    expect((await requests.transition(ok.id, 'approve', requester, mA)).state).toBe('approved');
+    expect((await requests.transition(ok.id, 'approve', checker, mA)).state).toBe('approved');
     expect((await requests.createRfqFromRequest(ok.id, [supplierId], null, requester, mA)).rfqNumber).toBeTruthy();
   });
 
@@ -146,7 +146,7 @@ describe('D7 — New Item Request + product lifecycle gate — real-Postgres, A/
 
     const pr = await requests.create({ warehouseId, lines: [{ productId: first.productId, quantity: '5' }] }, requester, mA);
     await requests.transition(pr.id, 'submit', requester, mA);
-    expect((await requests.transition(pr.id, 'approve', requester, mA)).state).toBe('approved');
+    expect((await requests.transition(pr.id, 'approve', checker, mA)).state).toBe('approved');
     expect((await requests.createRfqFromRequest(pr.id, [supplierId], null, requester, mA)).id).toBeTruthy();
     const po = await orders.create({ supplierId, warehouseId, lines: [{ productId: first.productId, quantity: '5', unitCostBase: '4.00' }] }, requester, mA);
     expect(po.poNumber).toBeTruthy();
@@ -163,7 +163,7 @@ describe('D7 — New Item Request + product lifecycle gate — real-Postgres, A/
     expect(view).toMatchObject({ status: 'rejected', decidedByUserId: checker, productStatus: 'draft' });
     const pr = await requests.create({ warehouseId, lines: [{ productId: second.productId, quantity: '1' }] }, requester, mA);
     await requests.transition(pr.id, 'submit', requester, mA);
-    await expect(requests.transition(pr.id, 'approve', requester, mA)).rejects.toThrow(/NEW-000002.*draft/);
+    await expect(requests.transition(pr.id, 'approve', checker, mA)).rejects.toThrow(/NEW-000002.*draft/);
     await expect(orders.create({ supplierId, warehouseId, lines: [{ productId: second.productId, quantity: '1', unitCostBase: '1' }] }, requester, mA)).rejects.toThrow(/draft item/);
     expect((await items.list('rejected', mA)).map((r) => r.id)).toEqual([second.request.id]);
   });

@@ -44,6 +44,7 @@ run('T0 clean-company baseline — real-Postgres, disposable', () => {
   jest.setTimeout(580_000);
   let h: TwoCompanyHarness;
   const actor = randomUUID();
+  const approver = randomUUID(); // ESC-3 — maker != checker on the PO
   const today = new Date().toISOString().slice(0, 10);
   const year = today.slice(0, 4);
   const evidence: Record<string, unknown> = {};
@@ -117,6 +118,7 @@ run('T0 clean-company baseline — real-Postgres, disposable', () => {
 
       // ---- minimal dataset (Company A only) ----
       await dsA.query(`INSERT INTO "users" ("id","fullName","email") VALUES ($1,'T0 Operator','t0-op@test.local') ON CONFLICT DO NOTHING`, [actor]);
+      await dsA.query(`INSERT INTO "users" ("id","fullName","email") VALUES ($1,'T0 Approver','t0-approver@test.local') ON CONFLICT DO NOTHING`, [approver]);
       const chart: Array<[string, string, string, string, string]> = [
         ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'],
         ['1102', 'Bank — Current Account', 'asset', 'debit', 'bank'],
@@ -168,7 +170,7 @@ run('T0 clean-company baseline — real-Postgres, disposable', () => {
         mA,
       );
       await purchaseOrders.transition(po.id, 'submit', actor, mA);
-      await purchaseOrders.transition(po.id, 'approve', actor, mA);
+      await purchaseOrders.transition(po.id, 'approve', approver, mA);
       const lines: Array<{ id: string; productId: string }> = await dsA.query(`SELECT id, "productId" FROM "purchase_order_lines" WHERE "purchaseOrderId" = $1`, [po.id]);
       const line = (pid: string) => lines.find((l) => l.productId === pid)!.id;
 

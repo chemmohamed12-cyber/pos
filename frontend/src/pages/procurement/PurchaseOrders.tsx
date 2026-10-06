@@ -19,6 +19,8 @@ interface Warehouse {
 }
 interface PurchaseOrderRow {
   id: string;
+  /** ESC-3 (maker != checker): the creator may not approve their own PO — the server refuses it; the screen just does not offer it. */
+  createdByUserId?: string | null;
   poNumber: string;
   supplierId: string;
   warehouseId: string;
@@ -61,7 +63,7 @@ const CANCELLABLE_STATES = new Set(['draft', 'submitted', 'approved']);
  * the id is what's actually sent to the backend.
  */
 export function PurchaseOrders() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -112,6 +114,7 @@ export function PurchaseOrders() {
     'action.add_po_line',
     'action.submit',
     'action.approve',
+    'panel.maker_cannot_decide',
     'action.reject',
     'action.cancel',
     'action.post_goods_receipt',
@@ -386,9 +389,10 @@ export function PurchaseOrders() {
                 )}
                 {detail.state === 'submitted' && (
                   <>
-                    <button className="btn btn-primary" disabled={busyAction === 'approve'} onClick={() => doTransition('approve')}>
+                    <button className="btn btn-primary" disabled={busyAction === 'approve' || (!!user && detail.purchaseOrder.createdByUserId === user.id)} onClick={() => doTransition('approve')}>
                       {t('action.approve')}
                     </button>
+                    {(!!user && detail.purchaseOrder.createdByUserId === user.id) && <span style={{ fontSize: 12, opacity: 0.8 }} data-testid="maker-cannot-approve">{t('panel.maker_cannot_decide')}</span>}
                     <button className="btn btn-secondary" disabled={busyAction === 'reject'} onClick={() => doTransition('reject')}>
                       {t('action.reject')}
                     </button>

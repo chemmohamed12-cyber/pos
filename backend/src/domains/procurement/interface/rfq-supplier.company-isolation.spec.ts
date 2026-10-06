@@ -124,7 +124,7 @@ describe('SupplierController + RfqController Area 21 retrofit — real-Postgres 
     const mB = await mgr(h.companyBId);
     const pr = await requests.create({ warehouseId: seeded.A.warehouseId, lines: [{ productId: seeded.A.productId, quantity: '5' }] }, makerA, mA);
     await requests.transition(pr.id, 'submit', makerA, mA);
-    await requests.transition(pr.id, 'approve', makerA, mA);
+    await requests.transition(pr.id, 'approve', checker1, mA);
     rfqA = (await requests.createRfqFromRequest(pr.id, [supA], null, makerA, mA)).id;
 
     expect((await rfqs.list(mA)).map((r) => r.id)).toEqual([rfqA]);

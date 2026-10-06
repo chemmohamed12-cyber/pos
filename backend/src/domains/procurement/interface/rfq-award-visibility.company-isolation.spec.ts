@@ -75,7 +75,7 @@ describe('D6 — RFQ award approval visibility (maker-checker unchanged) — rea
     const mA = await mgr(h.companyAId);
     const pr = await requests.create({ warehouseId, lines: [{ productId, quantity: '5' }] }, maker, mA);
     await requests.transition(pr.id, 'submit', maker, mA);
-    await requests.transition(pr.id, 'approve', maker, mA);
+    await requests.transition(pr.id, 'approve', checker, mA);
     const rfqId = (await requests.createRfqFromRequest(pr.id, [supplierId], null, maker, mA)).id;
     await rfqs.send(rfqId, maker, mA);
     const prLines = (await rfqs.getById(rfqId, mA)).purchaseRequestLines;

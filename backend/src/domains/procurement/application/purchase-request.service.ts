@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PurchaseRequest } from '../infrastructure/purchase-request.entity';
 import { PurchaseRequestLine } from '../infrastructure/purchase-request-line.entity';
@@ -116,6 +116,15 @@ export class PurchaseRequestService {
     const exists = await (manager ?? this.dataSource).getRepository(PurchaseRequest).findOne({ where: { id } });
     if (!exists) throw new NotFoundException(`Purchase Request "${id}" not found.`);
     if (action === 'approve') {
+      // ESC-3 (CTO, 2026-10-06, Option B) — maker != checker: the requester may not approve their own Purchase Request. The approver must be another
+      // user who already holds the existing approve permission (the permission model itself is unchanged). Checked BEFORE any state change.
+      if (exists.requestedByUserId === actorUserId) {
+        await this.audit.record(
+          { actorUserId, organizationId: null, action: 'purchase_request.approve', resource: 'purchase_request', resourceId: id, result: 'failure', correlationId: id, after: { reason: 'maker_cannot_approve_own_request' } },
+          manager,
+        );
+        throw new ForbiddenException('Maker/checker: the user who created this Purchase Request cannot approve it. Another authorized user must approve it.');
+      }
       // D7 — the lifecycle gate: an approved PR never points at an unapproved (draft) or discontinued item. Checked BEFORE the transition.
       const lines = await (manager ?? this.dataSource).getRepository(PurchaseRequestLine).find({ where: { purchaseRequestId: id } });
       await this.lifecycleGate.assertAllActive(lines.map((l) => l.productId), 'Cannot approve this Purchase Request', manager);
