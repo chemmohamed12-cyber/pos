@@ -3664,6 +3664,20 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Status**: FA-02 VERIFIED / CLOSED. **CUS-01** is at a one-question accounting gate (`CUS-01-ON-ACCOUNT-CUSTOMER-PAYMENT-2026-10-06.md`).
 
+## §65 — CUS-01 CLOSED: on-account / advance customer payment — blast radius (2026-10-06)
+
+**Scope**: `CUS-01-ON-ACCOUNT-CUSTOMER-PAYMENT-2026-10-06.md`. Three additive routes on the (closed) `payments.controller`, a nullable `invoiceId`, one new ledger entry type, a guard in the ledger sweep. **Count unchanged: 27/43.** No new GL account, no AR-reconciliation change, deposits/COD untouched.
+
+| Closed controller / service | CUS-01 change | Real-PG proof (green) |
+|---|---|---|
+| `payments.controller` / `PaymentsService` | additive routes + methods | `on-account-payment` (7), `payments` (5) |
+| `customer-ledger` (sweep guard, new entry type) | behaviour guard | `customer-ledger` (5), `invoices` (4), `deposits` (6) |
+| AR sub-ledger and GL, Treasury and GL | untouched, proved reconciled | `subledger-controllers` (5), `treasury-bank-leg` (7), `reports`, `returns-accounting` (12) |
+
+**Regression** (worded exactly in the record, section 7): 167/201 +1 skipped first run; 4 infra failures cleared individually; 4 other-session manufacturing suites need migrations absent from the isolated DB; full run 948/981 with only other-session / guarded failures.
+
+**Status**: CUS-01 VERIFIED / CLOSED (browser verification NOT PERFORMED).
+
 ## §15 — What This Document Is Not
 
 Not an implementation. Not a decision on the 5 Mixed/Special. Not a
