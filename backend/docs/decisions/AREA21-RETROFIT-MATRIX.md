@@ -3693,7 +3693,7 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Existing data**: none affected (test/disposable environments only) — CTO ruled no replay / repair / recovery. **Status: VERIFIED / CLOSED.**
 
-## §67 — D8 Acquisition-Journal Helper (Option C, Acquisition Clearing) — blast radius (2026-10-06)
+## §67 — D8 Acquisition-Journal Helper — DEFERRED / POLICY REQUIRED (code exists, not closed) — blast radius (2026-10-06)
 
 **Scope**: `D8-FIXED-ASSET-ACQUISITION-LINK-2026-10-05.md` section 8. One additive route on the (closed) `fixed-asset.controller`, one new service + event handler, one config key (manifest 1.19.0) and a UI button; **no schema/migration other than terminology, no AP/Treasury code. Count unchanged: 27/43.**
 
@@ -3704,12 +3704,12 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 | disposal / depreciation chain on a helper-created asset | unchanged | `fixed-asset-disposal-gain-loss` (5), `fixed-asset-disposal-reconciliation` (5), helper test 3 (depreciation run) |
 | AppModule wiring | new provider | `grni-reconciliation` (3, boots `AppModule`) |
 
-**Regression**: 14 suites, 76/76 in one serial run on the isolated PG (not a full-repository regression). **Status**: VERIFIED — UAT READY; Production HOLD.
+**Regression** (what was run, not an acceptance): 14 suites, 76/76 in one serial run on the isolated PG (not a full-repository regression). **Status (CTO correction 2026-10-06): DEFERRED / POLICY REQUIRED — NOT closed**; the credit-side accounting policy is unsettled; the code is inert unless its config key is set.
 
 ## §68 — Audit closure (2026-10-06)
 
 **Scope**: `ERP-AUDIT-CLOSURE-REPORT-2026-10-06.md`. Records only — no code, no controller, no schema change. **Area 21 count unchanged: 27/43.**
-INV-03 → VERIFIED / CLOSED (CTO; no warehouse GL account; central Inventory Control 1120 stays). Final record: D1/D6/D7/D8/D9/PRC-01/CUS-01/COA-01/SHR-01/D10/T0/INV-03/Journal Company Numbering → VERIFIED / CLOSED; FA-02 → VERIFIED / UAT READY; Browser Verification #1 → PERFORMED / VERIFIED (found and fixed the D1 label and D6 terminology defects, and surfaced the journal-numbering defect, fixed and re-verified). **UAT = READY / PENDING EXECUTION. Production = HOLD.**
+INV-03 → VERIFIED / CLOSED (evidence: the operator screenshot of the Warehouse screen — Code, Name, Location, Responsible only, no Account Code / GL mapping — stored under ~evidence/INV-03-warehouse-screen-operator-screenshot-2026-10-06.png`; no warehouse GL account; central Inventory Control 1120 stays). Final record: D1/D6/D7/D8 (acquisition / link workflow)/D9/PRC-01/CUS-01/COA-01/SHR-01/D10/T0/INV-03/Journal Company Numbering → VERIFIED / CLOSED; **D8 Acquisition-Journal Helper → DEFERRED / POLICY REQUIRED**; FA-02 → VERIFIED / UAT READY; Browser Verification #1 → PERFORMED / VERIFIED (found and fixed the D1 label and D6 terminology defects, and surfaced the journal-numbering defect, fixed and re-verified). **UAT = READY / PENDING EXECUTION. Production = HOLD.**
 
 ## §15 — What This Document Is Not
 

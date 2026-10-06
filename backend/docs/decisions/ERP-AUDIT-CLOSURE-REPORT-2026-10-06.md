@@ -1,6 +1,6 @@
 # ERP functional-integrity audit — Closure Report (2026-10-06)
 
-**Final state: Audit / Decision Closure = CLOSED · Implementation Verification = VERIFIED · Browser Verification = PERFORMED / VERIFIED · UAT = READY / PENDING EXECUTION · Production = HOLD.**
+**Final state: Audit decisions = CLOSED · Implemented scope = VERIFIED · Browser Verification = VERIFIED · D8 Acquisition-Journal Helper = DEFERRED / POLICY REQUIRED · UAT = READY / PENDING EXECUTION · Production = HOLD.**
 
 ## 1. Closed
 | Item | Status |
@@ -9,12 +9,13 @@
 | D2 treasury bank-leg · D3 inventory posting (+D3-B manual receipt) · D4 returns accounting · D5 PPV + Input VAT | VERIFIED / CLOSED (earlier in the program) |
 | D6 RFQ award visibility | VERIFIED / CLOSED |
 | D7 New Item Request + lifecycle gate | VERIFIED / CLOSED |
-| D8 fixed-asset acquisition link (manual JE + link) and the Acquisition-Journal Helper (Option C, Acquisition Clearing) | VERIFIED / CLOSED (helper: VERIFIED — UAT READY) |
+| D8 fixed-asset acquisition / link workflow (manual JE + link) | VERIFIED / CLOSED |
+| D8 Acquisition-Journal Helper | **DEFERRED / POLICY REQUIRED — NOT closed.** Credit-side accounting policy unsettled; no AP / Bank / Clearing choice without an explicit accounting decision; no implementation required at this stage. (Code written under the earlier Option C instruction exists in commits `fe213cc` / `9a2ba7e`, inert unless its config key is set; its disposition awaits the CTO.) |
 | D9 supplier edit + auto-numbered code | VERIFIED / CLOSED |
 | D10 Event Engine per-Company dispatch · T0 clean-company baseline | VERIFIED / CLOSED |
 | PRC-01 stock visibility · COA-01 · SHR-01 · CUS-01 on-account payments | VERIFIED / CLOSED |
 | FA-02 disposal gain/loss accounts | VERIFIED / UAT READY |
-| **INV-03** warehouse "Account Code" | **VERIFIED / CLOSED** — closed on the CTO's statement (2026-10-06) that the operator's screenshot confirmed the finding. **No code change, no migration, no warehouse GL account; the approved model stays one central Inventory Control account (1120).** *Evidence note: the screenshot file itself was not received by the engineering session and is therefore NOT attached here — attach it to this record when it is supplied.* |
+| **INV-03** warehouse "Account Code" | **VERIFIED / CLOSED** — evidence: the operator's screenshot of the Warehouse screen, stored at `evidence/INV-03-warehouse-screen-operator-screenshot-2026-10-06.png`: it shows only Code, Name, Location and Responsible — **no Account Code / GL Account / Warehouse GL Mapping**. No code change, no migration, no warehouse GL account; the approved model stays one central Inventory Control account (1120). |
 | Journal Company Numbering (defect found by Browser Verification #1) | VERIFIED / CLOSED — fresh Company, no SQL, sequence created on the Company DB, A/B isolation, concurrent first posts, event-driven posting, Platform is not a numbering source. No data repair needed (test data only). |
 | Browser Verification #1 (D1/D6/D7/D8/D9/PRC-01/CUS-01/COA-01/SHR-01) | PERFORMED / VERIFIED |
 
@@ -31,13 +32,13 @@ Every stage has a real-PostgreSQL spec with Company A/B isolation (Platform DB u
 - Regression is NOT a full-repository run. **Manufacturing/WIP failures are pre-existing test-environment/schema issues (the isolated DB lacks other sessions' newer manufacturing migrations, e.g. the routings table) and were not caused by the changes in this stage.** Four HR/provisioning characterization suites are guarded to run only on the HR instance and were not run.
 - Browser verification is developer-level: no screenshots (pane hidden), DOM/network/console evidence only, some fixtures raw-seeded; not a UAT.
 - FA-02: a Company B disposal approval was not executed end-to-end (the harness has no B approver) — a UAT item. Six other approval request types in other modules lack a title terminology row (reported, not changed).
-- The Acquisition Clearing account is not settled by anything yet — settlement against AP/Bank belongs to those future workflows; no settlement logic may be added to the helper.
+- D8 Acquisition-Journal Helper: deferred / policy required (see the table); nothing settles an acquisition clearing account.
 
 ## 5. Out of scope (not started)
-D4/D5/D6/CUS-01 deferred follow-ups; Manufacturing/WIP and HR work and their stale suites (other owners); H3 deployment safety (a different work stream — note: in THIS working tree `MIGRATION_TAGS` in `backend/src/database/enabled-modules.ts` still lists 6 tags and is unmodified since the baseline commit, so the H3 registry fix is not present here); any new feature.
+the D8 Acquisition-Journal Helper (policy decision required); D4/D5/D6/CUS-01 deferred follow-ups; Manufacturing/WIP and HR work and their stale suites (other owners); H3 deployment safety (a different work stream — note: in THIS working tree `MIGRATION_TAGS` in `backend/src/database/enabled-modules.ts` still lists 6 tags and is unmodified since the baseline commit, so the H3 registry fix is not present here); any new feature.
 
 ## 6. UAT
-READY / PENDING EXECUTION. Items to execute in UAT: all nine browser-verified stages with real operators, FA-02 including a Company B approver, the Acquisition Clearing helper with a configured clearing account, an on-account payment → application cycle, and visual / RTL review.
+READY / PENDING EXECUTION. Items to execute in UAT: the browser-verified stages with real operators (D1, D6, D7, D8 link workflow, D9, PRC-01, CUS-01, COA-01, SHR-01), FA-02 including a Company B approver, an on-account payment → application cycle, and visual / RTL review.
 
 ## 7. Production
 **HOLD.**
