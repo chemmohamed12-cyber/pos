@@ -3706,6 +3706,11 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Regression**: 14 suites, 76/76 in one serial run on the isolated PG (not a full-repository regression). **Status**: VERIFIED — UAT READY; Production HOLD.
 
+## §68 — Audit closure (2026-10-06)
+
+**Scope**: `ERP-AUDIT-CLOSURE-REPORT-2026-10-06.md`. Records only — no code, no controller, no schema change. **Area 21 count unchanged: 27/43.**
+INV-03 → VERIFIED / CLOSED (CTO; no warehouse GL account; central Inventory Control 1120 stays). Final record: D1/D6/D7/D8/D9/PRC-01/CUS-01/COA-01/SHR-01/D10/T0/INV-03/Journal Company Numbering → VERIFIED / CLOSED; FA-02 → VERIFIED / UAT READY; Browser Verification #1 → PERFORMED / VERIFIED (found and fixed the D1 label and D6 terminology defects, and surfaced the journal-numbering defect, fixed and re-verified). **UAT = READY / PENDING EXECUTION. Production = HOLD.**
+
 ## §15 — What This Document Is Not
 
 Not an implementation. Not a decision on the 5 Mixed/Special. Not a
