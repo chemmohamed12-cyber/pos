@@ -104,6 +104,22 @@ export class JournalEntryService implements OnModuleInit {
     await this.numbering.registerDocumentType(JOURNAL_ENTRY_DOCUMENT_TYPE, DEFAULT_JOURNAL_NUMBER_PREFIX, true);
   }
 
+  /**
+   * Company-scoped numbering (2026-10-06, CTO-authorised fix; found by Browser Verification #1). `ensureNumberingRegistered` above registers the
+   * JV sequence only on the AMBIENT database at boot, so a Company database — which owns its own `numbering_sequences` table under Model B — had
+   * no `accounting_journal_entry` sequence and the first post failed with "No numbering sequence registered". Every other numbered document
+   * registers its sequence on the manager it is about to draw from; this does the same for journals: the sequence is created, per Company and
+   * lazily, on the manager the number is drawn from, BEFORE the draw. No fallback to the ambient database, no shared/global sequence, the
+   * numbering architecture is unchanged. First-ever concurrent posts in one Company are serialised by a transaction-scoped advisory lock (the
+   * draw itself already serialises posting per Company via the sequence row's FOR UPDATE), so two simultaneous first posts cannot both insert.
+   */
+  private async ensureCompanyNumbering(m: EntityManager): Promise<void> {
+    const existing = await m.query('SELECT 1 FROM numbering_sequences WHERE "documentType" = $1', [JOURNAL_ENTRY_DOCUMENT_TYPE]);
+    if (existing.length > 0) return;
+    await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`numbering:register:${JOURNAL_ENTRY_DOCUMENT_TYPE}`]);
+    await this.numbering.registerDocumentType(JOURNAL_ENTRY_DOCUMENT_TYPE, DEFAULT_JOURNAL_NUMBER_PREFIX, true, m); // idempotent: re-checks under the lock
+  }
+
   // ---------------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------------
@@ -415,6 +431,7 @@ export class JournalEntryService implements OnModuleInit {
       //    FinancialEvent.UNIQUE(idempotencyKey); nothing further needed here.
 
       // 9. numbering — INSIDE this transaction (ADR-035 D8, NumberingService extended with `txManager`)
+      await this.ensureCompanyNumbering(txManager); // the Company's own sequence must exist on THIS manager before the draw
       const entryNumber = await this.numbering.getNextNumber(JOURNAL_ENTRY_DOCUMENT_TYPE, txManager);
 
       // 10. commit the post

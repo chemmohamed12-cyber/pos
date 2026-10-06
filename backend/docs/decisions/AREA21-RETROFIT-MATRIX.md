@@ -3678,6 +3678,21 @@ handler context `{manager, companyId}`; subscriber scope `ambient` (default) | `
 
 **Status**: CUS-01 VERIFIED / CLOSED (browser verification NOT PERFORMED).
 
+## §66 — Company-scoped journal numbering fix — blast radius (2026-10-06)
+
+**Scope**: `JOURNAL-COMPANY-NUMBERING-2026-10-06.md`. One private method + one call inside `JournalEntryService.postEntry` (the closed journal engine); **no controller, schema, migration or numbering-architecture change. Count unchanged: 27/43.** Per-Company lazy registration on the drawing manager; no ambient fallback; no shared sequence.
+
+| Closed area | Effect | Real-PG proof (green) |
+|---|---|---|
+| journal engine / GL (`general-ledger`, `accounting.company-isolation`) | first post in a Company now self-registers its sequence | `journal-numbering` (5, reproduces the defect pre-fix), `general-ledger` (9) |
+| Event Engine → GL posting | event-driven postings no longer rejected on a fresh Company | `event-engine` (8), `journal-numbering` test 3, live fresh-Company payment event POSTED |
+| posting domains (inventory, returns, procurement, treasury, fixed assets, payroll) | unchanged behaviour where the sequence exists | `inventory-posting` (9), `manual-receipt` (12), `returns-accounting` (12), `supplier-invoice-ppv-vat` (16), `treasury-bank-leg` (7), `fixed-asset` ×4 |
+| provisioning | a freshly provisioned Company posts journals with no manual setup | `database-provisioning` (4), `company-lifecycle-layer1` (10), live provisioning run |
+
+**Regression**: 205/220 first run (+1 skipped); all 14 failures are four manufacturing/WIP suites missing other sessions' migrations in the isolated DB (pre-existing/infrastructure). Not a full-repository regression.
+
+**Open**: Companies that already produced REJECTED events from this defect need a replay/data-repair decision.
+
 ## §15 — What This Document Is Not
 
 Not an implementation. Not a decision on the 5 Mixed/Special. Not a
