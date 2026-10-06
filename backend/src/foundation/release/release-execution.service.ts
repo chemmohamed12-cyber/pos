@@ -580,8 +580,9 @@ export class ReleaseExecutionService {
     const audit = (action: string, result: 'success' | 'failure', after?: Record<string, unknown>) =>
       this.audit.record({ actorUserId, organizationId: null, action, resource: 'release', resourceId: release.id, result, correlationId: null, after });
 
+    let failedSlotPath: string | undefined;
     try {
-      await this.stagedActivation.rollbackSwap(release.id);
+      failedSlotPath = (await this.stagedActivation.rollbackSwap(release.id))?.failedPath;
     } catch (err) {
       if (err instanceof RollbackFailedSafeError) return await this.raiseFailedSafe(release, actorUserId, `swap rollback (${err.stage}): ${err.message}`);
       throw err;
@@ -589,7 +590,7 @@ export class ReleaseExecutionService {
 
     // undo migrations this release ran (or full restore); a failure here is also FAILED-SAFE
     try {
-      await this.undoReleaseMigrations(release, actorUserId, migrationHeadBefore);
+      await this.undoReleaseMigrations(release, actorUserId, migrationHeadBefore, failedSlotPath);
     } catch (err) {
       return await this.raiseFailedSafe(release, actorUserId, `migration undo / backup restore failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -667,14 +668,15 @@ export class ReleaseExecutionService {
     }
 
     const migrationHeadBefore = await this.getMigrationHead();
+    let failedSlotPath: string | undefined;
     try {
-      await this.stagedActivation.rollbackSwap(releaseId);
+      failedSlotPath = (await this.stagedActivation.rollbackSwap(releaseId))?.failedPath;
     } catch (err) {
       if (err instanceof RollbackFailedSafeError) return await this.raiseFailedSafe(release, actorUserId, `swap rollback (${err.stage}): ${err.message}`);
       throw err;
     }
     try {
-      await this.undoReleaseMigrations(release, actorUserId, migrationHeadBefore);
+      await this.undoReleaseMigrations(release, actorUserId, migrationHeadBefore, failedSlotPath);
     } catch (err) {
       return await this.raiseFailedSafe(release, actorUserId, `migration undo / backup restore failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -692,7 +694,15 @@ export class ReleaseExecutionService {
     return release;
   }
 
-  private async undoReleaseMigrations(release: Release, actorUserId: string, _migrationHeadBefore: string | null): Promise<void> {
+  /**
+   * `migrationTreePath` — where to load the migration CLASSES from (H3 RB-1). On the staged path the
+   * release's migrations ran from its CANDIDATE tree, and by the time undo runs `rollbackSwap` has already
+   * put the PREVIOUS release back as ACTIVE (`appRoot`), which does not contain them — loading from
+   * `appRoot` made TypeORM throw "No migration … was found" and forced the full-restore fallback. The two
+   * staged callers therefore pass the FAILED slot (the rejected tree `rollbackSwap` just moved aside).
+   * Omitted (legacy in-place path) → `appRoot`, unchanged. The tag set still comes from `appRoot`'s manifest.
+   */
+  private async undoReleaseMigrations(release: Release, actorUserId: string, _migrationHeadBefore: string | null, migrationTreePath?: string): Promise<void> {
     const migrationRunRepo = this.dataSource.getRepository(ReleaseMigrationRun);
     const successfulRuns = await migrationRunRepo.find({ where: { releaseId: release.id, success: true }, order: { startedAt: 'DESC', id: 'DESC' } });
     if (successfulRuns.length === 0) return;
@@ -701,7 +711,7 @@ export class ReleaseExecutionService {
     // entitlement.manifest.json is currently on disk (the NEW one during a
     // post-swap rollback, restored to the OLD one only AFTER this undo).
     const undoTags = await this.resolveEntitlementTags(this.config.releaseExecution.appRoot);
-    const ds = createMigrationDataSource(this.config.releaseExecution.appRoot, this.config.database, undoTags);
+    const ds = createMigrationDataSource(migrationTreePath ?? this.config.releaseExecution.appRoot, this.config.database, undoTags);
     await ds.initialize();
     try {
       for (const run of successfulRuns) {
