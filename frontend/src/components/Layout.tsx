@@ -30,7 +30,7 @@ function loadOpenGroup(): string | null {
 
 /**
  * Foundation fix (Permission/Entitlement-aware nav): the sidebar used to be
- * a hardcoded `NAV_GROUPS` array filtered client-side by `hasRole(...)` —
+ * a hardcoded `NAV_GROUPS` array filtered client-side by a role check —
  * exactly the "frontend re-invents authorization" anti-pattern the CTO
  * directive forbids, and it silently drifted from the backend's own
  * `NAVIGATION_REGISTRY`. `GET /me/navigation` (`NavigationService.resolveFor`,
@@ -63,7 +63,7 @@ function useNavigation() {
 }
 
 export function Layout() {
-  const { user, logout, companyContext, hasRole, canPlatform, authz } = useAuth();
+  const { user, logout, companyContext, canPlatform, authz } = useAuth();
   const { lang, setLang, t, preload } = useLanguage();
   const [openGroup, setOpenGroup] = useState<string | null>(loadOpenGroup);
   const { groups: visibleGroups, error: navError, retry: retryNav } = useNavigation();
@@ -98,7 +98,7 @@ export function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">Daii</div>
-        {(hasRole('admin') || canPlatform('platform.company.view') || canPlatform('platform.support.view')) && (
+        {(canPlatform('platform.company.view') || canPlatform('platform.support.view')) && (
           // XNEXUS Control Plane — Installation-level, gated by the platform
           // `admin` role directly (same authorization axis as the backend's
           // `RolesGuard`/`@RequireRole('admin')` on `CompanyRegistryController`,
@@ -110,7 +110,7 @@ export function Layout() {
               <span className="nav-section-header-title">{t('module.control_plane')}</span>
             </div>
             <div className="nav-section-items">
-              {(hasRole('admin') || canPlatform('platform.company.view')) && (
+              {canPlatform('platform.company.view') && (
                 <NavLink to="/control-plane" end className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
                   {t('nav.company_registry')}
                 </NavLink>

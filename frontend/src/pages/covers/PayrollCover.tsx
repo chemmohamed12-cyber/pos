@@ -13,9 +13,9 @@ interface ReconciliationGap {
 
 /** ADR-070 — `payroll`'s own landing page, same shape as `AttendanceCover`/`HrCover`. */
 export function PayrollCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ pendingRuns: number; reconciliationGaps: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('payroll');
 
   useEffect(() => {
     if (!canView) return;

@@ -81,7 +81,8 @@ import { seedCompanyAdminRole, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAG
  * surface, same literal-grant discipline (§3.1 unchanged, never a
  * wildcard).
  */
-const FIXED_CORE_NODE_COUNT = 4;
+import { WORKFLOW_NODES } from '../authorization/workflow-rules';
+const FIXED_CORE_NODE_COUNT = 4 + WORKFLOW_NODES.length; // the four core.company.* nodes + (F5) every workflow capability the legacy administrator passed implicitly
 
 describe('seedCompanyAdminRole — §3.1 verified decision (2026-09-24)', () => {
   beforeEach(() => {

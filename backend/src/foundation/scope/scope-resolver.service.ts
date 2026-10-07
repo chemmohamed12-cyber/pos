@@ -5,7 +5,6 @@ import { OrganizationService } from '../organization/organization.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { SCOPE_DERIVATION_REGISTRY } from './scope-derivation.registry';
 
-const UNRESTRICTED_ROLES = ['admin'];
 
 /**
  * ADR-031 — Scope Derivation Architecture (closes AUDIT-SEC-03).
@@ -25,8 +24,7 @@ export class ScopeResolver {
   ) {}
 
   private async isUnrestricted(userId: string, manager?: EntityManager): Promise<boolean> {
-    const roles = await this.authorization.getRoleKeysForUser(userId, manager);
-    return roles.some((r) => UNRESTRICTED_ROLES.includes(r));
+    return (await this.authorization.workflowAccess(userId, manager)).allows('core.scope.unrestricted');
   }
 
   /**

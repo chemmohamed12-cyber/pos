@@ -4,6 +4,8 @@ import { NAVIGATION_REGISTRY } from './navigation-registry';
 import { AuthorizationContext, ContextGrant, ContextRole } from '../authorization/authorization-context';
 import { PermissionService } from '../permission/permission.service';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { WorkflowAccess } from '../authorization/workflow-access';
+import { WORKFLOW_NODES } from '../authorization/workflow-rules';
 import { RolePermission } from '../permission/role-permission.entity';
 
 /**
@@ -13,7 +15,7 @@ import { RolePermission } from '../permission/role-permission.entity';
  * Proved here: (1) for 400 random role/grant configurations the context path produces EXACTLY the same navigation as the legacy per-item path
  * (no ability loss, no gain); (2) the context path performs ZERO permission/role queries of its own — the single context load is the whole cost.
  */
-const GATED_NODES = [...new Set(NAVIGATION_REGISTRY.flatMap((g) => g.items.map((i) => i.permissionNode).filter((n): n is string => !!n)))];
+const GATED_NODES = [...new Set([...NAVIGATION_REGISTRY.flatMap((g) => g.items.map((i) => i.permissionNode).filter((n): n is string => !!n)), ...WORKFLOW_NODES])]; // F5: the workflow-rule menu items are gated by the wf.* nodes
 const ROLE_KEYS = ['admin', 'warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'driver', 'sales_supervisor', 'sales_manager', 'finance', 'viewer-x'];
 const LEVELS = ['hidden', 'read-only', 'editable'] as const;
 
@@ -56,6 +58,10 @@ describe('Navigation — request-scoped AuthorizationContext (F1.4)', () => {
           return roles.map((r) => r.key);
         },
         getRoleIdsForKeys: async (ks: string[]) => roles.filter((r) => ks.includes(r.key)).map((r) => r.id),
+        workflowAccess: async () => {
+          legacyCalls++;
+          return new WorkflowAccess(new AuthorizationContext('u', null, roles, grants), 'capability');
+        },
       } as unknown as AuthorizationService;
       const rolePermissionRepo = {
         find: async ({ where }: { where: { roleId: FindOperator<string>; nodeKey: FindOperator<string> } }) => {

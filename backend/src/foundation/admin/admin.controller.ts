@@ -6,7 +6,6 @@ import { UsersService } from '../identity/users.service';
 import { UserStatus } from '../identity/user.entity';
 import { AuthService } from '../authentication/auth.service';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
 import { AuthorizationContextService } from '../authorization/authorization-context.service';
 import { AuditService } from '../audit/audit.service';
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
@@ -89,21 +88,7 @@ export class AdminController {
     );
   }
 
-  /**
-   * Backs the Sales Order rep-selector (CTO instruction — customer
-   * visibility must filter by the SELECTED rep). Narrower than
-   * `GET /admin/users` on purpose, on two axes: role (admin/sales_manager
-   * only, not the class-level admin-only default — see the override
-   * below) and result shape (only users holding `sales_rep`, not the
-   * whole user table, which would leak drivers/warehouse workers into a
-   * rep picker for no reason).
-   */
-  @RequireRole('admin', 'sales_manager')
-  @Get('sales-reps')
-  async listSalesReps() {
-    const ids = await this.authorization.getUserIdsForRole('sales_rep');
-    return this.users.findByIds(ids);
-  }
+  // `GET /admin/sales-reps` (the Sales Order rep-selector) moved out in F5: it is a COMPANY surface (`SalesRepsDirectoryController`) — the reps of the CURRENT Company, never the platform's.
 
   @RequirePlatform('platform.role.assign', 'editable')
   @Post('roles/assign')

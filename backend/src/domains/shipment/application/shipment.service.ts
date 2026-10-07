@@ -270,8 +270,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   }
 
   async assignDriver(shipmentId: string, driverUserId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    if (!roles.includes('admin')) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows('logistics.shipment.assign_driver')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign a driver to a shipment.');
     }
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
@@ -310,8 +310,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     reason: string | null = null,
     manager?: EntityManager,
   ): Promise<Shipment> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    if (!roles.includes('admin')) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows('logistics.shipment.set_route')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign or change a shipment\'s shipping route.');
     }
     if (shippingCompanyId && vehicleId) {
@@ -436,9 +436,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async assertDriverOrAdmin(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
     const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
-    const isAdmin = roles.includes('admin');
+    const isAdmin = access.allows('logistics.shipment.act_any');
     if (!isAssignedDriver && !isAdmin) {
       throw new ForbiddenException('Only the assigned driver (or an admin) may act on this shipment.');
     }
@@ -462,9 +462,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   private async assertCanReadShipment(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<Shipment> {
     const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
-    const isReviewer = roles.some((r) => ['admin', 'finance'].includes(r));
+    const isReviewer = access.allows('logistics.shipment.read_any');
     if (!isAssignedDriver && !isReviewer) {
       throw new ForbiddenException('Only the assigned driver (or an admin/finance user) may view this shipment.');
     }
@@ -488,8 +488,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     // assigned-driver/admin check entirely instead of being rejected,
     // letting any authenticated user transition someone else's shipment.
     if (!DRIVER_ACTIONS.has(action)) {
-      const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-      if (!roles.includes('admin')) {
+      const access = await this.authorization.workflowAccess(actorUserId, manager);
+      if (!access.allows('logistics.shipment.manage_non_driver_actions')) {
         throw new ForbiddenException(`Role required for action "${action}": admin.`);
       }
     } else {
@@ -551,9 +551,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     actorUserId: string,
     manager?: EntityManager,
   ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
-    const shipments = roles.some((r) => ['admin', 'warehouse_worker'].includes(r))
+    const shipments = access.allows('logistics.shipment.board_all')
       ? await repo.find({ order: { createdAt: 'DESC' } })
       : await repo.find({ where: { driverUserId: actorUserId }, order: { createdAt: 'DESC' } });
     const repNameById = await this.buildUserNameMap();
@@ -628,9 +628,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>;
     total: number;
   }> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
-    const isBoardViewer = roles.some((r) => ['admin', 'warehouse_worker'].includes(r));
+    const isBoardViewer = access.allows('logistics.shipment.board_all');
     const where = isBoardViewer ? {} : { driverUserId: actorUserId };
     const skip = (options.page - 1) * options.pageSize;
 
@@ -1371,8 +1371,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       items: Array<{ productId: string; quantity: number }>;
     }>
   > {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    if (!roles.some((r) => ['admin', 'warehouse_worker', 'sales_supervisor'].includes(r))) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows('logistics.shipment.custody_query')) {
       throw new ForbiddenException('Role required: admin, warehouse_worker, or sales_supervisor.');
     }
 

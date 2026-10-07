@@ -10,9 +10,9 @@ interface Target {
 
 /** ADR-071 — `targets`'s own landing page, same shape as `PayrollCover`/`AttendanceCover`. */
 export function TargetsCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ pendingApproval: number; approved: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('targets');
 
   useEffect(() => {
     if (!canView) return;

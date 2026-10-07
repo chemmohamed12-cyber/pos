@@ -63,7 +63,7 @@ interface ProductOption {
 
 /** ADR-048 — Path B, steps 2-4: RFQ, Supplier Quotations (side-by-side comparison, cheapest first), and the Evaluation/Approval award step. */
 export function Rfqs() {
-  const { hasRole, user } = useAuth();
+  const { can, user } = useAuth();
   const { t, preload } = useLanguage();
   const [searchParams] = useSearchParams();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -293,7 +293,7 @@ export function Rfqs() {
               </div>
             )}
 
-            {hasRole('admin') && (
+            {can('procurement.rfq.edit', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 {detail.state === 'draft' && (
                   <button className="btn btn-primary" disabled={busyAction === 'send'} onClick={() => doAction('send')}>
@@ -326,7 +326,7 @@ export function Rfqs() {
                   <tr>
                     <th>{t('field.supplier')}</th>
                     <th>{t('field.total_quotation_amount')}</th>
-                    {hasRole('admin') && detail.state === 'sent' && !awardPending && <th></th>}
+                    {can('procurement.rfq.award', 'editable') && detail.state === 'sent' && !awardPending && <th></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -334,7 +334,7 @@ export function Rfqs() {
                     <tr key={q.id} style={q.id === cheapestId ? { background: '#e8f6ee' } : undefined}>
                       <td>{supplierName(q.supplierId)}</td>
                       <td>{q.totalAmount}</td>
-                      {hasRole('admin') && detail.state === 'sent' && !awardPending && (
+                      {can('procurement.rfq.award', 'editable') && detail.state === 'sent' && !awardPending && (
                         <td>
                           <button className="btn btn-secondary" disabled={busyAction === 'award'} onClick={() => onAward(q.id)}>
                             {t('action.award')}
@@ -347,7 +347,7 @@ export function Rfqs() {
               </table>
             )}
 
-            {detail.state === 'sent' && hasRole('admin') && (
+            {detail.state === 'sent' && can('procurement.rfq.record_quotation', 'editable') && (
               <form onSubmit={onRecordQuotation} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('action.record_quotation')}</h4>
                 <div className="form-field" style={{ marginBottom: 0 }}>

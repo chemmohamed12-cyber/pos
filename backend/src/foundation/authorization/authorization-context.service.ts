@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PermissionAccess } from '../permission/role-permission.entity';
-import { AuthorizationContext, ContextGrant, ContextRole } from './authorization-context';
+import { AuthorizationContext } from './authorization-context';
+import { loadAuthorizationContext } from './authorization-context.loader';
 
 /** What a request needs to carry for the context to be derived from it. Matches `CompanyScopedRequest` (the Company context is set by `CompanyContextGuard`). */
 export interface ContextRequest {
@@ -55,21 +56,6 @@ export class AuthorizationContextService {
    * role). Pre-F1 each permission check cost 4 statements (user_roles, roles, role ids, grants).
    */
   async load(userId: string, companyId: string | null, manager?: EntityManager): Promise<AuthorizationContext> {
-    const runner: { query: (sql: string, params: unknown[]) => Promise<unknown> } = manager ?? this.dataSource;
-    const rows = (await runner.query(
-      `SELECT r."id" AS "roleId", r."key" AS "key", rp."nodeKey" AS "nodeKey", rp."access" AS "access"
-         FROM "user_roles" ur
-         INNER JOIN "roles" r ON r."id" = ur."roleId"
-         LEFT JOIN "role_permissions" rp ON rp."roleId" = r."id"
-        WHERE ur."userId" = $1`,
-      [userId],
-    )) as Array<{ roleId: string; key: string; nodeKey: string | null; access: PermissionAccess | null }>;
-    const roles = new Map<string, ContextRole>();
-    const grants: ContextGrant[] = [];
-    for (const row of rows) {
-      if (!roles.has(row.roleId)) roles.set(row.roleId, { id: row.roleId, key: row.key });
-      if (row.nodeKey && row.access) grants.push({ roleId: row.roleId, nodeKey: row.nodeKey, access: row.access });
-    }
-    return new AuthorizationContext(userId, companyId, [...roles.values()], grants);
+    return loadAuthorizationContext(manager ?? this.dataSource, userId, companyId);
   }
 }

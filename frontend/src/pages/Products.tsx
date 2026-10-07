@@ -21,7 +21,7 @@ const NEXT_STATUS: Record<string, { action: string; to: string } | null> = {
 };
 
 export function Products() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [products, setProducts] = useState<Product[] | null>(null);
   const [sku, setSku] = useState('');
@@ -168,7 +168,7 @@ export function Products() {
         </button>
       </div>
 
-      {hasRole('admin') && (
+      {can('sales.catalog.create', 'editable') && (
         <ExcelImportExport
           templateUrl="/api/products/import-template"
           exportUrl="/api/products/export"
@@ -177,7 +177,7 @@ export function Products() {
         />
       )}
 
-      {hasRole('admin') && (
+      {can('sales.catalog.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
@@ -231,7 +231,7 @@ export function Products() {
               <th>{t('field.unit_price')}</th>
               <th>{t('field.unit')}</th>
               <th>{t('field.status')}</th>
-              {hasRole('admin') && <th>{t('field.actions')}</th>}
+              {can('sales.catalog.edit', 'editable') && <th>{t('field.actions')}</th>}
             </tr>
           </thead>
           <tbody>
@@ -253,7 +253,7 @@ export function Products() {
                   <td>
                     <StatusBadge code={`product_status.${p.status}`} />
                   </td>
-                  {hasRole('admin') && (
+                  {can('sales.catalog.edit', 'editable') && (
                     <td style={{ display: 'flex', gap: 6 }}>
                       {isEditing ? (
                         <>

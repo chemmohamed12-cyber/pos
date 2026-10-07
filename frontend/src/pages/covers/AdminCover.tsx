@@ -14,11 +14,11 @@ interface Connector {
 
 /** CTO directive ("Section Cover / Main Dashboard System") — the Administration section's own landing page: real user/role/integration counts, from the exact endpoints `Admin.tsx`/`ExternalIntegrations.tsx` already read. */
 export function AdminCover() {
-  const { hasRole, user } = useAuth();
+  const { canPlatform, user } = useAuth();
   const { t } = useLanguage();
   const [kpis, setKpis] = useState<{ totalUsers: number; activeIntegrations: number } | null>(null);
   const [roleBreakdown, setRoleBreakdown] = useState<Array<{ label: string; value: number }>>([]);
-  const canView = hasRole('admin');
+  const canView = canPlatform('platform.user.view');
 
   useEffect(() => {
     if (!canView) return;

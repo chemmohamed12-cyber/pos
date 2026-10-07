@@ -24,7 +24,7 @@ interface AdminUser {
 const NEXT_STATUS: Record<'active' | 'inactive', 'active' | 'inactive'> = { active: 'inactive', inactive: 'active' };
 
 export function Warehouses() {
-  const { hasRole } = useAuth();
+  const { can, canPlatform } = useAuth();
   const { t, preload } = useLanguage();
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState<Warehouse[] | null>(null);
@@ -65,7 +65,7 @@ export function Warehouses() {
     try {
       const data = await api.get<Warehouse[]>('/inventory/warehouses');
       setWarehouses(data);
-      if (hasRole('admin')) {
+      if (canPlatform('platform.user.view')) {
         const u = await api.get<AdminUser[]>('/admin/users');
         setUsers(u);
       }
@@ -123,7 +123,7 @@ export function Warehouses() {
         <h1>{t('nav.warehouses')}</h1>
       </div>
 
-      {hasRole('admin') && (
+      {can('inventory.warehouse.create', 'editable') && (
         <ExcelImportExport
           templateUrl="/api/inventory/warehouses/import-template"
           exportUrl="/api/inventory/warehouses/export"
@@ -132,7 +132,7 @@ export function Warehouses() {
         />
       )}
 
-      {hasRole('admin') && (
+      {can('inventory.warehouse.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
@@ -199,7 +199,7 @@ export function Warehouses() {
                   <button className="btn btn-secondary" onClick={() => navigate(`/inventory?warehouseId=${w.id}`)}>
                     {t('action.view_inventory')}
                   </button>
-                  {hasRole('admin') && (
+                  {can('inventory.warehouse.edit', 'editable') && (
                     <button className="btn btn-secondary" disabled={busyStatus === w.id} onClick={() => toggleStatus(w)}>
                       {t(w.status === 'active' ? 'action.deactivate_warehouse' : 'action.activate_warehouse')}
                     </button>

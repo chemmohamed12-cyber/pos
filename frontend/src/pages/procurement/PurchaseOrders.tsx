@@ -63,9 +63,9 @@ const CANCELLABLE_STATES = new Set(['draft', 'submitted', 'approved']);
  * the id is what's actually sent to the backend.
  */
 export function PurchaseOrders() {
-  const { hasRole, user, authz, can } = useAuth();
+  const { user, authz, can } = useAuth();
   // F1.3 — first `can()` consumer: the goods-receipt form is shown by the Company's own capability (the node the server enforces); falls back to the legacy role gate only while the authorization view is unavailable.
-  const canReceiveGoods = authz ? can('procurement.goods_receipt.create', 'editable') : hasRole('admin');
+  const canReceiveGoods = authz ? can('procurement.goods_receipt.create', 'editable') : false;
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -250,7 +250,7 @@ export function PurchaseOrders() {
         <h1>{t('nav.purchase_orders')}</h1>
       </div>
 
-      {hasRole('admin') && (
+      {can('procurement.purchase_order.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -382,7 +382,7 @@ export function PurchaseOrders() {
               <StatusBadge code={`purchase_order_lifecycle.state.${detail.state}`} />
             </div>
 
-            {hasRole('admin') && (
+            {can('procurement.purchase_order.edit', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
                 {detail.state === 'draft' && (
                   <button className="btn btn-secondary" disabled={busyAction === 'submit'} onClick={() => doTransition('submit')}>
@@ -429,7 +429,7 @@ export function PurchaseOrders() {
                       <StockCell stock={detailStock[l.productId]} />
                       {(detail.state === 'approved' || detail.state === 'partially_received') && (
                         <td>
-                          {remaining > 0 && hasRole('admin') && (
+                          {remaining > 0 && canReceiveGoods && (
                             <input
                               type="number"
                               min={0}

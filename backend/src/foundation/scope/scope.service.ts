@@ -28,7 +28,6 @@ import { AuthorizationService } from '../authorization/authorization.service';
  * — it was never there before, so a Company `DataSource` had no metadata
  * for it until now.
  */
-const UNRESTRICTED_ROLES = ['admin'];
 
 @Injectable()
 export class ScopeService {
@@ -49,8 +48,7 @@ export class ScopeService {
   }
 
   private async hasUnrestrictedScope(userId: string, manager?: EntityManager): Promise<boolean> {
-    const roles = await this.authorization.getRoleKeysForUser(userId, manager);
-    return roles.some((r) => UNRESTRICTED_ROLES.includes(r));
+    return (await this.authorization.workflowAccess(userId, manager)).allows('core.scope.unrestricted');
   }
 
   async getAssignedResourceIds(userId: string, resourceType: string, manager?: EntityManager): Promise<string[] | 'ALL'> {

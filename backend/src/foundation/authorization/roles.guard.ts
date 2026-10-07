@@ -2,7 +2,8 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Optional
 import { Reflector } from '@nestjs/core';
 import { AuthorizationService } from './authorization.service';
 import { AuthorizationContextService } from './authorization-context.service';
-import { ROLES_METADATA_KEY } from './require-role.decorator';
+import { ROLES_METADATA_KEY, WORKFLOW_RULE_METADATA_KEY } from './require-role.decorator';
+import { WorkflowAccess } from './workflow-access';
 import { CompanyScopedRequest } from '../company/company-context.guard';
 
 /**
@@ -38,6 +39,16 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+    // F5: a route may name a workflow rule (capability) instead of a role list; the rule is decided under the active mode by the request's single context load.
+    const requiredRule = this.reflector.getAllAndOverride<string | undefined>(WORKFLOW_RULE_METADATA_KEY, [context.getHandler(), context.getClass()]);
+    if (typeof requiredRule === 'string' && requiredRule) {
+      const req = context.switchToHttp().getRequest<CompanyScopedRequest>();
+      if (!req.user) throw new UnauthorizedException('Authentication required before authorization can be checked.');
+      if (!this.contexts) throw new ForbiddenException('Insufficient role for this action.');
+      const access = new WorkflowAccess(await this.contexts.forRequest(req));
+      if (!access.allows(requiredRule)) throw new ForbiddenException('Insufficient role for this action.');
+      return true;
+    }
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<CompanyScopedRequest>();

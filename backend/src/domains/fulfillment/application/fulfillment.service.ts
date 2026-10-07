@@ -201,8 +201,8 @@ export class FulfillmentService implements FulfillmentContract {
   }
 
   private async requireWorkerRole(actorUserId: string, manager?: EntityManager): Promise<void> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    if (!roles.includes(WORKER_ROLE) && !roles.includes('admin')) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows('inventory.fulfillment.worker')) {
       throw new ForbiddenException(`Role required: ${WORKER_ROLE} (or admin).`);
     }
   }

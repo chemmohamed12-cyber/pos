@@ -63,7 +63,7 @@ interface DraftLine {
 }
 
 export function SalesReturns() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'panel.no_sales_returns_yet',
@@ -236,7 +236,7 @@ export function SalesReturns() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {hasRole('sales_rep') && (
+      {can('wf.sales.rep.act', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t('action.create')}</h3>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
@@ -389,7 +389,7 @@ export function SalesReturns() {
                   <button className="btn btn-secondary" style={{ marginInlineEnd: 6 }} onClick={() => viewDetail(r.id)}>
                     {t('action.view_details')}
                   </button>
-                  {r.state === 'requested' && hasRole('warehouse_worker') && (
+                  {r.state === 'requested' && can('wf.logistics.return.receive', 'editable') && (
                     <button className="btn btn-primary" disabled={busy === r.id + 'complete'} onClick={() => complete(r.id)}>
                       {t('action.complete')}
                     </button>

@@ -60,8 +60,8 @@ const emptyLine = (): Line => ({ productId: '', quantity: 1, discountAmount: '0'
 export function SalesOrdersEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-  const canSetManagerPrice = hasRole('sales_manager', 'admin');
+  const { can } = useAuth();
+  const canSetManagerPrice = can('wf.sales.order.set_manager_price', 'editable');
   const { t, preload } = useLanguage();
   preload([
     'nav.sales_orders',

@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { Role } from './role.entity';
 import { UserRole } from './user-role.entity';
+import { loadAuthorizationContext } from './authorization-context.loader';
+import { WorkflowAccess } from './workflow-access';
 
 /**
  * Authorization — Stage 2 build-order item 7.
@@ -54,6 +56,16 @@ export class AuthorizationService {
     const role = await (manager ? manager.getRepository(Role) : this.roles).findOne({ where: { key: roleKey } });
     if (!role) return;
     await (manager ? manager.getRepository(UserRole) : this.userRoles).delete({ userId, roleId: role.id });
+  }
+
+  /**
+   * F5 — what this user holds (roles + every grant of those roles), answered as WORKFLOW RULES: the single replacement for the `getRoleKeysForUser(...)` +
+   * `roles.includes('sales_supervisor')` pattern at the product call sites. One statement (the same one the request-scoped context uses). `manager` routes it to a
+   * Company database exactly like the other methods here.
+   */
+  async workflowAccess(userId: string, manager?: EntityManager): Promise<WorkflowAccess> {
+    const runner = manager ?? this.roles.manager;
+    return new WorkflowAccess(await loadAuthorizationContext(runner, userId, null));
   }
 
   async getRoleKeysForUser(userId: string, manager?: EntityManager): Promise<string[]> {

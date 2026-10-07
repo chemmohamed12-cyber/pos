@@ -33,7 +33,7 @@ interface Product {
 export function StockCountEntry() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [txn, setTxn] = useState<Transaction | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -178,7 +178,7 @@ export function StockCountEntry() {
             </button>
           </>
         )}
-        {txn.state === 'submitted' && hasRole('warehouse_supervisor', 'inventory_controller') && (
+        {txn.state === 'submitted' && can('wf.inventory.warehouse_tx.approve', 'editable') && (
           <button className="btn btn-primary" disabled={busy !== null} onClick={() => runAction('approve')}>
             {t('warehouse_txn_action.approve')}
           </button>

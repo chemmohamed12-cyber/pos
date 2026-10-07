@@ -45,7 +45,7 @@ type SortColumn = (typeof SORTABLE_COLUMNS)[number];
  * the directive's explicit performance requirement).
  */
 export function Inventory() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -235,7 +235,7 @@ export function Inventory() {
               <option value="all">{t('value.item_scope.all')}</option>
             </select>
           </div>
-          {hasRole('admin') && warehouseId && (
+          {can('inventory.warehouse.edit', 'editable') && warehouseId && (
             <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
               <label>{t('panel.assign_item_to_warehouse')}</label>
               <ProductCombobox
@@ -271,7 +271,7 @@ export function Inventory() {
         </div>
       </div>
 
-      {hasRole('warehouse_worker', 'admin') && (
+      {can('inventory.movement.create', 'editable') && (
         <div style={{ marginBottom: 20 }}>
           <h3>{t('panel.opening_stock_import')}</h3>
           <ExcelImportExport
@@ -338,7 +338,7 @@ export function Inventory() {
                       {r.assigned ? (
                         <>
                           <span style={{ color: '#166534' }}>{t('value.assigned.yes')}</span>
-                          {hasRole('admin') && (
+                          {can('inventory.warehouse.edit', 'editable') && (
                             <button className="btn btn-secondary" style={{ marginInlineStart: 8 }} title={t('action.remove_from_warehouse')} onClick={() => removeItem(r.productId)}>
                               ×
                             </button>

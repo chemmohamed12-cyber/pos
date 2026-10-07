@@ -65,9 +65,9 @@ const CREATABLE_PO_STATES = new Set(['partially_received', 'received', 'closed']
  * enforced server-side), post it to AP, then record payments against it.
  */
 export function SupplierInvoices() {
-  const { hasRole, authz, can } = useAuth();
+  const { authz, can } = useAuth();
   // F1.3 — `can()` consumer: the payment form follows the Company capability the server enforces (`procurement.supplier_payment.create`); legacy role gate only while the authorization view is unavailable.
-  const canPaySupplier = authz ? can('procurement.supplier_payment.create', 'editable') : hasRole('admin');
+  const canPaySupplier = authz ? can('procurement.supplier_payment.create', 'editable') : false;
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<Array<PurchaseOrderRow & { state: string }>>([]);
@@ -266,7 +266,7 @@ export function SupplierInvoices() {
         <h1>{t('nav.supplier_invoices')}</h1>
       </div>
 
-      {hasRole('admin') && (
+      {can('procurement.supplier_invoice.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -393,7 +393,7 @@ export function SupplierInvoices() {
               <StatusBadge code={`supplier_invoice_lifecycle.state.${detail.state}`} />
             </div>
 
-            {hasRole('admin') && (
+            {can('procurement.supplier_invoice.post', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 {detail.state === 'draft' && (
                   <>

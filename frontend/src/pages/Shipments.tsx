@@ -113,7 +113,7 @@ function ShipmentDetail({
   onBack: () => void;
   onChanged: () => void;
 }) {
-  const { hasRole, user } = useAuth();
+  const { can, user } = useAuth();
   const { t } = useLanguage();
   const [order, setOrder] = useState<SalesOrderDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -374,7 +374,7 @@ function ShipmentDetail({
         <div style={{ marginBottom: 12 }}>
           {t('field.current_custodian')}: <strong>{custodianLabel}</strong>
         </div>
-        {hasRole('admin') && !routeLocked ? (
+        {can('wf.logistics.shipment.set_route', 'editable') && !routeLocked ? (
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>{t('field.shipping_method')}</label>
@@ -472,7 +472,7 @@ function ShipmentDetail({
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t('field.actions')}</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          {!shipment.driverUserId && hasRole('admin') && (
+          {!shipment.driverUserId && can('wf.logistics.shipment.assign_driver', 'editable') && (
             <>
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>{t('field.driver')}</label>
@@ -491,7 +491,7 @@ function ShipmentDetail({
             </>
           )}
 
-          {(isMyShipment || hasRole('admin')) &&
+          {(isMyShipment || can('wf.logistics.shipment.act_any', 'editable')) &&
             (DRIVER_ACTIONS[shipment.state] ?? [])
               .filter((a) => a !== 'fail_delivery')
               .map((action) => (
@@ -500,7 +500,7 @@ function ShipmentDetail({
                 </button>
               ))}
 
-          {(isMyShipment || hasRole('admin')) && shipment.state === 'out_for_delivery' && (
+          {(isMyShipment || can('wf.logistics.shipment.act_any', 'editable')) && shipment.state === 'out_for_delivery' && (
             <>
               <div className="form-field" style={{ marginBottom: 0, width: 140 }}>
                 <label>{t('field.collected_amount')}</label>
@@ -574,7 +574,7 @@ function ShipmentDetail({
 
 /** Shipping Screen Redesign directive — the Shipments screen redesigned as an operational dashboard: dynamic per-company/vehicle buckets on top (§1), a "New Shipping Orders" bucket for routeless auto-created RSH shipments (§2/§3), and a filtered list below that opens into ShipmentDetail for the full header/items/custody/tracking/action-panel view (§14). RSH Shipping Orders auto-create when a Pack Task closes (ShipmentService.onModuleInit) — there is nothing left to "create" here; this screen's job is to route and progress what already exists, never a parallel shipping/custody/inventory mechanism. */
 export function Shipments() {
-  const { hasRole } = useAuth();
+  const { canPlatform } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'panel.no_shipments_yet',
@@ -660,7 +660,7 @@ export function Shipments() {
       setShipments(shipmentData);
       setCompanies(companyData);
       setVehicles(vehicleData);
-      if (hasRole('admin')) {
+      if (canPlatform('platform.user.view')) {
         const u = await api.get<AdminUser[]>('/admin/users').catch(() => []);
         setUsers(u);
       }

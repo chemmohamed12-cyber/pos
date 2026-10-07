@@ -1,5 +1,6 @@
 import { permissionCatalogNodes, moduleOfNode } from './permission-catalog';
 import { nodeRisk, NodeRisk } from './permission-risk';
+import { WORKFLOW_RULE_BY_NODE } from '../authorization/workflow-rules';
 
 /**
  * Authorization Foundation F3 — the Permission Catalog with business-language metadata (Blueprint §8). Built ONLY from the existing nodes
@@ -104,6 +105,8 @@ let cache: readonly CatalogNode[] | null = null;
 export function buildCatalog(): readonly CatalogNode[] {
   if (cache) return cache;
   cache = permissionCatalogNodes().map((node): CatalogNode => {
+    const wf = WORKFLOW_RULE_BY_NODE.get(node);
+    if (wf) return { node, module: moduleOfNode(node), resource: 'workflow', action: wf.key.split('.').pop() ?? null, scope: 'action', risk: wf.risk, titleEn: wf.titleEn, titleAr: wf.titleAr };
     const parts = node.split('.');
     const module = moduleOfNode(node);
     const mod = MODULE_TITLES[parts[0]] ?? [humanize(parts[0]), humanize(parts[0])];

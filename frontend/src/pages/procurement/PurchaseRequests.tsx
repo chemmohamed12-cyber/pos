@@ -50,7 +50,7 @@ const CANCELLABLE_STATES = new Set(['draft', 'submitted', 'approved']);
 
 /** ADR-048 — Path B, step 1: Purchase Request (the internal requisition — no cost, cost comes later from RFQ/Quotations). */
 export function PurchaseRequests() {
-  const { hasRole, user } = useAuth();
+  const { can, user } = useAuth();
   const { t, preload } = useLanguage();
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -251,7 +251,7 @@ export function PurchaseRequests() {
         <h1>{t('nav.purchase_requests')}</h1>
       </div>
 
-      {hasRole('admin') && (
+      {can('procurement.purchase_request.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate}>
             <div style={{ marginBottom: 14 }}>
@@ -314,7 +314,7 @@ export function PurchaseRequests() {
         </div>
       )}
 
-      {hasRole('admin') && (
+      {can('procurement.purchase_request.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t('action.request_new_item')}</h3>
           <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>{t('panel.new_item_request_hint')}</div>
@@ -400,7 +400,7 @@ export function PurchaseRequests() {
               <StatusBadge code={`purchase_request_lifecycle.state.${detail.state}`} />
             </div>
 
-            {hasRole('admin') && (
+            {can('procurement.purchase_request.edit', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
                 {detail.state === 'draft' && (
                   <button className="btn btn-secondary" disabled={busyAction === 'submit'} onClick={() => doTransition('submit')}>
@@ -448,7 +448,7 @@ export function PurchaseRequests() {
               </tbody>
             </table>
 
-            {detail.state === 'approved' && hasRole('admin') && (
+            {detail.state === 'approved' && can('procurement.rfq.create', 'editable') && (
               <div>
                 <h4>{t('field.invited_suppliers')}</h4>
                 {suppliers.map((s) => (

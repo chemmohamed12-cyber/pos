@@ -43,7 +43,7 @@ interface TreasuryAccount {
  * engine.
  */
 export function CollectionSettlements() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'nav.collection_settlements',
@@ -57,7 +57,7 @@ export function CollectionSettlements() {
     'action.print',
   ]);
 
-  const canView = hasRole('admin', 'finance');
+  const canView = can('logistics.collection.view');
   const [pending, setPending] = useState<PendingCollection[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [companies, setCompanies] = useState<ShippingCompany[]>([]);

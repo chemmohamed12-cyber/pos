@@ -190,14 +190,14 @@ function PrintButton({ type, query }: { type: string; query?: string }) {
 }
 
 export function Reports() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const initialTab = (TABS as readonly string[]).includes(requestedTab ?? '') ? (requestedTab as Tab) : 'sales_orders';
   const [tab, setTab] = useState<Tab>(initialTab);
   const [error, setError] = useState<string | null>(null);
-  const visibleTabs = TABS.filter((tb) => !FINANCE_ONLY_TABS.includes(tb) || hasRole('admin', 'finance'));
+  const visibleTabs = TABS.filter((tb) => !FINANCE_ONLY_TABS.includes(tb) || can('reporting.finance.view'));
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard, AuthenticatedRequest } from './jwt-auth.guard';
 import { UsersService } from '../identity/users.service';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { AuthorizationContextService } from '../authorization/authorization-context.service';
 import { AppConfigService } from '../configuration/app-config.service';
 import { JWT_VERIFY_OPTIONS } from './jwt-constants';
 import { AuthMeService } from './auth-me.service';
@@ -100,6 +101,7 @@ export class AuthController {
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
     private readonly authMe: AuthMeService,
+    private readonly contexts: AuthorizationContextService,
   ) {}
 
   /** The frontend's one source of truth for "who is logged in, with which roles" — drives role-based navigation and permission-aware actions. */
@@ -144,8 +146,9 @@ export class AuthController {
     } catch {
       throw new UnauthorizedException('Invalid or expired token.');
     }
-    const roles = await this.authorization.getRoleKeysForUser(payload.sub);
-    if (!roles.includes('admin')) {
+    // F5 (dual): the platform capability `platform.user.create` OR the legacy ambient `admin` alias (platform plane only — never a Company role).
+    const ctx = await this.contexts.load(payload.sub, null);
+    if (!(ctx.hasAtLeast('platform.user.create', 'editable') || ctx.hasRole('admin'))) {
       throw new ForbiddenException('Only an admin may register additional users.');
     }
   }

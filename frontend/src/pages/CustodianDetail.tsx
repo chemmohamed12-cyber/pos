@@ -78,7 +78,7 @@ interface CustodyShipmentSearchResult {
 export function CustodianDetail() {
   const { type, id } = useParams<{ type: 'company' | 'vehicle'; id: string }>();
   const { t, preload } = useLanguage();
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const navigate = useNavigate();
   preload([
     'panel.custodian_detail',
@@ -118,7 +118,7 @@ export function CustodianDetail() {
   const [error, setError] = useState<string | null>(null);
 
   const isVehicle = type === 'vehicle';
-  const canOperateWarehouse = hasRole('warehouse_worker', 'inventory_controller', 'admin');
+  const canOperateWarehouse = can('inventory.movement.create', 'editable');
 
   useEffect(() => {
     (async () => {

@@ -50,6 +50,8 @@ export interface NavItem {
   permissionNode?: string;
   /** Legacy per-item role gate — the ACTUAL enforcement mechanism every linked route still uses today (P4 Tranche-2 has not guard-swapped these domains). */
   roles?: string[];
+  /** F5 — a WORKFLOW RULE (capability, `authorization/workflow-rules.ts`) that replaces `roles` for the migrated items; decided under the active `AUTHZ_WORKFLOW_MODE`. The platform tools (`/admin`, `/integrations`, `/release-center`) keep `roles: ['admin']` — see the F5 report (AZ-01 residual). */
+  workflowRule?: string;
 }
 
 export interface NavGroup {
@@ -89,17 +91,17 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     code: 'nav_group.warehouses',
     coverTo: '/warehouse-overview',
     items: [
-      { to: '/warehouse-overview', code: 'nav.warehouse_overview', module: 'inventory', roles: ['warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'admin'] },
+      { to: '/warehouse-overview', code: 'nav.warehouse_overview', module: 'inventory', workflowRule: 'nav.warehouse' },
       // 2026-09-26 — Navigation Root-Cause Fix (CTO-authorized, NAVIGATION-REGISTRY-VERIFICATION-2026-09-26.md
       // items A1-A4): `inventory.controller.ts`/`warehouse-transactions.controller.ts`'s GET/list routes
       // for these 4 items carry NO `@RequirePermission` (verified directly — only writes are permission-gated),
       // so `roles` remains the actual, accurate enforcement axis here (not a `permissionNode` case). `admin`
       // added — the old client-side `hasRole()` bypass (removed when this registry was authored) meant admin
       // always saw these; the registry's own role list never carried that bypass forward.
-      { to: '/warehouses', code: 'nav.warehouses', module: 'inventory', roles: ['warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'admin'] },
-      { to: '/movement-center', code: 'nav.movement_center', module: 'inventory', roles: ['warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'admin'] },
-      { to: '/inventory', code: 'nav.inventory', module: 'inventory', roles: ['warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'admin'] },
-      { to: '/stock-count', code: 'nav.stock_count', module: 'inventory', roles: ['warehouse_worker', 'warehouse_supervisor', 'inventory_controller', 'admin'] },
+      { to: '/warehouses', code: 'nav.warehouses', module: 'inventory', workflowRule: 'nav.warehouse' },
+      { to: '/movement-center', code: 'nav.movement_center', module: 'inventory', workflowRule: 'nav.warehouse' },
+      { to: '/inventory', code: 'nav.inventory', module: 'inventory', workflowRule: 'nav.warehouse' },
+      { to: '/stock-count', code: 'nav.stock_count', module: 'inventory', workflowRule: 'nav.warehouse' },
     ],
   },
   {
@@ -109,7 +111,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     // `JwtAuthGuard` — no `RequireModuleGuard`/`PermissionGuard`/`RolesGuard` at all (a separate,
     // out-of-scope entitlement-gating finding, not fixed here) — so `roles` here has never mirrored a
     // real backend restriction; adding `admin` is a pure, safe nav-visibility correction.
-    items: [{ to: '/fulfillment', code: 'nav.fulfillment', module: 'inventory', roles: ['warehouse_worker', 'admin'] }],
+    items: [{ to: '/fulfillment', code: 'nav.fulfillment', module: 'inventory', workflowRule: 'nav.fulfillment' }],
   },
   {
     code: 'nav_group.shipping',
@@ -118,10 +120,10 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // 2026-09-26 — Navigation Root-Cause Fix (item A6): `shipment.controller.ts`'s GET/list routes
       // are module+auth only (writes are permission-gated) — `roles` is the accurate axis; `admin`
       // was already present on this group's other 3 items, just missing here.
-      { to: '/shipments', code: 'nav.shipments', module: 'logistics', roles: ['driver', 'admin'] },
-      { to: '/shipping-methods', code: 'nav.shipping_methods', module: 'logistics', roles: ['admin'] },
-      { to: '/custody-returns', code: 'nav.custody_returns', module: 'logistics', roles: ['admin', 'warehouse_worker', 'sales_supervisor'] },
-      { to: '/collection-settlements', code: 'nav.collection_settlements', module: 'logistics', roles: ['admin', 'finance'] },
+      { to: '/shipments', code: 'nav.shipments', module: 'logistics', workflowRule: 'nav.shipments' },
+      { to: '/shipping-methods', code: 'nav.shipping_methods', module: 'logistics', workflowRule: 'nav.shipping_methods' },
+      { to: '/custody-returns', code: 'nav.custody_returns', module: 'logistics', workflowRule: 'nav.custody_returns' },
+      { to: '/collection-settlements', code: 'nav.collection_settlements', module: 'logistics', workflowRule: 'nav.collection_settlements' },
       // 2026-09-26 — Navigation Root-Cause Fix, Full Closure batch: `shipment-returns.controller.ts`'s
       // base `GET()` list route carries `@RequirePermission('logistics.shipment_return.view')`, no role
       // gate — grouped alongside `custody-returns`, this group's existing returns-adjacent item.
@@ -157,8 +159,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     coverTo: '/catalog',
     items: [
       { to: '/products', code: 'nav.products', module: 'sales' },
-      { to: '/price-lists', code: 'nav.price_lists', module: 'sales', roles: ['admin', 'sales_manager'] },
-      { to: '/bom', code: 'nav.bom', module: 'sales', roles: ['admin'] },
+      { to: '/price-lists', code: 'nav.price_lists', module: 'sales', workflowRule: 'nav.price_lists' },
+      { to: '/bom', code: 'nav.bom', module: 'sales', workflowRule: 'nav.bom' },
     ],
   },
   { code: '', items: [{ to: '/reports-overview', code: 'nav.reports', module: 'reporting' }] },
@@ -444,7 +446,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // present (ADR-023 — "core is implicit and never listed" in
       // depends_on), so entitlement never restricts these; `roles` is
       // the whole gate, exactly as it is on their actual routes today.
-      { to: '/organization', code: 'nav.organization', roles: ['admin'] },
+      { to: '/organization', code: 'nav.organization', workflowRule: 'core.organization.manage' },
       // F2 (2026-10-07): the Company's own user directory, invitations and roles. `/company/users*` is gated by `core.company.members.manage` (read for the directory, editable for writes) on every route, so nav visibility and route access use the same axis.
       { to: '/company-users', code: 'nav.company_users', permissionNode: 'core.company.members.manage' },
       // F3: roles, templates and capabilities of the Company. Every `/company/roles*` route is gated by `core.company.roles.manage` (read for lists, editable for writes).

@@ -38,7 +38,6 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  hasRole: (...roles: string[]) => boolean;
   /** F1.3 — the Company-aware authorization view from `GET /auth/me` (`null` until loaded). UX guidance only; the backend is the authority. */
   authz: AuthzView | null;
   /** F1.3 — `can('accounting.journal.post', 'editable')`: a lookup in the effective capabilities of the CURRENT Company. Show/enable hint, never a grant. */
@@ -139,12 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const inScope = (kind: ScopeKind, id: string) => inScopeFrom(authz, kind, id);
   const canPlatform = (node: string, level: AccessLevel = 'read-only') => !!authz && (authz.legacyRoles.includes('admin') || (({ 'read-only': 1, editable: 2 } as Record<string, number>)[authz.platform.capabilities[node] ?? ''] ?? 0) >= (level === 'editable' ? 2 : 1));
 
-  function hasRole(...roles: string[]) {
-    if (!user) return false;
-    if (user.roles.includes('admin')) return true;
-    return roles.some((r) => user.roles.includes(r));
-  }
-
   async function loadMemberships(): Promise<CompanyMembership[] | null> {
     try {
       const rows = await api.get<CompanyMembership[]>('/memberships/mine');
@@ -217,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, hasRole, authz, can, canPlatform, inScope, companyContext, memberships, refreshMemberships, selectCompany }}
+      value={{ user, loading, login, logout, authz, can, canPlatform, inScope, companyContext, memberships, refreshMemberships, selectCompany }}
     >
       {children}
     </AuthContext.Provider>

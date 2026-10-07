@@ -39,7 +39,7 @@ import { LimitService } from '../../../foundation/limit-engine/limit.service';
  * needs the same "qualified role, not per-resource assignment" treatment
  * `sales_supervisor`/`sales_manager` already get.
  */
-const REVIEWER_ROLES = ['admin', 'sales_supervisor', 'sales_manager', 'finance'];
+const REVIEWER_ROLES = ['admin', 'sales_supervisor', 'sales_manager', 'finance']; // F5: documentation of the legacy leg; the decision is the rule `sales.customer.read_any`
 
 /**
  * Gap G-5 (planning/excel-mapping/EXCEL_BUSINESS_MAPPING_PACKAGE.md §4) —
@@ -641,8 +641,8 @@ export class CustomersService implements SalesCustomersContract {
 
   /** Scope-checked detail read — 404s (never 403s) for a customer outside the caller's scope. Reviewer roles bypass Scope (see REVIEWER_ROLES doc comment). */
   async getCustomer(customerId: string, requestingUserId: string, manager?: EntityManager): Promise<Customer> {
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
-    if (!roles.some((r) => REVIEWER_ROLES.includes(r))) {
+    const access = await this.authorization.workflowAccess(requestingUserId, manager);
+    if (!access.allows('sales.customer.read_any')) {
       await this.scope.assertAccess(requestingUserId, 'customer', customerId, manager);
     }
     return (manager ?? this.dataSource).getRepository(Customer).findOneOrFail({ where: { id: customerId } });
@@ -657,8 +657,8 @@ export class CustomersService implements SalesCustomersContract {
    */
   async listCustomers(requestingUserId: string, manager?: EntityManager): Promise<Customer[]> {
     const repo = (manager ?? this.dataSource).getRepository(Customer);
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
-    if (roles.some((r) => REVIEWER_ROLES.includes(r))) return repo.find();
+    const access = await this.authorization.workflowAccess(requestingUserId, manager);
+    if (access.allows('sales.customer.read_any')) return repo.find();
     const allowedIds = await this.scope.getAssignedResourceIds(requestingUserId, 'customer', manager);
     if (allowedIds === 'ALL') return repo.find();
     if (allowedIds.length === 0) return [];
@@ -686,8 +686,8 @@ export class CustomersService implements SalesCustomersContract {
   async listCustomersForRep(requestingUserId: string, targetSalesRepUserId?: string, manager?: EntityManager): Promise<Customer[]> {
     if (!targetSalesRepUserId) return this.listCustomers(requestingUserId, manager);
 
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
-    const isReviewer = roles.some((r) => REVIEWER_ROLES.includes(r));
+    const access = await this.authorization.workflowAccess(requestingUserId, manager);
+    const isReviewer = access.allows('sales.customer.read_any');
     if (!isReviewer && targetSalesRepUserId !== requestingUserId) {
       throw new ForbiddenException("Only a sales manager/supervisor/admin may view another Sales Representative's customers.");
     }
@@ -718,8 +718,8 @@ export class CustomersService implements SalesCustomersContract {
     manager?: EntityManager,
   ): Promise<{ rows: Customer[]; total: number }> {
     const repo = (manager ?? this.dataSource).getRepository(Customer);
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
-    const isReviewer = roles.some((r) => REVIEWER_ROLES.includes(r));
+    const access = await this.authorization.workflowAccess(requestingUserId, manager);
+    const isReviewer = access.allows('sales.customer.read_any');
 
     let allowedIds: 'ALL' | string[];
     if (options.salesRepUserId) {

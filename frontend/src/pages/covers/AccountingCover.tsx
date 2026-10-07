@@ -14,9 +14,9 @@ interface JournalEntry {
 
 /** CTO directive ("Section Cover / Main Dashboard System") — `accounting`'s own landing page: trial-balance totals + today's journal activity, from the same endpoints the module's own screens already read. */
 export function AccountingCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ totalDebit: string; balanced: boolean; todaysJournals: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('accounting');
 
   useEffect(() => {
     if (!canView) return;

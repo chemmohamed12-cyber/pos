@@ -14,7 +14,7 @@ const time = async (s, p) => { const t = process.hrtime.bigint(); const r = awai
 (async () => {
   const pre = await session(3602);
   const cur = await session(3601);
-  const eps = [['health', '/health'], ['auth/me', '/auth/me'], ['me/navigation', '/me/navigation'], ['memberships/mine', '/memberships/mine'], ['accounting/accounts', '/accounting/accounts'], ['sales-orders', '/sales-orders'], ['approvals/requests', '/approvals/requests'], ['purchase-orders', '/procurement/purchase-orders'], ['organization/units', '/organization/units'], ['company/users (F2 only)', '/company/users']];
+  const eps = [['health', '/health'], ['auth/me', '/auth/me'], ['me/navigation', '/me/navigation'], ['memberships/mine', '/memberships/mine'], ['accounting/accounts', '/accounting/accounts'], ['sales-orders', '/sales-orders'], ['approvals/requests', '/approvals/requests'], ['purchase-orders', '/procurement/purchase-orders'], ['organization/units', '/organization/units'], ['customers', '/customers?page=1&pageSize=20'], ['company/users (F2 only)', '/company/users']];
   const out = [];
   for (const [name, p] of eps) {
     for (let i = 0; i < 5; i++) { await time(pre, p); await time(cur, p); }

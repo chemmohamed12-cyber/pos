@@ -4,7 +4,7 @@ import { OrganizationService } from './organization.service';
 import { OrgUnitType } from './org-unit.entity';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
+import { RequireWorkflow } from '../authorization/require-role.decorator';
 import { CompanyContextGuard, CompanyScopedRequest } from '../company/company-context.guard';
 
 class CreateUnitDto {
@@ -54,7 +54,7 @@ export class OrganizationController {
   }
 
   @UseGuards(RolesGuard)
-  @RequireRole('admin')
+  @RequireWorkflow('core.organization.manage')
   @Post('units')
   async createUnit(@Req() req: CompanyScopedRequest, @Body() dto: CreateUnitDto) {
     return this.organization.createUnit(dto.type, dto.name, dto.parentId ?? null, null, this.manager(req));
@@ -66,7 +66,7 @@ export class OrganizationController {
   }
 
   @UseGuards(RolesGuard)
-  @RequireRole('admin')
+  @RequireWorkflow('core.organization.manage')
   @Post('units/:id/members')
   async assignMember(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: AssignMemberDto) {
     await this.organization.assignMember(dto.userId, id, this.manager(req));
@@ -74,7 +74,7 @@ export class OrganizationController {
   }
 
   @UseGuards(RolesGuard)
-  @RequireRole('admin')
+  @RequireWorkflow('core.organization.manage')
   @Delete('units/:id/members')
   async removeMember(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Query('userId') userId: string) {
     await this.organization.removeMember(userId, id, this.manager(req));

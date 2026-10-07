@@ -17,11 +17,11 @@ interface LedgerEntry {
 
 /** CTO directive ("Section Cover / Main Dashboard System") — the Treasury section's own landing page: total balance across every real account and today's ledger activity, from the exact endpoints `TreasuryAccounts.tsx`/`TreasuryLedger.tsx` already read. */
 export function TreasuryCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t } = useLanguage();
   const [kpis, setKpis] = useState<{ totalBalance: string; todaysCount: number } | null>(null);
   const [topAccounts, setTopAccounts] = useState<TreasuryAccount[]>([]);
-  const canView = hasRole('admin', 'finance');
+  const canView = can('finance', 'editable');
 
   useEffect(() => {
     if (!canView) return;

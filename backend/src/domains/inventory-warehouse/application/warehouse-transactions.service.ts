@@ -4,7 +4,7 @@ import { WarehouseTransaction } from '../infrastructure/warehouse-transaction.en
 import { WarehouseTransactionLine } from '../infrastructure/warehouse-transaction-line.entity';
 import { WarehouseTransactionType, NUMBERING_SERIES_BY_TYPE, NO_APPROVAL_REQUIRED } from '../domain/warehouse-transaction-type';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../domain/warehouse-transaction-process';
-import { WAREHOUSE_TRANSACTION_ACTION_ROLES } from '../domain/warehouse-transaction-action-roles';
+import { WAREHOUSE_TRANSACTION_ACTION_ROLES, WAREHOUSE_TRANSACTION_ACTION_RULES } from '../domain/warehouse-transaction-action-roles';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -345,9 +345,8 @@ export class WarehouseTransactionsService {
     if (!requiredRoles) {
       throw new ForbiddenException(`"${action}" is not a valid client-initiated action.`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isAdmin = userRoles.includes('admin');
-    if (!isAdmin && !requiredRoles.some((r) => userRoles.includes(r))) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows(WAREHOUSE_TRANSACTION_ACTION_RULES[action])) {
       throw new ForbiddenException(`Role required for action "${action}": one of [${requiredRoles.join(', ')}].`);
     }
 

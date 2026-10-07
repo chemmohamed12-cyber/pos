@@ -3,6 +3,8 @@ import { NAVIGATION_REGISTRY } from './navigation-registry';
 import { EntitlementService } from '../entitlement/entitlement.service';
 import { PermissionService } from '../permission/permission.service';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { AuthorizationContext } from '../authorization/authorization-context';
+import { WorkflowAccess } from '../authorization/workflow-access';
 
 /**
  * Navigation Root-Cause Fix (2026-09-26, CTO-authorized —
@@ -22,7 +24,8 @@ describe('NavigationService.resolveFor — Navigation Root-Cause Fix (2026-09-26
 
     const entitlement = { resolve: () => ({ modules, features }) } as unknown as EntitlementService;
     const permission = { hasAtLeast: async (_userId: string, node: string) => grantedNodes.has(node) } as unknown as PermissionService;
-    const authorization = { getRoleKeysForUser: async () => roles } as unknown as AuthorizationService;
+    // F5: workflow rules are answered under the LEGACY decision here (these specs pin which menu items each ROLE sees; the capability == legacy equivalence is proven in workflow-rules.spec.ts).
+    const authorization = { getRoleKeysForUser: async () => roles, workflowAccess: async () => new WorkflowAccess(new AuthorizationContext('u', null, roles.map((k) => ({ id: k, key: k })), []), 'legacy') } as unknown as AuthorizationService;
 
     return new NavigationService(entitlement, permission, authorization);
   }

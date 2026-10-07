@@ -33,7 +33,7 @@ interface OrderLine {
  * enforces this server-side too, not just here).
  */
 export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesOrderId: string; orderStatus: string; lines: OrderLine[] }) {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
@@ -101,7 +101,7 @@ export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesO
       <h3 style={{ marginTop: 0 }}>{t('panel.stock_reservation')}</h3>
       {error && <div className="error-text">{error}</div>}
 
-      {!allReserved && hasRole('sales_rep') && (
+      {!allReserved && can('wf.sales.rep.act', 'editable') && (
         <div className="form-field" style={{ maxWidth: 320 }}>
           <label>
             {t('field.warehouse')} ({t('action.applies_to_every_line')})
@@ -122,7 +122,7 @@ export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesO
             <th>{t('field.product')}</th>
             <th>{t('field.quantity')}</th>
             <th>{t('field.status')}</th>
-            {!allReserved && hasRole('sales_rep') && <th></th>}
+            {!allReserved && can('wf.sales.rep.act', 'editable') && <th></th>}
           </tr>
         </thead>
         <tbody>
@@ -139,7 +139,7 @@ export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesO
                     <span className="status-badge">{t('action.not_reserved')}</span>
                   )}
                 </td>
-                {!allReserved && hasRole('sales_rep') && (
+                {!allReserved && can('wf.sales.rep.act', 'editable') && (
                   <td>
                     {!reservation && (
                       <button
@@ -158,7 +158,7 @@ export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesO
         </tbody>
       </table>
 
-      {!allReserved && !hasRole('sales_rep') && <div className="empty-state">{t('panel.waiting_for_rep_reservation')}</div>}
+      {!allReserved && !can('wf.sales.rep.act', 'editable') && <div className="empty-state">{t('panel.waiting_for_rep_reservation')}</div>}
     </div>
   );
 }

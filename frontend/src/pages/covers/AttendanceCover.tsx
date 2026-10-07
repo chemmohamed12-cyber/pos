@@ -13,9 +13,9 @@ interface AttendanceApprovalBatch {
 
 /** ADR-065 (Attendance Phase 1) — `attendance`'s own landing page, same shape as `HrCover`. */
 export function AttendanceCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ unmapped: number; pendingBatches: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('attendance');
 
   useEffect(() => {
     if (!canView) return;

@@ -6,6 +6,7 @@ import { PermissionService } from '../permission/permission.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { CompanyEntitlementService } from '../plans/company-entitlement.service';
 import { AuthorizationContext } from '../authorization/authorization-context';
+import { WorkflowAccess } from '../authorization/workflow-access';
 
 export interface NavItemView {
   to: string;
@@ -46,6 +47,7 @@ export class NavigationService {
       company && this.companyEntitlement ? await this.companyEntitlement.resolve(company.companyId) : this.entitlement.resolve();
     const manager = company?.manager;
     const userRoles = ctx ? ctx.roleKeys : await this.authorization.getRoleKeysForUser(userId, manager);
+    // F5: workflow rules are decided by the SAME single load (the request context) — one extra query only for legacy callers without one.
 
     const groups: NavGroupView[] = [];
     for (const group of registry) {
@@ -55,6 +57,7 @@ export class NavigationService {
         if (item.feature && !resolved.features.has(item.feature)) continue;
         if (item.permissionNode && !(ctx ? ctx.hasAtLeast(item.permissionNode, 'read-only') : await this.permission.hasAtLeast(userId, item.permissionNode, 'read-only', manager))) continue;
         if (item.roles && !item.roles.some((r) => userRoles.includes(r))) continue;
+        if (item.workflowRule && !(await this.workflowFor(ctx, userId, manager)).allows(item.workflowRule)) continue;
         items.push({ to: item.to, code: item.code });
       }
       if (items.length > 0) {
@@ -62,6 +65,17 @@ export class NavigationService {
       }
     }
     return groups;
+  }
+
+  private workflowCache = new WeakMap<object, WorkflowAccess>();
+
+  private async workflowFor(ctx: AuthorizationContext | undefined, userId: string, manager?: EntityManager): Promise<WorkflowAccess> {
+    if (ctx) {
+      let w = this.workflowCache.get(ctx);
+      if (!w) { w = new WorkflowAccess(ctx); this.workflowCache.set(ctx, w); }
+      return w;
+    }
+    return this.authorization.workflowAccess(userId, manager);
   }
 
   /** Every terminology code referenced anywhere in the FULL registry (not just what one user sees) — lets the SPA preload every possible label once, same as `Layout.tsx`'s prior `ALL_CODES` did. Static, no principal needed. */

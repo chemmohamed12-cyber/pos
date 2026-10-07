@@ -55,7 +55,7 @@ const NEXT_STATUS: Record<'active' | 'inactive', 'active' | 'inactive'> = { acti
  * suppliers created here by id (never by free-text name).
  */
 export function Suppliers() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -219,7 +219,7 @@ export function Suppliers() {
         <h1>{t('nav.suppliers')}</h1>
       </div>
 
-      {hasRole('admin') && (
+      {can('procurement.supplier.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onSubmitSupplier} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
@@ -303,7 +303,7 @@ export function Suppliers() {
                       <StatusBadge code={`supplier_status.${s.status}`} />
                     </td>
                     <td>
-                      {hasRole('admin') && (
+                      {can('procurement.supplier.edit', 'editable') && (
                         <button
                           className="btn btn-secondary"
                           disabled={busyStatus === s.id}
@@ -327,7 +327,7 @@ export function Suppliers() {
           <div className="card" style={{ width: 380, flexShrink: 0 }}>
             <h3 style={{ marginTop: 0 }}>{detail.supplier.legalName}</h3>
             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>{detail.supplier.code}</div>
-            {hasRole('admin') && (
+            {can('procurement.supplier.edit', 'editable') && (
               <button className="btn btn-secondary" style={{ marginBottom: 12 }} onClick={() => startEdit(detail.supplier)}>
                 {t('action.edit_supplier')}
               </button>
@@ -363,7 +363,7 @@ export function Suppliers() {
               </table>
             )}
 
-            {hasRole('admin') && (
+            {can('procurement.supplier.edit', 'editable') && (
               <form onSubmit={onAddBankAccount} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label>{t('field.bank_name')}</label>

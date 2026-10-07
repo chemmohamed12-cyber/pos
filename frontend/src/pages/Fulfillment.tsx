@@ -78,7 +78,7 @@ type View = { kind: 'dashboard' } | { kind: 'list'; bucket: Bucket } | { kind: '
  * action (`receiveAndStartPickTask`, accept+start run together).
  */
 export function Fulfillment() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'nav.fulfillment',
@@ -329,7 +329,7 @@ export function Fulfillment() {
     }
   }
 
-  const canAct = hasRole('warehouse_worker', 'admin');
+  const canAct = can('wf.inventory.fulfillment.worker', 'editable');
 
   return (
     <div>

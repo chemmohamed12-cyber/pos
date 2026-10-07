@@ -49,7 +49,7 @@ const METHOD_TO_TYPE_CODE: Record<string, string> = {
  * row, so no separate "resubmit" endpoint exists.
  */
 export function DepositPanel({ salesOrderId, orderStatus, onChanged }: { salesOrderId: string; orderStatus: string; onChanged: () => void }) {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [deposit, setDeposit] = useState<Deposit | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -65,7 +65,7 @@ export function DepositPanel({ salesOrderId, orderStatus, onChanged }: { salesOr
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const canReview = hasRole('admin', 'finance');
+  const canReview = can('sales.deposit.approve', 'editable');
 
   preload([
     'deposit.status.submitted',
@@ -308,7 +308,7 @@ export function DepositPanel({ salesOrderId, orderStatus, onChanged }: { salesOr
         </div>
       )}
 
-      {needsSubmission && hasRole('sales_rep') && (
+      {needsSubmission && can('wf.sales.rep.act', 'editable') && (
         <form onSubmit={submit} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>{t('field.total_amount')}</label>
@@ -329,7 +329,7 @@ export function DepositPanel({ salesOrderId, orderStatus, onChanged }: { salesOr
         </form>
       )}
 
-      {needsSubmission && !hasRole('sales_rep') && <div className="empty-state">{t('panel.waiting_for_rep_deposit')}</div>}
+      {needsSubmission && !can('wf.sales.rep.act', 'editable') && <div className="empty-state">{t('panel.waiting_for_rep_deposit')}</div>}
 
       {previewUrl && (
         <div

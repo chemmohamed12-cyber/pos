@@ -45,7 +45,7 @@ interface CustodianOverview {
  * and the custody overview (money + goods under custody) per custodian.
  */
 export function ShippingMethods() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'nav.shipping_methods',
@@ -91,7 +91,7 @@ export function ShippingMethods() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const canView = hasRole('admin');
+  const canView = can('wf.logistics.nav.shipping_methods', 'editable');
 
   async function loadAll() {
     if (!canView) return;

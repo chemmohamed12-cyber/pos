@@ -31,8 +31,8 @@ interface ArAgingRow {
  * as broadly visible as the Reports tool itself.
  */
 export function ReportsCover() {
-  const { hasRole } = useAuth();
-  const canViewFinance = hasRole('admin', 'finance');
+  const { can } = useAuth();
+  const canViewFinance = can('reporting.finance.view');
   const [kpis, setKpis] = useState<{ openOrders: number; activeShipments: number; openReturns: number } | null>(null);
   const [arOutstanding, setArOutstanding] = useState<string | null>(null);
 

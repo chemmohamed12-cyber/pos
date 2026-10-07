@@ -6,6 +6,8 @@ import { PLATFORM_NODES, PLATFORM_ROLES } from './platform-nodes';
 import { PlatformGuard, RequirePlatform } from './platform.guard';
 import { IntegrationCatalogService } from './integration-catalog.service';
 import { SupportAccessService } from './support-access.service';
+import { WORKFLOW_DIVERGENCE, currentWorkflowMode } from '../authorization/workflow-access';
+import { WORKFLOW_RULES } from '../authorization/workflow-rules';
 
 /**
  * Authorization Foundation F4 — the platform plane's own surface: the platform role catalog and support access. Every route is gated by `PlatformGuard`
@@ -44,6 +46,18 @@ export class PlatformController {
         { key: 'admin', type: 'legacy', nameEn: 'Legacy Super Admin', nameAr: 'المدير الأعلى (قديم)', descriptionEn: 'The pre-F4 platform super-user: alias of Platform Super Admin, kept until the legacy role checks are retired.', descriptionAr: 'مدير المنصة الأعلى قبل F4: مرادف لمدير المنصة الأعلى حتى يُنهى العمل بفحوص الأدوار القديمة.', grants: 'all platform.* nodes', holders: count.get('admin') ?? 0 },
       ],
     };
+  }
+
+  /**
+   * F5 — the legacy-role retirement monitor: the active mode and, per workflow rule, how often the legacy role list and the capability disagreed since this process
+   * booted (`legacyOnly` = a user would LOSE the power when the legacy leg is retired; `capabilityOnly` = a user GAINS power compared with the role lists).
+   * Counters are per process and only fill in `dual` mode. Read-only; reveals no user or Company data.
+   */
+  @RequirePlatform('platform.audit.view')
+  @Get('authz/workflow-divergence')
+  workflowDivergence() {
+    const rules = WORKFLOW_RULES.map((r) => ({ rule: r.key, node: r.node, ...(WORKFLOW_DIVERGENCE.get(r.key) ?? { total: 0, legacyOnly: 0, capabilityOnly: 0 }) }));
+    return { success: true, data: { mode: currentWorkflowMode(), totals: { legacyOnly: rules.reduce((a, r) => a + r.legacyOnly, 0), capabilityOnly: rules.reduce((a, r) => a + r.capabilityOnly, 0) }, rules } };
   }
 
   @RequirePlatform('platform.support.view')

@@ -17,7 +17,7 @@ interface AdminUser {
 const UNIT_TYPES = ['company', 'branch', 'department', 'team', 'warehouse'];
 
 export function Organization() {
-  const { hasRole } = useAuth();
+  const { can, canPlatform } = useAuth();
   const { t, preload } = useLanguage();
   const [units, setUnits] = useState<OrgUnit[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -50,7 +50,7 @@ export function Organization() {
       setUnits(unitsData);
       const memberEntries = await Promise.all(unitsData.map(async (u) => [u.id, await api.get<string[]>(`/organization/units/${u.id}/members`)] as const));
       setMembers(Object.fromEntries(memberEntries));
-      if (hasRole('admin')) {
+      if (canPlatform('platform.user.view')) {
         const usersData = await api.get<AdminUser[]>('/admin/users');
         setUsers(usersData);
       }
@@ -102,7 +102,7 @@ export function Organization() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {hasRole('admin') && (
+      {can('wf.core.organization.manage', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
@@ -159,12 +159,12 @@ export function Organization() {
                   <div style={{ marginBottom: 6 }}>
                     {(members[u.id] ?? []).map((uid) => (
                       <span key={uid} className="status-badge" style={{ marginInlineEnd: 4 }}>
-                        {hasRole('admin') ? userName(uid) : uid}
+                        {canPlatform('platform.user.view') ? userName(uid) : uid}
                       </span>
                     ))}
                     {(members[u.id] ?? []).length === 0 && <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>—</span>}
                   </div>
-                  {hasRole('admin') && (
+                  {can('wf.core.organization.manage', 'editable') && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <select
                         value={memberSelections[u.id] ?? ''}

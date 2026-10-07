@@ -152,7 +152,7 @@ export class ReturnsService implements LogisticsReturnsContract {
     quantity: number,
     reason: string,
     actorUserId: string, manager?: EntityManager): Promise<ReturnRequest> {
-    await this.requireRole(actorUserId, ['warehouse_worker', 'sales_supervisor'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.request', ['warehouse_worker', 'sales_supervisor'], manager);
 
     if (!Number.isInteger(quantity) || quantity <= 0) throw new BadRequestException('Return quantity must be a positive integer.');
 
@@ -268,22 +268,22 @@ export class ReturnsService implements LogisticsReturnsContract {
     );
   }
 
-  private async requireRole(actorUserId: string, roles: string[], manager?: EntityManager): Promise<void> {
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    if (userRoles.includes('admin')) return;
-    if (!roles.some((r) => userRoles.includes(r))) {
+  /** F5: the call sites below name a workflow rule (capability); the role list is only the text of the refusal. */
+  private async requireRule(actorUserId: string, ruleKey: string, roles: string[], manager?: EntityManager): Promise<void> {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows(ruleKey)) {
       throw new ForbiddenException(`Role required: one of [${roles.join(', ')}] (or admin).`);
     }
   }
 
   async authorize(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
-    await this.requireRole(actorUserId, ['sales_supervisor'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.authorize', ['sales_supervisor'], manager);
     await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'authorize', actorUserId, manager);
     return this.getStatus(returnRequestId, manager);
   }
 
   async reject(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
-    await this.requireRole(actorUserId, ['sales_supervisor'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.reject', ['sales_supervisor'], manager);
     await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'reject', actorUserId, manager);
     return this.getStatus(returnRequestId, manager);
   }
@@ -298,7 +298,7 @@ export class ReturnsService implements LogisticsReturnsContract {
    * directive's "Draft لا يحرك مخزونًا" boundary.
    */
   async receiveAtWarehouse(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
-    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.receive', ['warehouse_worker'], manager);
     const request = await this.em(manager).getRepository(ReturnRequest).findOneOrFail({ where: { id: returnRequestId } });
     await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'receive_at_warehouse', actorUserId, manager);
 
@@ -318,7 +318,7 @@ export class ReturnsService implements LogisticsReturnsContract {
   }
 
   async inspect(returnRequestId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
-    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.inspect', ['warehouse_worker'], manager);
     await this.processEngine.transition(RETURN_PROCESS, ENTITY_TYPE, returnRequestId, 'inspect', actorUserId, manager);
     return this.getStatus(returnRequestId, manager);
   }
@@ -390,7 +390,7 @@ export class ReturnsService implements LogisticsReturnsContract {
     disposition: DispositionType,
     notes: string | null,
     actorUserId: string, manager?: EntityManager): Promise<ReturnDisposition> {
-    await this.requireRole(actorUserId, ['warehouse_worker'], manager);
+    await this.requireRule(actorUserId, 'logistics.return.disposition', ['warehouse_worker'], manager);
 
     const currentState = await this.getStatus(returnRequestId, manager);
     if (currentState !== 'inspected') {

@@ -71,23 +71,23 @@ interface EditHistoryEntry {
 }
 
 /** Mirrors ORDER_ACTION_REQUIRED_ROLES (backend, order-action-roles.ts) — kept in sync deliberately, same discipline as Terminology codes: this is UI-only gating, the server re-checks every action regardless. */
-const STATE_ACTIONS: Record<string, Array<{ action: string; roles: string[] }>> = {
-  draft: [{ action: 'submit', roles: ['sales_rep'] }],
+const STATE_ACTIONS: Record<string, Array<{ action: string; node: string }>> = {
+  draft: [{ action: 'submit', node: 'wf.sales.order.submit' }],
   supervisor_review: [
-    { action: 'supervisor_approve', roles: ['sales_supervisor'] },
-    { action: 'supervisor_reject', roles: ['sales_supervisor'] },
+    { action: 'supervisor_approve', node: 'wf.sales.order.supervisor_approve' },
+    { action: 'supervisor_reject', node: 'wf.sales.order.supervisor_reject' },
   ],
   manager_approval: [
-    { action: 'manager_approve', roles: ['sales_manager'] },
-    { action: 'manager_reject', roles: ['sales_manager'] },
+    { action: 'manager_approve', node: 'wf.sales.order.manager_approve' },
+    { action: 'manager_reject', node: 'wf.sales.order.manager_reject' },
   ],
-  pending_resubmission: [{ action: 'resubmit', roles: ['sales_rep'] }],
+  pending_resubmission: [{ action: 'resubmit', node: 'wf.sales.order.resubmit' }],
 };
 
 export function SalesOrdersDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasRole, user } = useAuth();
+  const { can, user } = useAuth();
   const { t, preload } = useLanguage();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [productNames, setProductNames] = useState<Record<string, string>>({});
@@ -191,15 +191,15 @@ export function SalesOrdersDetail() {
   // below in the edit form and, authoritatively, server-side.
   const canEditInline =
     !!order &&
-    ((order.status === 'supervisor_review' && hasRole('sales_supervisor', 'admin')) ||
-      (order.status === 'manager_approval' && hasRole('sales_manager', 'admin')) ||
-      (order.status === 'released' && hasRole('admin', 'finance')));
+    ((order.status === 'supervisor_review' && can('wf.sales.order.edit_supervisor_review', 'editable')) ||
+      (order.status === 'manager_approval' && can('wf.sales.order.edit_manager_approval', 'editable')) ||
+      (order.status === 'released' && can('wf.sales.order.edit_released', 'editable')));
   const editReasonRequired = order?.status === 'released';
   // Order Edit at Draft (CTO directive) — ownership-gated, not role-gated:
   // mirrors editDraftOrder's own check (the order's own rep, or admin).
   // Opens the full add/remove-item screen instead of the narrower inline
   // quantity/price edit the two review stages above use.
-  const canEditDraft = !!order && order.status === 'draft' && (hasRole('admin') || order.salesRepUserId === user?.id);
+  const canEditDraft = !!order && order.status === 'draft' && (can('wf.sales.order.edit_any_draft', 'editable') || order.salesRepUserId === user?.id);
 
   preload([
     'action.edit',
@@ -327,7 +327,7 @@ export function SalesOrdersDetail() {
           quantity: Number(v.quantity),
           discountAmount: v.discountAmount || '0',
           ...(v.repPrice ? { repPrice: v.repPrice } : {}),
-          ...(hasRole('sales_manager', 'admin') && v.managerPrice ? { managerPrice: v.managerPrice } : {}),
+          ...(can('wf.sales.order.set_manager_price', 'editable') && v.managerPrice ? { managerPrice: v.managerPrice } : {}),
         };
       });
       await api.post(`/sales-orders/${id}/lines`, { lines, ...(editReasonRequired ? { reason: editReason.trim() } : {}) });
@@ -479,7 +479,7 @@ export function SalesOrdersDetail() {
           )}
           {!editing &&
             availableActions
-              .filter((a) => hasRole(...a.roles))
+              .filter((a) => can(a.node, 'editable'))
               .map((a) => (
                 <button
                   key={a.action}
@@ -583,7 +583,7 @@ export function SalesOrdersDetail() {
                   )}
                 </td>
                 <td>
-                  {editing && v && hasRole('sales_manager', 'admin') ? (
+                  {editing && v && can('wf.sales.order.set_manager_price', 'editable') ? (
                     <input
                       type="number"
                       min="0"

@@ -14,9 +14,9 @@ interface CommissionApprovalBatch {
 
 /** ADR-071 — `commission`'s own landing page, same shape as `PayrollCover`/`TargetsCover`. */
 export function CommissionCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ unbatchedResults: number; pendingBatches: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('commission');
 
   useEffect(() => {
     if (!canView) return;

@@ -23,10 +23,10 @@ const IN_TRANSIT_STATES = ['picked_up', 'in_transit', 'out_for_delivery'];
 
 /** CTO directive ("Section Cover / Main Dashboard System") — the Shipping section's own landing page: shipments in transit, pending remittances, and total money currently under custody, all from the exact endpoints `Shipments.tsx` itself already reads. */
 export function ShippingCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ inTransit: number; pendingRemittances: number | null; custodyBalance: string | null } | null>(null);
 
-  const canReviewFinance = hasRole('admin', 'finance');
+  const canReviewFinance = can('logistics.collection.view');
 
   useEffect(() => {
     (async () => {
@@ -76,7 +76,7 @@ export function ShippingCover() {
 
   const shortcuts = [
     { to: '/shipments', labelCode: 'nav.shipments' },
-    ...(hasRole('admin') ? [{ to: '/shipping-methods', labelCode: 'nav.shipping_methods' }] : []),
+    ...(can('wf.logistics.nav.shipping_methods', 'editable') ? [{ to: '/shipping-methods', labelCode: 'nav.shipping_methods' }] : []),
     { to: '/custody-returns', labelCode: 'nav.custody_returns' },
     ...(canReviewFinance ? [{ to: '/collection-settlements', labelCode: 'nav.collection_settlements' }] : []),
   ];

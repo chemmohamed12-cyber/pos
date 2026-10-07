@@ -13,9 +13,9 @@ interface Department {
 
 /** CTO directive ("Section Cover / Main Dashboard System") — `hr`'s own landing page. Terminology seeded by `SeedHrCoverTerminology1755859500000`. */
 export function HrCover() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const [kpis, setKpis] = useState<{ total: number; active: number; departments: number } | null>(null);
-  const canView = hasRole('admin');
+  const canView = can('hr');
 
   useEffect(() => {
     if (!canView) return;

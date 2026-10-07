@@ -61,6 +61,7 @@ export interface CompanyAdminRoleSeedResult {
 export { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE } from '../permission/company-nodes';
 import { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, COMPANY_ADMINISTRATION_NODES } from '../permission/company-nodes';
 import { COMPANY_ADMIN_ROLE_KEY, COMPANY_ADMIN_ROLE_META } from '../module-registry/role-templates';
+import { WORKFLOW_NODES } from '../authorization/workflow-rules';
 /** Backup/DR Architecture V1 (2026-09-24, Track D §Step 10) — same grandfathered `core.*` node convention as `COMPANY_MEMBERS_MANAGE_NODE` above, never a wildcard. */
 /** Area 14 (2026-09-25, CTO Implementation Gate) — same literal-node discipline as the two above, never a wildcard. Read-only: gates `CompanyAuditController`'s query/export surface. */
 
@@ -100,7 +101,8 @@ export async function seedCompanyAdminRole(database: DatabaseConfig, moduleCodes
       role = await roleRepo.save(roleRepo.create({ key: 'admin', type: 'legacy', nameEn: 'Legacy Administrator (Operational)', nameAr: 'مدير تشغيلي (قديم)' }));
     }
 
-    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE];
+    // F5: the legacy administrator also holds every workflow capability (it passed every role-list check implicitly).
+    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, ...WORKFLOW_NODES];
     let grants = 0;
     for (const node of nodes) {
       const existing = await permRepo.findOne({ where: { roleId: role.id, nodeKey: node } });

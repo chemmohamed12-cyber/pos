@@ -60,7 +60,7 @@ interface PriceList {
 }
 
 export function Customers() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[] | null>(null);
@@ -142,11 +142,12 @@ export function Customers() {
       const data = await api.get<CustomersPage>(`/customers?${params.toString()}`);
       setCustomers(data.rows);
       setTotal(data.total);
-      if (hasRole('admin')) {
-        const users = await api.get<AdminUser[]>('/admin/users');
+      if (can('sales.customer.assign', 'editable')) {
+        // F5: the Company's own sales reps (the former `/admin/users` was the platform's user table).
+        const users = await api.get<AdminUser[]>('/admin/sales-reps').catch(() => [] as AdminUser[]);
         setReps(users);
       }
-      if (hasRole('admin', 'sales_manager')) {
+      if (can('sales.customer.edit', 'editable')) {
         const lists = await api.get<PriceList[]>('/price-lists');
         setPriceLists(lists);
       }
@@ -313,10 +314,10 @@ export function Customers() {
               <th>{t('field.status')}</th>
               <th>{t('field.created_at')}</th>
               <th>{t('field.actions')}</th>
-              {hasRole('admin') && <th>{t('role.sales_rep')}</th>}
-              {hasRole('admin', 'sales_manager') && <th>{t('field.classification')}</th>}
-              {hasRole('admin', 'sales_manager') && <th>{t('field.order_workflow_policy')}</th>}
-              {hasRole('admin', 'sales_manager') && <th>{t('field.customer_price_list')}</th>}
+              {can('sales.customer.assign', 'editable') && <th>{t('role.sales_rep')}</th>}
+              {can('sales.customer.edit', 'editable') && <th>{t('field.classification')}</th>}
+              {can('sales.customer.edit', 'editable') && <th>{t('field.order_workflow_policy')}</th>}
+              {can('sales.customer.edit', 'editable') && <th>{t('field.customer_price_list')}</th>}
             </tr>
           </thead>
           <tbody>
@@ -330,7 +331,7 @@ export function Customers() {
                 <td>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <span className="status-badge">{c.status}</span>
-                    {hasRole('admin') && NEXT_CUSTOMER_STATUS[c.status] && (
+                    {can('sales.customer_status.edit', 'editable') && NEXT_CUSTOMER_STATUS[c.status] && (
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '2px 8px', fontSize: '0.78rem' }}
@@ -354,7 +355,7 @@ export function Customers() {
                     {t('action.view_account')}
                   </button>
                 </td>
-                {hasRole('admin') && (
+                {can('sales.customer.assign', 'editable') && (
                   <td>
                     {assignedMessage[c.id] ? (
                       <span className="status-badge positive">{assignedMessage[c.id]}</span>
@@ -390,7 +391,7 @@ export function Customers() {
                     )}
                   </td>
                 )}
-                {hasRole('admin', 'sales_manager') && (
+                {can('sales.customer.edit', 'editable') && (
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <input
@@ -406,7 +407,7 @@ export function Customers() {
                     </div>
                   </td>
                 )}
-                {hasRole('admin', 'sales_manager') && (
+                {can('sales.customer.edit', 'editable') && (
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <select
@@ -428,7 +429,7 @@ export function Customers() {
                     </div>
                   </td>
                 )}
-                {hasRole('admin', 'sales_manager') && (
+                {can('sales.customer.edit', 'editable') && (
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <select

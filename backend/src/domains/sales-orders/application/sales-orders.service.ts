@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { DataSource, EntityManager } from 'typeorm';
 import { SalesOrder } from '../infrastructure/sales-order.entity';
 import { SalesOrderLine } from '../infrastructure/sales-order-line.entity';
-import { ORDER_ACTION_REQUIRED_ROLES } from '../domain/order-action-roles';
+import { ORDER_ACTION_REQUIRED_ROLES, ORDER_ACTION_RULES } from '../domain/order-action-roles';
 import { ProductsService } from '../../commerce/application/products.service';
 import { PriceListsService } from '../../commerce/application/price-lists.service';
 import { CustomersService } from '../../crm/application/customers.service';
@@ -67,8 +67,6 @@ interface ResolvedLineInput {
   lineTotal: string;
 }
 
-const MANAGER_PRICE_ROLES = ['sales_manager', 'admin'];
-
 const ENTITY_TYPE = 'sales_order';
 
 /** Order Edit During Review (CTO directive §1) — who may edit a line while the order sits in each review stage. Mirrors ORDER_ACTION_REQUIRED_ROLES' own supervisor_approve/manager_approve gates: whoever may approve a stage may also edit the order during it. `released` (Post-Deposit-Approval Edit Control, CTO directive) is deliberately separate from the review-stage entries below: reaching it means the order is live/committed for BOTH workflow policies (it's exactly the state `DepositsService.approveDeposit` transitions into for the standard policy, and open-account's own terminal state), so editing it is restricted to admin/finance and requires a reason (enforced in `updateOrderLines`, not here — this map only decides WHO). */
@@ -76,6 +74,12 @@ const STAGE_EDIT_ROLES: Record<string, string[]> = {
   supervisor_review: ['sales_supervisor'],
   manager_approval: ['sales_manager'],
   released: ['admin', 'finance'],
+};
+/** F5: the workflow capability behind each stage (the role lists above remain the documented legacy leg and the text of the refusal). */
+const STAGE_EDIT_RULES: Record<string, string> = {
+  supervisor_review: 'sales.order.edit_supervisor_review',
+  manager_approval: 'sales.order.edit_manager_approval',
+  released: 'sales.order.edit_released',
 };
 
 /** Post-Deposit-Approval Edit Control (CTO directive) — the one stage where a reason is mandatory for every edit. */
@@ -236,8 +240,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // were always forced to be the same person); a plain sales_rep may
     // only ever create their own orders, same as before this change.
     // (2) whether any line's `managerPrice` may be honored at all.
-    const actorRoles = actorUserId ? await this.authorization.getRoleKeysForUser(actorUserId, manager) : [];
-    const actorCanSetManagerPrice = actorRoles.some((r) => MANAGER_PRICE_ROLES.includes(r));
+    const actorCanSetManagerPrice = actorUserId ? (await this.authorization.workflowAccess(actorUserId, manager)).allows('sales.order.set_manager_price') : false;
     if (salesRepUserId !== actorUserId && !actorCanSetManagerPrice) {
       throw new ForbiddenException('Only a sales manager or admin may create an order under a different Sales Representative.');
     }
@@ -393,7 +396,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    */
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
   async listOrders(actorUserId: string, manager?: EntityManager): Promise<SalesOrder[]> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
     // REAL BUG FOUND LIVE (CTO directive — Fulfillment dashboard rework):
     // `warehouse_worker` was never in this "sees everything" set, so a
     // real fulfillment operator opening the Fulfillment screen's
@@ -402,7 +405,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // sales rep. Fulfillment.tsx already assumed broad visibility
     // (`GET /sales-orders` with no rep filter); the server just never
     // actually granted it.
-    const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker'].includes(r));
+    const isReviewerOrAdmin = access.allows('sales.order.list_all');
     const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     if (isReviewerOrAdmin) {
       return repo.find({ order: { createdAt: 'DESC' } });
@@ -422,8 +425,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * as `listOrders`.
    */
   async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number }, manager?: EntityManager): Promise<{ rows: SalesOrder[]; total: number }> {
-    const roles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker'].includes(r));
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const isReviewerOrAdmin = access.allows('sales.order.list_all');
     const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     const [rows, total] = await repo.findAndCount({
       where: isReviewerOrAdmin ? {} : { salesRepUserId: actorUserId },
@@ -442,7 +445,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * the operational UI's order-detail screen needed it).
    */
   async getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<SalesOrder> {
-    const roles = await this.authorization.getRoleKeysForUser(requestingUserId, manager);
+    const access = await this.authorization.workflowAccess(requestingUserId, manager);
     // warehouse_worker included for the same reason as listOrders above —
     // a fulfillment operator needs to open an order's detail from the
     // Fulfillment dashboard even though Scope was only ever granted to
@@ -460,7 +463,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // not per-resource assignment" fix as warehouse_worker above, kept
     // local here rather than widening `ScopeService.UNRESTRICTED_ROLES`
     // (see `customers.service.ts`'s `REVIEWER_ROLES` comment for why).
-    const isReviewerOrAdmin = roles.some((r) => ['admin', 'sales_supervisor', 'sales_manager', 'warehouse_worker', 'finance'].includes(r));
+    const isReviewerOrAdmin = access.allows('sales.order.read_any');
     if (!isReviewerOrAdmin) {
       await this.scope.assertAccess(requestingUserId, ENTITY_TYPE, orderId, manager);
     }
@@ -636,19 +639,19 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     const { order } = await this.getOrderAndDefinition(orderId, manager);
     const currentState = await this.getOrderStatus(orderId, manager);
     const requiredRoles = STAGE_EDIT_ROLES[currentState];
-    if (!requiredRoles) {
+    const editRule = STAGE_EDIT_RULES[currentState];
+    if (!requiredRoles || !editRule) {
       throw new ConflictException(`This order cannot be edited while it is in status "${currentState}".`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isAdmin = userRoles.includes('admin');
-    if (!isAdmin && !requiredRoles.some((r) => userRoles.includes(r))) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows(editRule)) {
       throw new ForbiddenException(`Role required to edit an order in status "${currentState}": one of [${requiredRoles.join(', ')}].`);
     }
     const trimmedReason = reason?.trim() || null;
     if (REASON_REQUIRED_STAGES.has(currentState) && !trimmedReason) {
       throw new BadRequestException(`A reason is required to edit an order in status "${currentState}".`);
     }
-    const actorCanSetManagerPrice = userRoles.some((r) => MANAGER_PRICE_ROLES.includes(r));
+    const actorCanSetManagerPrice = access.allows('sales.order.set_manager_price');
 
     const lineRepo = (manager ?? this.dataSource).getRepository(SalesOrderLine);
     const existingLines = await lineRepo.find({ where: { salesOrderId: orderId } });
@@ -894,12 +897,11 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be edited this way while it is in "draft" status (currently "${currentState}").`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isAdmin = userRoles.includes('admin');
-    if (!isAdmin && order.salesRepUserId !== actorUserId) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (order.salesRepUserId !== actorUserId && !access.allows('sales.order.edit_any_draft')) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may edit it while in draft.");
     }
-    const actorCanSetManagerPrice = userRoles.some((r) => MANAGER_PRICE_ROLES.includes(r));
+    const actorCanSetManagerPrice = access.allows('sales.order.set_manager_price');
     if (!actorCanSetManagerPrice && lines.some((l) => l.managerPrice !== undefined && l.managerPrice !== null && l.managerPrice !== '')) {
       throw new ForbiddenException('Only a sales manager or admin may set a manager price on an order line.');
     }
@@ -1026,9 +1028,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be deleted while it is in "draft" status (currently "${currentState}").`);
     }
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isAdmin = userRoles.includes('admin');
-    if (!isAdmin && order.salesRepUserId !== actorUserId) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (order.salesRepUserId !== actorUserId && !access.allows('sales.order.delete_any_draft')) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may delete it while in draft.");
     }
 
@@ -1130,10 +1131,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       await this.scope.assertAccess(actorUserId, ENTITY_TYPE, orderId, manager);
     }
 
-    const userRoles = await this.authorization.getRoleKeysForUser(actorUserId, manager);
-    const isAdmin = userRoles.includes('admin');
-    const hasRequiredRole = requiredRoles.some((r) => userRoles.includes(r));
-    if (!isAdmin && !hasRequiredRole) {
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (!access.allows(ORDER_ACTION_RULES[action])) {
       throw new ForbiddenException(`Role required for action "${action}": one of [${requiredRoles.join(', ')}].`);
     }
 

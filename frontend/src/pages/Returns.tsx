@@ -37,20 +37,20 @@ interface Customer {
   name: string;
 }
 
-const ACTIONS: Record<string, Array<{ action: string; roles: string[]; endpoint: string }>> = {
+const ACTIONS: Record<string, Array<{ action: string; node: string; endpoint: string }>> = {
   requested: [
-    { action: 'authorize', roles: ['sales_supervisor'], endpoint: 'authorize' },
-    { action: 'reject', roles: ['sales_supervisor'], endpoint: 'reject' },
+    { action: 'authorize', node: 'wf.logistics.return.authorize', endpoint: 'authorize' },
+    { action: 'reject', node: 'wf.logistics.return.reject', endpoint: 'reject' },
   ],
-  authorized: [{ action: 'receive_at_warehouse', roles: ['warehouse_worker'], endpoint: 'receive' }],
-  received: [{ action: 'inspect', roles: ['warehouse_worker'], endpoint: 'inspect' }],
+  authorized: [{ action: 'receive_at_warehouse', node: 'wf.logistics.return.receive', endpoint: 'receive' }],
+  received: [{ action: 'inspect', node: 'wf.logistics.return.inspect', endpoint: 'inspect' }],
 };
 
 const DISPOSITIONS = ['restock', 'damaged', 'repair', 'scrap', 'replacement'];
 const RETURN_TYPES = ['exchange', 'value_credit', 'product_return'] as const;
 
 export function Returns() {
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   preload([
     'panel.no_returns_yet',
@@ -192,7 +192,7 @@ export function Returns() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {hasRole('sales_rep') && (
+      {can('wf.sales.rep.act', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t('action.create')}</h3>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -297,7 +297,7 @@ export function Returns() {
                 </td>
                 <td>
                   {(ACTIONS[r.state] ?? [])
-                    .filter((a) => hasRole(...a.roles))
+                    .filter((a) => can(a.node, 'editable'))
                     .map((a) => (
                       <button
                         key={a.action}
@@ -312,7 +312,7 @@ export function Returns() {
                   <button className="btn btn-secondary" onClick={() => window.open(`/print/return/${r.id}`, '_blank')}>
                     {t('action.print')}
                   </button>
-                  {r.state === 'inspected' && hasRole('warehouse_worker') && (
+                  {r.state === 'inspected' && can('wf.logistics.return.disposition', 'editable') && (
                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                       <select
                         value={dispositionChoice[r.id] ?? 'restock'}

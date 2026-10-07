@@ -54,7 +54,7 @@ const STATE_ACTIONS: Record<string, string[]> = {
 export function WarehouseTransactionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [txn, setTxn] = useState<Transaction | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -203,9 +203,9 @@ export function WarehouseTransactionDetail() {
 
         <div className="action-row">
           {availableActions
-            .filter((a) => a !== 'approve' || hasRole('warehouse_supervisor', 'inventory_controller'))
-            .filter((a) => a !== 'post' || hasRole('warehouse_supervisor', 'inventory_controller'))
-            .filter((a) => a !== 'reverse' || hasRole('warehouse_supervisor'))
+            .filter((a) => a !== 'approve' || can('wf.inventory.warehouse_tx.approve', 'editable'))
+            .filter((a) => a !== 'post' || can('wf.inventory.warehouse_tx.post', 'editable'))
+            .filter((a) => a !== 'reverse' || can('wf.inventory.warehouse_tx.reverse', 'editable'))
             .map((a) => (
               <button
                 key={a}

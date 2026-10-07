@@ -14,3 +14,12 @@ export const WAREHOUSE_TRANSACTION_ACTION_ROLES: Record<string, string[]> = {
   post: ['warehouse_supervisor', 'inventory_controller'],
   reverse: ['warehouse_supervisor'],
 };
+
+/** F5: the workflow capability behind each action (the role lists above stay as the documented legacy leg and the text of the refusal). */
+export const WAREHOUSE_TRANSACTION_ACTION_RULES: Record<string, string> = {
+  submit: 'inventory.warehouse_tx.submit',
+  recall: 'inventory.warehouse_tx.recall',
+  approve: 'inventory.warehouse_tx.approve',
+  post: 'inventory.warehouse_tx.post',
+  reverse: 'inventory.warehouse_tx.reverse',
+};

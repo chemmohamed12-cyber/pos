@@ -40,7 +40,7 @@ const PAGE_SIZE = 50;
  */
 export function MovementCenter() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -150,7 +150,7 @@ export function MovementCenter() {
           <button className="btn btn-secondary" onClick={() => navigate('/stock-count')}>
             {t('action.start_count')}
           </button>
-          {hasRole('warehouse_worker', 'admin') && (
+          {can('inventory.movement.create', 'editable') && (
             <button className="btn btn-secondary" onClick={() => setAssembleOpen((v) => !v)}>
               {t('action.assemble')}
             </button>

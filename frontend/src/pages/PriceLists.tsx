@@ -32,8 +32,8 @@ const NEXT_STATUS: Record<string, { action: 'activate_price_list' | 'deactivate_
 };
 
 export function PriceLists() {
-  const { hasRole } = useAuth();
-  const canManage = hasRole('admin', 'sales_manager');
+  const { can } = useAuth();
+  const canManage = can('sales.price_list.edit', 'editable');
   const { t, preload } = useLanguage();
   const [priceLists, setPriceLists] = useState<PriceList[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);

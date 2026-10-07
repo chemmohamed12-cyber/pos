@@ -67,12 +67,12 @@ interface UpgradeResolution {
  * version reach this release at all, and through which intermediate
  * releases?" — a read-only planning question, distinct from the deployment
  * gate. Real enforcement is the server's `RolesGuard` + `PermissionGuard`
- * on every `/release/*` route — this page's own `hasRole` checks only
+ * on every `/release/*` route — this page's own `canPlatform` checks only
  * avoid showing controls a click would just 404/403 on.
  */
 export function ReleaseCenter() {
-  const { hasRole } = useAuth();
-  const canDeploy = hasRole('admin');
+  const { canPlatform } = useAuth();
+  const canDeploy = canPlatform('platform.release.deploy', 'editable');
   const { t, preload } = useLanguage();
 
   const [version, setVersion] = useState<string | null>(null);
