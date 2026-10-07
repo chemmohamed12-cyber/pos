@@ -1,6 +1,7 @@
 import { MODULE_REGISTRY } from '../module-registry/module-registry';
 import { MODULE_ROLE_TEMPLATES } from '../module-registry/role-templates';
 import { NAVIGATION_REGISTRY } from '../navigation/navigation-registry';
+import { COMPANY_ADMINISTRATION_NODES } from './company-nodes';
 
 /**
  * Authorization Program F1.2 — the permission node UNIVERSE used to build `/auth/me.capabilities`.
@@ -17,6 +18,7 @@ export function permissionCatalogNodes(): readonly string[] {
   for (const code of MODULE_REGISTRY.allModuleCodes()) for (const n of MODULE_REGISTRY.nodesForModule(code)) nodes.add(n);
   for (const g of NAVIGATION_REGISTRY) for (const i of g.items) if (i.permissionNode) nodes.add(i.permissionNode);
   for (const templates of Object.values(MODULE_ROLE_TEMPLATES)) for (const t of templates) for (const g of t.grants) nodes.add(g.node);
+  for (const n of COMPANY_ADMINISTRATION_NODES) nodes.add(n); // the Company administration nodes are part of the universe even before a screen gates on each
   cache = [...nodes].sort();
   return cache;
 }

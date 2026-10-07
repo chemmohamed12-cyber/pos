@@ -80,7 +80,7 @@ export class ModuleRoleTemplateSeeder implements OnApplicationBootstrap {
     for (const t of templates) {
       let role = await this.roles.findOne({ where: { key: t.key } });
       if (!role) {
-        role = await this.roles.save(this.roles.create({ key: t.key }));
+        role = await this.roles.save(this.roles.create({ key: t.key, type: 'template', templateKey: t.key, templateVersion: t.version ?? 1, customized: false }));
         roles++;
       }
       for (const g of t.grants) {

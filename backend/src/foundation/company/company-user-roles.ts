@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { DaiiException } from '../error-contract/daii-exception';
+import { criticalNodesCovered, Grant } from '../permission/role-grant-math';
 import { AuthorizationContext } from '../authorization/authorization-context';
 
 /**
@@ -11,7 +12,8 @@ import { AuthorizationContext } from '../authorization/authorization-context';
 /** Role keys that carry Company administration. `company_admin` is the F3 key; today every Company's administrator role is `admin`. */
 export const ADMIN_ROLE_KEYS: readonly string[] = ['admin', 'company_admin'];
 
-type CompanyUserErrorCode = 'LAST_ADMIN' | 'SELF_ROLE_CHANGE' | 'ROLE_EXCEEDS_GRANTOR' | 'UNKNOWN_ROLE' | 'NOT_A_MEMBER' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'ACCOUNT_EXISTS_SIGN_IN' | 'INVALID_INPUT';
+type CompanyUserErrorCode = 'LAST_ADMIN' | 'SELF_ROLE_CHANGE' | 'ROLE_EXCEEDS_GRANTOR' | 'UNKNOWN_ROLE' | 'NOT_A_MEMBER' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'ACCOUNT_EXISTS_SIGN_IN' | 'INVALID_INPUT'
+  | 'ROLE_NOT_FOUND' | 'ROLE_PROTECTED' | 'ROLE_IN_USE' | 'ROLE_EXISTS' | 'ROLE_INACTIVE' | 'ROLE_CUSTOMIZED' | 'UNKNOWN_NODE' | 'NODE_NOT_ENTITLED' | 'ADMINISTRATION_WOULD_BE_LOST' | 'NO_TEMPLATE_UPDATE';
 
 const STATUS: Record<CompanyUserErrorCode, HttpStatus> = {
   LAST_ADMIN: HttpStatus.CONFLICT,
@@ -23,6 +25,16 @@ const STATUS: Record<CompanyUserErrorCode, HttpStatus> = {
   INVITATION_INVALID: HttpStatus.NOT_FOUND,
   ACCOUNT_EXISTS_SIGN_IN: HttpStatus.CONFLICT,
   INVALID_INPUT: HttpStatus.BAD_REQUEST,
+  ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ROLE_PROTECTED: HttpStatus.CONFLICT,
+  ROLE_IN_USE: HttpStatus.CONFLICT,
+  ROLE_EXISTS: HttpStatus.CONFLICT,
+  ROLE_INACTIVE: HttpStatus.CONFLICT,
+  ROLE_CUSTOMIZED: HttpStatus.CONFLICT,
+  UNKNOWN_NODE: HttpStatus.BAD_REQUEST,
+  NODE_NOT_ENTITLED: HttpStatus.BAD_REQUEST,
+  ADMINISTRATION_WOULD_BE_LOST: HttpStatus.CONFLICT,
+  NO_TEMPLATE_UPDATE: HttpStatus.CONFLICT,
 };
 
 /** Domain errors of the Company Users surface: a `DaiiException` (stable `code`, mapped HTTP status) so the error contract renders them uniformly. */
@@ -54,11 +66,13 @@ export function normalizeRoleKeys(input: readonly unknown[]): string[] {
 export interface CompanyRoleRow {
   id: string;
   key: string;
+  /** F3: an inactive role cannot be newly assigned (existing holders keep it). */
+  isActive: boolean;
 }
 
 export async function loadRolesByKeys(manager: EntityManager, keys: readonly string[]): Promise<CompanyRoleRow[]> {
   if (keys.length === 0) return [];
-  return manager.query(`SELECT "id", "key" FROM "roles" WHERE "key" = ANY($1::text[])`, [keys as string[]]);
+  return manager.query(`SELECT "id", "key", "isActive" FROM "roles" WHERE "key" = ANY($1::text[])`, [keys as string[]]);
 }
 
 export async function currentRoleKeys(manager: EntityManager, userId: string): Promise<string[]> {
@@ -98,9 +112,11 @@ export interface GrantRow {
 }
 
 /**
- * Anti-self-elevation (Blueprint §6.2, F2 rule): an actor may add or remove a role only if THEY hold every grant that role carries — a role is
- * never assignable beyond the grantor's own authority. Returns the (role, node, level) triples the actor lacks; empty = allowed.
- * Evaluated on the actor's request-scoped AuthorizationContext (the same grants the guards used), never on client input.
+ * Anti-self-elevation (Blueprint §6.2), risk-aware since F3. Administration authority (the members / roles management nodes the endpoint guard
+ * already required) lets an actor assign or remove ANY role whose reach is non-critical; a role that reaches CRITICAL nodes (see `permission-risk.ts`) can be
+ * assigned or removed only by an actor who holds each of those critical nodes EXPLICITLY (an `editable` grant reaching them, on their own request-scoped
+ * AuthorizationContext) — administration alone never confers critical power, and nobody can hand out what they do not hold. Returns the (role, critical
+ * node) pairs the actor lacks; empty = allowed.
  */
 export async function grantsBeyondActor(manager: EntityManager, actor: AuthorizationContext, roleKeys: readonly string[]): Promise<GrantRow[]> {
   if (roleKeys.length === 0) return [];
@@ -110,5 +126,13 @@ export async function grantsBeyondActor(manager: EntityManager, actor: Authoriza
       WHERE r."key" = ANY($1::text[])`,
     [roleKeys as string[]],
   );
-  return rows.filter((g) => g.access !== 'hidden' && !actor.hasAtLeast(g.nodeKey, g.access));
+  const byRole = new Map<string, Grant[]>();
+  for (const g of rows) byRole.set(g.roleKey, [...(byRole.get(g.roleKey) ?? []), { node: g.nodeKey, access: g.access }]);
+  const beyond: GrantRow[] = [];
+  for (const [roleKey, grants] of byRole) {
+    for (const node of criticalNodesCovered(grants)) {
+      if (!actor.hasAtLeast(node, 'editable')) beyond.push({ roleKey, nodeKey: node, access: 'editable' });
+    }
+  }
+  return beyond;
 }

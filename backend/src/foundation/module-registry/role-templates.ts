@@ -17,6 +17,11 @@ export interface RoleTemplate {
   /** role key, `<module_code>.<role>` */
   key: string;
   titleCode: string;
+  /**
+   * F3 — the template's own version (default 1). A Company role records the version it was cloned at; a higher catalog version is OFFERED to the
+   * Company (diff + apply/ignore), never applied automatically (Blueprint §7).
+   */
+  version?: number;
   grants: { node: string; access: PermissionAccess }[];
 }
 
@@ -80,6 +85,19 @@ export const MODULE_ROLE_TEMPLATES: Record<string, RoleTemplate[]> = {
       ],
     },
     { key: 'finance.viewer', titleCode: 'role.finance.viewer', grants: [{ node: 'finance', access: 'read-only' }] },
+    // F3: treasury had only module-wide roles. The officer works the cash desk (view / post / transfer) and the treasury accounts; reversing a cash entry stays out of the template.
+    {
+      key: 'finance.treasury_officer',
+      titleCode: 'role.finance.treasury_officer',
+      grants: [
+        { node: 'finance.cash.view', access: 'read-only' },
+        { node: 'finance.cash.post', access: 'editable' },
+        { node: 'finance.cash.transfer', access: 'editable' },
+        { node: 'finance.treasury', access: 'editable' },
+        { node: 'finance.payment.view', access: 'read-only' },
+        { node: 'finance.ledger.view', access: 'read-only' },
+      ],
+    },
   ],
   reporting: [
     { key: 'reporting.analyst', titleCode: 'role.reporting.analyst', grants: [{ node: 'reporting', access: 'read-only' }] },
@@ -110,4 +128,56 @@ export const MODULE_ROLE_TEMPLATES: Record<string, RoleTemplate[]> = {
     { key: 'accounting.manager', titleCode: 'role.accounting.manager', grants: [{ node: 'accounting', access: 'editable' }] },
     { key: 'accounting.viewer', titleCode: 'role.accounting.viewer', grants: [{ node: 'accounting', access: 'read-only' }] },
   ],
+  // ── F3 (2026-10-07) — templates for the modules that had none (AZ-04). Created UNASSIGNED when the module is enabled; no one gains anything automatically.
+  procurement: [
+    { key: 'procurement.manager', titleCode: 'role.procurement.manager', grants: [{ node: 'procurement', access: 'editable' }] },
+    {
+      key: 'procurement.buyer',
+      titleCode: 'role.procurement.buyer',
+      grants: [
+        { node: 'procurement.purchase_request.view', access: 'read-only' },
+        { node: 'procurement.purchase_request.create', access: 'editable' },
+        { node: 'procurement.purchase_request.edit', access: 'editable' },
+        { node: 'procurement.purchase_order.view', access: 'read-only' },
+        { node: 'procurement.purchase_order.create', access: 'editable' },
+        { node: 'procurement.purchase_order.edit', access: 'editable' },
+        { node: 'procurement.rfq.view', access: 'read-only' },
+        { node: 'procurement.rfq.create', access: 'editable' },
+        { node: 'procurement.rfq.edit', access: 'editable' },
+        { node: 'procurement.rfq.record_quotation', access: 'editable' },
+        { node: 'procurement.supplier.view', access: 'read-only' },
+        { node: 'procurement.goods_receipt.view', access: 'read-only' },
+      ],
+    },
+    { key: 'procurement.viewer', titleCode: 'role.procurement.viewer', grants: [{ node: 'procurement', access: 'read-only' }] },
+  ],
+  payroll: [
+    { key: 'payroll.manager', titleCode: 'role.payroll.manager', grants: [{ node: 'payroll', access: 'editable' }] },
+    { key: 'payroll.viewer', titleCode: 'role.payroll.viewer', grants: [{ node: 'payroll', access: 'read-only' }] },
+  ],
+  attendance: [
+    { key: 'attendance.manager', titleCode: 'role.attendance.manager', grants: [{ node: 'attendance', access: 'editable' }] },
+    { key: 'attendance.viewer', titleCode: 'role.attendance.viewer', grants: [{ node: 'attendance', access: 'read-only' }] },
+  ],
+  commission: [
+    { key: 'commission.manager', titleCode: 'role.commission.manager', grants: [{ node: 'commission', access: 'editable' }] },
+    { key: 'commission.viewer', titleCode: 'role.commission.viewer', grants: [{ node: 'commission', access: 'read-only' }] },
+  ],
+  targets: [
+    { key: 'targets.manager', titleCode: 'role.targets.manager', grants: [{ node: 'targets', access: 'editable' }] },
+    { key: 'targets.viewer', titleCode: 'role.targets.viewer', grants: [{ node: 'targets', access: 'read-only' }] },
+  ],
+};
+
+/**
+ * F3 — the Company ADMINISTRATION system role (Blueprint §6.2, D17): `company_admin` administers the Company (users, roles, backups, the authorization
+ * audit) and holds NO operational or critical capability. It is NOT a module template (it is not entitlement-gated and is never part of the catalog a module
+ * brings); it is seeded for NEW Companies only — existing Companies keep their `admin` row verbatim, relabelled "Legacy Administrator (Operational)".
+ */
+export const COMPANY_ADMIN_ROLE_KEY = 'company_admin';
+export const COMPANY_ADMIN_ROLE_META = {
+  nameEn: 'Company Administrator',
+  nameAr: 'مدير الشركة',
+  descriptionEn: 'Administers the Company: users, roles, backups and the authorization audit. Holds no operational or critical permission; those are granted explicitly by roles.',
+  descriptionAr: 'يدير الشركة: المستخدمين والأدوار والنسخ الاحتياطي وسجل التدقيق. لا يملك أي صلاحية تشغيلية أو حرجة؛ تُمنح هذه صراحةً عبر الأدوار.',
 };

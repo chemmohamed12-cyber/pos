@@ -39,6 +39,10 @@ export interface DirectoryRow {
 export interface AssignableRole {
   key: string;
   type: RoleType;
+  nameEn: string | null;
+  nameAr: string | null;
+  /** Inactive roles cannot be newly assigned. */
+  isActive: boolean;
   /** False when the actor does not hold every grant the role carries — assigning it would exceed the grantor's own authority. */
   assignable: boolean;
 }
@@ -70,13 +74,17 @@ export class CompanyUserManagementService {
     const [identities, roleRows] = await Promise.all([
       this.users.findByIds(ids),
       companyDs.manager.query(
-        `SELECT ur."userId" AS "userId", r."key" AS "key" FROM "user_roles" ur INNER JOIN "roles" r ON r."id" = ur."roleId" WHERE ur."userId" = ANY($1::uuid[]) ORDER BY r."key"`,
+        `SELECT ur."userId" AS "userId", r."key" AS "key", r."type" AS "type" FROM "user_roles" ur INNER JOIN "roles" r ON r."id" = ur."roleId" WHERE ur."userId" = ANY($1::uuid[]) ORDER BY r."key"`,
         [ids],
-      ) as Promise<Array<{ userId: string; key: string }>>,
+      ) as Promise<Array<{ userId: string; key: string; type: RoleType }>>,
     ]);
     const byId = new Map(identities.map((u) => [u.id, u]));
     const rolesBy = new Map<string, string[]>();
-    for (const r of roleRows) rolesBy.set(r.userId, [...(rolesBy.get(r.userId) ?? []), r.key]);
+    const typeOf = new Map<string, RoleType>();
+    for (const r of roleRows) {
+      rolesBy.set(r.userId, [...(rolesBy.get(r.userId) ?? []), r.key]);
+      typeOf.set(r.key, r.type);
+    }
     return members
       .map((m) => {
         const u = byId.get(m.userId);
@@ -88,7 +96,7 @@ export class CompanyUserManagementService {
           email: u.email,
           identityStatus: u.status,
           membership: { id: m.id, status: m.status, joinedAt: new Date(m.joinedAt).toISOString(), lastAccessAt: m.lastAccessAt ? new Date(m.lastAccessAt).toISOString() : null, invitedBy: m.invitedBy, authzVersion: m.authzVersion },
-          roles: keys.map((key) => ({ key, type: classifyRole(key) })),
+          roles: keys.map((key) => ({ key, type: typeOf.get(key) ?? classifyRole(key) })),
           isAdministrator: keys.some((k) => ADMIN_ROLE_KEYS.includes(k)),
         } as DirectoryRow;
       })
@@ -98,9 +106,9 @@ export class CompanyUserManagementService {
 
   /** The Company's roles with whether THIS actor may assign each (anti-elevation preview — the server re-checks on every write). */
   async assignableRoles(companyDs: DataSource, actor: CompanyActor): Promise<AssignableRole[]> {
-    const rows: Array<{ key: string }> = await companyDs.manager.query(`SELECT "key" FROM "roles" ORDER BY "key"`);
+    const rows: Array<{ key: string; type: RoleType; nameEn: string | null; nameAr: string | null; isActive: boolean }> = await companyDs.manager.query(`SELECT "key", "type", "nameEn", "nameAr", "isActive" FROM "roles" ORDER BY "key"`);
     const beyond = new Set((await grantsBeyondActor(companyDs.manager, actor.authz, rows.map((r) => r.key))).map((g) => g.roleKey));
-    return rows.map((r) => ({ key: r.key, type: classifyRole(r.key), assignable: !beyond.has(r.key) }));
+    return rows.map((r) => ({ key: r.key, type: r.type, nameEn: r.nameEn, nameAr: r.nameAr, isActive: r.isActive, assignable: r.isActive && !beyond.has(r.key) }));
   }
 
   /**
@@ -132,10 +140,12 @@ export class CompanyUserManagementService {
         const known = await loadRolesByKeys(manager, target);
         const unknown = target.filter((k) => !known.some((r) => r.key === k));
         if (unknown.length) throw new CompanyUserError('UNKNOWN_ROLE', `Unknown role(s): ${unknown.join(', ')}.`, { unknown });
+        const inactive = added.filter((k) => known.find((r) => r.key === k)?.isActive === false);
+        if (inactive.length) throw new CompanyUserError('ROLE_INACTIVE', `Inactive role(s) cannot be newly assigned: ${inactive.join(', ')}.`, { inactive });
 
         const beyond = await grantsBeyondActor(manager, actor.authz, [...added, ...removed]);
         if (beyond.length) {
-          throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only assign or remove roles whose permissions you hold yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))] });
+          throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'Roles that carry critical permissions can only be assigned or removed by someone who holds those permissions explicitly.', { roles: [...new Set(beyond.map((g) => g.roleKey))], criticalNodes: [...new Set(beyond.map((g) => g.nodeKey))] });
         }
 
         if (previous.some((k) => ADMIN_ROLE_KEYS.includes(k)) && !target.some((k) => ADMIN_ROLE_KEYS.includes(k))) {
@@ -226,7 +236,7 @@ export class CompanyUserManagementService {
       removedRoles = await currentRoleKeys(manager, targetUserId);
       if (removedRoles.some((k) => ADMIN_ROLE_KEYS.includes(k))) await this.assertAnotherActiveAdmin(companyId, manager, targetUserId);
       const beyond = await grantsBeyondActor(manager, actor.authz, removedRoles);
-      if (beyond.length) throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only remove members whose roles you could assign yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))] });
+      if (beyond.length) throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only remove members whose critical permissions you hold explicitly yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))], criticalNodes: [...new Set(beyond.map((g) => g.nodeKey))] });
       await replaceUserRoles(manager, targetUserId, []);
       await this.memberships.revoke(targetUserId, companyId);
       await this.companyAudit(manager, actor.userId, 'membership.removed', targetUserId, correlationId, { roleKeys: removedRoles, status: membership.status }, null);

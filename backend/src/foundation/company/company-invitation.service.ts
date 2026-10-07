@@ -84,10 +84,12 @@ export class CompanyInvitationService {
       const known = await loadRolesByKeys(companyDs.manager, roleKeys);
       const unknown = roleKeys.filter((k) => !known.some((r) => r.key === k));
       if (unknown.length) throw new CompanyUserError('UNKNOWN_ROLE', `Unknown role(s): ${unknown.join(', ')}.`, { unknown });
+      const inactive = roleKeys.filter((k) => known.find((r) => r.key === k)?.isActive === false);
+      if (inactive.length) throw new CompanyUserError('ROLE_INACTIVE', `Inactive role(s) cannot be offered: ${inactive.join(', ')}.`, { inactive });
       const beyond = await grantsBeyondActor(companyDs.manager, actor.authz, roleKeys);
       if (beyond.length) {
         await this.audit.record({ actorUserId: actor.userId, organizationId: null, action: 'invitation.denied', resource: 'invitation', resourceId: null, result: 'denied', correlationId: randomUUID(), after: { reason: 'role_exceeds_grantor', roleKeys } }, companyDs.manager).catch(() => undefined);
-        throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only invite with roles whose permissions you hold yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))] });
+        throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'Roles that carry critical permissions can only be offered by someone who holds those permissions explicitly.', { roles: [...new Set(beyond.map((g) => g.roleKey))], criticalNodes: [...new Set(beyond.map((g) => g.nodeKey))] });
       }
     }
 

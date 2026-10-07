@@ -16,6 +16,8 @@ import { CompanyInvitationsPublicController } from './company-invitations-public
 import { CompanyInvitation } from './company-invitation.entity';
 import { CompanyInvitationService } from './company-invitation.service';
 import { CompanyUserManagementService } from './company-user-management.service';
+import { CompanyRolesController } from './company-roles.controller';
+import { CompanyRoleManagementService } from './company-role-management.service';
 import { InstallationMembershipController } from './installation-membership.controller';
 import { MembershipsMineController } from './memberships-mine.controller';
 import { CompanyRegistryController } from './company-registry.controller';
@@ -58,7 +60,7 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     // circular shape as AuthenticationModule above, same fix.
     forwardRef(() => DatabaseProvisioningModule),
   ],
-  controllers: [CompanyUsersController, CompanyInvitationsPublicController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
+  controllers: [CompanyUsersController, CompanyRolesController, CompanyInvitationsPublicController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
   providers: [
     CompanyService,
     CompanyRegistryService,
@@ -70,6 +72,7 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     MembershipReconciliationScheduler,
     CompanyUserManagementService,
     CompanyInvitationService,
+    CompanyRoleManagementService,
   ],
   exports: [
     TypeOrmModule,

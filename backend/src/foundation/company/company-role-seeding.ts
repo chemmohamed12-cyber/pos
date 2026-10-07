@@ -58,11 +58,11 @@ export interface CompanyAdminRoleSeedResult {
 }
 
 /** The literal, always-entitled node §3.1 verified against the real permission engine — never a wildcard, and not part of `MODULE_ROLE_TEMPLATES` (Area 6/20 CTO decision, 2026-09-24). */
-export const COMPANY_MEMBERS_MANAGE_NODE = 'core.company.members.manage';
+export { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE } from '../permission/company-nodes';
+import { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, COMPANY_ADMINISTRATION_NODES } from '../permission/company-nodes';
+import { COMPANY_ADMIN_ROLE_KEY, COMPANY_ADMIN_ROLE_META } from '../module-registry/role-templates';
 /** Backup/DR Architecture V1 (2026-09-24, Track D §Step 10) — same grandfathered `core.*` node convention as `COMPANY_MEMBERS_MANAGE_NODE` above, never a wildcard. */
-export const COMPANY_BACKUP_MANAGE_NODE = 'core.company.backup.manage';
 /** Area 14 (2026-09-25, CTO Implementation Gate) — same literal-node discipline as the two above, never a wildcard. Read-only: gates `CompanyAuditController`'s query/export surface. */
-export const COMPANY_AUDIT_VIEW_NODE = 'core.company.audit.view';
 
 /**
  * Multi-Company Area 20/Membership-Management (2026-09-24, §3.1 verified
@@ -97,10 +97,10 @@ export async function seedCompanyAdminRole(database: DatabaseConfig, moduleCodes
     let role = await roleRepo.findOne({ where: { key: 'admin' } });
     const created = !role;
     if (!role) {
-      role = await roleRepo.save(roleRepo.create({ key: 'admin' }));
+      role = await roleRepo.save(roleRepo.create({ key: 'admin', type: 'legacy', nameEn: 'Legacy Administrator (Operational)', nameAr: 'مدير تشغيلي (قديم)' }));
     }
 
-    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE];
+    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE];
     let grants = 0;
     for (const node of nodes) {
       const existing = await permRepo.findOne({ where: { roleId: role.id, nodeKey: node } });
@@ -114,5 +114,32 @@ export async function seedCompanyAdminRole(database: DatabaseConfig, moduleCodes
     if (dataSource.isInitialized) {
       await dataSource.destroy();
     }
+  }
+}
+
+/**
+ * F3 / D17 — seeds the Company ADMINISTRATION system role `company_admin` (idempotent): the four `core.company.*` administration nodes at `editable`
+ * and NOTHING operational — no module-wide grant, no critical node. Unlike `seedCompanyAdminRole` it never extends with the Company's modules, and a package
+ * upgrade never adds to it (the only automatic grants to an administrator are administration nodes, Blueprint E2/A3).
+ */
+export async function seedCompanyAdministratorRole(database: DatabaseConfig): Promise<CompanyAdminRoleSeedResult> {
+  const dataSource = new DataSource({ type: 'postgres', ...database, entities: [Role, RolePermission], synchronize: false, logging: false });
+  await dataSource.initialize();
+  try {
+    const roleRepo = dataSource.getRepository(Role);
+    const permRepo = dataSource.getRepository(RolePermission);
+    let role = await roleRepo.findOne({ where: { key: COMPANY_ADMIN_ROLE_KEY } });
+    const created = !role;
+    if (!role) role = await roleRepo.save(roleRepo.create({ key: COMPANY_ADMIN_ROLE_KEY, type: 'system', ...COMPANY_ADMIN_ROLE_META }));
+    let grants = 0;
+    for (const node of COMPANY_ADMINISTRATION_NODES) {
+      if (!(await permRepo.findOne({ where: { roleId: role.id, nodeKey: node } }))) {
+        await permRepo.save(permRepo.create({ roleId: role.id, nodeKey: node, access: 'editable' }));
+        grants++;
+      }
+    }
+    return { created, grants };
+  } finally {
+    if (dataSource.isInitialized) await dataSource.destroy();
   }
 }

@@ -97,6 +97,7 @@ import { Guide } from './pages/Guide';
 import { ReleaseCenter } from './pages/ReleaseCenter';
 import { Organization } from './pages/Organization';
 import { CompanyUsers } from './pages/CompanyUsers';
+import { CompanyRoles } from './pages/CompanyRoles';
 import { AcceptInvitation } from './pages/AcceptInvitation';
 import { Reports } from './pages/Reports';
 import { ReportsCover } from './pages/covers/ReportsCover';
@@ -229,6 +230,7 @@ function AppRoutes() {
         <Route path="release-center" element={<ReleaseCenter />} />
         <Route path="organization" element={<Organization />} />
         <Route path="company-users" element={<CompanyUsers />} />
+        <Route path="company-roles" element={<CompanyRoles />} />
         <Route path="reports-overview" element={<ReportsCover />} />
         <Route path="reports" element={<Reports />} />
         <Route path="integrations" element={<ExternalIntegrations />} />

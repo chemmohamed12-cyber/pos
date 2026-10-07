@@ -7,6 +7,8 @@ import { CompanyUsersController } from './company-users.controller';
 import { CompanyInvitationsPublicController } from './company-invitations-public.controller';
 import { InstallationMembershipController } from './installation-membership.controller';
 import { COMPANY_MEMBERS_MANAGE_NODE } from './company-role-seeding';
+import { CompanyRolesController } from './company-roles.controller';
+import { COMPANY_ROLES_MANAGE_NODE } from '../permission/company-nodes';
 
 /**
  * F2 wiring guard (the class-level metadata incident documented in `permission.guard.ts` is exactly the kind of regression this prevents):
@@ -54,5 +56,20 @@ describe('F2 controller wiring', () => {
 
   it('the platform plane keeps its explicit installation route (admin-only, :companyId by design) for support / bootstrap', () => {
     expect(Reflect.getMetadata(PATH_METADATA, InstallationMembershipController)).toBe('installation/companies/:companyId/memberships');
+  });
+
+  it('F3: every /company/roles route requires core.company.roles.manage; GET = read-only, every write = editable; static routes precede :roleId', () => {
+    const all = routes(CompanyRolesController);
+    expect(Reflect.getMetadata(PATH_METADATA, CompanyRolesController)).toBe('company/roles');
+    expect(all.length).toBeGreaterThanOrEqual(12);
+    for (const r of all) {
+      expect(r.required?.nodeKey).toBe(COMPANY_ROLES_MANAGE_NODE);
+      expect(r.required?.access).toBe(r.method === 'GET' ? 'read-only' : 'editable');
+    }
+    expect(all.some((r) => /companyId/i.test(r.path))).toBe(false);
+    const order = Object.getOwnPropertyNames(CompanyRolesController.prototype);
+    expect(order.indexOf('catalog')).toBeLessThan(order.indexOf('detail')); // GET /catalog must not be captured by GET /:roleId
+    expect(order.indexOf('templates')).toBeLessThan(order.indexOf('detail'));
+    expect(order.indexOf('fromTemplate')).toBeLessThan(order.indexOf('clone'));
   });
 });

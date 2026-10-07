@@ -4,7 +4,8 @@ import { CompanyRegistryService } from '../company/company-registry.service';
 import { DatabaseRegistryService } from '../database-registry/database-registry.service';
 import { DatabaseRegistry } from '../database-registry/database-registry.entity';
 import { runMigrationsForDatabase } from '../release-orchestration/company-migration-runner';
-import { seedCompanyRoleTemplates, seedCompanyAdminRole, CompanyRoleSeedResult } from '../company/company-role-seeding';
+import { seedCompanyRoleTemplates, seedCompanyAdminRole, seedCompanyAdministratorRole, CompanyRoleSeedResult } from '../company/company-role-seeding';
+import { COMPANY_ADMIN_ROLE_KEY } from '../module-registry/role-templates';
 import { applyCompanyAuthorizationSchemaAdjustment } from '../company/company-authorization-schema-adjustment';
 import { applyEntitlementManifestToCompany, CompanyEntitlementOptions } from '../company/company-entitlement-provisioning';
 import { EntitlementManifest } from '../entitlement/manifest.type';
@@ -56,6 +57,13 @@ export interface ProvisionCompanyDatabaseParams {
    * remediation step).
    */
   initialAdminUserId: string;
+  /**
+   * F3 / D17 — which administrator role a NEW Company is born with. `'admin'` (default for now) is the pre-existing operational administrator;
+   * `'company_admin'` is the administration-only system role (users, roles, backups, audit — no operational/critical power). The default stays `'admin'`
+   * until the legacy role checks are migrated (F5): ~89 backend call-sites still demand the key `admin` (e.g. Organization writes), so a `company_admin`-only
+   * Company would 403 on them. Flip the default when F5 closes (CTO decision recorded in the F3 report).
+   */
+  administratorRole?: 'admin' | 'company_admin';
 }
 
 export interface ProvisionCompanyDatabaseResult {
@@ -189,7 +197,8 @@ export class DatabaseProvisioningService {
     let roleSeedResult: CompanyRoleSeedResult;
     try {
       roleSeedResult = await seedCompanyRoleTemplates(databaseConfig, params.roleModuleCodes ?? []);
-      await seedCompanyAdminRole(databaseConfig, params.roleModuleCodes ?? []);
+      if (params.administratorRole === 'company_admin') await seedCompanyAdministratorRole(databaseConfig);
+      else await seedCompanyAdminRole(databaseConfig, params.roleModuleCodes ?? []);
     } catch (err) {
       await this.databaseRegistry.markStatus(registry.id, 'FAILED');
       throw new ProvisioningFailedError('role-seeding', err instanceof Error ? err.message : String(err));
@@ -219,12 +228,13 @@ export class DatabaseProvisioningService {
     // `CompanyMembershipProvisioningService`/`CompanyConnectionManagerService`,
     // which require the registry to already be `'ACTIVE'` (not true yet
     // at this point in the sequence).
+    const adminRoleKey = params.administratorRole === 'company_admin' ? COMPANY_ADMIN_ROLE_KEY : ADMIN_ROLE_KEY;
     let initialAdmin: Membership;
     try {
       await this.users.findById(params.initialAdminUserId);
       initialAdmin =
         (await this.memberships.findByUserAndCompany(params.initialAdminUserId, params.companyId)) ??
-        (await this.memberships.create({ userId: params.initialAdminUserId, companyId: params.companyId, roleKey: ADMIN_ROLE_KEY }));
+        (await this.memberships.create({ userId: params.initialAdminUserId, companyId: params.companyId, roleKey: adminRoleKey }));
 
       // `entities` must be listed explicitly — this is a one-off raw DataSource (the Company
       // isn't pooled via CompanyConnectionManagerService yet at provisioning time), not
@@ -234,7 +244,7 @@ export class DatabaseProvisioningService {
       const adminDataSource = new DataSource({ type: 'postgres', ...databaseConfig, synchronize: false, logging: false, entities: [Role, UserRole] });
       try {
         await adminDataSource.initialize();
-        await provisionUserRoleForMembership(adminDataSource, params.initialAdminUserId, ADMIN_ROLE_KEY);
+        await provisionUserRoleForMembership(adminDataSource, params.initialAdminUserId, adminRoleKey);
       } finally {
         if (adminDataSource.isInitialized) {
           await adminDataSource.destroy();

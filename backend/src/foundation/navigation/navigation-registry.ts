@@ -447,6 +447,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/organization', code: 'nav.organization', roles: ['admin'] },
       // F2 (2026-10-07): the Company's own user directory, invitations and roles. `/company/users*` is gated by `core.company.members.manage` (read for the directory, editable for writes) on every route, so nav visibility and route access use the same axis.
       { to: '/company-users', code: 'nav.company_users', permissionNode: 'core.company.members.manage' },
+      // F3: roles, templates and capabilities of the Company. Every `/company/roles*` route is gated by `core.company.roles.manage` (read for lists, editable for writes).
+      { to: '/company-roles', code: 'nav.company_roles', permissionNode: 'core.company.roles.manage' },
       { to: '/admin', code: 'nav.admin', roles: ['admin'] },
       { to: '/integrations', code: 'nav.integrations', roles: ['admin'] },
       { to: '/release-center', code: 'nav.release_center', roles: ['admin'] },

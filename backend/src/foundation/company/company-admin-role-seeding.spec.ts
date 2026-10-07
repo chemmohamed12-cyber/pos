@@ -81,7 +81,7 @@ import { seedCompanyAdminRole, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAG
  * surface, same literal-grant discipline (§3.1 unchanged, never a
  * wildcard).
  */
-const FIXED_CORE_NODE_COUNT = 3;
+const FIXED_CORE_NODE_COUNT = 4;
 
 describe('seedCompanyAdminRole — §3.1 verified decision (2026-09-24)', () => {
   beforeEach(() => {
@@ -95,7 +95,7 @@ describe('seedCompanyAdminRole — §3.1 verified decision (2026-09-24)', () => 
     const result = await seedCompanyAdminRole({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['sales', 'inventory']);
 
     expect(result.created).toBe(true);
-    expect(result.grants).toBe(2 + FIXED_CORE_NODE_COUNT); // sales, inventory, core.company.members.manage, core.company.backup.manage, core.company.audit.view
+    expect(result.grants).toBe(2 + FIXED_CORE_NODE_COUNT); // sales, inventory + the four core.company.* administration nodes (members, roles [F3], backup, audit)
     const grants = [...grantsStoreMock.values()].map((g) => g.nodeKey);
     expect(grants).toEqual(expect.arrayContaining(['sales', 'inventory', COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE]));
     expect(grants.every((n) => n !== '*')).toBe(true); // never a wildcard — §3.1

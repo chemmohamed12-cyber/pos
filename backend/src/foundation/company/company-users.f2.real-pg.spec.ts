@@ -120,31 +120,41 @@ describe('F2 — Company Users, invitations, multi-role (real Postgres, two Comp
     expect((await memberships.findByUserAndCompany(alice, h.companyAId))?.authzVersion).toBeGreaterThan(1);
   });
 
-  it('anti-elevation: cannot change own roles; cannot assign/remove a role carrying grants you do not hold; refusals are audited and change nothing', async () => {
+  it('anti-elevation (risk-aware, F3): cannot change own roles; administration authority assigns NON-critical roles freely but roles reaching CRITICAL nodes only if you hold them explicitly; refusals are audited and change nothing', async () => {
     const carol = await mk('Carol Manager');
     const dave = await mk('Dave Target');
     await memberships.create({ userId: carol, companyId: h.companyAId, roleKey: 'people_manager' });
     await memberships.create({ userId: dave, companyId: h.companyAId, roleKey: 'sales.viewer' });
-    // a Company-owned role that can ONLY manage members (no sales grants, no admin)
+    // a Company-owned role that can ONLY manage members (no sales grants, no admin, nothing critical)
     const [role] = await dsA.query(`INSERT INTO roles ("key") VALUES ('people_manager') RETURNING id`);
     await dsA.query(`INSERT INTO role_permissions ("roleId","nodeKey","access") VALUES ($1,$2,'editable')`, [role.id, COMPANY_MEMBERS_MANAGE_NODE]);
     await dsA.query(`INSERT INTO user_roles ("userId","roleId") VALUES ($1,$2)`, [carol, role.id]);
     await dsA.query(`INSERT INTO user_roles ("userId","roleId") SELECT $1, id FROM roles WHERE "key"='sales.viewer'`, [dave]);
+    // a role that reaches a CRITICAL node
+    const [crit] = await dsA.query(`INSERT INTO roles ("key") VALUES ('ops_critical') RETURNING id`);
+    await dsA.query(`INSERT INTO role_permissions ("roleId","nodeKey","access") VALUES ($1,'accounting.journal.reverse','editable')`, [crit.id]);
     const C = await actorOf(dsA, carol);
     const before = await rolesOf(dsA, dave);
 
-    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, carol, ['people_manager', 'admin']), 'SELF_ROLE_CHANGE');
-    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'admin']), 'ROLE_EXCEEDS_GRANTOR'); // cannot hand out admin
-    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.manager']), 'ROLE_EXCEEDS_GRANTOR'); // cannot assign sales grants she lacks
-    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, []), 'ROLE_EXCEEDS_GRANTOR'); // cannot remove a role she does not hold either
+    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, carol, ['people_manager', 'sales.manager']), 'SELF_ROLE_CHANGE');
+    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'admin']), 'ROLE_EXCEEDS_GRANTOR'); // the legacy admin reaches every critical node
+    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'ops_critical']), 'ROLE_EXCEEDS_GRANTOR'); // explicit critical role
     await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['no_such_role']), 'UNKNOWN_ROLE');
     expect(await rolesOf(dsA, dave)).toEqual(before); // nothing changed
-    await mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'people_manager']); // she CAN hand out what she holds
+    await mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.manager']); // non-critical: administration authority is enough
+    expect(await rolesOf(dsA, dave)).toEqual(['sales.manager']);
+    await mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'people_manager']); // she can also hand out her own role
     expect(await rolesOf(dsA, dave)).toEqual(['people_manager', 'sales.viewer']);
+    // a member who ALREADY holds a critical role cannot be stripped of it by someone who does not hold it
+    await dsA.query(`INSERT INTO user_roles ("userId","roleId") VALUES ($1,$2)`, [dave, crit.id]);
+    await expectCode(mgmt.setRoles(C, h.companyAId, dsA, dave, ['sales.viewer', 'people_manager']), 'ROLE_EXCEEDS_GRANTOR');
+    await dsA.query(`DELETE FROM user_roles WHERE "userId"=$1 AND "roleId"=$2`, [dave, crit.id]);
     const denied = await dsA.query(`SELECT count(*)::int n FROM audit_records WHERE result='denied' AND action LIKE 'role.assignment%'`);
     expect(denied[0].n).toBeGreaterThanOrEqual(3);
     const preview = await mgmt.assignableRoles(dsA, C);
     expect(preview.find((r) => r.key === 'admin')?.assignable).toBe(false);
+    expect(preview.find((r) => r.key === 'ops_critical')?.assignable).toBe(false);
+    expect(preview.find((r) => r.key === 'sales.manager')?.assignable).toBe(true);
     expect(preview.find((r) => r.key === 'people_manager')?.assignable).toBe(true);
   });
 
@@ -157,7 +167,7 @@ describe('F2 — Company Users, invitations, multi-role (real Postgres, two Comp
     const B2 = await actorOf(dsB, b2);
     await mgmt.setRoles(B, h.companyBId, dsB, b2, ['admin']); // no-op
     await mgmt.removeMember(B2, h.companyBId, dsB, adminB1); // B2 removes B1 -> B2 is now the last admin
-    await expectCode(mgmt.setRoles(await actorOf(dsB, alice), h.companyBId, dsB, b2, []), 'ROLE_EXCEEDS_GRANTOR'); // sanity: a non-admin cannot do this at all
+    await expectCode(mgmt.setRoles(await actorOf(dsB, alice), h.companyBId, dsB, b2, []), 'ROLE_EXCEEDS_GRANTOR'); // sanity: removing the (critical-reaching) admin role needs explicit critical power
     // the last admin cannot be touched by anyone who could: demote/suspend/remove all refused
     await expectCode(mgmt.removeMember(B2, h.companyBId, dsB, b2), 'SELF_ROLE_CHANGE');
     const tmp = await mk('Temp Admin B');
