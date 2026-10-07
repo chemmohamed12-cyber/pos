@@ -240,6 +240,8 @@ export class CompanyUserManagementService {
       const beyond = await grantsBeyondActor(manager, actor.authz, removedRoles);
       if (beyond.length) throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only remove members whose critical permissions you hold explicitly yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))], criticalNodes: [...new Set(beyond.map((g) => g.nodeKey))] });
       await replaceUserRoles(manager, targetUserId, []);
+      // F6: explicit access-scope grants die with the membership — a person invited again later must not silently regain a scope they were removed with
+      if ((await manager.query(`SELECT to_regclass('access_scopes')::text AS "t"`))[0]?.t) await manager.query(`DELETE FROM "access_scopes" WHERE "userId" = $1`, [targetUserId]);
       await this.memberships.revoke(targetUserId, companyId);
       await this.companyAudit(manager, actor.userId, membership.kind === 'support' ? 'support_access.revoked' : 'membership.removed', targetUserId, correlationId, { roleKeys: removedRoles, status: membership.status, reason: membership.reason ?? null }, membership.kind === 'support' ? { by: 'company' } : null);
     });

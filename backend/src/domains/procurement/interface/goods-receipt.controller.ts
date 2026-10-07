@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard'
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
+import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
+import { WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
 
 class PostGoodsReceiptLineDto {
@@ -38,13 +40,14 @@ class PostGoodsReceiptDto {
  * `GoodsReceiptService`.
  */
 @Controller('procurement/goods-receipts')
-@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, WarehouseScopeGuard)
 @RequireModule('procurement')
 export class GoodsReceiptController {
   constructor(private readonly goodsReceipts: GoodsReceiptService) {}
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.goods_receipt.view', 'read-only')
+  @WarehouseScoped({ recordOf: 'purchase_orders', param: 'purchaseOrderId' })
   @Get('by-purchase-order/:purchaseOrderId')
   async listForPurchaseOrder(@Req() req: CompanyScopedRequest, @Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -53,6 +56,7 @@ export class GoodsReceiptController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.goods_receipt.create', 'editable')
+  @WarehouseScoped({ recordOf: 'purchase_orders', body: 'purchaseOrderId' })
   @Post()
   async post(@Body() dto: PostGoodsReceiptDto, @Req() req: CompanyScopedRequest) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();

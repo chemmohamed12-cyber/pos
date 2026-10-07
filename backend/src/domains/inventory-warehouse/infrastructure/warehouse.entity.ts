@@ -48,6 +48,14 @@ export class Warehouse {
   @Column({ type: 'varchar', length: 16, default: 'main' })
   kind!: 'main' | 'operational';
 
+  /**
+   * F6 (Blueprint §10, D12) — optional link to the organization unit (branch / warehouse unit) that owns this warehouse: the SCOPE KEY of the pilot domains.
+   * `null` = unscoped = visible to everyone (every existing warehouse). An operational custody sub-location inherits its parent warehouse's unit when it has none.
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  orgUnitId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

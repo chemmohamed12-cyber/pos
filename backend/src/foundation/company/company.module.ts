@@ -11,6 +11,8 @@ import { CompanyContextGuard } from './company-context.guard';
 import { MembershipOperation } from './membership-operation.entity';
 import { MembershipOperationService } from './membership-operation.service';
 import { MembershipReconciliationScheduler } from './membership-reconciliation.scheduler';
+import { CompanyAccessScopeController } from './company-access-scope.controller';
+import { AccessScopeService } from '../scope/access-scope.service';
 import { CompanyUsersController } from './company-users.controller';
 import { CompanyInvitationsPublicController } from './company-invitations-public.controller';
 import { CompanyInvitation } from './company-invitation.entity';
@@ -60,7 +62,7 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     // circular shape as AuthenticationModule above, same fix.
     forwardRef(() => DatabaseProvisioningModule),
   ],
-  controllers: [CompanyUsersController, CompanyRolesController, CompanyInvitationsPublicController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
+  controllers: [CompanyAccessScopeController, CompanyUsersController, CompanyRolesController, CompanyInvitationsPublicController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
   providers: [
     CompanyService,
     CompanyRegistryService,
@@ -73,6 +75,8 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     CompanyUserManagementService,
     CompanyInvitationService,
     CompanyRoleManagementService,
+    // F6 — scope resolution + the scope management / Effective Access Preview controller.
+    AccessScopeService,
   ],
   exports: [
     TypeOrmModule,

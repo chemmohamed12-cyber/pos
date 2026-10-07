@@ -4,6 +4,7 @@ import { ScopeService } from './scope.service';
 import { OrganizationService } from '../organization/organization.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { SCOPE_DERIVATION_REGISTRY } from './scope-derivation.registry';
+import { AccessScopeService } from './access-scope.service';
 
 
 /**
@@ -21,6 +22,8 @@ export class ScopeResolver {
     private readonly scope: ScopeService,
     private readonly organization: OrganizationService,
     private readonly authorization: AuthorizationService,
+    /** F6: the single definition of the caller's accessible org units (memberships + explicit grants, descendants, one statement). */
+    private readonly accessScope: AccessScopeService,
   ) {}
 
   private async isUnrestricted(userId: string, manager?: EntityManager): Promise<boolean> {
@@ -55,17 +58,14 @@ export class ScopeResolver {
     }
 
     // 'org_unit'
-    if (await this.isUnrestricted(userId, manager)) return;
     if (!derivationRef) return; // no branch assigned to this resource = root = everyone, today's behaviour unchanged
-    const accessible = await this.accessibleOrgUnitIds(userId, manager);
-    if (!accessible.has(derivationRef)) throw new NotFoundException(); // 404, not 403 — anti-enumeration, ADR-005
+    this.accessScope.assertUnit(await this.accessScope.resolve(userId, manager), derivationRef); // 404, not 403 — anti-enumeration, ADR-005
   }
 
   /** List-query safety net — same role as `ScopeService.filterAllowed`, extended to org-unit derivation. */
   async filterAllowedByOrgUnit<T extends { id: string; orgUnitId?: string | null }>(userId: string, rows: T[], manager?: EntityManager): Promise<T[]> {
-    if (await this.isUnrestricted(userId, manager)) return rows;
-    const accessible = await this.accessibleOrgUnitIds(userId, manager);
-    return rows.filter((r) => !r.orgUnitId || accessible.has(r.orgUnitId));
+    const scope = await this.accessScope.resolve(userId, manager);
+    return rows.filter((r) => this.accessScope.allowsUnit(scope, r.orgUnitId));
   }
 
   /**
@@ -85,14 +85,5 @@ export class ScopeResolver {
       const ref = refIdOf(row);
       return !ref || allowedSet.has(ref);
     });
-  }
-
-  private async accessibleOrgUnitIds(userId: string, manager?: EntityManager): Promise<Set<string>> {
-    const myUnits = await this.organization.getUnitIdsForUser(userId, manager);
-    const accessible = new Set<string>(myUnits);
-    for (const unit of myUnits) {
-      for (const d of await this.organization.getDescendantIds(unit, manager)) accessible.add(d);
-    }
-    return accessible;
   }
 }

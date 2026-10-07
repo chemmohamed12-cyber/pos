@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { AccessScopePanel } from '../components/AccessScopePanel';
 
 interface MemberRow {
   userId: string;
@@ -81,6 +82,7 @@ export function CompanyUsers() {
   const [created, setCreated] = useState<CreatedInvitation | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editRoles, setEditRoles] = useState<string[]>([]);
+  const [scopeFor, setScopeFor] = useState<{ userId: string; name: string } | null>(null);
 
   async function load() {
     try {
@@ -237,6 +239,9 @@ export function CompanyUsers() {
                         <button className="btn btn-secondary" disabled={busy} onClick={() => { setEditing(m.userId); setEditRoles(m.roles.map((r) => r.key)); }}>
                           {ar ? 'الأدوار' : 'Roles'}
                         </button>{' '}
+                        <button className="btn btn-secondary" disabled={busy} onClick={() => setScopeFor({ userId: m.userId, name: m.fullName })}>
+                          {ar ? 'النطاق' : 'Scope'}
+                        </button>{' '}
                         <button className="btn btn-secondary" disabled={busy} onClick={() => run(() => api.patch(`/company/users/${m.userId}`, { status: m.membership.status === 'active' ? 'suspended' : 'active' }))}>
                           {m.membership.status === 'active' ? (ar ? 'إيقاف' : 'Suspend') : ar ? 'إعادة تفعيل' : 'Reactivate'}
                         </button>{' '}
@@ -252,6 +257,8 @@ export function CompanyUsers() {
           })}
         </tbody>
       </table>
+
+      {scopeFor && <AccessScopePanel key={scopeFor.userId} userId={scopeFor.userId} name={scopeFor.name} ar={ar} canWrite={canWrite} onClose={() => setScopeFor(null)} />}
 
       <h3 style={{ marginTop: 28 }}>{ar ? 'الدعوات المعلّقة' : 'Pending invitations'}</h3>
       {pending.length === 0 ? (

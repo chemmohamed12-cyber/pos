@@ -8,7 +8,6 @@ import { SalesOrdersController } from './interface/sales-orders.controller';
 import { CommerceModule } from '../commerce/commerce.module';
 import { CrmModule } from '../crm/crm.module';
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
-import { ScopeModule } from '../../foundation/scope/scope.module';
 import { AuditModule } from '../../foundation/audit/audit.module';
 import { AuthorizationModule } from '../../foundation/authorization/authorization.module';
 import { ProcessEngineModule } from '../../foundation/process-engine/process-engine.module';
@@ -18,6 +17,7 @@ import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-wareh
 import { SALES_ORDERS_READ_CONTRACT } from '../../foundation/module-registry/contracts/sales.contract';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 import { CompanyModule } from '../../foundation/company/company.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 
 /**
  * Consumes Commerce and CRM only through their exported services

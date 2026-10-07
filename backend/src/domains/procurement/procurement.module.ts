@@ -53,6 +53,7 @@ import { SUPPLIER_LEDGER_CONTRACT } from '../../foundation/module-registry/contr
 import { GRNI_LEDGER_CONTRACT } from '../../foundation/module-registry/contracts/grni-events.contract';
 import { CompanyModule } from '../../foundation/company/company.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 
 /**
  * ADR-048 — Procurement domain (promoted from `ReservedModuleCode`).
@@ -122,6 +123,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     // discovered during `products.controller.ts`'s retrofit.
     CompanyModule,
     DatabaseRegistryModule,
+    // F6 — AccessScopeService + WarehouseScopeGuard (scope pilot: PR / PO / GR).
+    ScopeModule,
   ],
   controllers: [
     SupplierController,

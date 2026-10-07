@@ -11,6 +11,9 @@ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/c
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
+import { WarehouseScopeExempt, WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 import { MovementType } from '../domain/movement-type';
 import { WarehouseStatus } from '../domain/warehouse-status';
 import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
@@ -65,6 +68,18 @@ class CreateWarehouseDto {
   @IsOptional()
   @IsString()
   responsibleUserId?: string;
+
+  /** F6 — optional link to the organization unit (branch / warehouse unit) that owns the warehouse. */
+  @IsOptional()
+  @IsUUID()
+  orgUnitId?: string;
+}
+
+class SetWarehouseOrgUnitDto {
+  /** `null` unlinks the warehouse (unscoped = visible to everyone). */
+  @IsOptional()
+  @IsUUID()
+  orgUnitId?: string | null;
 }
 
 class SetWarehouseStatusDto {
@@ -151,14 +166,21 @@ class ReserveStockDto {
  * making `BomService` manager-capable.
  */
 @Controller('inventory')
-@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, WarehouseScopeGuard)
 @RequireModule('inventory')
 export class InventoryController {
   constructor(
     private readonly inventory: InventoryService,
     private readonly excel: ExcelService,
     @Inject(SALES_PRODUCTS_CONTRACT) private readonly products: SalesProductsContract,
+    private readonly scopes: AccessScopeService,
   ) {}
+
+  /** F6 — the warehouses the caller may see: `'ALL'` (unrestricted) or the list; lists, reports and exports filter by it BEFORE returning/aggregating. */
+  private async visibleWarehouses(req: CompanyScopedRequest): Promise<'ALL' | string[]> {
+    const scope = await this.scopes.forRequest(req);
+    return this.scopes.visibleWarehouseIds(scope, req.companyContext!.dataSource.manager);
+  }
 
   /** Shared by the movements/stock-report export endpoints — resolves warehouse code and product sku/name for readable spreadsheet columns (the JSON endpoints stay raw-id; the frontend already holds these lists for on-screen display, same as the rest of this screen). */
   private async buildNameMaps(manager: EntityManager) {
@@ -172,17 +194,21 @@ export class InventoryController {
     return { sku: product?.sku ?? productId, productName: product?.name ?? productId };
   }
 
+  @WarehouseScopeFiltered('listWarehouses: only the caller\'s visible warehouses')
   @Get('warehouses')
   async listWarehouses(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.inventory.listWarehouses(req.companyContext.dataSource.manager);
+    const [all, visible] = await Promise.all([this.inventory.listWarehouses(req.companyContext.dataSource.manager), this.visibleWarehouses(req)]);
+    return visible === 'ALL' ? all : all.filter((w) => visible.includes(w.id));
   }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.create', 'editable')
+  @WarehouseScopeExempt('creates a NEW warehouse; a link to an organization unit is checked against the caller\'s scope below')
   @Post('warehouses')
   async createWarehouse(@Req() req: CompanyScopedRequest, @Body() dto: CreateWarehouseDto) {
     if (!req.companyContext) throw new UnauthorizedException();
+    if (dto.orgUnitId) this.scopes.assertUnit(await this.scopes.forRequest(req), dto.orgUnitId); // a unit outside the caller's scope is invisible to them
     return this.inventory.createWarehouse(
       dto.code,
       dto.name,
@@ -191,18 +217,32 @@ export class InventoryController {
       null,
       'main',
       req.companyContext.dataSource.manager,
+      dto.orgUnitId ?? null,
     );
+  }
+
+  /** F6 (Blueprint §10, D12) — link a warehouse to the organization unit that owns it (the scope key), or unlink it. Needs the warehouse AND the new unit to be inside the caller's scope. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScoped({ param: 'id' })
+  @Post('warehouses/:id/org-unit')
+  async setWarehouseOrgUnit(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SetWarehouseOrgUnitDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    if (dto.orgUnitId) this.scopes.assertUnit(await this.scopes.forRequest(req), dto.orgUnitId);
+    return this.inventory.setWarehouseOrgUnit(id, dto.orgUnitId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — active/inactive toggle. */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScoped({ param: 'id' })
   @Post('warehouses/:id/status')
   async setWarehouseStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetWarehouseStatusDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.inventory.setWarehouseStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
+  @WarehouseScopeExempt('template download')
   @Get('warehouses/import-template')
   async warehouseImportTemplate(@Res() res: Response) {
     // Plain (non-passthrough) @Res() bypasses the global ResponseEnvelopeInterceptor,
@@ -222,10 +262,12 @@ export class InventoryController {
   // `AuthController` narrows its own sensitive routes (see
   // `ReportsController.salesOrdersExport`'s own comment for full rationale).
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @WarehouseScopeFiltered('export: only the caller\'s visible warehouses')
   @Get('warehouses/export')
   async warehouseExport(@Req() req: CompanyScopedRequest, @Res() res: Response) {
     if (!req.companyContext) throw new UnauthorizedException();
-    const rows = await this.inventory.listWarehouses(req.companyContext.dataSource.manager);
+    const [all, visible] = await Promise.all([this.inventory.listWarehouses(req.companyContext.dataSource.manager), this.visibleWarehouses(req)]);
+    const rows = visible === 'ALL' ? all : all.filter((w) => visible.includes(w.id));
     const buffer = await this.excel.buildExport('Warehouses', WAREHOUSE_EXPORT_COLUMNS, rows.map((w) => ({ code: w.code, name: w.name })));
     res
       .set({
@@ -237,6 +279,7 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.create', 'editable')
+  @WarehouseScopeExempt('bulk-creates NEW warehouses, which start unlinked (unscoped)')
   @Post('warehouses/import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
   async warehouseImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
@@ -250,6 +293,7 @@ export class InventoryController {
     return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [] };
   }
 
+  @WarehouseScopeExempt('template download')
   @Get('opening-stock/import-template')
   async openingStockImportTemplate(@Res() res: Response) {
     // Plain (non-passthrough) @Res() bypasses the global ResponseEnvelopeInterceptor,
@@ -265,6 +309,7 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.movement.create', 'editable')
+  @WarehouseScopeFiltered('import rows naming a warehouse outside the caller\'s scope are rejected like an unknown code')
   @Post('opening-stock/import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
   async openingStockImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
@@ -275,10 +320,12 @@ export class InventoryController {
       rows as Array<{ warehouseCode: string; productSku: string; quantity: string; unitCost: string }>,
       req.user.id,
       req.companyContext.dataSource.manager,
+      await this.visibleWarehouses(req),
     );
     return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [] };
   }
 
+  @WarehouseScoped({ query: 'warehouseId' })
   @Get('stock')
   async getStock(@Req() req: CompanyScopedRequest, @Query('warehouseId') warehouseId: string, @Query('productId') productId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -292,6 +339,7 @@ export class InventoryController {
   }
 
   /** D3-B — the reason codes a manual receipt may use (those with a configured offset GL account). */
+  @WarehouseScopeExempt('static reason codes')
   @Get('manual-receipt-reasons')
   async manualReceiptReasons(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -300,6 +348,7 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.movement.create', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' })
   @Post('movements')
   async recordMovement(@Req() req: CompanyScopedRequest, @Body() dto: RecordMovementDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -341,6 +390,7 @@ export class InventoryController {
    */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.movement.view', 'read-only')
+  @WarehouseScoped({ recordOf: 'stock_movements', param: 'id' })
   @Get('movements/:id')
   async getMovement(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -348,6 +398,8 @@ export class InventoryController {
   }
 
   /** Warehouse Movements operational report — raw-id JSON; the frontend already holds product/warehouse lists for on-screen name display. */
+  @WarehouseScoped({ query: 'warehouseId' })
+  @WarehouseScopeFiltered('movements of the caller\'s visible warehouses only')
   @Get('reports/movements')
   async movementsReport(
     @Req() req: CompanyScopedRequest,
@@ -358,10 +410,13 @@ export class InventoryController {
     @Query('dateTo') dateTo?: string,
   ) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo }, req.companyContext.dataSource.manager);
+    const visible = await this.visibleWarehouses(req);
+    return this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo, visibleWarehouseIds: visible === 'ALL' ? undefined : visible }, req.companyContext.dataSource.manager);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see warehouseExport's own comment
+  @WarehouseScoped({ query: 'warehouseId' })
+  @WarehouseScopeFiltered('movements of the caller\'s visible warehouses only')
   @Get('reports/movements/export')
   async movementsReportExport(
     @Req() req: CompanyScopedRequest,
@@ -374,7 +429,8 @@ export class InventoryController {
   ) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const movements = await this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo }, manager);
+    const visibleExport = await this.visibleWarehouses(req);
+    const movements = await this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo, visibleWarehouseIds: visibleExport === 'ALL' ? undefined : visibleExport }, manager);
     const { warehouseNames } = await this.buildNameMaps(manager);
     const rows = await Promise.all(
       movements.map(async (m) => {
@@ -399,10 +455,13 @@ export class InventoryController {
   }
 
   /** Inventory/Stock operational report — raw-id JSON, same rationale as the movements report above. */
+  @WarehouseScoped({ query: 'warehouseId' })
+  @WarehouseScopeFiltered('stock of the caller\'s visible warehouses only')
   @Get('reports/stock')
   async stockReport(@Req() req: CompanyScopedRequest, @Query('warehouseId') warehouseId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.inventory.getStockReport(warehouseId, req.companyContext.dataSource.manager);
+    const visible = await this.visibleWarehouses(req);
+    return this.inventory.getStockReport(warehouseId, req.companyContext.dataSource.manager, visible === 'ALL' ? undefined : visible);
   }
 
   /**
@@ -412,6 +471,7 @@ export class InventoryController {
    * `products` here (never a client-side cross-reference of a full
    * catalog dump), so the grid scales independently of catalog size.
    */
+  @WarehouseScoped({ param: 'warehouseId' })
   @Get('warehouses/:warehouseId/inventory')
   async warehouseInventory(
     @Req() req: CompanyScopedRequest,
@@ -443,6 +503,7 @@ export class InventoryController {
   /** D1 — assign items to a warehouse (master data, bulk, idempotent). Advisory: nothing is blocked by assignment yet. */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScoped({ param: 'warehouseId' })
   @Post('warehouses/:warehouseId/items')
   async assignItems(@Req() req: CompanyScopedRequest, @Param('warehouseId', ParseUUIDPipe) warehouseId: string, @Body() dto: AssignItemsDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -452,6 +513,7 @@ export class InventoryController {
   /** D1 — remove an item from a warehouse; rejected while it still holds stock/reservations there. */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScoped({ param: 'warehouseId' })
   @Delete('warehouses/:warehouseId/items/:productId')
   async unassignItem(
     @Req() req: CompanyScopedRequest,
@@ -463,6 +525,8 @@ export class InventoryController {
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see warehouseExport's own comment
+  @WarehouseScoped({ query: 'warehouseId' })
+  @WarehouseScopeFiltered('stock of the caller\'s visible warehouses only')
   @Get('reports/stock/export')
   async stockReportExport(@Req() req: CompanyScopedRequest, @Res() res: Response, @Query('warehouseId') warehouseId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -494,12 +558,14 @@ export class InventoryController {
   /** Gap G-2 — same role tier as `recordMovement`: a production-floor operation. */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.assembly.create', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' })
   @Post('assemble')
   async assemble(@Req() req: CompanyScopedRequest, @Body() dto: AssembleProductDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.inventory.assembleProduct(dto.warehouseId, dto.finishedProductId, dto.quantity, req.user.id, req.companyContext.dataSource.manager);
   }
 
+  @WarehouseScoped({ recordOf: 'sales_orders', query: 'salesOrderId' })
   @Get('reservations/by-order')
   async reservationsByOrder(@Req() req: CompanyScopedRequest, @Query('salesOrderId') salesOrderId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -508,6 +574,7 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.reservation.create', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' })
   @Post('reservations')
   async reserveStock(@Req() req: CompanyScopedRequest, @Body() dto: ReserveStockDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -524,6 +591,7 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.reservation.release', 'editable')
+  @WarehouseScoped({ recordOf: 'stock_reservations', param: 'id' })
   @Post('reservations/:id/release')
   async releaseReservation(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();

@@ -13,7 +13,14 @@ interface Warehouse {
   location: string | null;
   responsibleUserId: string | null;
   status: 'active' | 'inactive';
+  /** F6 — the organization unit (branch / warehouse unit) that owns the warehouse; null = unscoped (visible to everyone). */
+  orgUnitId?: string | null;
   createdAt: string;
+}
+interface OrgUnit {
+  id: string;
+  type: string;
+  name: string;
 }
 interface AdminUser {
   id: string;
@@ -25,10 +32,14 @@ const NEXT_STATUS: Record<'active' | 'inactive', 'active' | 'inactive'> = { acti
 
 export function Warehouses() {
   const { can, canPlatform } = useAuth();
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
+  const ar = lang === 'ar';
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState<Warehouse[] | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [units, setUnits] = useState<OrgUnit[]>([]);
+  const [orgUnitId, setOrgUnitId] = useState('');
+  const [busyLink, setBusyLink] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
@@ -65,6 +76,7 @@ export function Warehouses() {
     try {
       const data = await api.get<Warehouse[]>('/inventory/warehouses');
       setWarehouses(data);
+      setUnits(await api.get<OrgUnit[]>('/organization/units').catch(() => [] as OrgUnit[]));
       if (canPlatform('platform.user.view')) {
         const u = await api.get<AdminUser[]>('/admin/users');
         setUsers(u);
@@ -89,11 +101,13 @@ export function Warehouses() {
         name,
         location: location || undefined,
         responsibleUserId: responsibleUserId || undefined,
+        orgUnitId: orgUnitId || undefined,
       });
       setCode('');
       setName('');
       setLocation('');
       setResponsibleUserId('');
+      setOrgUnitId('');
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create warehouse.');
@@ -115,6 +129,20 @@ export function Warehouses() {
     }
   }
 
+  async function linkUnit(w: Warehouse, unitId: string) {
+    setBusyLink(w.id);
+    setError(null);
+    try {
+      await api.post(`/inventory/warehouses/${w.id}/org-unit`, { orgUnitId: unitId || null });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 404 ? (ar ? 'هذه الوحدة خارج نطاقك.' : 'That unit is outside your scope.') : err instanceof ApiError ? err.message : 'Failed to link the warehouse.');
+    } finally {
+      setBusyLink(null);
+    }
+  }
+
+  const unitName = (id: string | null | undefined) => (id ? units.find((u) => u.id === id)?.name ?? id : ar ? 'بلا وحدة (يراه الجميع)' : 'Unlinked (visible to everyone)');
   const userName = (id: string | null) => (id ? users.find((u) => u.id === id)?.fullName ?? id : '—');
 
   return (
@@ -158,6 +186,15 @@ export function Warehouses() {
                 ))}
               </select>
             </div>
+            <div className="form-field" style={{ marginBottom: 0, minWidth: 200 }}>
+              <label>{ar ? 'الوحدة التنظيمية (النطاق)' : 'Organization unit (scope)'}</label>
+              <select value={orgUnitId} onChange={(e) => setOrgUnitId(e.target.value)}>
+                <option value="">{ar ? '— بدون —' : '— none —'}</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                ))}
+              </select>
+            </div>
             <button className="btn btn-primary" type="submit" disabled={creating}>
               {t('action.create')}
             </button>
@@ -179,6 +216,7 @@ export function Warehouses() {
               <th>{t('field.name')}</th>
               <th>{t('field.location')}</th>
               <th>{t('field.responsible_user')}</th>
+              <th>{ar ? 'الوحدة التنظيمية' : 'Organization unit'}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.created_at')}</th>
               <th>{t('field.actions')}</th>
@@ -191,6 +229,18 @@ export function Warehouses() {
                 <td>{w.name}</td>
                 <td>{w.location ?? '—'}</td>
                 <td>{userName(w.responsibleUserId)}</td>
+                <td>
+                  {can('inventory.warehouse.edit', 'editable') ? (
+                    <select value={w.orgUnitId ?? ''} disabled={busyLink === w.id} onChange={(e) => linkUnit(w, e.target.value)} aria-label={ar ? 'الوحدة التنظيمية' : 'Organization unit'}>
+                      <option value="">{ar ? '— بدون (يراه الجميع) —' : '— none (visible to everyone) —'}</option>
+                      {units.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    unitName(w.orgUnitId)
+                  )}
+                </td>
                 <td>
                   <StatusBadge code={`warehouse_status.${w.status}`} />
                 </td>

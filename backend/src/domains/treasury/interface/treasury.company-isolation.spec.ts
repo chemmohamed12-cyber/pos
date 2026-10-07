@@ -5,6 +5,7 @@ import { AuditService } from '../../../foundation/audit/audit.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { IdempotencyService } from '../../../foundation/error-contract/idempotency.service';
 import { ScopeResolver } from '../../../foundation/scope/scope-resolver.service';
+import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
 import { ScopeService } from '../../../foundation/scope/scope.service';
 import { OrganizationService } from '../../../foundation/organization/organization.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -76,7 +77,7 @@ describe('TreasuryController Area 21 retrofit — real-Postgres Company isolatio
     const scopeService = new ScopeService(h.controlPlane, {} as never);
     const organization = new OrganizationService(h.controlPlane);
     const authorization = new AuthorizationService(dsA.getRepository(Role), dsA.getRepository(UserRole));
-    const scopeResolver = new ScopeResolver(scopeService, organization, authorization);
+    const scopeResolver = new ScopeResolver(scopeService, organization, authorization, new AccessScopeService(h.controlPlane, authorization));
     const numbering = new NumberingService(h.controlPlane);
     service = new TreasuryService(h.controlPlane, numbering, audit, scopeResolver, new EventBusService({} as never, h.connections));
     idempotency = new IdempotencyService(h.controlPlane);

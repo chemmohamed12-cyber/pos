@@ -6,6 +6,9 @@ import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard'
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { SHIPPING_METHODS, ShippingMethod } from '../domain/shipping-method';
 import { RequireModule, RequireModuleGuard } from '../../../foundation/module-registry/require-module.decorator';
+import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
+import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 
 class OrderLineDto {
   @IsString()
@@ -159,11 +162,22 @@ class EditDraftOrderDto {
  * already found.
  */
 @Controller('sales-orders')
-@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, WarehouseScopeGuard)
 @RequireModule('sales')
 export class SalesOrdersController {
-  constructor(private readonly salesOrders: SalesOrdersService) {}
+  constructor(
+    private readonly salesOrders: SalesOrdersService,
+    private readonly scopes: AccessScopeService,
+  ) {}
 
+  /** F6 — the caller's visible warehouses for the list filter (`undefined` = unrestricted). An order with no warehouse (legacy) is unscoped. */
+  private async visibleOnly(req: CompanyScopedRequest): Promise<string[] | undefined> {
+    const scope = await this.scopes.forRequest(req);
+    const visible = await this.scopes.visibleWarehouseIds(scope, req.companyContext!.dataSource.manager);
+    return visible === 'ALL' ? undefined : visible;
+  }
+
+  @WarehouseScoped({ body: 'warehouseId' })
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateOrderDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -191,25 +205,28 @@ export class SalesOrdersController {
    * and get back `{rows, total}` instead — same clamp convention as
    * `InventoryController.warehouseInventory`.
    */
+  @WarehouseScopeFiltered('orders of the caller\'s visible warehouses only (on top of the rep / reviewer visibility)')
   @Get()
   async list(@Req() req: CompanyScopedRequest, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
+    const visibleWarehouseIds = await this.visibleOnly(req);
     if (!page && !pageSize) {
-      const orders = await this.salesOrders.listOrders(req.user.id, manager);
+      const orders = await this.salesOrders.listOrders(req.user.id, manager, visibleWarehouseIds);
       return Promise.all(
         orders.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
       );
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize }, manager);
+    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize, visibleWarehouseIds }, manager);
     const enriched = await Promise.all(
       rows.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
     );
     return { rows: enriched, total };
   }
 
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Get(':id')
   async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -219,6 +236,7 @@ export class SalesOrdersController {
     return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
 
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Post(':id/transition')
   async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -227,6 +245,7 @@ export class SalesOrdersController {
   }
 
   /** Order Edit During Review (CTO directive §1) — role/stage gating lives in SalesOrdersService.updateOrderLines, not here (same "no business logic in the UI/interface layer" discipline as everywhere else in this controller). */
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Post(':id/lines')
   async updateLines(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateOrderLinesDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -237,6 +256,7 @@ export class SalesOrdersController {
   }
 
   /** Order Edit History (CTO directive §1) — read-only trail of every field-level edit on this order's lines, including post-release admin/finance edits and their reason. */
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Get(':id/edit-history')
   async editHistory(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -244,6 +264,7 @@ export class SalesOrdersController {
   }
 
   /** Order Edit at Draft — full add/remove/change, ownership-gated in SalesOrdersService.editDraftOrder. */
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Post(':id/draft-lines')
   async editDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: EditDraftOrderDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -254,6 +275,7 @@ export class SalesOrdersController {
   }
 
   /** Draft Order Deletion (CTO directive §2) — ownership/status gating lives in SalesOrdersService.deleteDraftOrder. POST-action style, matching this controller's own convention, rather than the only @Delete() verb in this file. */
+  @WarehouseScoped({ recordOf: 'sales_orders', param: 'id' })
   @Post(':id/delete')
   async deleteDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();

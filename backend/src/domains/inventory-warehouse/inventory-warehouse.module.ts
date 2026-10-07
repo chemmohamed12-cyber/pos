@@ -22,6 +22,7 @@ import { EventsModule } from '../../foundation/events/events.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
 import { CompanyModule } from '../../foundation/company/company.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 
 import { WarehouseItem } from './infrastructure/warehouse-item.entity';
 
@@ -50,6 +51,8 @@ import { WarehouseItem } from './infrastructure/warehouse-item.entity';
     // required pairing discovered during `products.controller.ts`'s retrofit.
     CompanyModule,
     DatabaseRegistryModule,
+    // F6 — AccessScopeService + WarehouseScopeGuard (the scope pilot).
+    ScopeModule,
   ],
   controllers: [InventoryController, WarehouseTransactionsController],
   providers: [

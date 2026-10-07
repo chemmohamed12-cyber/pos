@@ -50,8 +50,8 @@ export class PurchaseOrderService {
     return new Map(rows.map((r) => [r.entityId, r.currentState]));
   }
 
-  async list(manager?: EntityManager): Promise<Array<PurchaseOrder & { state: string }>> {
-    const pos = await (manager ?? this.dataSource).getRepository(PurchaseOrder).find({ order: { createdAt: 'DESC' } });
+  async list(manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<Array<PurchaseOrder & { state: string }>> {
+    const pos = await (manager ?? this.dataSource).getRepository(PurchaseOrder).find({ where: visibleWarehouseIds ? { warehouseId: In(visibleWarehouseIds) } : undefined, order: { createdAt: 'DESC' } });
     const states = await this.statesFor(pos.map((p) => p.id), manager);
     return pos.map((p) => ({ ...p, state: states.get(p.id) ?? 'draft' }));
   }

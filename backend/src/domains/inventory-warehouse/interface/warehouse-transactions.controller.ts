@@ -7,6 +7,9 @@ import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard'
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
+import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
+import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
 
 class TransactionLineDto {
@@ -110,13 +113,24 @@ class TransitionDto {
  * `WarehouseTransactionsService`.
  */
 @Controller('warehouse-transactions')
-@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+@UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, WarehouseScopeGuard)
 @RequireModule('inventory')
 export class WarehouseTransactionsController {
-  constructor(private readonly transactions: WarehouseTransactionsService) {}
+  constructor(
+    private readonly transactions: WarehouseTransactionsService,
+    private readonly scopes: AccessScopeService,
+  ) {}
+
+  /** F6 — the caller's visible warehouses for the list/overview filters (`undefined` = unrestricted). */
+  private async visibleOnly(req: CompanyScopedRequest): Promise<string[] | undefined> {
+    const scope = await this.scopes.forRequest(req);
+    const visible = await this.scopes.visibleWarehouseIds(scope, req.companyContext!.dataSource.manager);
+    return visible === 'ALL' ? undefined : visible;
+  }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.transaction.create', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' }, { body: 'destinationWarehouseId' })
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateTransactionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -137,6 +151,7 @@ export class WarehouseTransactionsController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.stock_count.create', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' })
   @Post('count')
   async startCount(@Req() req: CompanyScopedRequest, @Body() dto: StartCountDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -145,6 +160,7 @@ export class WarehouseTransactionsController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.stock_count.adjust', 'editable')
+  @WarehouseScoped({ recordOf: 'warehouse_transactions', param: 'id' })
   @Post(':id/count-results')
   async recordCountResults(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: RecordCountResultsDto) {
     if (!req.companyContext) throw new UnauthorizedException();
@@ -152,10 +168,11 @@ export class WarehouseTransactionsController {
     return { recorded: true };
   }
 
+  @WarehouseScopeFiltered('KPIs of the caller\'s visible warehouses only')
   @Get('overview')
   async overview(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.transactions.getOverview(req.companyContext.dataSource.manager);
+    return this.transactions.getOverview(req.companyContext.dataSource.manager, await this.visibleOnly(req));
   }
 
   /**
@@ -166,6 +183,8 @@ export class WarehouseTransactionsController {
    * into the real, take/skip-bounded `listTransactionsPage` instead —
    * same clamp convention as `InventoryController.warehouseInventory`.
    */
+  @WarehouseScoped({ query: 'warehouseId' })
+  @WarehouseScopeFiltered('transactions of the caller\'s visible warehouses only')
   @Get()
   async list(
     @Req() req: CompanyScopedRequest,
@@ -176,26 +195,30 @@ export class WarehouseTransactionsController {
   ) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
+    const visibleWarehouseIds = await this.visibleOnly(req);
     if (!page && !pageSize) {
-      return this.transactions.listTransactions({ warehouseId, type }, manager);
+      return this.transactions.listTransactions({ warehouseId, type, visibleWarehouseIds }, manager);
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    return this.transactions.listTransactionsPage({ warehouseId, type, page: parsedPage, pageSize: parsedPageSize }, manager);
+    return this.transactions.listTransactionsPage({ warehouseId, type, page: parsedPage, pageSize: parsedPageSize, visibleWarehouseIds }, manager);
   }
 
+  @WarehouseScoped({ recordOf: 'warehouse_transactions', param: 'id' })
   @Get(':id')
   async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.transactions.getTransaction(id, req.companyContext.dataSource.manager);
   }
 
+  @WarehouseScoped({ recordOf: 'warehouse_transactions', param: 'id' })
   @Get(':id/lines')
   async getLines(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.transactions.getLines(id, req.companyContext.dataSource.manager);
   }
 
+  @WarehouseScoped({ recordOf: 'warehouse_transactions', param: 'id' })
   @Post(':id/transition')
   async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();

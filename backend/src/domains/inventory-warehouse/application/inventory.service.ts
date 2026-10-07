@@ -93,11 +93,33 @@ export class InventoryService implements InventoryReservationContract, Inventory
     parentWarehouseId: string | null = null,
     kind: 'main' | 'operational' = 'main',
     manager?: EntityManager,
+    /** F6 — optional link to the organization unit (branch / warehouse unit) that owns the warehouse (the scope key). */
+    orgUnitId: string | null = null,
   ): Promise<Warehouse> {
     const repo = (manager ?? this.dataSource).getRepository(Warehouse);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Warehouse with code "${code}" already exists.`);
-    return repo.save(repo.create({ code, name, location, responsibleUserId, parentWarehouseId, kind, status: 'active' }));
+    if (orgUnitId) await this.assertOrgUnitExists(orgUnitId, manager);
+    return repo.save(repo.create({ code, name, location, responsibleUserId, parentWarehouseId, kind, status: 'active', orgUnitId }));
+  }
+
+  private async assertOrgUnitExists(orgUnitId: string, manager?: EntityManager): Promise<void> {
+    const rows: unknown[] = await (manager ?? this.dataSource).query(`SELECT 1 FROM "org_units" WHERE "id" = $1`, [orgUnitId]);
+    if (rows.length === 0) throw new BadRequestException(`Organization unit "${orgUnitId}" not found.`);
+  }
+
+  /** F6 — links (or, with `null`, unlinks) a warehouse to an organization unit: the scope key of the pilot domains. Audited. The caller has already been checked against the warehouse's CURRENT and the NEW unit. */
+  async setWarehouseOrgUnit(warehouseId: string, orgUnitId: string | null, actorUserId: string | null, manager?: EntityManager): Promise<Warehouse> {
+    const warehouse = await this.getWarehouse(warehouseId, manager);
+    if (orgUnitId) await this.assertOrgUnitExists(orgUnitId, manager);
+    const before = { orgUnitId: warehouse.orgUnitId ?? null };
+    warehouse.orgUnitId = orgUnitId;
+    const saved = await (manager ?? this.dataSource).getRepository(Warehouse).save(warehouse);
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'inventory.warehouse.org_unit_changed', resource: 'warehouse', resourceId: warehouseId, result: 'success', correlationId: null, before, after: { orgUnitId } },
+      manager,
+    );
+    return saved;
   }
 
   async listWarehouses(manager?: EntityManager): Promise<Warehouse[]> {
@@ -456,11 +478,17 @@ export class InventoryService implements InventoryReservationContract, Inventory
       movementType?: string;
       dateFrom?: string;
       dateTo?: string;
+      /** F6 — the caller's visible warehouses (omit for unrestricted): movements of any other warehouse are never returned. */
+      visibleWarehouseIds?: string[];
     },
     manager?: EntityManager,
   ): Promise<StockMovement[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
+    if (filters.visibleWarehouseIds) {
+      params.push(filters.visibleWarehouseIds);
+      conditions.push(`"warehouseId" = ANY($${params.length}::uuid[])`);
+    }
     const addCondition = (column: string, value: string | undefined) => {
       if (!value) return;
       params.push(value);
@@ -496,18 +524,30 @@ export class InventoryService implements InventoryReservationContract, Inventory
   async getStockReport(
     warehouseId?: string,
     manager?: EntityManager,
+    /** F6 — the caller's visible warehouses (omit for unrestricted): filtered BEFORE aggregation. */
+    visibleWarehouseIds?: string[],
   ): Promise<Array<{ warehouseId: string; productId: string; onHand: number; reserved: number; available: number }>> {
+    const params: unknown[] = [];
+    const where: string[] = [];
+    if (warehouseId) {
+      params.push(warehouseId);
+      where.push(`"warehouseId" = $${params.length}`);
+    }
+    if (visibleWarehouseIds) {
+      params.push(visibleWarehouseIds);
+      where.push(`"warehouseId" = ANY($${params.length}::uuid[])`);
+    }
     const onHandRows: Array<{ warehouseId: string; productId: string; sum: string }> = await (manager ?? this.dataSource).query(
       `SELECT "warehouseId", "productId", SUM(quantity) as sum FROM stock_movements
-       ${warehouseId ? 'WHERE "warehouseId" = $1' : ''}
+       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        GROUP BY "warehouseId", "productId"`,
-      warehouseId ? [warehouseId] : [],
+      params,
     );
     const reservedRows: Array<{ warehouseId: string; productId: string; sum: string }> = await (manager ?? this.dataSource).query(
       `SELECT "warehouseId", "productId", SUM(quantity) as sum FROM stock_reservations
-       WHERE status IN ('active', 'preliminary') ${warehouseId ? 'AND "warehouseId" = $1' : ''}
+       WHERE status IN ('active', 'preliminary') ${where.length ? 'AND ' + where.join(' AND ') : ''}
        GROUP BY "warehouseId", "productId"`,
-      warehouseId ? [warehouseId] : [],
+      params,
     );
     const reservedMap = new Map(reservedRows.map((r) => [`${r.warehouseId}:${r.productId}`, Number(r.sum)]));
 
@@ -991,10 +1031,13 @@ export class InventoryService implements InventoryReservationContract, Inventory
     rows: Array<{ warehouseCode: string; productSku: string; quantity: string; unitCost: string }>,
     actorUserId: string | null,
     manager?: EntityManager,
+    /** F6 — the caller's visible warehouses (omit / 'ALL' for unrestricted): a row naming any other warehouse is rejected exactly like an unknown code (no enumeration). */
+    visibleWarehouseIds?: 'ALL' | string[],
   ): Promise<{ succeeded: StockMovement[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: StockMovement[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
-    const warehouses = await (manager ?? this.dataSource).getRepository(Warehouse).find();
+    const allWarehouses = await (manager ?? this.dataSource).getRepository(Warehouse).find();
+    const warehouses = !visibleWarehouseIds || visibleWarehouseIds === 'ALL' ? allWarehouses : allWarehouses.filter((w) => visibleWarehouseIds.includes(w.id));
 
     for (let i = 0; i < rows.length; i++) {
       const rowNumber = i + 2;

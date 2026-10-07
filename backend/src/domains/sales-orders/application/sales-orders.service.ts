@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, Raw } from 'typeorm';
 import { SalesOrder } from '../infrastructure/sales-order.entity';
 import { SalesOrderLine } from '../infrastructure/sales-order-line.entity';
 import { ORDER_ACTION_REQUIRED_ROLES, ORDER_ACTION_RULES } from '../domain/order-action-roles';
@@ -395,7 +395,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * governing the review actions themselves.
    */
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
-  async listOrders(actorUserId: string, manager?: EntityManager): Promise<SalesOrder[]> {
+  async listOrders(actorUserId: string, manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<SalesOrder[]> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     // REAL BUG FOUND LIVE (CTO directive — Fulfillment dashboard rework):
     // `warehouse_worker` was never in this "sees everything" set, so a
@@ -407,10 +407,17 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // actually granted it.
     const isReviewerOrAdmin = access.allows('sales.order.list_all');
     const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
+    const inScope = this.warehouseVisibility(visibleWarehouseIds);
     if (isReviewerOrAdmin) {
-      return repo.find({ order: { createdAt: 'DESC' } });
+      return repo.find({ where: inScope, order: { createdAt: 'DESC' } });
     }
-    return repo.find({ where: { salesRepUserId: actorUserId }, order: { createdAt: 'DESC' } });
+    return repo.find({ where: { salesRepUserId: actorUserId, ...inScope }, order: { createdAt: 'DESC' } });
+  }
+
+  /** F6 — an order is in the caller's scope when its warehouse is among their visible ones; an order with NO warehouse (legacy) is unscoped. `undefined` (unrestricted) adds no condition. */
+  private warehouseVisibility(visibleWarehouseIds?: string[]): Record<string, unknown> {
+    if (!visibleWarehouseIds) return {};
+    return { warehouseId: Raw((col) => `(${col} IS NULL OR ${col} = ANY(:visible))`, { visible: visibleWarehouseIds }) };
   }
 
   /**
@@ -424,12 +431,12 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * screen's own table specifically; same Scope-vs-Role visibility split
    * as `listOrders`.
    */
-  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number }, manager?: EntityManager): Promise<{ rows: SalesOrder[]; total: number }> {
+  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number; visibleWarehouseIds?: string[] }, manager?: EntityManager): Promise<{ rows: SalesOrder[]; total: number }> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const isReviewerOrAdmin = access.allows('sales.order.list_all');
     const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     const [rows, total] = await repo.findAndCount({
-      where: isReviewerOrAdmin ? {} : { salesRepUserId: actorUserId },
+      where: isReviewerOrAdmin ? this.warehouseVisibility(options.visibleWarehouseIds) : { salesRepUserId: actorUserId, ...this.warehouseVisibility(options.visibleWarehouseIds) },
       order: { createdAt: 'DESC' },
       take: options.pageSize,
       skip: (options.page - 1) * options.pageSize,

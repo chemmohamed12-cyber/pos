@@ -13,6 +13,7 @@ import { ApprovalRequestType } from '../approval-engine/approval-request-type.en
 import { ApprovalMatrixRule } from '../approval-engine/approval-matrix-rule.entity';
 import { ApprovalDecision } from '../approval-engine/approval-decision.entity';
 import { ScopeAssignment } from '../scope/scope-assignment.entity';
+import { AccessScope } from '../scope/access-scope.entity';
 import { OrgUnit } from '../organization/org-unit.entity';
 import { OrgMembership } from '../organization/org-membership.entity';
 import { IdempotencyRecord } from '../error-contract/idempotency-record.entity';
@@ -62,6 +63,7 @@ export const CORE_COMPANY_ENTITIES = [
   ApprovalMatrixRule,
   ApprovalDecision,
   ScopeAssignment,
+  AccessScope,
   OrgUnit,
   OrgMembership,
   IdempotencyRecord,

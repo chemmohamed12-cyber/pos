@@ -214,10 +214,19 @@ export class AuthMeService {
 
   private async orgUnitIds(userId: string, manager: EntityManager): Promise<string[]> {
     try {
-      const rows: Array<{ orgUnitId: string }> = await manager.query(`SELECT "orgUnitId" FROM "org_memberships" WHERE "userId" = $1`, [userId]);
+      // F6: the units the user belongs to PLUS the units explicitly granted to them (access scopes) — one statement, same cost as before
+      const rows: Array<{ orgUnitId: string }> = await manager.query(
+        `SELECT "orgUnitId" FROM "org_memberships" WHERE "userId" = $1 UNION SELECT "orgUnitId" FROM "access_scopes" WHERE "userId" = $1`,
+        [userId],
+      );
       return rows.map((r) => r.orgUnitId);
     } catch {
-      return []; // a Company database without the org tables yet: no org scope, never a failure of /auth/me
+      try {
+        const rows: Array<{ orgUnitId: string }> = await manager.query(`SELECT "orgUnitId" FROM "org_memberships" WHERE "userId" = $1`, [userId]); // a database not yet migrated to F6
+        return rows.map((r) => r.orgUnitId);
+      } catch {
+        return []; // a Company database without the org tables yet: no org scope, never a failure of /auth/me
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In, Raw } from 'typeorm';
 import { WarehouseTransaction } from '../infrastructure/warehouse-transaction.entity';
 import { WarehouseTransactionLine } from '../infrastructure/warehouse-transaction-line.entity';
 import { WarehouseTransactionType, NUMBERING_SERIES_BY_TYPE, NO_APPROVAL_REQUIRED } from '../domain/warehouse-transaction-type';
@@ -247,7 +247,7 @@ export class WarehouseTransactionsService {
    * per-product/warehouse minimum-stock threshold exists to compare
    * against yet.
    */
-  async getOverview(manager?: EntityManager): Promise<{
+  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<{
     totalWarehouses: number;
     totalInventoryValueAtSellingPrice: string;
     todaysMovementsCount: number;
@@ -256,17 +256,19 @@ export class WarehouseTransactionsService {
     openCountsCount: number;
     negativeStockItems: Array<{ warehouseId: string; productId: string; onHand: number }>;
   }> {
-    const [warehouses, stockReport, products, allTransactions] = await Promise.all([
+    const [allWarehouses, stockReport, products, allTransactions] = await Promise.all([
       this.inventory.listWarehouses(manager),
-      this.inventory.getStockReport(undefined, manager),
+      this.inventory.getStockReport(undefined, manager, visibleWarehouseIds),
       this.products.listAllProducts(manager),
-      this.listTransactions({}, manager),
+      this.listTransactions({ visibleWarehouseIds }, manager),
     ]);
+    // F6 — the KPIs describe the caller's visible warehouses only (filtered before aggregation)
+    const warehouses = visibleWarehouseIds ? allWarehouses.filter((w) => visibleWarehouseIds.includes(w.id)) : allWarehouses;
     const priceById = new Map(products.map((p) => [p.id, Number(p.unitPrice)]));
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString() }, manager);
+    const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString(), visibleWarehouseIds }, manager);
 
     return {
       totalWarehouses: warehouses.length,
@@ -281,15 +283,24 @@ export class WarehouseTransactionsService {
     };
   }
 
+  /** F6 — a transaction is visible only when EVERY warehouse it involves (source and, for a transfer, destination) is among the caller's visible warehouses. */
+  private applyVisibility(where: Record<string, unknown>, visibleWarehouseIds?: string[]): void {
+    if (!visibleWarehouseIds) return;
+    if (!where.warehouseId) where.warehouseId = In(visibleWarehouseIds);
+    else if (!visibleWarehouseIds.includes(where.warehouseId as string)) where.warehouseId = In([]); // an explicit filter on a warehouse outside the scope: nothing
+    where.destinationWarehouseId = Raw((col) => `(${col} IS NULL OR ${col} = ANY(:visible))`, { visible: visibleWarehouseIds });
+  }
+
   /** Backs the Movement Center / Warehouse screen's transaction list — filterable by warehouse/type, newest first. */
   async listTransactions(
-    filters: { warehouseId?: string; type?: WarehouseTransactionType },
+    filters: { warehouseId?: string; type?: WarehouseTransactionType; visibleWarehouseIds?: string[] },
     manager?: EntityManager,
   ): Promise<Array<WarehouseTransaction & { state: string }>> {
     const repo = (manager ?? this.dataSource).getRepository(WarehouseTransaction);
     const where: Record<string, unknown> = {};
     if (filters.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters.type) where.type = filters.type;
+    this.applyVisibility(where, filters.visibleWarehouseIds);
     const rows = await repo.find({ where, order: { createdAt: 'DESC' } });
     return Promise.all(rows.map(async (r) => ({ ...r, state: await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, r.id, manager) })));
   }
@@ -307,13 +318,14 @@ export class WarehouseTransactionsService {
    * now bounded to one page's worth of rows instead of the whole table.
    */
   async listTransactionsPage(
-    filters: { warehouseId?: string; type?: WarehouseTransactionType; page: number; pageSize: number },
+    filters: { warehouseId?: string; type?: WarehouseTransactionType; page: number; pageSize: number; visibleWarehouseIds?: string[] },
     manager?: EntityManager,
   ): Promise<{ rows: Array<WarehouseTransaction & { state: string }>; total: number }> {
     const repo = (manager ?? this.dataSource).getRepository(WarehouseTransaction);
     const where: Record<string, unknown> = {};
     if (filters.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters.type) where.type = filters.type;
+    this.applyVisibility(where, filters.visibleWarehouseIds);
     const [rows, total] = await repo.findAndCount({
       where,
       order: { createdAt: 'DESC' },
