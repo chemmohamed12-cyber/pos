@@ -5,6 +5,7 @@ import { EntitlementService } from '../entitlement/entitlement.service';
 import { PermissionService } from '../permission/permission.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { CompanyEntitlementService } from '../plans/company-entitlement.service';
+import { AuthorizationContext } from '../authorization/authorization-context';
 
 export interface NavItemView {
   to: string;
@@ -38,11 +39,13 @@ export class NavigationService {
     registry: readonly NavGroup[] = NAVIGATION_REGISTRY,
     /** A Membership-VALIDATED Company (see `CompanyViewContextService`) — when present, entitlement is the Company's package and roles/permissions come from the Company's own database. */
     company?: { companyId: string; manager: EntityManager } | null,
+    /** F1.4 — the request-scoped AuthorizationContext (one load for the whole request). When supplied, every role/permission check below is an in-memory lookup; when absent (legacy callers/specs) the pre-F1 per-check queries run unchanged. */
+    ctx?: AuthorizationContext,
   ): Promise<NavGroupView[]> {
     const resolved =
       company && this.companyEntitlement ? await this.companyEntitlement.resolve(company.companyId) : this.entitlement.resolve();
     const manager = company?.manager;
-    const userRoles = await this.authorization.getRoleKeysForUser(userId, manager);
+    const userRoles = ctx ? ctx.roleKeys : await this.authorization.getRoleKeysForUser(userId, manager);
 
     const groups: NavGroupView[] = [];
     for (const group of registry) {
@@ -50,7 +53,7 @@ export class NavigationService {
       for (const item of group.items) {
         if (item.module && !resolved.modules.has(item.module)) continue;
         if (item.feature && !resolved.features.has(item.feature)) continue;
-        if (item.permissionNode && !(await this.permission.hasAtLeast(userId, item.permissionNode, 'read-only', manager))) continue;
+        if (item.permissionNode && !(ctx ? ctx.hasAtLeast(item.permissionNode, 'read-only') : await this.permission.hasAtLeast(userId, item.permissionNode, 'read-only', manager))) continue;
         if (item.roles && !item.roles.some((r) => userRoles.includes(r))) continue;
         items.push({ to: item.to, code: item.code });
       }

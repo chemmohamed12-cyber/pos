@@ -9,6 +9,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { IdentityModule } from '../identity/identity.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { CompanyModule } from '../company/company.module';
+import { DatabaseRegistryModule } from '../database-registry/database-registry.module';
+import { AuthMeService } from './auth-me.service';
 
 @Module({
   imports: [
@@ -22,9 +24,10 @@ import { CompanyModule } from '../company/company.module';
     // Management (2026-09-24) made this circular: CompanyModule's own
     // controllers now need JwtAuthGuard from THIS module.
     forwardRef(() => CompanyModule),
+    DatabaseRegistryModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, AuthMeService, JwtAuthGuard],
   // JwtModule AND IdentityModule are re-exported (not just
   // AuthService/JwtAuthGuard) because JwtAuthGuard's OWN constructor
   // needs JwtService, UsersService, AND AppConfigService — any module

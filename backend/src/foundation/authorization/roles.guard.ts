@@ -1,6 +1,7 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthorizationService } from './authorization.service';
+import { AuthorizationContextService } from './authorization-context.service';
 import { ROLES_METADATA_KEY } from './require-role.decorator';
 import { CompanyScopedRequest } from '../company/company-context.guard';
 
@@ -20,6 +21,8 @@ export class RolesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly authorization: AuthorizationService,
+    /** F1.1 — when present (always, under Nest DI) the roles come from the request-scoped AuthorizationContext (one load per request, shared with PermissionGuard). Optional only so legacy unit specs can construct the guard without it. */
+    @Optional() private readonly contexts?: AuthorizationContextService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,7 +52,7 @@ export class RolesGuard implements CanActivate {
     // Company boundary structural. Routes without `CompanyContextGuard`
     // are unaffected — `manager` is simply `undefined`.
     const manager = request.companyContext?.dataSource.manager;
-    const userRoles = await this.authorization.getRoleKeysForUser(request.user.id, manager);
+    const userRoles = this.contexts ? (await this.contexts.forRequest(request)).roleKeys : await this.authorization.getRoleKeysForUser(request.user.id, manager);
     const authorized = requiredRoles.some((role) => userRoles.includes(role));
     if (!authorized) {
       throw new ForbiddenException('Insufficient role for this action.');

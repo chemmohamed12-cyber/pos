@@ -63,7 +63,9 @@ const CANCELLABLE_STATES = new Set(['draft', 'submitted', 'approved']);
  * the id is what's actually sent to the backend.
  */
 export function PurchaseOrders() {
-  const { hasRole, user } = useAuth();
+  const { hasRole, user, authz, can } = useAuth();
+  // F1.3 — first `can()` consumer: the goods-receipt form is shown by the Company's own capability (the node the server enforces); falls back to the legacy role gate only while the authorization view is unavailable.
+  const canReceiveGoods = authz ? can('procurement.goods_receipt.create', 'editable') : hasRole('admin');
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -447,7 +449,7 @@ export function PurchaseOrders() {
               </tbody>
             </table>
 
-            {(detail.state === 'approved' || detail.state === 'partially_received') && hasRole('admin') && (
+            {(detail.state === 'approved' || detail.state === 'partially_received') && canReceiveGoods && (
               <button className="btn btn-primary" disabled={posting} onClick={onPostReceipt} style={{ marginBottom: 14 }}>
                 {t('action.post_goods_receipt')}
               </button>

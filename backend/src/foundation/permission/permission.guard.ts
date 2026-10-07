@@ -1,6 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionService } from './permission.service';
+import { AuthorizationContextService } from '../authorization/authorization-context.service';
 import { PERMISSION_METADATA_KEY, RequiredPermission } from './require-permission.decorator';
 import { CompanyScopedRequest } from '../company/company-context.guard';
 
@@ -30,6 +31,8 @@ export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly permission: PermissionService,
+    /** F1.1 — request-scoped AuthorizationContext (one load per request, shared with RolesGuard/navigation). Optional only so legacy unit specs can construct the guard without it. */
+    @Optional() private readonly contexts?: AuthorizationContextService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,7 +49,10 @@ export class PermissionGuard implements CanActivate {
 
     // Multi-Company Area 6 (2026-09-23) — see RolesGuard's identical comment.
     const manager = request.companyContext?.dataSource.manager;
-    const allowed = await this.permission.hasAtLeast(request.user.id, required.nodeKey, required.access, manager);
+    // F1.1: with the context service (always, under Nest DI) the decision is an in-memory lookup on the request's single load; a load error propagates (deny — never allow).
+    const allowed = this.contexts
+      ? (await this.contexts.forRequest(request)).hasAtLeast(required.nodeKey, required.access)
+      : await this.permission.hasAtLeast(request.user.id, required.nodeKey, required.access, manager);
     if (!allowed) {
       throw new NotFoundException();
     }

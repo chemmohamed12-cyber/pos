@@ -17,8 +17,9 @@ export class RetireHrDepartmentsIntoOrgUnits1789710000000 implements MigrationIn
   name = 'RetireHrDepartmentsIntoOrgUnits1789710000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "org_units" ADD COLUMN "code" VARCHAR(32)`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_org_units_code" ON "org_units" ("code") WHERE "code" IS NOT NULL`);
+    // IF NOT EXISTS (2026-10-07, Authorization F1.5): core migration 1790002000000 now ensures this column in every database; a Company that enables HR later must not collide with it.
+    await queryRunner.query(`ALTER TABLE "org_units" ADD COLUMN IF NOT EXISTS "code" VARCHAR(32)`);
+    await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "IDX_org_units_code" ON "org_units" ("code") WHERE "code" IS NOT NULL`);
 
     await queryRunner.query(`
       INSERT INTO "org_units" ("id", "type", "name", "code", "parentId", "createdAt")

@@ -9,6 +9,7 @@ import { UsersService } from '../identity/users.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { AppConfigService } from '../configuration/app-config.service';
 import { JWT_VERIFY_OPTIONS } from './jwt-constants';
+import { AuthMeService } from './auth-me.service';
 import { getLiveConfigEngine } from '../configuration-engine/live-config-accessor';
 
 /**
@@ -98,6 +99,7 @@ export class AuthController {
     private readonly authorization: AuthorizationService,
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
+    private readonly authMe: AuthMeService,
   ) {}
 
   /** The frontend's one source of truth for "who is logged in, with which roles" — drives role-based navigation and permission-aware actions. */
@@ -105,9 +107,9 @@ export class AuthController {
   @Get('me')
   async me(@Req() req: AuthenticatedRequest) {
     if (!req.user) throw new UnauthorizedException();
-    const user = await this.users.findById(req.user.id);
-    const roles = await this.authorization.getRoleKeysForUser(req.user.id);
-    return { success: true, data: { id: user.id, email: user.email, fullName: user.fullName, roles } };
+    // F1.2: Company-aware, ADDITIVE contract (identity/platform/company/membership/capabilities/scopes/entitlements/policyFlags/authzVersion/legacyRoles).
+    // The legacy fields (id/email/fullName/roles) keep their meaning. Nothing here is an authority — see AuthMeView.
+    return { success: true, data: await this.authMe.build(req) };
   }
 
   /**

@@ -65,7 +65,9 @@ const CREATABLE_PO_STATES = new Set(['partially_received', 'received', 'closed']
  * enforced server-side), post it to AP, then record payments against it.
  */
 export function SupplierInvoices() {
-  const { hasRole } = useAuth();
+  const { hasRole, authz, can } = useAuth();
+  // F1.3 — `can()` consumer: the payment form follows the Company capability the server enforces (`procurement.supplier_payment.create`); legacy role gate only while the authorization view is unavailable.
+  const canPaySupplier = authz ? can('procurement.supplier_payment.create', 'editable') : hasRole('admin');
   const { t, preload } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<Array<PurchaseOrderRow & { state: string }>>([]);
@@ -434,7 +436,7 @@ export function SupplierInvoices() {
 
             <FinancialTrace ids={[detail.id, ...paymentIds]} />
 
-            {(detail.state === 'posted' || detail.state === 'partially_paid') && hasRole('admin') && Number(detail.remaining) > 0 && (
+            {(detail.state === 'posted' || detail.state === 'partially_paid') && canPaySupplier && Number(detail.remaining) > 0 && (
               <form onSubmit={onRecordPayment} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <h4 style={{ margin: 0 }}>{t('action.record_payment')}</h4>
                 <div className="form-field" style={{ marginBottom: 0 }}>
