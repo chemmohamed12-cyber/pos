@@ -77,6 +77,17 @@ export class AuthService {
     return this.users.findById(user.id);
   }
 
+  /**
+   * F2 — creates the identity for an ACCEPTED Company invitation: active, with the invitee's own password, and NO role of any kind (not even
+   * `register`'s first-user bootstrap `admin`). Authority comes only from the Company membership the acceptance creates.
+   */
+  async createInvitedIdentity(email: string, fullName: string, password: string): Promise<User> {
+    const user = await this.users.create({ email, fullName });
+    await this.users.setStatus(user.id, 'active');
+    await this.setPassword(user.id, password);
+    return this.users.findById(user.id);
+  }
+
   /** Attaches a password to an already-created (Identity) user. Not a public self-registration endpoint. */
   async setPassword(userId: string, plainPassword: string): Promise<void> {
     const passwordHash = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
@@ -174,7 +185,7 @@ export class AuthService {
    * session-based "active Company" state to mutate in place.
    */
   async selectCompany(userId: string, companyId: string): Promise<TokenPair> {
-    const membership = await this.memberships.findByUserAndCompany(userId, companyId);
+    const membership = await this.memberships.findActiveByUserAndCompany(userId, companyId);
     if (!membership) {
       throw new UnauthorizedException('You are not a member of this Company.');
     }
@@ -188,6 +199,8 @@ export class AuthService {
     if (!isCompanyOperational(company.status)) {
       throw new CompanyNotReadyException();
     }
+    // F2: `lastAccessAt` is a best-effort stamp — it never blocks or fails a Company switch.
+    this.memberships.touchLastAccess(userId, companyId).catch(() => undefined);
     return this.issueTokenPair(userId, randomUUID(), companyId);
   }
 
@@ -230,7 +243,7 @@ export class AuthService {
     // Company context fast rather than mint a token `CompanyContextGuard`
     // would just reject on its first real use anyway.
     let companyId: string | null = record.companyId;
-    if (companyId && !(await this.memberships.findByUserAndCompany(record.userId, companyId))) {
+    if (companyId && !(await this.memberships.findActiveByUserAndCompany(record.userId, companyId))) {
       companyId = null;
     }
     // WP-4.1 / DP-9 D-6: the Company claim is NOT carried over when the Company

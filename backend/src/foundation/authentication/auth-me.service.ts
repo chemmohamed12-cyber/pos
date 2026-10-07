@@ -157,7 +157,7 @@ export class AuthMeService {
               m."id" AS "membershipId", m."createdAt" AS "membershipCreatedAt", c."name" AS "companyName", c."status" AS "companyStatus",
               ARRAY(SELECT r."key" FROM "user_roles" ur INNER JOIN "roles" r ON r."id" = ur."roleId" WHERE ur."userId" = u."id" ORDER BY r."key") AS "ambientRoleKeys"
          FROM "users" u
-         LEFT JOIN "user_company_memberships" m ON m."userId" = u."id" AND m."companyId" = $2
+         LEFT JOIN "user_company_memberships" m ON m."userId" = u."id" AND m."companyId" = $2 AND m."status" = 'active'
          LEFT JOIN "companies" c ON c."id" = m."companyId"
         WHERE u."id" = $1`,
       [userId, companyId],

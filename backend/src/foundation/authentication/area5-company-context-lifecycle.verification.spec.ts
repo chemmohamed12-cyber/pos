@@ -43,7 +43,7 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
   let jwtAuthGuard: JwtAuthGuard;
   let companyContextGuard: CompanyContextGuard;
   let jwt: JwtService;
-  const membershipsMock = { findByUserAndCompany: jest.fn() };
+  const membershipsMock = { findActiveByUserAndCompany: jest.fn(), touchLastAccess: jest.fn().mockResolvedValue(undefined) };
   const connectionsMock = { getDataSource: jest.fn() };
   const usersMock = { findById: jest.fn(), findByEmail: jest.fn() };
 
@@ -110,9 +110,9 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
     expect(baseRequest.user.companyId).toBeUndefined();
 
     // 2 + 3. Company Selection + Membership Validation (at mint time)
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
     const scopedTokens = await authService.selectCompany(USER_ID, COMPANY_ID);
-    expect(membershipsMock.findByUserAndCompany).toHaveBeenCalledWith(USER_ID, COMPANY_ID);
+    expect(membershipsMock.findActiveByUserAndCompany).toHaveBeenCalledWith(USER_ID, COMPANY_ID);
 
     // 4. Company-scoped JWT — a real, independently-verifiable signed token carrying the claim.
     const decoded = await jwt.verifyAsync<{ sub: string; companyId?: string }>(scopedTokens.accessToken, { secret: ACCESS_SECRET });
@@ -124,20 +124,20 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
     expect(scopedRequest.user.companyId).toBe(COMPANY_ID);
 
     // 6. Fresh Membership Validation — CompanyContextGuard re-checks the database, not the token's own claim.
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
     connectionsMock.getDataSource.mockResolvedValueOnce({ manager: { tag: 'company-manager' } });
     await companyContextGuard.canActivate(fakeGuardContext(scopedRequest));
-    expect(membershipsMock.findByUserAndCompany).toHaveBeenCalledWith(USER_ID, COMPANY_ID);
+    expect(membershipsMock.findActiveByUserAndCompany).toHaveBeenCalledWith(USER_ID, COMPANY_ID);
     expect(scopedRequest.companyContext).toEqual({ companyId: COMPANY_ID, dataSource: { manager: { tag: 'company-manager' } } });
   });
 
   it('Company Selection rejects a non-member BEFORE any Company-scoped JWT is minted', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce(null);
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce(null);
     await expect(authService.selectCompany(USER_ID, COMPANY_ID)).rejects.toThrow();
   });
 
   it('the JWT companyId claim alone is NEVER trusted — a still-valid, correctly-signed token is rejected once Membership is revoked', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
     const scopedTokens = await authService.selectCompany(USER_ID, COMPANY_ID);
 
     // The token itself is still perfectly valid (correct signature, not expired) — only the
@@ -145,7 +145,7 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
     const request = fakeHttpRequest(scopedTokens.accessToken) as CompanyScopedRequest;
     await jwtAuthGuard.canActivate(fakeGuardContext(request));
 
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce(null); // revoked between mint and this request
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce(null); // revoked between mint and this request
     await expect(companyContextGuard.canActivate(fakeGuardContext(request))).rejects.toThrow(ForbiddenException);
     expect(connectionsMock.getDataSource).not.toHaveBeenCalled(); // never even reaches the Company DB
   });
@@ -156,14 +156,14 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
     await jwtAuthGuard.canActivate(fakeGuardContext(request));
 
     await expect(companyContextGuard.canActivate(fakeGuardContext(request))).rejects.toThrow(ForbiddenException);
-    expect(membershipsMock.findByUserAndCompany).not.toHaveBeenCalled();
+    expect(membershipsMock.findActiveByUserAndCompany).not.toHaveBeenCalled();
   });
 
   it('refresh preserves the Company-scoped context only while Membership remains valid (lifecycle continuity)', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
     const scopedTokens = await authService.selectCompany(USER_ID, COMPANY_ID);
 
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm-1', userId: USER_ID, companyId: COMPANY_ID, roleKey: 'accountant' });
     const refreshed = await authService.refresh(scopedTokens.refreshToken);
 
     const decoded = await new JwtService({}).verifyAsync<{ sub: string; companyId?: string }>(refreshed.accessToken, { secret: ACCESS_SECRET });

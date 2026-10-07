@@ -9,7 +9,7 @@ import { AuthorizationService } from '../authorization/authorization.service';
 import { Role } from '../authorization/role.entity';
 import { UserRole } from '../authorization/user-role.entity';
 import { RolePermission } from '../permission/role-permission.entity';
-import { CompanyMembershipController } from './company-membership.controller';
+import { CompanyUsersController } from './company-users.controller';
 import { COMPANY_MEMBERS_MANAGE_NODE } from './company-role-seeding';
 
 /**
@@ -22,7 +22,7 @@ import { COMPANY_MEMBERS_MANAGE_NODE } from './company-role-seeding';
  * Composes the REAL chain:
  *   CompanyContextGuard → PermissionGuard → PermissionService
  *   → AuthorizationService → Company DataSource
- * against the REAL `CompanyMembershipController` class (its actual
+ * against the REAL `CompanyUsersController` class (its actual
  * class-level `@RequirePermission(core.company.members.manage, 'editable')`
  * decorator, not a stand-in), with the AMBIENT (platform) `Role`/
  * `UserRole`/`RolePermission` repos poisoned, and two Companies with
@@ -67,14 +67,14 @@ function makeCompanyDataSource(grantNodeForAdmin: string | null) {
 
 function fakeGuardContext(request: Partial<CompanyScopedRequest>): ExecutionContext {
   return {
-    getHandler: () => CompanyMembershipController.prototype.grant,
-    getClass: () => CompanyMembershipController,
+    getHandler: () => CompanyUsersController.prototype.invite,
+    getClass: () => CompanyUsersController,
     switchToHttp: () => ({ getRequest: () => request }),
   } as unknown as ExecutionContext;
 }
 
 describe('Permission-path composed isolation — CompanyContextGuard → PermissionGuard → PermissionService → Company DataSource', () => {
-  const membershipsMock = { findByUserAndCompany: jest.fn() };
+  const membershipsMock = { findActiveByUserAndCompany: jest.fn() };
   const connectionsMock = { getDataSource: jest.fn() };
   let companyContextGuard: CompanyContextGuard;
   let permissionGuard: PermissionGuard;
@@ -106,7 +106,7 @@ describe('Permission-path composed isolation — CompanyContextGuard → Permiss
   }
 
   it('grants access when the Company-scoped role actually holds core.company.members.manage, and never touches the ambient (poisoned) platform tables', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'alice', companyId: 'company-A', roleKey: 'admin' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'alice', companyId: 'company-A', roleKey: 'admin' });
     connectionsMock.getDataSource.mockResolvedValue(companyA.dataSource);
 
     // If PermissionGuard/PermissionService/AuthorizationService ever fell back to the ambient
@@ -115,7 +115,7 @@ describe('Permission-path composed isolation — CompanyContextGuard → Permiss
   });
 
   it('the SAME user\'s grant in Company A does NOT carry over to Company B — denied there despite being an "admin" in both', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-2', userId: 'alice', companyId: 'company-B', roleKey: 'admin' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-2', userId: 'alice', companyId: 'company-B', roleKey: 'admin' });
     connectionsMock.getDataSource.mockResolvedValue(companyB.dataSource);
 
     // Company B's own 'admin' role does NOT grant core.company.members.manage (only 'sales') —
@@ -124,7 +124,7 @@ describe('Permission-path composed isolation — CompanyContextGuard → Permiss
   });
 
   it('a user with no Membership in Company B is rejected at CompanyContextGuard — PermissionService/Company B\'s DataSource is never reached, regardless of any client-supplied companyId', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValue(null); // not a member of Company B at all
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValue(null); // not a member of Company B at all
 
     const request = { user: { id: 'mallory', email: 'mallory@x.com', companyId: 'company-B' } } as unknown as CompanyScopedRequest;
     await expect(companyContextGuard.canActivate(fakeGuardContext(request))).rejects.toThrow(ForbiddenException);

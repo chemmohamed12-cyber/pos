@@ -11,7 +11,11 @@ import { CompanyContextGuard } from './company-context.guard';
 import { MembershipOperation } from './membership-operation.entity';
 import { MembershipOperationService } from './membership-operation.service';
 import { MembershipReconciliationScheduler } from './membership-reconciliation.scheduler';
-import { CompanyMembershipController } from './company-membership.controller';
+import { CompanyUsersController } from './company-users.controller';
+import { CompanyInvitationsPublicController } from './company-invitations-public.controller';
+import { CompanyInvitation } from './company-invitation.entity';
+import { CompanyInvitationService } from './company-invitation.service';
+import { CompanyUserManagementService } from './company-user-management.service';
 import { InstallationMembershipController } from './installation-membership.controller';
 import { MembershipsMineController } from './memberships-mine.controller';
 import { CompanyRegistryController } from './company-registry.controller';
@@ -34,7 +38,7 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Company, Membership, MembershipOperation]),
+    TypeOrmModule.forFeature([Company, Membership, MembershipOperation, CompanyInvitation]),
     DatabaseRegistryModule,
     // `forwardRef` — Area 14 (2026-09-25) made AuditModule need
     // CompanyContextGuard back (for its own CompanyAuditController), the
@@ -54,7 +58,7 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     // circular shape as AuthenticationModule above, same fix.
     forwardRef(() => DatabaseProvisioningModule),
   ],
-  controllers: [CompanyMembershipController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
+  controllers: [CompanyUsersController, CompanyInvitationsPublicController, InstallationMembershipController, MembershipsMineController, CompanyRegistryController],
   providers: [
     CompanyService,
     CompanyRegistryService,
@@ -64,6 +68,8 @@ import { DatabaseProvisioningModule } from '../database-provisioning/database-pr
     CompanyContextGuard,
     MembershipOperationService,
     MembershipReconciliationScheduler,
+    CompanyUserManagementService,
+    CompanyInvitationService,
   ],
   exports: [
     TypeOrmModule,

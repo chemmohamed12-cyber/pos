@@ -30,7 +30,7 @@ export class CompanyViewContextService {
 
   async resolve(user: { id: string; companyId?: string | null }): Promise<CompanyViewContext | null> {
     if (!user.companyId) return null;
-    const membership = await this.memberships.findByUserAndCompany(user.id, user.companyId);
+    const membership = await this.memberships.findActiveByUserAndCompany(user.id, user.companyId);
     if (!membership) return null;
     try {
       const ds = await this.connections.getDataSource(user.companyId);

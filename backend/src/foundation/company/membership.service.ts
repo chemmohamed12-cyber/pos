@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Membership } from './membership.entity';
+import { Membership, MembershipStatus } from './membership.entity';
 
 /**
  * Multi-Company Phase 3 V7, Area 6. Plain CRUD only — no role-existence
@@ -15,12 +15,21 @@ import { Membership } from './membership.entity';
 export class MembershipService {
   constructor(@InjectRepository(Membership) private readonly memberships: Repository<Membership>) {}
 
-  async create(data: Pick<Membership, 'userId' | 'companyId' | 'roleKey'>): Promise<Membership> {
+  async create(data: Pick<Membership, 'userId' | 'companyId' | 'roleKey'> & Partial<Pick<Membership, 'status' | 'invitedBy'>>): Promise<Membership> {
     return this.memberships.save(this.memberships.create(data));
   }
 
+  /** The membership row in ANY status (provisioning / management paths). Access decisions use `findActiveByUserAndCompany`. */
   async findByUserAndCompany(userId: string, companyId: string): Promise<Membership | null> {
     return this.memberships.findOne({ where: { userId, companyId } });
+  }
+
+  /**
+   * F2: the membership that GRANTS ACCESS — `status = 'active'` only. A `suspended` member is a member (the row, history and roles stay) but is
+   * refused by `CompanyContextGuard`, `select-company`, refresh and the Company view on the very next request. Every access-deciding read uses this.
+   */
+  async findActiveByUserAndCompany(userId: string, companyId: string): Promise<Membership | null> {
+    return this.memberships.findOne({ where: { userId, companyId, status: 'active' } });
   }
 
   async findByCompany(companyId: string): Promise<Membership[]> {
@@ -36,6 +45,21 @@ export class MembershipService {
    */
   async findByUserId(userId: string): Promise<Membership[]> {
     return this.memberships.find({ where: { userId } });
+  }
+
+  /** F2 — suspend / re-activate the member's access to THIS Company only (never the identity). Bumps the authorization version. */
+  async setStatus(userId: string, companyId: string, status: MembershipStatus): Promise<void> {
+    await this.memberships.createQueryBuilder().update(Membership).set({ status, authzVersion: () => '"authzVersion" + 1' }).where('"userId" = :userId AND "companyId" = :companyId', { userId, companyId }).execute();
+  }
+
+  /** F2 — refreshes the compatibility mirror (`roleKey`) from the authority and bumps the authorization version. */
+  async setRoleMirror(userId: string, companyId: string, roleKey: string): Promise<void> {
+    await this.memberships.createQueryBuilder().update(Membership).set({ roleKey, authzVersion: () => '"authzVersion" + 1' }).where('"userId" = :userId AND "companyId" = :companyId', { userId, companyId }).execute();
+  }
+
+  /** F2 — `lastAccessAt` at `select-company`. Best effort by the caller (never blocks a login). */
+  async touchLastAccess(userId: string, companyId: string): Promise<void> {
+    await this.memberships.update({ userId, companyId }, { lastAccessAt: new Date() });
   }
 
   /** Multi-Company Area 6/5 (2026-09-23) — removes the platform-DB membership row. Callers needing the corresponding Company-DB `UserRole` deprovisioned too should use `CompanyMembershipProvisioningService.revokeMembership` instead of calling this directly. */

@@ -22,7 +22,7 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
   const jwtMock = { signAsync: jest.fn(async (payload: Record<string, unknown>) => `signed:${JSON.stringify(payload)}`) };
   const configMock = { auth: { accessSecret: 's', accessTtlSeconds: 900, refreshTtlDays: 7 } };
   const authorizationMock = { assignRole: jest.fn() };
-  const membershipsMock = { findByUserAndCompany: jest.fn() };
+  const membershipsMock = { findActiveByUserAndCompany: jest.fn(), touchLastAccess: jest.fn().mockResolvedValue(undefined) };
   const companiesMock = { findById: jest.fn() };
 
   beforeEach(() => {
@@ -43,13 +43,13 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
 
   describe('selectCompany', () => {
     it('rejects when the user is not a member of the requested Company — never issues a token', async () => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue(null);
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue(null);
       await expect(service.selectCompany('user-1', 'company-B')).rejects.toThrow(UnauthorizedException);
       expect(jwtMock.signAsync).not.toHaveBeenCalled();
     });
 
     it('issues a Company-scoped token pair when Membership is valid, embedding companyId as a JWT claim', async () => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
 
       const tokens = await service.selectCompany('user-1', 'company-A');
 
@@ -58,7 +58,7 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
     });
 
     it.each(['PROVISIONING', 'DEGRADED', 'SUSPENDED', 'MIGRATING', 'FAILED', 'DECOMMISSIONED'])('WP-4.1 (DP-9 D-4): a member selecting a %s Company is rejected with 409 COMPANY_NOT_READY — no token is signed or persisted', async (status) => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
       companiesMock.findById.mockResolvedValue({ id: 'company-A', status });
 
       const err = await service.selectCompany('user-1', 'company-A').catch((e: unknown) => e);
@@ -70,14 +70,14 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
     });
 
     it('WP-4.1: a non-member of a non-READY Company gets the Membership rejection (membership first — no state leak)', async () => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue(null);
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue(null);
       companiesMock.findById.mockResolvedValue({ id: 'company-A', status: 'SUSPENDED' });
       await expect(service.selectCompany('user-1', 'company-A')).rejects.toThrow(UnauthorizedException);
       expect(companiesMock.findById).not.toHaveBeenCalled();
     });
 
     it('WP-4.1: a Membership whose Company row is missing is rejected like a missing Membership and issues no token', async () => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
       companiesMock.findById.mockResolvedValue(null);
       await expect(service.selectCompany('user-1', 'company-A')).rejects.toThrow(UnauthorizedException);
       expect(jwtMock.signAsync).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
         revokedAt: null,
         expiresAt: new Date(Date.now() + 100_000),
       });
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
 
       const tokens = await service.refresh('raw-token');
 
@@ -112,7 +112,7 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
         revokedAt: null,
         expiresAt: new Date(Date.now() + 100_000),
       });
-      membershipsMock.findByUserAndCompany.mockResolvedValue(null); // revoked
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue(null); // revoked
 
       const tokens = await service.refresh('raw-token');
 
@@ -133,12 +133,12 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
       const tokens = await service.refresh('raw-token');
 
       expect(tokens.accessToken).not.toContain('companyId');
-      expect(membershipsMock.findByUserAndCompany).not.toHaveBeenCalled();
+      expect(membershipsMock.findActiveByUserAndCompany).not.toHaveBeenCalled();
     });
 
     it.each(['SUSPENDED', 'DECOMMISSIONED', 'DEGRADED', 'MIGRATING', 'FAILED', 'PROVISIONING'])('WP-4.1 (DP-9 D-6): refresh drops the companyId claim when the Company is %s — the refresh itself succeeds and the family is NOT revoked', async (status) => {
       refreshTokenRows.push({ id: 'rt-1', userId: 'user-1', family: 'family-1', companyId: 'company-A', tokenHash: hashToken('raw-token'), revokedAt: null, expiresAt: new Date(Date.now() + 100_000) });
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
       companiesMock.findById.mockResolvedValue({ id: 'company-A', status });
 
       const tokens = await service.refresh('raw-token');
@@ -150,7 +150,7 @@ describe('AuthService — Multi-Company Area 5 (2026-09-23, locked decision): se
 
     it('WP-4.1: refresh drops the claim when the Company row no longer exists', async () => {
       refreshTokenRows.push({ id: 'rt-1', userId: 'user-1', family: 'family-1', companyId: 'company-A', tokenHash: hashToken('raw-token'), revokedAt: null, expiresAt: new Date(Date.now() + 100_000) });
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
+      membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm-1', userId: 'user-1', companyId: 'company-A', roleKey: 'accountant' });
       companiesMock.findById.mockResolvedValue(null);
       expect((await service.refresh('raw-token')).accessToken).not.toContain('companyId');
     });

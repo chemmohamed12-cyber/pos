@@ -45,6 +45,12 @@ export class UsersService {
     return this.users.findOne({ where: { email } });
   }
 
+  /** F2 — invitation e-mails are normalised to lower case; identities may have been stored with any casing. */
+  async findByEmailInsensitive(email: string): Promise<User | null> {
+    const rows = await this.users.createQueryBuilder('u').where('LOWER(u."email") = LOWER(:email)', { email }).getMany();
+    return rows.length === 1 ? rows[0] : null;
+  }
+
   /**
    * Case-insensitive exact-name lookup — CRM Customer import (Gap G-5)
    * resolves a Sales Rep by name because that is the only identifier the

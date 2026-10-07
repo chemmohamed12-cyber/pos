@@ -82,6 +82,8 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
 export const api = {
   get: <T>(path: string) => apiFetch<T>('GET', path),
   post: <T>(path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }) => apiFetch<T>('POST', path, body, opts),
+  put: <T>(path: string, body?: unknown) => apiFetch<T>('PUT', path, body),
+  patch: <T>(path: string, body?: unknown) => apiFetch<T>('PATCH', path, body),
   delete: <T>(path: string) => apiFetch<T>('DELETE', path),
 };
 

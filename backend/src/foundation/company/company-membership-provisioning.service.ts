@@ -37,7 +37,7 @@ export class CompanyMembershipProvisioningService {
 
   private async countAdmins(companyId: string): Promise<number> {
     const all = await this.memberships.findByCompany(companyId);
-    return all.filter((m) => m.roleKey === ADMIN_ROLE_KEY).length;
+    return all.filter((m) => m.roleKey === ADMIN_ROLE_KEY && (m.status ?? 'active') === 'active').length; // F2: a suspended administrator cannot keep a Company administered
   }
 
   /** D1 — Membership Management never creates a `User`; it must already exist. Propagates `UsersService.findById`'s own `NotFoundException` unchanged. */

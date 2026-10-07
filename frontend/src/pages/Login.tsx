@@ -20,7 +20,14 @@ export function Login() {
     setBusy(true);
     try {
       await login(email, password);
-      navigate('/');
+      // F2: a person who came from an invitation link and chose "sign in" returns to that invitation to accept it.
+      let pending: string | null = null;
+      try {
+        pending = sessionStorage.getItem('daii_pending_invitation');
+      } catch {
+        /* ignore */
+      }
+      navigate(pending ? `/accept-invitation?token=${encodeURIComponent(pending)}` : '/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed.');
     } finally {

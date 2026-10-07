@@ -96,6 +96,8 @@ import { PendingWork } from './pages/PendingWork';
 import { Guide } from './pages/Guide';
 import { ReleaseCenter } from './pages/ReleaseCenter';
 import { Organization } from './pages/Organization';
+import { CompanyUsers } from './pages/CompanyUsers';
+import { AcceptInvitation } from './pages/AcceptInvitation';
 import { Reports } from './pages/Reports';
 import { ReportsCover } from './pages/covers/ReportsCover';
 import { ExternalIntegrations } from './pages/ExternalIntegrations';
@@ -167,6 +169,8 @@ function AppRoutes() {
           </RedirectIfAuthed>
         }
       />
+      {/* F2: the invitation link is the credential — reachable signed-out (preview / create account) and signed-in (accept). */}
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
       <Route
         path="/"
         element={
@@ -224,6 +228,7 @@ function AppRoutes() {
         <Route path="guide" element={<Guide />} />
         <Route path="release-center" element={<ReleaseCenter />} />
         <Route path="organization" element={<Organization />} />
+        <Route path="company-users" element={<CompanyUsers />} />
         <Route path="reports-overview" element={<ReportsCover />} />
         <Route path="reports" element={<Reports />} />
         <Route path="integrations" element={<ExternalIntegrations />} />

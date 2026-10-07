@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
-export type MembershipOperationType = 'grant' | 'revoke' | 'role_change';
+export type MembershipOperationType = 'grant' | 'revoke' | 'role_change' | 'role_set';
 export type MembershipOperationStatus = 'PENDING' | 'APPLYING' | 'COMPLETED' | 'FAILED' | 'RETRYING';
 
 /**
@@ -41,6 +41,13 @@ export class MembershipOperation {
 
   @Column({ type: 'varchar', length: 64, nullable: true })
   targetRoleKey!: string | null;
+
+  /** F2 `role_set`: the full role sets before/after. The Company DB (`user_roles`) is already updated when this is recorded; the ledger row tracks the platform MIRROR sync, which the reconciler can always recompute from the authority. */
+  @Column({ type: 'jsonb', nullable: true })
+  previousRoleKeys!: string[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  targetRoleKeys!: string[] | null;
 
   @Index()
   @Column({ type: 'varchar', length: 16 })

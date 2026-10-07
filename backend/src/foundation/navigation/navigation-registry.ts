@@ -445,6 +445,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // depends_on), so entitlement never restricts these; `roles` is
       // the whole gate, exactly as it is on their actual routes today.
       { to: '/organization', code: 'nav.organization', roles: ['admin'] },
+      // F2 (2026-10-07): the Company's own user directory, invitations and roles. `/company/users*` is gated by `core.company.members.manage` (read for the directory, editable for writes) on every route, so nav visibility and route access use the same axis.
+      { to: '/company-users', code: 'nav.company_users', permissionNode: 'core.company.members.manage' },
       { to: '/admin', code: 'nav.admin', roles: ['admin'] },
       { to: '/integrations', code: 'nav.integrations', roles: ['admin'] },
       { to: '/release-center', code: 'nav.release_center', roles: ['admin'] },

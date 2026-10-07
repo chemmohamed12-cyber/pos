@@ -6,6 +6,7 @@ import { CompanyConnectionManagerService } from '../database-registry/company-co
 import { AuditService } from '../audit/audit.service';
 import { provisionUserRoleForMembership, deprovisionUserRoleForMembership } from './membership-role-provisioning';
 import { MembershipOperation } from './membership-operation.entity';
+import { currentRoleKeys, primaryRoleKey } from './company-user-roles';
 
 const MAX_ATTEMPTS = 5;
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -70,6 +71,34 @@ export class MembershipReconciliationScheduler implements OnModuleInit, OnModule
     const retryable = await this.operations.findRetryable(MAX_ATTEMPTS);
     for (const op of retryable) {
       try {
+        if (op.operationType === 'role_set') {
+          // F2: the Company DB (`user_roles`) is the authority and is already committed; the only thing left to heal is the platform MIRROR, which is
+          // always recomputed from the authority (never from the ledger), so a stale/duplicate operation can never overwrite a newer decision.
+          const current = await this.memberships.findByUserAndCompany(op.userId, op.companyId);
+          if (current) {
+            await this.operations.markRetrying(op.id);
+            const ds = await this.connections.getDataSource(op.companyId);
+            await this.memberships.setRoleMirror(op.userId, op.companyId, primaryRoleKey(await currentRoleKeys(ds.manager, op.userId), current.roleKey));
+          }
+          await this.operations.markCompleted(op.id);
+          continue;
+        }
+        if (op.operationType === 'grant' && op.targetRoleKeys) {
+          // F2 invitation acceptance: replay the full role set (idempotent) while the membership still exists.
+          const current = await this.memberships.findByUserAndCompany(op.userId, op.companyId);
+          if (!current) {
+            await this.operations.markCompleted(op.id);
+            continue;
+          }
+          await this.operations.markRetrying(op.id);
+          const ds = await this.connections.getDataSource(op.companyId);
+          await ds.transaction(async (manager) => {
+            for (const key of op.targetRoleKeys!) await provisionUserRoleForMembership(manager, op.userId, key);
+            await this.recordCompanyAudit(op, 'company.membership.granted', manager, { after: { userId: op.userId, roleKeys: op.targetRoleKeys } });
+          });
+          await this.operations.markCompleted(op.id);
+          continue;
+        }
         if (op.operationType === 'grant' || op.operationType === 'role_change') {
           const current = await this.memberships.findByUserAndCompany(op.userId, op.companyId);
           if (!current || current.roleKey !== op.targetRoleKey) {

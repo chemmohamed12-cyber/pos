@@ -15,7 +15,14 @@ import { MembershipOperation, MembershipOperationType } from './membership-opera
 export class MembershipOperationService {
   constructor(@InjectRepository(MembershipOperation) private readonly operations: Repository<MembershipOperation>) {}
 
-  async start(userId: string, companyId: string, operationType: MembershipOperationType, previousRoleKey: string | null, targetRoleKey: string | null): Promise<MembershipOperation> {
+  async start(
+    userId: string,
+    companyId: string,
+    operationType: MembershipOperationType,
+    previousRoleKey: string | null,
+    targetRoleKey: string | null,
+    roleSets?: { previousRoleKeys?: string[] | null; targetRoleKeys?: string[] | null },
+  ): Promise<MembershipOperation> {
     return this.operations.save(
       this.operations.create({
         userId,
@@ -23,6 +30,8 @@ export class MembershipOperationService {
         operationType,
         previousRoleKey,
         targetRoleKey,
+        previousRoleKeys: roleSets?.previousRoleKeys ?? null,
+        targetRoleKeys: roleSets?.targetRoleKeys ?? null,
         status: 'PENDING',
         attempts: 0,
         lastError: null,
@@ -43,6 +52,11 @@ export class MembershipOperationService {
   async markFailed(id: string, error: string): Promise<void> {
     const op = await this.operations.findOneOrFail({ where: { id } });
     await this.operations.update({ id }, { status: 'FAILED', attempts: op.attempts + 1, lastError: error });
+  }
+
+  /** F2: the Company-side change was refused / rolled back before anything changed, so there is nothing for the reconciler to heal. Closed as COMPLETED with the reason kept in `lastError`. */
+  async markAborted(id: string, reason: string): Promise<void> {
+    await this.operations.update({ id }, { status: 'COMPLETED', lastError: `aborted: ${reason}`.slice(0, 500) });
   }
 
   async markRetrying(id: string): Promise<void> {

@@ -53,7 +53,7 @@ export class CompanyContextGuard implements CanActivate {
       throw new ForbiddenException('This route requires a Company context. Call POST /auth/select-company first.');
     }
 
-    const membership = await this.memberships.findByUserAndCompany(request.user.id, companyId);
+    const membership = await this.memberships.findActiveByUserAndCompany(request.user.id, companyId); // F2: a suspended member is refused exactly like a non-member
     if (!membership) {
       throw new ForbiddenException('You are not a member of this Company.');
     }

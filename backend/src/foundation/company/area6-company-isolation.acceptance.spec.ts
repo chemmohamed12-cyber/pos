@@ -52,7 +52,7 @@ function fakeGuardContext(request: Partial<CompanyScopedRequest>): ExecutionCont
 }
 
 describe('Area 6 acceptance — Company authorization isolation (composed guard chain, not mocked in isolation)', () => {
-  const membershipsMock = { findByUserAndCompany: jest.fn() };
+  const membershipsMock = { findActiveByUserAndCompany: jest.fn() };
   const connectionsMock = { getDataSource: jest.fn() };
   let companyContextGuard: CompanyContextGuard;
   let rolesGuard: RolesGuard;
@@ -83,7 +83,7 @@ describe('Area 6 acceptance — Company authorization isolation (composed guard 
   }
 
   it('1+2+3. the same user sees DIFFERENT, correctly-isolated roles in Company A vs Company B — no bleed either direction', async () => {
-    membershipsMock.findByUserAndCompany.mockImplementation(async (userId: string, companyId: string) =>
+    membershipsMock.findActiveByUserAndCompany.mockImplementation(async (userId: string, companyId: string) =>
       userId === 'alice' ? { id: 'm', userId, companyId, roleKey: companyId === 'company-A' ? 'accountant' : 'viewer' } : null,
     );
     connectionsMock.getDataSource.mockImplementation(async (companyId: string) => (companyId === 'company-A' ? companyA.dataSource : companyB.dataSource));
@@ -97,7 +97,7 @@ describe('Area 6 acceptance — Company authorization isolation (composed guard 
   });
 
   it('4+5. a user NOT a member of Company B is rejected before Company B\'s database is ever selected', async () => {
-    membershipsMock.findByUserAndCompany.mockImplementation(async (userId: string, companyId: string) => (userId === 'bob' && companyId === 'company-A' ? { id: 'm', userId, companyId, roleKey: 'accountant' } : null));
+    membershipsMock.findActiveByUserAndCompany.mockImplementation(async (userId: string, companyId: string) => (userId === 'bob' && companyId === 'company-A' ? { id: 'm', userId, companyId, roleKey: 'accountant' } : null));
 
     const request = { user: { id: 'bob', email: 'bob@x.com', companyId: 'company-B' } } as unknown as CompanyScopedRequest;
     await expect(companyContextGuard.canActivate(fakeGuardContext(request))).rejects.toThrow(ForbiddenException);
@@ -107,18 +107,18 @@ describe('Area 6 acceptance — Company authorization isolation (composed guard 
   });
 
   it('6. revoking Membership blocks access on the very next request — nothing cached from the prior successful one', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce({ id: 'm', userId: 'alice', companyId: 'company-A', roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce({ id: 'm', userId: 'alice', companyId: 'company-A', roleKey: 'accountant' });
     connectionsMock.getDataSource.mockResolvedValueOnce(companyA.dataSource);
     const firstRequest = { user: { id: 'alice', email: 'alice@x.com', companyId: 'company-A' } } as unknown as CompanyScopedRequest;
     await expect(companyContextGuard.canActivate(fakeGuardContext(firstRequest))).resolves.toBe(true);
 
-    membershipsMock.findByUserAndCompany.mockResolvedValueOnce(null); // revoked
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValueOnce(null); // revoked
     const secondRequest = { user: { id: 'alice', email: 'alice@x.com', companyId: 'company-A' } } as unknown as CompanyScopedRequest;
     await expect(companyContextGuard.canActivate(fakeGuardContext(secondRequest))).rejects.toThrow(ForbiddenException);
   });
 
   it('7. RolesGuard never falls back to the ambient (platform) tables for a Company-scoped request — proven by a poisoned ambient AuthorizationService', async () => {
-    membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'm', userId: 'alice', companyId: 'company-A', roleKey: 'accountant' });
+    membershipsMock.findActiveByUserAndCompany.mockResolvedValue({ id: 'm', userId: 'alice', companyId: 'company-A', roleKey: 'accountant' });
     connectionsMock.getDataSource.mockResolvedValue(companyA.dataSource);
 
     // If RolesGuard/AuthorizationService ever fell back to the ambient repos for this

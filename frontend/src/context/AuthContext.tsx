@@ -205,7 +205,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Unknown to the loaded list: still let the server decide (it rejects a non-member).
     const tokens = await api.post<{ accessToken: string }>('/auth/select-company', { companyId }, { skipUnauthorizedHandler: true });
     setAccessToken(tokens.accessToken);
-    setCompanyContext(null);
+    // The Company was not in the loaded list (e.g. just joined via an invitation): reload the list and derive the Company session from the SERVER's row.
+    const rows = await loadMemberships();
+    const joined = rows?.find((m) => m.companyId === companyId);
+    setCompanyContext(joined ? { companyId: joined.companyId, companyName: joined.companyName, status: joined.status, roleKey: joined.roleKey } : null);
     await refreshAuthz();
   }
 

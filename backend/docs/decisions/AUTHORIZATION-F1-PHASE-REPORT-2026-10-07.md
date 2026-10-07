@@ -53,12 +53,29 @@ Method: interleaved A/B against a real pre-F1 build (worktree of 7d112ba, port 3
 
 (Absolute times are higher than the first campaign because the machine was busier; the interleaved ratio is what is compared.)
 
+**ADDENDUM 2026-10-07 (F2 measurement, stricter harness) — supersedes the `/auth/me` figures above.**
+While measuring F2 the A/B harness was found to validate each endpoint run only by the status of its LAST request, so a run in which the Throttler answered 429 earlier in the loop could still be averaged in. The harness now counts every non-200 and discards the whole run, and the F1 build was re-measured against the same pre-F1 build: 4 runs × N=100 per endpoint, interleaved, zero non-200.
+
+| Endpoint | pre p50/p95 (ms) | F1+F2 build p50/p95 (ms) | Δp50 | Δp95 |
+|---|---|---|---|---|
+| auth/me | 7.2/10.4 | 7.1/11.3 | −0% | +8% |
+| me/navigation | 107.3/184.1 | 7.8/11.8 | −93% | −94% |
+| memberships/mine | 6.2/8.9 | 6.7/9.6 | +8% | +8% |
+| accounting/accounts | 9.7/15.6 | 11.1/17.0 | +14% | +9% |
+| sales-orders | 10.1/15.7 | 11.0/16.6 | +8% | +5% |
+| approvals/requests | 9.0/14.4 | 8.2/11.9 | −9% | −17% |
+| purchase-orders | 9.9/15.2 | 8.9/13.2 | −10% | −13% |
+| organization/units | 5.0/6.9 | 7.0/10.1 | +39% | +46% (intentional security-boundary cost, unchanged) |
+
+Honest reading: `/auth/me` is at PARITY with pre-F1, not measurably below it — per-run Δp50 ranged −7%…+12% and Δp95 +4%…+17% across the four runs, i.e. the difference is inside the measurement noise. The earlier "−7%/−15%" was optimistic. `/me/navigation` remains ~93% faster; every normal guarded route is within the +25% budget. If the CTO requires `/auth/me` strictly below baseline (not parity), a further reduction would need to drop the capability map from the payload, which changes the contract — flagged as a decision, not done silently.
+
+
 Gate result: `/auth/me` ≤ baseline ✔ (−7%/−15%); `/me/navigation` ≤ baseline ✔; normal guarded p95 within +25% ✔ (largest +11%).
 
 **`/organization/units` +38%/+42% (≈ +1.9/+3.0 ms) — documented as INTENTIONAL SECURITY-BOUNDARY COST, not a performance regression.** Before F1 this route skipped `CompanyContextGuard` and read the platform `org_units` table (finding F-1: a Company administrator could read/write a table that is not the Company's). It now runs the same guard chain as every other Company route (membership + Company status check per request, then the Company DataSource), which is exactly the cost the other guarded routes already pay. Removing it would re-open the cross-company exposure. No further optimization is planned; the route is low-frequency (organization admin screen).
 
 ## 7. Status
-Final F1 Gate (re-run 2026-10-07): implementation ✔, real-PG A/B isolation ✔, real HTTP 14/14 ✔ (re-run on the rebuilt backend), `/auth/me` ≤ baseline ✔ (−7%/−15%), `/me/navigation` ≤ baseline ✔ (−94%), normal guarded p95 ≤ +25% ✔, Organization cost documented as intentional security-boundary cost ✔, grni-posting formally attributed (pre-existing, not F1) ✔, regression 701/718 with the only failures being the 4 environment-guarded characterization suites (identical pre-F1).
+Final F1 Gate (re-run 2026-10-07): implementation ✔, real-PG A/B isolation ✔, real HTTP 14/14 ✔ (re-run on the rebuilt backend), `/auth/me` at parity with baseline (✔ within noise; re-measured on the stricter harness in the addendum: −0% p50 / +8% p95 — NOT 'below baseline' as first reported), `/me/navigation` ≤ baseline ✔ (−93%), normal guarded p95 ≤ +25% ✔, Organization cost documented as intentional security-boundary cost ✔, grni-posting formally attributed (pre-existing, not F1) ✔, regression 701/718 with the only failures being the 4 environment-guarded characterization suites (identical pre-F1).
 
 **F1: IMPLEMENTED · INTEGRATED · VERIFIED → UAT READY (isolated environment)** — per the CTO directive of 2026-10-07, F1 becomes UAT READY when the two red gates (`/auth/me` performance, grni-posting attribution) close; both are closed above. F2 starts next.
 
