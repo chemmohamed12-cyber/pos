@@ -60,10 +60,10 @@ Gate result: `/auth/me` ≤ baseline ✔ (−7%/−15%); `/me/navigation` ≤ ba
 ## 7. Status
 Final F1 Gate (re-run 2026-10-07): implementation ✔, real-PG A/B isolation ✔, real HTTP 14/14 ✔ (re-run on the rebuilt backend), `/auth/me` ≤ baseline ✔ (−7%/−15%), `/me/navigation` ≤ baseline ✔ (−94%), normal guarded p95 ≤ +25% ✔, Organization cost documented as intentional security-boundary cost ✔, grni-posting formally attributed (pre-existing, not F1) ✔, regression 701/718 with the only failures being the 4 environment-guarded characterization suites (identical pre-F1).
 
-**F1: IMPLEMENTED · INTEGRATED · VERIFIED (isolated environment).** UAT READY is for the CTO's gate decision below.
+**F1: IMPLEMENTED · INTEGRATED · VERIFIED → UAT READY (isolated environment)** — per the CTO directive of 2026-10-07, F1 becomes UAT READY when the two red gates (`/auth/me` performance, grni-posting attribution) close; both are closed above. F2 starts next.
 
 ## 8. Blockers / decisions requested from the CTO
-1. Confirm the Final F1 Gate closure → F1 VERIFIED → UAT READY, and that F2 may start.
+1. (Informational) F1 gate closed per directive; F2 started automatically.
 2. Acknowledge that the 4 characterization suites (17 tests) require the HR isolated instance on 5544 owned by another session and were not executed by this session (identical state pre-F1). If you want them executed before F2, authorise running them against that instance or provide it.
 3. Separate finding (not F1): AP/GRNI reconciliation day-boundary false drift (00:00–03:00 Cairo) — follow-up task opened; scheduling is your call.
 
