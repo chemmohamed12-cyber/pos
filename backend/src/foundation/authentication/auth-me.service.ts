@@ -89,29 +89,27 @@ export class AuthMeService {
 
     // Stage 1: ONE control-plane statement for identity + the platform role keys + Membership + Company (the Company claim in the JWT is honoured only
     // if this Membership exists — same rule as /me/navigation — otherwise the platform view).
+    // The Company-database reads for the CLAIMED Company are started speculatively, in parallel with the identity statement (one fewer sequential
+    // round trip). Their result is consumed ONLY if the Membership check below passes; otherwise it is discarded and never memoized on the request,
+    // so an unvalidated claim can neither surface data nor influence a later guard. The claim itself is a signed JWT field issued by select-company.
+    const speculative = claimed ? this.speculativeCompanyReads(req.user.id, claimed) : null;
     const identity = await this.identityRow(req.user.id, claimed);
     if (!identity) throw new NotFoundException('User not found.');
     const legacyRoles = identity.ambientRoleKeys ?? [];
 
     const member = claimed && identity.membershipId && identity.companyName !== null;
-    let manager: EntityManager | null = null;
-    if (member) {
-      try {
-        manager = (await this.connections.getDataSource(claimed as string)).manager;
-      } catch {
-        manager = null; // an unreachable Company database degrades to the platform view (same as CompanyViewContextService), never to partial Company data
-      }
-    }
-    const active = member && manager ? { companyId: claimed as string, manager } : null;
+    const reads = member && speculative ? await speculative : null; // null = Company DB unreachable
+    // An unreachable Company database degrades to the platform view (same as CompanyViewContextService), never to partial Company data.
+    const active = member && reads ? { companyId: claimed as string, manager: reads.manager } : null;
 
-    // Stage 2 (parallel): the authorization context of the ACTIVE domain (the validated Company's, or — in platform mode — the platform's), the
-    // entitlement and the org memberships. In Company mode the platform grants are NOT loaded: `platform.capabilities` is reserved for the
-    // `platform.*` namespace introduced in F4 (nothing consumes it before then), and `roles` already comes from the identity statement.
-    const [domainCtx, entitled, orgUnitIds] = await Promise.all([
-      active ? this.contexts.forRequest(req, active.manager) : legacyRoles.length > 0 ? this.contexts.load(req.user.id, null) : Promise.resolve(new AuthorizationContext(req.user.id, null, [], [])),
+    // Stage 2 (parallel): the entitlement, plus — in platform mode only — the platform authorization context. In Company mode the platform grants
+    // are NOT loaded: `platform.capabilities` is reserved for the `platform.*` namespace introduced in F4 (nothing consumes it before then), and
+    // `roles` already comes from the identity statement.
+    const [domainCtx, entitled] = await Promise.all([
+      active && reads ? Promise.resolve(reads.ctx) : legacyRoles.length > 0 ? this.contexts.load(req.user.id, null) : Promise.resolve(new AuthorizationContext(req.user.id, null, [], [])),
       this.entitledModules(active ? active.companyId : null),
-      active ? this.orgUnitIds(req.user.id, active.manager) : Promise.resolve([] as string[]),
     ]);
+    const orgUnitIds = active && reads ? reads.orgUnitIds : [];
     const ctx = domainCtx;
     const computed = this.compute(ctx, entitled.modules, active?.companyId ?? null);
     const platformCapabilities: Record<string, Level> = active ? {} : computed.capabilities;
@@ -140,6 +138,17 @@ export class AuthMeService {
       legacyRoles,
       legacy: { rolesSource: 'platform' },
     };
+  }
+
+  /** Company-DB reads for the claimed Company (authorization context + org memberships). NEVER rejects: any failure yields `null` (platform view). Not memoized on the request. */
+  private async speculativeCompanyReads(userId: string, companyId: string): Promise<{ manager: EntityManager; ctx: AuthorizationContext; orgUnitIds: string[] } | null> {
+    try {
+      const manager = (await this.connections.getDataSource(companyId)).manager;
+      const [ctx, orgUnitIds] = await Promise.all([this.contexts.load(userId, companyId, manager), this.orgUnitIds(userId, manager)]);
+      return { manager, ctx, orgUnitIds };
+    } catch {
+      return null;
+    }
   }
 
   private async identityRow(userId: string, companyId: string | null): Promise<IdentityRow | null> {

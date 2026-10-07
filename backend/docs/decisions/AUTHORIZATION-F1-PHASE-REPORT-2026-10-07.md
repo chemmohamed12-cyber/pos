@@ -27,35 +27,53 @@ Frontend: `lib/authz.ts`, `context/AuthContext.tsx`, `pages/procurement/{Purchas
 | Real HTTP against booted backend (script `f1-http.js`) | 14/14 |
 | Browser: Organization screen under Company token; GR form via `can()` | verified |
 
-## 4. Regression (affected areas: foundation, procurement, treasury, sales-orders, crm, inventory-warehouse)
-First run: 104 suites, **700/718**. Failures: the 4 characterization suites (need the HR instance on port 5544, owned by another session — NOT executed) and one `grni-posting` test that passes alone (2/2). Attribution run on the pre-F1 build: see §9.
+## 4. Regression (affected areas: foundation, procurement, accounting company-isolation, treasury, sales-orders, crm, inventory-warehouse)
+- Gate run #1 (before the `/auth/me` change): 104 suites, 700/718 — the 4 environment-guarded characterization suites + one `grni-posting` test (attributed in §9: pre-existing day-boundary defect, not F1).
+- **FINAL gate run (rebuilt code, outside the 00:00–03:00 Cairo window): 104 suites, 701/718 first run. The only 17 failing tests are the 4 characterization suites** (`provisioning-lifecycle`, `module-add-existing-company`, `limits-scope`, `ui-created-company-admin`), which refuse to start by design: they require the isolated HR instance on 127.0.0.1:5544 owned by another session ("Refusing to run: … DB_PORT=5544"). The identical 4 suites refuse identically on the pre-F1 build (95-suite pre-F1 run: same 4 environment refusals; the only other pre-F1 failure there was `build-release.spec`, an artefact of running inside the worktree). `grni-posting` 2/2 passes in the final run.
+- Not executed here, therefore NOT claimed: those 4 suites (17 tests). They exercise provisioning / limits / initial-admin flows, none of which F1 modifies; running them needs the 5544 instance (another session) — listed as an open item, not a hidden pass.
 
 ## 5. Security / isolation
 Same identity with two Company tokens gets two different authorization views (different company, membership id, authzVersion); forged `x-company-id`/`x-roles` headers and `companyId` query are ignored; forged bearer → 401; the org unit created under Verify Co is absent in Fresh Co 3 and the platform `org_units` table is untouched; platform token without Company → 403 on `/organization/units`. No privilege widening: context semantics proven equal to `resolve`.
 
-## 6. Performance (interleaved A/B vs real pre-F1 build, mean of 3 runs, N=150 each)
+## 6. Performance (Option A applied: `/auth/me` optimized, criterion NOT changed)
+Method: interleaved A/B against a real pre-F1 build (worktree of 7d112ba, port 3602) on the same isolated DBs, one client, alternating requests, N=150 per run. Samples where either side answered 429 (Throttler) are DISCARDED, never averaged in (5 valid runs for `organization/units`, 3 for the rest).
+
+**`/auth/me` optimization (CTO order, Option A).** The Company-database reads for the claimed Company (authorization context + org memberships) now start speculatively in parallel with the single control-plane identity statement, removing one sequential round trip. Safety is unchanged: the speculative result is consumed ONLY if the Membership check passes; otherwise it is discarded, is never memoized on the request (it uses `load`, not `forRequest`) and never reaches a guard; an unreachable Company DB still degrades to the platform view. Contract spec 8/8 (incl. forged/unvalidated claim), real HTTP 14/14 re-run on the rebuilt backend.
+
 | Endpoint | pre p50/p95 (ms) | F1 p50/p95 (ms) | Δp50 | Δp95 |
 |---|---|---|---|---|
-| health | 2.5/4.2 | 2.4/4.7 | −3% | +13% |
-| **auth/me** | 5.6/9.2 | 6.8/11.2 | **+20%** | **+22%** |
-| me/navigation | 87.4/141.4 | 9.9/15.1 | −89% | −89% |
-| memberships | 7.9/11.2 | 7.3/11.3 | −7% | +1% |
-| accounting/accounts | 8.3/12.7 | 8.7/13.7 | +5% | +8% |
-| sales-orders | 8.8/12.6 | 9.3/13.2 | +6% | +5% |
-| approvals/requests | 8.5/12.1 | 7.4/10.5 | −13% | −13% |
-| purchase-orders | 7.9/11.7 | 7.1/10.3 | −10% | −12% |
-| **organization/units** | 4.7/6.2 | 6.5/8.8 | **+39%** | **+41%** |
+| **auth/me** | 8.0/12.0 | 7.4/10.3 | **−7%** | **−15%** |
+| me/navigation | 138.4/192.5 | 8.6/13.0 | −94% | −93% |
+| memberships | 13.2/17.8 | 12.1/16.8 | −9% | −6% |
+| accounting/accounts | 13.5/17.4 | 14.5/19.2 | +8% | +11% |
+| sales-orders | 13.1/16.8 | 13.2/17.7 | +1% | +5% |
+| approvals/requests | 10.0/14.1 | 8.7/12.9 | −13% | −9% |
+| purchase-orders | 12.0/18.9 | 10.5/15.4 | −12% | −19% |
+| **organization/units** | 5.3/7.1 | 7.2/10.1 | **+38%** | **+42%** |
 
-Normal guarded routes are within the +25% budget. Two deviations:
-- `/auth/me`: +1.2/+2.0 ms absolute; the payload is now richer (Company roles, 359-node capability map, entitlements, scopes). The F1 criterion said "≤ baseline" — **not met literally**.
-- `/organization/units`: +1.8/+2.6 ms absolute; intentional — the route now runs the Company guard chain (membership + company status) it previously skipped (that was the F-1 leak).
+(Absolute times are higher than the first campaign because the machine was busier; the interleaved ratio is what is compared.)
+
+Gate result: `/auth/me` ≤ baseline ✔ (−7%/−15%); `/me/navigation` ≤ baseline ✔; normal guarded p95 within +25% ✔ (largest +11%).
+
+**`/organization/units` +38%/+42% (≈ +1.9/+3.0 ms) — documented as INTENTIONAL SECURITY-BOUNDARY COST, not a performance regression.** Before F1 this route skipped `CompanyContextGuard` and read the platform `org_units` table (finding F-1: a Company administrator could read/write a table that is not the Company's). It now runs the same guard chain as every other Company route (membership + Company status check per request, then the Company DataSource), which is exactly the cost the other guarded routes already pay. Removing it would re-open the cross-company exposure. No further optimization is planned; the route is low-frequency (organization admin screen).
 
 ## 7. Status
-IMPLEMENTED · INTEGRATED · VERIFIED (isolated env) with the two performance deviations above. Not UAT READY.
+Final F1 Gate (re-run 2026-10-07): implementation ✔, real-PG A/B isolation ✔, real HTTP 14/14 ✔ (re-run on the rebuilt backend), `/auth/me` ≤ baseline ✔ (−7%/−15%), `/me/navigation` ≤ baseline ✔ (−94%), normal guarded p95 ≤ +25% ✔, Organization cost documented as intentional security-boundary cost ✔, grni-posting formally attributed (pre-existing, not F1) ✔, regression 701/718 with the only failures being the 4 environment-guarded characterization suites (identical pre-F1).
+
+**F1: IMPLEMENTED · INTEGRATED · VERIFIED (isolated environment).** UAT READY is for the CTO's gate decision below.
 
 ## 8. Blockers / decisions requested from the CTO
-1. Accept the two deviations (recommended: absolute cost ≈ 2 ms, one is the security fix), **or** order further reduction of `/auth/me` before F2.
-2. Characterization suites (HR instance on 5544) remain unexecuted by this session.
+1. Confirm the Final F1 Gate closure → F1 VERIFIED → UAT READY, and that F2 may start.
+2. Acknowledge that the 4 characterization suites (17 tests) require the HR isolated instance on 5544 owned by another session and were not executed by this session (identical state pre-F1). If you want them executed before F2, authorise running them against that instance or provide it.
+3. Separate finding (not F1): AP/GRNI reconciliation day-boundary false drift (00:00–03:00 Cairo) — follow-up task opened; scheduling is your call.
 
-## 9. grni-posting attribution
-Pending the pre-F1 run; result appended below when available.
+## 9. grni-posting attribution (formal)
+**Verdict: PRE-EXISTING defect, NOT introduced by F1. Not a blocker for F1. Registered as a separate finding (follow-up task opened).**
+
+Evidence (all read-only on the isolated `d3verify_main`):
+1. `accounting_ap_reconciliation_runs` holds the failing run: `2026-10-06T23:57:33.850Z drift_found`, subledger 975.0000, GL −1050.0000, drift −75.0000. The very next run, 10 minutes later (`00:08:02Z`), is `matched` at 1125/−1125, and every run before 17:37Z and after 00:08Z is `matched`. The 75 is exactly the one invoice (5 × 15.00) posted 150 ms before the failing reconcile.
+2. Cause: the invoice's journal entry has `businessDate = 2026-10-06` (UTC-derived date, which is also the reconcile `asOfDate` default `new Date().toISOString().slice(0,10)`), while its `supplier_ledger_entries.entryDate` is `2026-10-07 02:57:33+03` (timestamptz, DB timezone Africa/Cairo). `SupplierLedgerService.getAllSupplierBalances` filters `"entryDate" < ($1::date + INTERVAL '1 day')` in the DB timezone, so the subledger excludes an invoice the GL includes. This happens only when the UTC date differs from the Cairo date, i.e. 00:00–03:00 Cairo time. At 03:08 Cairo (`00:08Z`) the dates agree and the same test passes.
+3. The failing run happened at 02:57 Cairo; the pre-F1 comparison run executed after 03:08 Cairo and therefore passed — it was a wall-clock coincidence, not an F1 effect. F1 alone-runs (4×) and the final regression (outside the window) pass.
+4. No F1 file touches `ap-reconciliation.service.ts`, `supplier-ledger.service.ts`, the ledger or event code.
+
+Consequence outside tests: AP reconciliation can report a **false drift** during 00:00–03:00 Cairo. Follow-up (separate scope, not F1): one consistent business-date source for the as-of default and the subledger filter, plus a clock-pinned regression test; the same UTC-vs-local default should be audited in the AR/Cash-Bank/Inventory/GRNI reconciliations and `closing-snapshot.service.ts`.
