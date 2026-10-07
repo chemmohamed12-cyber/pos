@@ -14,7 +14,7 @@ export interface AuthzView {
   identity: { id: string; email: string; fullName: string; status: string };
   platform: { roles: string[]; capabilities: Record<string, AccessLevel>; isPlatformAdmin: boolean };
   company: { id: string; name: string; status: string } | null;
-  membership: { id: string; roleKeys: string[]; roles: Array<{ key: string; type: string; titleCode: string | null }>; joinedAt: string } | null;
+  membership: { id: string; roleKeys: string[]; roles: Array<{ key: string; type: string; titleCode: string | null }>; joinedAt: string; kind?: 'member' | 'support'; expiresAt?: string | null } | null;
   capabilities: Record<string, AccessLevel>;
   scopes: { unrestricted: boolean; orgUnitIds: string[]; warehouseIds: string[]; departmentIds: string[]; ownOnly: boolean };
   entitlements: { modules: string[]; source: string | null };

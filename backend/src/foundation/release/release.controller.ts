@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -108,8 +109,7 @@ function redactErrorForResponse<T>(value: T): T {
  *   zero further migration needed as new leaf nodes are added.
  */
 @Controller('release')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@RequireRole('admin')
+@UseGuards(JwtAuthGuard, PlatformGuard)
 export class ReleaseController {
   constructor(
     private readonly backupManager: BackupManagerService,
@@ -122,15 +122,13 @@ export class ReleaseController {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('backups')
   async listBackups() {
     return redactErrorForResponse(await this.dataSource.getRepository(BackupRun).find({ order: { startedAt: 'DESC' }, take: 100 }));
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('backups/:id')
   async getBackup(@Param('id') id: string) {
     const run = await this.dataSource.getRepository(BackupRun).findOne({ where: { id } });
@@ -138,38 +136,33 @@ export class ReleaseController {
     return redactErrorForResponse({ run, artifacts });
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.backup', 'editable')
+  @RequirePlatform('platform.release.backup', 'editable')
   @Post('backups')
   async createBackup(@Req() req: AuthenticatedRequest) {
     return redactErrorForResponse(await this.backupManager.createBackup('manual', req.user.id));
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.backup', 'editable')
+  @RequirePlatform('platform.release.backup', 'editable')
   @Post('backups/artifacts/:artifactId/verify')
   async reverifyBackupArtifact(@Param('artifactId') artifactId: string) {
     return redactErrorForResponse(await this.backupManager.reverifyArtifact(artifactId));
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('restores/:id')
   async getRestore(@Param('id') id: string) {
     return this.dataSource.getRepository(RestoreOperation).findOne({ where: { id } });
   }
 
   /** Step 1 of 2 — read-only, never touches the database. Returns a `RestoreOperation` a human must review before calling `confirm` below. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('backups/:backupRunId/restore/preflight')
   async preflightRestore(@Param('backupRunId') backupRunId: string, @Req() req: AuthenticatedRequest) {
     return this.restoreManager.preflight(backupRunId, req.user.id);
   }
 
   /** Step 2 of 2 — the only endpoint in this codebase that actually overwrites live database content. Requires a `pending_confirmation` operation from `preflight` above, within its confirmation window. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('restores/:id/confirm')
   async confirmRestore(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.restoreManager.confirmAndRestore(id, req.user.id);
@@ -189,8 +182,7 @@ export class ReleaseController {
   // inside `BackupManagerService`/`RestoreManagerService` — never a direct
   // database selector reaching those services from here.
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('companies/:companyId/backups')
   async listCompanyBackups(@Param('companyId') companyId: string) {
     return redactErrorForResponse(
@@ -198,22 +190,19 @@ export class ReleaseController {
     );
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.backup', 'editable')
+  @RequirePlatform('platform.release.backup', 'editable')
   @Post('companies/:companyId/backups')
   async createCompanyBackup(@Param('companyId') companyId: string, @Req() req: AuthenticatedRequest) {
     return redactErrorForResponse(await this.backupManager.createBackup('manual', req.user.id, companyId));
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('companies/:companyId/backups/:backupRunId/restore/preflight')
   async preflightCompanyRestore(@Param('companyId') companyId: string, @Param('backupRunId') backupRunId: string, @Req() req: AuthenticatedRequest) {
     return this.restoreManager.preflight(backupRunId, req.user.id, companyId);
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('companies/:companyId/restores/:id/confirm')
   async confirmCompanyRestore(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     // `companyId` is re-validated INSIDE confirmAndRestore/preflight against the RestoreOperation's
@@ -228,37 +217,32 @@ export class ReleaseController {
   // rollback endpoints are the next increment — see
   // `ReleaseManagerService`'s doc comment for the explicit scope boundary.
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('releases')
   async listReleases() {
     return this.dataSource.getRepository(Release).find({ order: { uploadedAt: 'DESC' }, take: 100 });
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('releases/:id')
   async getRelease(@Param('id') id: string) {
     return this.dataSource.getRepository(Release).findOne({ where: { id } });
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'editable')
+  @RequirePlatform('platform.release.deploy', 'editable')
   @Post('releases')
   async registerRelease(@Body() dto: RegisterReleaseDto, @Req() req: AuthenticatedRequest) {
     return this.releaseManager.registerRelease(dto.manifest, dto.packageType, req.user.id);
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'editable')
+  @RequirePlatform('platform.release.deploy', 'editable')
   @Post('releases/:id/link-backup')
   async linkReleaseBackup(@Param('id') id: string, @Body() dto: LinkBackupDto, @Req() req: AuthenticatedRequest) {
     return this.releaseManager.linkVerifiedBackup(id, dto.backupRunId, req.user.id);
   }
 
   /** Read-only check — "would a deploy be allowed right now." Never itself deploys anything. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'read-only')
+  @RequirePlatform('platform.release.deploy', 'read-only')
   @Get('releases/:id/deployment-gate')
   async checkDeploymentGate(@Param('id') id: string) {
     return this.releaseManager.checkDeploymentGate(id);
@@ -273,16 +257,14 @@ export class ReleaseController {
    * Migration Preflight's own per-release compatibility gate that runs at
    * actual deploy time.
    */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'read-only')
+  @RequirePlatform('platform.release.deploy', 'read-only')
   @Get('releases/:id/upgrade-path')
   async resolveUpgradePath(@Param('id') id: string) {
     return this.releaseManager.resolveUpgradePath(id);
   }
 
   /** Read-only host/environment readiness (binaries, disk, DB, paths). Run before a deploy; the deploy runs it again itself (with the staged package) and STOPs on any critical fail. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'read-only')
+  @RequirePlatform('platform.release.deploy', 'read-only')
   @Get('preflight')
   async deployPreflightCheck() {
     return this.deployPreflight.runPreflight();
@@ -299,16 +281,14 @@ export class ReleaseController {
    * `buildTag` reads an optional `<appRoot>/dist/build-info.json`; absent →
    * `null` (never throws). `RELEASE_ENGINES_SPEC.md` rev-3 dependency #1.
    */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('version')
   getVersion() {
     return { version: readAppVersion(), buildTag: readBuildInfo(this.config.releaseExecution.appRoot).buildTag };
   }
 
   /** The real ZIP-upload entry point — validates, stages, and registers the release in one call. `registerRelease` (JSON-only, above) stays for tooling/tests that don't need a real zip. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'editable')
+  @RequirePlatform('platform.release.deploy', 'editable')
   @Post('releases/upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -329,8 +309,7 @@ export class ReleaseController {
     }
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.deploy', 'editable')
+  @RequirePlatform('platform.release.deploy', 'editable')
   @Post('releases/:id/deploy')
   async deployRelease(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.releaseExecution.deployRelease(id, req.user.id);
@@ -344,8 +323,7 @@ export class ReleaseController {
    * genuinely exercised) but `error_message` stays null and the
    * rollback-reason sidecar records `drill:<name>` (rev-3 dependency #3).
    */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.rollback', 'editable')
+  @RequirePlatform('platform.release.rollback', 'editable')
   @Post('releases/:id/rollback')
   async rollbackRelease(@Param('id') id: string, @Body('drill') drill: string | undefined, @Req() req: AuthenticatedRequest) {
     if (this.config.releaseDeploy.stagedActivation) {
@@ -355,8 +333,7 @@ export class ReleaseController {
   }
 
   /** The rollback-reason sidecar for a release — drill vs real-failure distinction (rev-3 dependency #3). */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('releases/:id/rollback-reason')
   async getReleaseRollbackReason(@Param('id') id: string) {
     return (await this.releaseExecution.readRollbackReason(id)) ?? { rollback_reason: null };
@@ -379,8 +356,7 @@ export class ReleaseController {
    * older attempts stay in the table (nothing deleted), this endpoint just
    * stops conflating them with the latest one.
    */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('releases/:id/migrations')
   async getReleaseMigrations(@Param('id') id: string) {
     const repo = this.dataSource.getRepository(ReleaseMigrationRun);
@@ -396,55 +372,48 @@ export class ReleaseController {
   // for reads. See `DataRepairService` for the full flow and why it is a
   // first-class capability rather than a runbook.
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('data-repairs')
   async listDataRepairs() {
     return this.dataRepair.list();
   }
 
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('data-repairs/:id')
   async getDataRepair(@Param('id') id: string): Promise<DataRepairRun> {
     return this.dataRepair.get(id);
   }
 
   /** Step 1 — create the run and capture the read-only UUID audit. Nothing in any business table changes. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('data-repairs')
   async createDataRepair(@Body() dto: CreateDataRepairDto, @Req() req: AuthenticatedRequest) {
     return this.dataRepair.createAndAudit(dto.kind, req.user.id);
   }
 
   /** Step 2 — generate the reviewable old→new id mapping (read-only). */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('data-repairs/:id/plan')
   async planDataRepair(@Param('id') id: string) {
     return this.dataRepair.plan(id);
   }
 
   /** Step 3 — tie a VERIFIED pre-repair backup to this repair (the gate). */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('data-repairs/:id/link-backup')
   async linkDataRepairBackup(@Param('id') id: string, @Body() dto: LinkBackupDto, @Req() req: AuthenticatedRequest) {
     return this.dataRepair.linkVerifiedBackup(id, dto.backupRunId, req.user.id);
   }
 
   /** Step 4 — run the repair in one transaction, then verify integrity. Only a "backup_linked" repair can be executed. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.restore', 'editable')
+  @RequirePlatform('platform.release.restore', 'editable')
   @Post('data-repairs/:id/execute')
   async executeDataRepair(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.dataRepair.execute(id, req.user.id);
   }
 
   /** Read-only — re-run integrity verification against the current DB state (e.g. after a restore). Does not mutate the stored run. */
-  @UseGuards(PermissionGuard)
-  @RequirePermission('system.release.view', 'read-only')
+  @RequirePlatform('platform.release.view', 'read-only')
   @Get('data-repairs/verify/now')
   async verifyDataRepairNow() {
     return this.dataRepair.verifyNow();

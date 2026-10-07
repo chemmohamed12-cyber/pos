@@ -44,6 +44,7 @@ import { DeliveryModule } from './domains/delivery/delivery.module';
 import { ReturnsModule } from './domains/returns/returns.module';
 import { CustomerFinanceModule } from './domains/customer-finance/customer-finance.module';
 import { AdminModule } from './foundation/admin/admin.module';
+import { PlatformModule } from './foundation/platform/platform.module';
 import { IntegrationsModule } from './foundation/integrations/integrations.module';
 import { ReportsModule } from './domains/reports/reports.module';
 import { ReleaseModule } from './foundation/release/release.module';
@@ -114,6 +115,7 @@ import { CommissionModule } from './domains/commission/commission.module';
     ReturnsModule,
     CustomerFinanceModule,
     AdminModule,
+    PlatformModule,
     IntegrationsModule,
     ReportsModule,
     HealthModule,

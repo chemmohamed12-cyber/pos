@@ -43,6 +43,8 @@ interface AuthContextValue {
   authz: AuthzView | null;
   /** F1.3 — `can('accounting.journal.post', 'editable')`: a lookup in the effective capabilities of the CURRENT Company. Show/enable hint, never a grant. */
   can: (node: string, level?: AccessLevel) => boolean;
+  /** F4 — a lookup in the caller's PLATFORM capabilities (`platform.*`, control-plane authority only). Show/enable hint, never a grant; the server re-verifies. */
+  canPlatform: (node: string, level?: AccessLevel) => boolean;
   /** F1.3 — is this org unit / warehouse / department inside the user's scope (hint; services enforce scope). */
   inScope: (kind: ScopeKind, id: string) => boolean;
   /** Active Company session, or null before one is selected. */
@@ -135,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = (node: string, level: AccessLevel = 'read-only') => canFrom(authz, node, level);
   const inScope = (kind: ScopeKind, id: string) => inScopeFrom(authz, kind, id);
+  const canPlatform = (node: string, level: AccessLevel = 'read-only') => !!authz && (authz.legacyRoles.includes('admin') || (({ 'read-only': 1, editable: 2 } as Record<string, number>)[authz.platform.capabilities[node] ?? ''] ?? 0) >= (level === 'editable' ? 2 : 1));
 
   function hasRole(...roles: string[]) {
     if (!user) return false;
@@ -214,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, hasRole, authz, can, inScope, companyContext, memberships, refreshMemberships, selectCompany }}
+      value={{ user, loading, login, logout, hasRole, authz, can, canPlatform, inScope, companyContext, memberships, refreshMemberships, selectCompany }}
     >
       {children}
     </AuthContext.Provider>

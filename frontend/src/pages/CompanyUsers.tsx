@@ -8,7 +8,7 @@ interface MemberRow {
   fullName: string;
   email: string;
   identityStatus: string;
-  membership: { id: string; status: 'active' | 'suspended' | string; joinedAt: string; lastAccessAt: string | null };
+  membership: { id: string; status: 'active' | 'suspended' | string; joinedAt: string; lastAccessAt: string | null; kind?: 'member' | 'support'; expiresAt?: string | null; reason?: string | null };
   roles: Array<{ key: string; type: string }>;
   isAdministrator: boolean;
 }
@@ -200,7 +200,11 @@ export function CompanyUsers() {
                 <td>{m.fullName}{isSelf ? (ar ? ' (أنت)' : ' (you)') : ''}</td>
                 <td style={{ direction: 'ltr', textAlign: 'start' }}>{m.email}</td>
                 <td>
-                  {editing === m.userId ? (
+                  {m.membership.kind === 'support' ? (
+                    <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }} data-testid="support-badge" title={m.membership.reason ?? ''}>
+                      {ar ? `وصول دعم المنصة (قراءة فقط) — ينتهي ${fmt(m.membership.expiresAt ?? null)}` : `Platform support access (read-only) — ends ${fmt(m.membership.expiresAt ?? null)}`}
+                    </span>
+                  ) : editing === m.userId ? (
                     <RolePicker roles={roles} ar={ar} selected={editRoles} onToggle={(k) => toggle(editRoles, setEditRoles, k)} />
                   ) : m.roles.length === 0 ? (
                     <span style={{ color: '#9ca3af' }}>{ar ? 'بلا أدوار' : 'no roles'}</span>
@@ -217,6 +221,10 @@ export function CompanyUsers() {
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {isSelf ? (
                       <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>—</span>
+                    ) : m.membership.kind === 'support' ? (
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => { if (window.confirm(ar ? 'إنهاء وصول الدعم الآن؟' : 'End this support access now?')) run(() => api.delete(`/company/users/${m.userId}`), ar ? 'تم إنهاء وصول الدعم.' : 'Support access ended.'); }}>
+                        {ar ? 'إنهاء الوصول' : 'End access'}
+                      </button>
                     ) : editing === m.userId ? (
                       <>
                         <button className="btn btn-primary" disabled={busy} onClick={() => run(async () => { await api.put(`/company/users/${m.userId}/roles`, { roleKeys: editRoles }); setEditing(null); }, ar ? 'تم حفظ الأدوار.' : 'Roles saved.')}>

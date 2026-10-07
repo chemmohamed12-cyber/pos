@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Controller, Get, Param, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
@@ -17,14 +18,14 @@ import { AuditRecord } from './audit-record.entity';
  * by this controller's existence.
  */
 @Controller('installation/companies/:companyId/audit')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@RequireRole('admin')
+@UseGuards(JwtAuthGuard, PlatformGuard)
 export class InstallationAuditController {
   constructor(
     private readonly connections: CompanyConnectionManagerService,
     private readonly audit: AuditService,
   ) {}
 
+  @RequirePlatform('platform.audit.view')
   @Get()
   async list(@Req() req: AuthenticatedRequest, @Param('companyId') companyId: string, @Query('action') action?: string, @Query('take') take?: string) {
     if (!req.user) throw new UnauthorizedException();

@@ -13,7 +13,7 @@ import { AuthorizationContext } from '../authorization/authorization-context';
 export const ADMIN_ROLE_KEYS: readonly string[] = ['admin', 'company_admin'];
 
 type CompanyUserErrorCode = 'LAST_ADMIN' | 'SELF_ROLE_CHANGE' | 'ROLE_EXCEEDS_GRANTOR' | 'UNKNOWN_ROLE' | 'NOT_A_MEMBER' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'ACCOUNT_EXISTS_SIGN_IN' | 'INVALID_INPUT'
-  | 'ROLE_NOT_FOUND' | 'ROLE_PROTECTED' | 'ROLE_IN_USE' | 'ROLE_EXISTS' | 'ROLE_INACTIVE' | 'ROLE_CUSTOMIZED' | 'UNKNOWN_NODE' | 'NODE_NOT_ENTITLED' | 'ADMINISTRATION_WOULD_BE_LOST' | 'NO_TEMPLATE_UPDATE';
+  | 'ROLE_NOT_FOUND' | 'ROLE_PROTECTED' | 'ROLE_IN_USE' | 'ROLE_EXISTS' | 'ROLE_INACTIVE' | 'ROLE_CUSTOMIZED' | 'UNKNOWN_NODE' | 'NODE_NOT_ENTITLED' | 'ADMINISTRATION_WOULD_BE_LOST' | 'NO_TEMPLATE_UPDATE' | 'SUPPORT_ACCESS_FIXED';
 
 const STATUS: Record<CompanyUserErrorCode, HttpStatus> = {
   LAST_ADMIN: HttpStatus.CONFLICT,
@@ -35,6 +35,7 @@ const STATUS: Record<CompanyUserErrorCode, HttpStatus> = {
   NODE_NOT_ENTITLED: HttpStatus.BAD_REQUEST,
   ADMINISTRATION_WOULD_BE_LOST: HttpStatus.CONFLICT,
   NO_TEMPLATE_UPDATE: HttpStatus.CONFLICT,
+  SUPPORT_ACCESS_FIXED: HttpStatus.CONFLICT,
 };
 
 /** Domain errors of the Company Users surface: a `DaiiException` (stable `code`, mapped HTTP status) so the error contract renders them uniformly. */

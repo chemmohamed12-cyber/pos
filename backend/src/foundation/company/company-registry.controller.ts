@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
@@ -84,8 +85,7 @@ interface CompanyView {
  * (the real DB-level FK, not a guessed error path).
  */
 @Controller('installation/companies')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@RequireRole('admin')
+@UseGuards(JwtAuthGuard, PlatformGuard)
 export class CompanyRegistryController {
   constructor(
     private readonly companyRegistry: CompanyRegistryService,
@@ -95,6 +95,7 @@ export class CompanyRegistryController {
     private readonly config: AppConfigService,
   ) {}
 
+  @RequirePlatform('platform.company.view')
   @Get()
   async list() {
     const companies = await this.companyRegistry.listVisible(INSTALLATION_SINGLETON_ID);
@@ -102,6 +103,7 @@ export class CompanyRegistryController {
     return { success: true, data: views };
   }
 
+  @RequirePlatform('platform.company.view')
   @Get(':id')
   async get(@Param('id') id: string) {
     const company = await this.companyRegistry.findById(id);
@@ -122,6 +124,7 @@ export class CompanyRegistryController {
    * here — that would be changing existing, already-verified service
    * behavior, out of this endpoint's scope.
    */
+  @RequirePlatform('platform.company.create', 'editable')
   @Post()
   async create(@Body() dto: CreateCompanyDto) {
     const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
@@ -176,16 +179,19 @@ export class CompanyRegistryController {
     }
   }
 
+  @RequirePlatform('platform.company.suspend', 'editable')
   @Post(':id/suspend')
   async suspend(@Param('id') id: string) {
     return { success: true, data: await this.transition(id, () => this.companyActivation.suspend(id)) };
   }
 
+  @RequirePlatform('platform.company.reactivate', 'editable')
   @Post(':id/reactivate')
   async reactivate(@Param('id') id: string) {
     return { success: true, data: await this.transition(id, () => this.companyActivation.reactivate(id)) };
   }
 
+  @RequirePlatform('platform.company.decommission', 'editable')
   @Post(':id/decommission')
   async decommission(@Param('id') id: string) {
     return { success: true, data: await this.transition(id, () => this.companyActivation.decommission(id)) };

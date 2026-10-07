@@ -31,7 +31,7 @@ export interface DirectoryRow {
   fullName: string;
   email: string;
   identityStatus: string;
-  membership: { id: string; status: string; joinedAt: string; lastAccessAt: string | null; invitedBy: string | null; authzVersion: number };
+  membership: { id: string; status: string; joinedAt: string; lastAccessAt: string | null; invitedBy: string | null; authzVersion: number; kind: 'member' | 'support'; expiresAt: string | null; reason: string | null };
   roles: Array<{ key: string; type: RoleType }>;
   isAdministrator: boolean;
 }
@@ -95,7 +95,7 @@ export class CompanyUserManagementService {
           fullName: u.fullName,
           email: u.email,
           identityStatus: u.status,
-          membership: { id: m.id, status: m.status, joinedAt: new Date(m.joinedAt).toISOString(), lastAccessAt: m.lastAccessAt ? new Date(m.lastAccessAt).toISOString() : null, invitedBy: m.invitedBy, authzVersion: m.authzVersion },
+          membership: { id: m.id, status: m.status, joinedAt: new Date(m.joinedAt).toISOString(), lastAccessAt: m.lastAccessAt ? new Date(m.lastAccessAt).toISOString() : null, invitedBy: m.invitedBy, authzVersion: m.authzVersion, kind: m.kind ?? 'member', expiresAt: m.expiresAt ? new Date(m.expiresAt).toISOString() : null, reason: m.reason ?? null },
           roles: keys.map((key) => ({ key, type: typeOf.get(key) ?? classifyRole(key) })),
           isAdministrator: keys.some((k) => ADMIN_ROLE_KEYS.includes(k)),
         } as DirectoryRow;
@@ -123,6 +123,7 @@ export class CompanyUserManagementService {
     }
     const membership = await this.memberships.findByUserAndCompany(targetUserId, companyId);
     if (!membership) throw new CompanyUserError('NOT_A_MEMBER', 'That user is not a member of this Company.');
+    if (membership.kind === 'support') throw new CompanyUserError('SUPPORT_ACCESS_FIXED', 'Support access carries a fixed read-only role; end the access instead.');
 
     const correlationId = randomUUID();
     let previous: string[] = [];
@@ -198,6 +199,7 @@ export class CompanyUserManagementService {
     if (actor.userId === targetUserId) throw new CompanyUserError('SELF_ROLE_CHANGE', 'You cannot change your own membership status.');
     const membership = await this.memberships.findByUserAndCompany(targetUserId, companyId);
     if (!membership) throw new CompanyUserError('NOT_A_MEMBER', 'That user is not a member of this Company.');
+    if (membership.kind === 'support') throw new CompanyUserError('SUPPORT_ACCESS_FIXED', 'Support access cannot be suspended; end the access instead.');
     if (membership.status === status) return;
     const correlationId = randomUUID();
     await companyDs.transaction(async (manager) => {
@@ -239,12 +241,12 @@ export class CompanyUserManagementService {
       if (beyond.length) throw new CompanyUserError('ROLE_EXCEEDS_GRANTOR', 'You can only remove members whose critical permissions you hold explicitly yourself.', { roles: [...new Set(beyond.map((g) => g.roleKey))], criticalNodes: [...new Set(beyond.map((g) => g.nodeKey))] });
       await replaceUserRoles(manager, targetUserId, []);
       await this.memberships.revoke(targetUserId, companyId);
-      await this.companyAudit(manager, actor.userId, 'membership.removed', targetUserId, correlationId, { roleKeys: removedRoles, status: membership.status }, null);
+      await this.companyAudit(manager, actor.userId, membership.kind === 'support' ? 'support_access.revoked' : 'membership.removed', targetUserId, correlationId, { roleKeys: removedRoles, status: membership.status, reason: membership.reason ?? null }, membership.kind === 'support' ? { by: 'company' } : null);
     });
     await this.audit.record({
       actorUserId: actor.userId,
       organizationId: null,
-      action: 'company.membership.removed',
+      action: membership.kind === 'support' ? 'platform.support_access.revoked' : 'company.membership.removed',
       resource: 'membership',
       resourceId: membership.id,
       result: 'success',

@@ -49,6 +49,20 @@ export class Membership {
   @Column({ type: 'timestamptz', nullable: true })
   lastAccessAt!: Date | null;
 
+  /** F4: `member` = a person who belongs to the Company; `support` = a platform user's explicit, reason-required, TIME-BOXED entry with a limited role (never a standing back door). */
+  @Column({ type: 'varchar', length: 16, default: 'member' })
+  kind!: 'member' | 'support';
+
+  /** Support access ends here; the access guards treat an expired row exactly like a missing one. `null` for ordinary members. */
+  @Column({ type: 'timestamptz', nullable: true })
+  expiresAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  reason!: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  grantedBy!: string | null;
+
   /** Bumped on every change to the member's roles / status (the cache-invalidation counter the Blueprint's authzVersion becomes). */
   @Column({ type: 'int', default: 1 })
   authzVersion!: number;

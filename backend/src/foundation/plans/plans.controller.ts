@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
@@ -63,8 +64,7 @@ class AssignPackageDto {
  * the rest of the control plane (the shared `api` helper has no PATCH).
  */
 @Controller('installation')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@RequireRole('admin')
+@UseGuards(JwtAuthGuard, PlatformGuard)
 export class PlansController {
   constructor(
     private readonly plans: PlanService,
@@ -72,27 +72,32 @@ export class PlansController {
   ) {}
 
   /** Every module with its dependencies and whether the installation licence includes it. */
+  @RequirePlatform('platform.plan.view')
   @Get('module-catalog')
   moduleCatalog() {
     return { success: true, data: this.plans.moduleCatalog() };
   }
 
+  @RequirePlatform('platform.plan.view')
   @Get('plans')
   async list() {
     return { success: true, data: await this.plans.list() };
   }
 
+  @RequirePlatform('platform.plan.view')
   @Get('plans/:code')
   async get(@Param('code') code: string) {
     return { success: true, data: await this.plans.get(code) };
   }
 
+  @RequirePlatform('platform.plan.manage', 'editable')
   @Post('plans')
   async create(@Req() req: AuthenticatedRequest, @Body() dto: CreatePlanDto) {
     if (!req.user) throw new UnauthorizedException();
     return { success: true, data: await this.plans.create(dto, req.user.id) };
   }
 
+  @RequirePlatform('platform.plan.manage', 'editable')
   @Post('plans/:code')
   async update(@Req() req: AuthenticatedRequest, @Param('code') code: string, @Body() dto: UpdatePlanDto) {
     if (!req.user) throw new UnauthorizedException();
@@ -101,11 +106,13 @@ export class PlansController {
     return { success: true, data: result };
   }
 
+  @RequirePlatform('platform.entitlement.view')
   @Get('companies/:companyId/package')
   async companyPackage(@Param('companyId', ParseUUIDPipe) companyId: string) {
     return { success: true, data: await this.packages.getForCompany(companyId) };
   }
 
+  @RequirePlatform('platform.entitlement.manage', 'editable')
   @Post('companies/:companyId/package')
   async assignPackage(@Req() req: AuthenticatedRequest, @Param('companyId', ParseUUIDPipe) companyId: string, @Body() dto: AssignPackageDto) {
     if (!req.user) throw new UnauthorizedException();

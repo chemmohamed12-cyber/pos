@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
@@ -35,20 +36,21 @@ class ChangeMembershipRoleDto {
  * existence, since it never sets or reads `companyContext` at all.
  */
 @Controller('installation/companies/:companyId/memberships')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@RequireRole('admin')
+@UseGuards(JwtAuthGuard, PlatformGuard)
 export class InstallationMembershipController {
   constructor(
     private readonly provisioning: CompanyMembershipProvisioningService,
     private readonly memberships: MembershipService,
   ) {}
 
+  @RequirePlatform('platform.membership.view')
   @Get()
   async list(@Param('companyId') companyId: string) {
     const rows = await this.memberships.findByCompany(companyId);
     return { success: true, data: rows };
   }
 
+  @RequirePlatform('platform.membership.grant', 'editable')
   @Post()
   async grant(@Req() req: AuthenticatedRequest, @Param('companyId') companyId: string, @Body() dto: GrantMembershipDto) {
     if (!req.user) throw new UnauthorizedException();
@@ -56,6 +58,7 @@ export class InstallationMembershipController {
     return { success: true, data: membership };
   }
 
+  @RequirePlatform('platform.membership.revoke', 'editable')
   @Delete(':userId')
   async revoke(@Req() req: AuthenticatedRequest, @Param('companyId') companyId: string, @Param('userId') userId: string) {
     if (!req.user) throw new UnauthorizedException();
@@ -63,6 +66,7 @@ export class InstallationMembershipController {
     return { success: true, data: { revoked: true } };
   }
 
+  @RequirePlatform('platform.membership.update', 'editable')
   @Patch(':userId')
   async changeRole(@Req() req: AuthenticatedRequest, @Param('companyId') companyId: string, @Param('userId') userId: string, @Body() dto: ChangeMembershipRoleDto) {
     if (!req.user) throw new UnauthorizedException();

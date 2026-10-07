@@ -63,7 +63,7 @@ function useNavigation() {
 }
 
 export function Layout() {
-  const { user, logout, companyContext, hasRole } = useAuth();
+  const { user, logout, companyContext, hasRole, canPlatform, authz } = useAuth();
   const { lang, setLang, t, preload } = useLanguage();
   const [openGroup, setOpenGroup] = useState<string | null>(loadOpenGroup);
   const { groups: visibleGroups, error: navError, retry: retryNav } = useNavigation();
@@ -98,7 +98,7 @@ export function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">Daii</div>
-        {hasRole('admin') && (
+        {(hasRole('admin') || canPlatform('platform.company.view') || canPlatform('platform.support.view')) && (
           // XNEXUS Control Plane — Installation-level, gated by the platform
           // `admin` role directly (same authorization axis as the backend's
           // `RolesGuard`/`@RequireRole('admin')` on `CompanyRegistryController`,
@@ -110,9 +110,21 @@ export function Layout() {
               <span className="nav-section-header-title">{t('module.control_plane')}</span>
             </div>
             <div className="nav-section-items">
-              <NavLink to="/control-plane" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-                {t('nav.company_registry')}
-              </NavLink>
+              {(hasRole('admin') || canPlatform('platform.company.view')) && (
+                <NavLink to="/control-plane" end className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                  {t('nav.company_registry')}
+                </NavLink>
+              )}
+              {canPlatform('platform.support.view') && (
+                <NavLink to="/control-plane/support" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                  {lang === 'ar' ? 'وصول الدعم' : 'Support access'}
+                </NavLink>
+              )}
+              {canPlatform('platform.role.view') && (
+                <NavLink to="/control-plane/roles" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                  {lang === 'ar' ? 'أدوار المنصة' : 'Platform roles'}
+                </NavLink>
+              )}
             </div>
           </div>
         )}
@@ -191,6 +203,13 @@ export function Layout() {
             convention (lib/companyScope.ts) for the day a lighter-weight switch
             replaces that reload — every Company-scoped screen under here must
             remount, never keep stale state, when companyContext changes. */}
+        {authz?.membership?.kind === 'support' && authz.membership.expiresAt && (
+          <div role="status" data-testid="support-banner" style={{ background: '#fef3c7', color: '#92400e', padding: '8px 16px', fontSize: '0.9rem' }}>
+            {lang === 'ar'
+              ? `وصول دعم محدد المدة إلى «${companyContext?.companyName ?? ''}» — للقراءة فقط — ينتهي ${new Date(authz.membership.expiresAt).toLocaleString('ar-EG')}`
+              : `Time-boxed support access to “${companyContext?.companyName ?? ''}” — read-only — ends ${new Date(authz.membership.expiresAt).toLocaleString('en-GB')}`}
+          </div>
+        )}
         <main className="content" key={companyRemountKey(companyContext?.companyId ?? null)}>
           <Outlet />
         </main>

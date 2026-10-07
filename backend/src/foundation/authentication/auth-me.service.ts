@@ -8,6 +8,7 @@ import { CompanyConnectionManagerService } from '../database-registry/company-co
 import { CompanyEntitlementService } from '../plans/company-entitlement.service';
 import { EntitlementService } from '../entitlement/entitlement.service';
 import { moduleOfNode, permissionCatalogNodes } from '../permission/permission-catalog';
+import { PLATFORM_NODE_KEYS } from '../platform/platform-nodes';
 
 /** Policy flags exposed to the UI (ESC-3, CTO 2026-10-06): document types where the maker cannot approve. A UX hint — the services enforce it. */
 const MAKER_CHECKER_DOCUMENTS = ['purchase_request', 'purchase_order'];
@@ -41,7 +42,7 @@ export interface AuthMeView {
   identity: { id: string; email: string; fullName: string; status: string };
   platform: { roles: string[]; capabilities: Record<string, Level>; isPlatformAdmin: boolean };
   company: { id: string; name: string; status: string } | null;
-  membership: { id: string; roleKeys: string[]; roles: AuthMeRole[]; joinedAt: string } | null;
+  membership: { id: string; roleKeys: string[]; roles: AuthMeRole[]; joinedAt: string; kind: 'member' | 'support'; expiresAt: string | null } | null;
   /** Effective node -> level for the CURRENT authorization domain (the Company's when one is active, else the platform's), entitlement-filtered. */
   capabilities: Record<string, Level>;
   scopes: { unrestricted: boolean; orgUnitIds: string[]; warehouseIds: string[]; departmentIds: string[]; ownOnly: boolean };
@@ -60,6 +61,8 @@ interface IdentityRow {
   status: string;
   membershipId: string | null;
   membershipCreatedAt: Date | null;
+  membershipKind: 'member' | 'support' | null;
+  membershipExpiresAt: Date | null;
   companyName: string | null;
   companyStatus: string | null;
   ambientRoleKeys: string[] | null;
@@ -105,14 +108,26 @@ export class AuthMeService {
     // Stage 2 (parallel): the entitlement, plus — in platform mode only — the platform authorization context. In Company mode the platform grants
     // are NOT loaded: `platform.capabilities` is reserved for the `platform.*` namespace introduced in F4 (nothing consumes it before then), and
     // `roles` already comes from the identity statement.
-    const [domainCtx, entitled] = await Promise.all([
-      active && reads ? Promise.resolve(reads.ctx) : legacyRoles.length > 0 ? this.contexts.load(req.user.id, null) : Promise.resolve(new AuthorizationContext(req.user.id, null, [], [])),
+    // F4: the control-plane authority is needed for `platform.capabilities` and, when no Company is active, as the domain context. The legacy `admin` (Super Admin alias)
+    // holds every platform node by definition, so in Company mode it needs NO extra statement; any other platform role loads its grants once, in parallel.
+    const isSuperAdmin = legacyRoles.includes('admin');
+    const needAmbient = legacyRoles.length > 0 && (!active || !isSuperAdmin);
+    const ambientCtx = needAmbient ? this.contexts.load(req.user.id, null) : Promise.resolve(new AuthorizationContext(req.user.id, null, [], []));
+    const [domainCtx, entitled, platformCtx] = await Promise.all([
+      active && reads ? Promise.resolve(reads.ctx) : ambientCtx,
       this.entitledModules(active ? active.companyId : null),
+      ambientCtx,
     ]);
     const orgUnitIds = active && reads ? reads.orgUnitIds : [];
     const ctx = domainCtx;
     const computed = this.compute(ctx, entitled.modules, active?.companyId ?? null);
-    const platformCapabilities: Record<string, Level> = active ? {} : computed.capabilities;
+    // F4: `platform.capabilities` = the caller's effective `platform.*` map (control-plane authority only; the legacy `admin` is the Super Admin alias). A UX hint like
+    // every capability — the platform guard re-verifies on each request.
+    const platformCapabilities: Record<string, Level> = {};
+    for (const node of PLATFORM_NODE_KEYS) {
+      const level = isSuperAdmin ? (node.endsWith('.view') ? 'read-only' : 'editable') : platformCtx.resolve(node);
+      if (level !== 'hidden') platformCapabilities[node] = level as Level;
+    }
 
     const roles: AuthMeRole[] = ctx.roles.map((r) => ({ key: r.key, type: classifyRole(r.key), titleCode: roleTitleCode(r.key) }));
     return {
@@ -123,7 +138,7 @@ export class AuthMeService {
       identity: { id: identity.id, email: identity.email, fullName: identity.fullName, status: identity.status },
       platform: { roles: legacyRoles, capabilities: platformCapabilities, isPlatformAdmin: legacyRoles.includes('admin') },
       company: active ? { id: active.companyId, name: identity.companyName as string, status: identity.companyStatus as string } : null,
-      membership: active ? { id: identity.membershipId as string, roleKeys: ctx.roleKeys, roles, joinedAt: new Date(identity.membershipCreatedAt as Date).toISOString() } : null,
+      membership: active ? { id: identity.membershipId as string, roleKeys: ctx.roleKeys, roles, joinedAt: new Date(identity.membershipCreatedAt as Date).toISOString(), kind: identity.membershipKind ?? 'member', expiresAt: identity.membershipExpiresAt ? new Date(identity.membershipExpiresAt).toISOString() : null } : null,
       capabilities: computed.capabilities,
       scopes: {
         unrestricted: ctx.roleKeys.some((k) => UNRESTRICTED_ROLE_KEYS.includes(k)),
@@ -154,10 +169,10 @@ export class AuthMeService {
   private async identityRow(userId: string, companyId: string | null): Promise<IdentityRow | null> {
     const rows = (await this.dataSource.query(
       `SELECT u."id" AS "id", u."email" AS "email", u."fullName" AS "fullName", u."status" AS "status",
-              m."id" AS "membershipId", m."createdAt" AS "membershipCreatedAt", c."name" AS "companyName", c."status" AS "companyStatus",
+              m."id" AS "membershipId", m."createdAt" AS "membershipCreatedAt", m."kind" AS "membershipKind", m."expiresAt" AS "membershipExpiresAt", c."name" AS "companyName", c."status" AS "companyStatus",
               ARRAY(SELECT r."key" FROM "user_roles" ur INNER JOIN "roles" r ON r."id" = ur."roleId" WHERE ur."userId" = u."id" ORDER BY r."key") AS "ambientRoleKeys"
          FROM "users" u
-         LEFT JOIN "user_company_memberships" m ON m."userId" = u."id" AND m."companyId" = $2 AND m."status" = 'active'
+         LEFT JOIN "user_company_memberships" m ON m."userId" = u."id" AND m."companyId" = $2 AND m."status" = 'active' AND (m."expiresAt" IS NULL OR m."expiresAt" > now())
          LEFT JOIN "companies" c ON c."id" = m."companyId"
         WHERE u."id" = $1`,
       [userId, companyId],

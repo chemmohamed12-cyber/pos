@@ -2,7 +2,8 @@ import { UnauthorizedException } from '@nestjs/common';
 import { InstallationMembershipController } from './installation-membership.controller';
 import { CompanyMembershipProvisioningService } from './company-membership-provisioning.service';
 import { MembershipService } from './membership.service';
-import { ROLES_METADATA_KEY } from '../authorization/require-role.decorator';
+import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { PLATFORM_PERMISSION_KEY, PlatformGuard } from '../platform/platform.guard';
 import { AuthenticatedRequest } from '../authentication/jwt-auth.guard';
 
 describe('InstallationMembershipController — Multi-Company Membership HTTP Management (D2/D3, 2026-09-24)', () => {
@@ -18,9 +19,15 @@ describe('InstallationMembershipController — Multi-Company Membership HTTP Man
     );
   });
 
-  it('requires the platform admin role — gated by RolesGuard, never CompanyContextGuard', () => {
-    const metadata = Reflect.getMetadata(ROLES_METADATA_KEY, InstallationMembershipController);
-    expect(metadata).toEqual(['admin']);
+  it('F4: gated by the PLATFORM guard (control-plane authority only, never CompanyContextGuard) — each route declares its platform.membership.* node', () => {
+    expect(Reflect.getMetadata('__guards__', InstallationMembershipController)).toContain(PlatformGuard);
+    const node = (name: string) => Reflect.getMetadata(PLATFORM_PERMISSION_KEY, (InstallationMembershipController.prototype as unknown as Record<string, object>)[name]);
+    expect(node('list')).toMatchObject({ node: 'platform.membership.view', access: 'read-only' });
+    expect(node('grant')).toMatchObject({ node: 'platform.membership.grant', access: 'editable' });
+    expect(node('revoke')).toMatchObject({ node: 'platform.membership.revoke', access: 'editable' });
+    expect(node('changeRole')).toMatchObject({ node: 'platform.membership.update', access: 'editable' });
+    void PATH_METADATA;
+    void METHOD_METADATA;
   });
 
   const fakeRequest = { user: { id: 'installation-admin-1', email: 'admin@platform.test' } } as unknown as AuthenticatedRequest;

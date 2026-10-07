@@ -3,9 +3,10 @@ import { AdminController } from './admin.controller';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { IdentityModule } from '../identity/identity.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [AuthorizationModule, AuthenticationModule, IdentityModule],
+  imports: [AuthorizationModule, AuthenticationModule, IdentityModule, AuditModule],
   controllers: [AdminController],
 })
 export class AdminModule {}

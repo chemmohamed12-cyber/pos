@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Body, Controller, Get, Optional, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsObject, IsString } from 'class-validator';
 import { EntitlementService } from './entitlement.service';
@@ -60,8 +61,8 @@ export class EntitlementController {
   }
 
   @Get('admin/entitlement')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.entitlement.view', 'read-only')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.entitlement.view', 'read-only', { legacyNodes: ['core.entitlement.view'] })
   adminView() {
     const e = this.entitlement.resolve();
     return { resolved: { ...e, modules: [...e.modules], features: [...e.features], limits: Object.fromEntries(e.limits) } };
@@ -69,8 +70,8 @@ export class EntitlementController {
 
   /** The endpoint P6's deploy step calls to apply a freshly-issued signed manifest. */
   @Post('admin/entitlement/apply')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.entitlement.apply', 'editable')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.entitlement.manage', 'editable', { legacyNodes: ['core.entitlement.apply'] })
   async apply(
     @Req() req: AuthenticatedRequest,
     @Body() dto: ApplyManifestDto,

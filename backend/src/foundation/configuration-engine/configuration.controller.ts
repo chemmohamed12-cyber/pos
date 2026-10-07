@@ -1,3 +1,4 @@
+import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Body, Controller, Delete, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { IsDefined, IsIn, IsOptional, IsString } from 'class-validator';
 import { ConfigurationEngineService } from './configuration-engine.service';
@@ -49,8 +50,8 @@ export class ConfigurationController {
   constructor(private readonly config: ConfigurationEngineService) {}
 
   @Get('keys')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.config.view', 'read-only')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.config.view', 'read-only', { legacyNodes: ['core.config.view'] })
   listKeys(@Req() req: AuthenticatedRequest, @Query('module') moduleCode?: string) {
     return this.config.keys(moduleCode).map((meta) => ({
       key: meta.key,
@@ -69,8 +70,8 @@ export class ConfigurationController {
   }
 
   @Get('keys/:key')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.config.view', 'read-only')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.config.view', 'read-only', { legacyNodes: ['core.config.view'] })
   getKey(@Req() req: AuthenticatedRequest, @Param('key') key: string) {
     const meta = this.config.describe(key);
     return {
@@ -85,8 +86,8 @@ export class ConfigurationController {
   }
 
   @Put('values/:key')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.config.edit', 'editable')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.config.edit', 'editable', { legacyNodes: ['core.config.edit'] })
   async setValue(@Req() req: AuthenticatedRequest, @Param('key') key: string, @Body() dto: SetValueDto) {
     await this.config.set(
       key,
@@ -98,8 +99,8 @@ export class ConfigurationController {
   }
 
   @Delete('values/:key')
-  @UseGuards(PermissionGuard)
-  @RequirePermission('core.config.edit', 'editable')
+  @UseGuards(PlatformGuard)
+  @RequirePlatform('platform.config.edit', 'editable', { legacyNodes: ['core.config.edit'] })
   async clearValue(
     @Req() req: AuthenticatedRequest,
     @Param('key') key: string,

@@ -15,7 +15,7 @@ import { Membership, MembershipStatus } from './membership.entity';
 export class MembershipService {
   constructor(@InjectRepository(Membership) private readonly memberships: Repository<Membership>) {}
 
-  async create(data: Pick<Membership, 'userId' | 'companyId' | 'roleKey'> & Partial<Pick<Membership, 'status' | 'invitedBy'>>): Promise<Membership> {
+  async create(data: Pick<Membership, 'userId' | 'companyId' | 'roleKey'> & Partial<Pick<Membership, 'status' | 'invitedBy' | 'kind' | 'expiresAt' | 'reason' | 'grantedBy'>>): Promise<Membership> {
     return this.memberships.save(this.memberships.create(data));
   }
 
@@ -29,7 +29,11 @@ export class MembershipService {
    * refused by `CompanyContextGuard`, `select-company`, refresh and the Company view on the very next request. Every access-deciding read uses this.
    */
   async findActiveByUserAndCompany(userId: string, companyId: string): Promise<Membership | null> {
-    return this.memberships.findOne({ where: { userId, companyId, status: 'active' } });
+    // F4: an EXPIRED support membership is refused exactly like a missing one (time-boxed access has no grace period).
+    return this.memberships
+      .createQueryBuilder('m')
+      .where('m."userId" = :userId AND m."companyId" = :companyId AND m."status" = :status AND (m."expiresAt" IS NULL OR m."expiresAt" > now())', { userId, companyId, status: 'active' })
+      .getOne();
   }
 
   async findByCompany(companyId: string): Promise<Membership[]> {

@@ -138,6 +138,8 @@ import { CompanyRegistry } from './pages/control-plane/CompanyRegistry';
 import { CreateCompany } from './pages/control-plane/CreateCompany';
 import { CompanyDetails } from './pages/control-plane/CompanyDetails';
 import { Plans } from './pages/control-plane/Plans';
+import { SupportAccess } from './pages/control-plane/SupportAccess';
+import { PlatformRoles } from './pages/control-plane/PlatformRoles';
 import './styles/ui.css';
 
 function WarehouseTransactionFormRoute() {
@@ -295,6 +297,8 @@ function AppRoutes() {
         <Route path="accounting/reports/cash-flow" element={<CashFlowStatement />} />
         <Route path="control-plane" element={<CompanyRegistry />} />
         <Route path="control-plane/plans" element={<Plans />} />
+        <Route path="control-plane/support" element={<SupportAccess />} />
+        <Route path="control-plane/roles" element={<PlatformRoles />} />
         <Route path="control-plane/companies/new" element={<CreateCompany />} />
         <Route path="control-plane/companies/:id" element={<CompanyDetails />} />
       </Route>

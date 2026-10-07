@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { LimitService } from './limit.service';
@@ -12,8 +12,8 @@ import { Role } from '../authorization/role.entity';
 import { UserRole } from '../authorization/user-role.entity';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { RolePermission } from '../permission/role-permission.entity';
-import { PermissionService } from '../permission/permission.service';
-import { PermissionGuard } from '../permission/permission.guard';
+import { AuthorizationContextService } from '../authorization/authorization-context.service';
+import { PlatformGuard } from '../platform/platform.guard';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../testing/two-company-real-pg-harness';
 import { Recorder, assertIsolatedInstance, dbConfig, hashFile, residueOf } from '../testing/saas-characterization.helpers';
 
@@ -30,12 +30,12 @@ describe('WP-0.5b characterization — /limits scope and Company limit editabili
   const rec = new Recorder();
   const PREFIX = 'wp05b_limits';
   const KEY = 'sales.max_customers';
-  const sources = ['src/foundation/limit-engine/limit.service.ts', 'src/foundation/limit-engine/limit.controller.ts', 'src/foundation/permission/permission.guard.ts', 'src/foundation/permission/permission.service.ts', 'src/foundation/testing/two-company-real-pg-harness.ts'];
+  const sources = ['src/foundation/limit-engine/limit.service.ts', 'src/foundation/limit-engine/limit.controller.ts', 'src/foundation/platform/platform.guard.ts', 'src/foundation/authorization/authorization-context.service.ts', 'src/foundation/testing/two-company-real-pg-harness.ts'];
   let h: TwoCompanyHarness;
   let platformDs: DataSource;
   let limits: LimitService;
   let controller: LimitController;
-  let guard: PermissionGuard;
+  let guard: PlatformGuard;
   let platformAdminId: string;
   let companyAdminId: string;
   let before: Record<string, string>;
@@ -64,7 +64,8 @@ describe('WP-0.5b characterization — /limits scope and Company limit editabili
     limits = new LimitService(platformDs, new LimitRegistrySeeder(platformDs, audit), audit);
     controller = new LimitController(limits);
     const authorization = new AuthorizationService(platformDs.getRepository(Role), platformDs.getRepository(UserRole));
-    guard = new PermissionGuard(new Reflector(), new PermissionService(platformDs.getRepository(RolePermission), authorization));
+    // F4 (2026-10-07): the /limits routes are PLATFORM routes — `PlatformGuard` + `@RequirePlatform('platform.limit.edit')` (legacy node `core.limit.edit` kept as an alias).
+    guard = new PlatformGuard(new Reflector(), new AuthorizationContextService(platformDs));
 
     const platformAdmin = await h.users.create({ fullName: 'WP05b Platform Admin', email: 'wp05b-platform-admin@test.local' });
     platformAdminId = platformAdmin.id;
@@ -82,16 +83,18 @@ describe('WP-0.5b characterization — /limits scope and Company limit editabili
     expect(await residueOf(`daii_test_${PREFIX}`)).toEqual([]);
   });
 
-  it('platform `admin` passes the /limits edit guard with NO Company context (permission evaluated on the platform database)', async () => {
+  it('platform `admin` passes the /limits edit guard with NO Company context (platform authority evaluated on the platform database)', async () => {
     await expect(guard.canActivate(ctxFor(platformAdminId))).resolves.toBe(true);
   });
 
   it('a Company A administrator is DENIED the /limits edit guard as the route is actually wired (no Company context → evaluated on the platform database); with Company A\'s context the outcome is RECORDED', async () => {
     const dsA = await h.connections.getDataSource(h.companyAId);
-    await expect(guard.canActivate(ctxFor(companyAdminId))).rejects.toBeInstanceOf(NotFoundException);
+    await expect(guard.canActivate(ctxFor(companyAdminId))).rejects.toBeInstanceOf(ForbiddenException);
     // Not how the route is wired (the controller has no CompanyContextGuard) — recorded because the Company
     // `admin` role is seeded by the core migrations and may itself hold `core.limit`.
+    // F4: the platform guard never reads a Company database, so supplying a Company context cannot change the outcome.
     const withContext = await guard.canActivate(ctxFor(companyAdminId, { dataSource: dsA })).then(() => 'allowed', () => 'denied');
+    expect(withContext).toBe('denied');
     const adminNodes = (await dsA.query(`SELECT rp."nodeKey" FROM "role_permissions" rp JOIN "roles" r ON r.id = rp."roleId" WHERE r."key" = 'admin' AND rp."nodeKey" LIKE 'core.%' ORDER BY rp."nodeKey"`)).map((r: { nodeKey: string }) => r.nodeKey);
     rec.record('companyAdminWithCompanyContext', withContext);
     rec.record('companyAdminCoreNodesInCompanyDb', adminNodes);

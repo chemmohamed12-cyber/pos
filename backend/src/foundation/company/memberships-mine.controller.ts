@@ -46,7 +46,7 @@ export class MembershipsMineController {
   async list(@Req() req: AuthenticatedRequest): Promise<{ success: true; data: MembershipMineRow[] }> {
     if (!req.user) throw new UnauthorizedException();
 
-    const rows = (await this.memberships.findByUserId(req.user.id)).filter((r) => r.status === 'active'); // F2: a suspended membership is not a selectable Company
+    const rows = (await this.memberships.findByUserId(req.user.id)).filter((r) => r.status === 'active' && (!r.expiresAt || new Date(r.expiresAt).getTime() > Date.now())); // F2/F4: a suspended or EXPIRED membership is not a selectable Company
     const companies = await this.companies.findByIds(rows.map((r) => r.companyId));
     const companyById = new Map(companies.map((c) => [c.id, c]));
 
