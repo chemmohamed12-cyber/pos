@@ -143,6 +143,18 @@ export const configurationValidationSchema = Joi.object({
   // null → audit + log only.
   RELEASE_NOTIFY_WEBHOOK: Joi.string().uri().allow(null, '').default(null),
 
+  // Company fan-out (CTO 2026-10-08). Whether a staged deploy also upgrades the EXISTING READY Company databases, not only the Platform database.
+  //   off     = Platform only; no Company database is read or written (audited as such). The default — the capability is enabled deliberately.
+  //   dry-run = plan only: discover READY Companies, derive each one's tags, report each one's pending migrations. Reads, never writes.
+  //   on      = back up each affected Company, move it READY -> MIGRATING, migrate it, MIGRATING -> READY; stop at the first failure (pre-swap, ACTIVE untouched).
+  // Requires RELEASE_STAGED_ACTIVATION=true (the legacy in-place path has no pre-swap point at which to run it).
+  RELEASE_COMPANY_MIGRATIONS: Joi.string().valid('off', 'dry-run', 'on').default('off'),
+  // How each affected Company gets its restore point before it is migrated.
+  //   create         = the engine takes (and verifies) a `pre_update` backup of that Company's own database first.
+  //   require-recent = a verified backup of that Company no older than RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS must already exist.
+  RELEASE_COMPANY_BACKUP_POLICY: Joi.string().valid('create', 'require-recent').default('create'),
+  RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS: Joi.number().integer().min(1).default(24),
+
   // Entitlement Engine (ERP Foundation P3) — DEPLOYMENT/verification config
   // (NOT business config; ADR-023 C5 keeps Edition/feature keys OUT of the
   // runtime Configuration Engine, but the manifest *verification* material

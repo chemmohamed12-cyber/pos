@@ -28,6 +28,7 @@ import { canonicalize } from '../entitlement/canonicalize';
 import { EntitlementManifest } from '../entitlement/manifest.type';
 import { computeInstallationFingerprint } from '../entitlement/installation-fingerprint';
 import { ModuleLifecycleService } from '../module-lifecycle/module-lifecycle.service';
+import { CompanyFanoutService, CompanyFanoutBlockedError, CompanyFanoutMode, CompanyFanoutPlan, CompanyFanoutResult, CompanyBackupEvidence, summarizePlan, summarizeResult } from './company-fanout.service';
 
 /**
  * Release Center — Execution Layer. The orchestrator for the CTO
@@ -77,7 +78,23 @@ export class ReleaseExecutionService {
      * carries `manifest.entitlement`, which no pre-P6 test does.
      */
     @Optional() private readonly moduleLifecycle?: ModuleLifecycleService,
+    /**
+     * Company fan-out (CTO 2026-10-08). Optional for the same reason as `moduleLifecycle` (manual-construction unit specs); the real DI container always
+     * provides it. Only consulted when `RELEASE_COMPANY_MIGRATIONS` is `dry-run` or `on`; with the default `off` no Company database is ever read or written.
+     */
+    @Optional() private readonly companyFanout?: CompanyFanoutService,
   ) {}
+
+  /**
+   * The effective fan-out mode. A configured `dry-run`/`on` with no fan-out service wired is a misconfiguration and fails LOUDLY — silently degrading to `off`
+   * would deploy new code over Company databases the operator believed were being upgraded.
+   */
+  private companyFanoutMode(): CompanyFanoutMode {
+    const configured = this.config.releaseDeploy?.companyMigrations;
+    if (configured !== 'dry-run' && configured !== 'on') return 'off';
+    if (!this.companyFanout) throw new Error(`RELEASE_COMPANY_MIGRATIONS=${configured} but no CompanyFanoutService is wired — refusing to deploy.`);
+    return configured;
+  }
 
   private stagingDirFor(releaseId: string): string {
     return join(this.config.releaseExecution.stagingPath, releaseId);
@@ -289,6 +306,11 @@ export class ReleaseExecutionService {
 
     const { appRoot } = this.config.releaseExecution;
 
+    // Company fan-out needs a pre-swap point to run in; only the staged path has one. Refuse BEFORE anything is touched (status still `backup_verified`).
+    if (this.companyFanoutMode() !== 'off' && !this.config.releaseDeploy.stagedActivation) {
+      throw new ConflictException('RELEASE_COMPANY_MIGRATIONS requires RELEASE_STAGED_ACTIVATION=true: the legacy in-place deploy has no pre-swap point at which to migrate Company databases.');
+    }
+
     release.status = 'deploying';
     await releaseRepo.save(release);
     await this.audit.record({
@@ -395,6 +417,11 @@ export class ReleaseExecutionService {
     let swapped = false;
     let entitlementApplied: { manifest: EntitlementManifest; signatureB64: string; prevText: string | null } | null = null;
     const migrationHeadBefore = await this.getMigrationHead();
+    // Company fan-out state (CTO 2026-10-08) — declared here so the failure audit below can report exactly who was migrated.
+    const fanMode = this.companyFanoutMode();
+    let fanPlan: CompanyFanoutPlan | null = null;
+    let fanBackups: CompanyBackupEvidence[] = [];
+    let fanResult: CompanyFanoutResult | null = null;
 
     try {
       // 1. build + verify CANDIDATE — nothing touches ACTIVE yet
@@ -466,6 +493,20 @@ export class ReleaseExecutionService {
         throw new PreSwapAbort(formatMigrationPreflight(preflightReport));
       }
 
+      // 1d. Company fan-out PLAN (CTO 2026-10-08). `off` (the default) is an audited, deliberate statement that no Company database is part of this deploy —
+      //     nothing about any Company is read. `dry-run`/`on` discover the READY Companies and compute each one's tags + pending migrations (read-only). A READY
+      //     Company that cannot be evaluated BLOCKS the deploy here, pre-swap, with ACTIVE untouched.
+      if (fanMode === 'off') {
+        await audit('release.deploy.company_fanout', 'success', { mode: 'off', note: 'Company databases are not part of this deployment (RELEASE_COMPANY_MIGRATIONS=off); none was read or written.' });
+      } else {
+        fanPlan = await this.companyFanout!.plan(candidatePath, migrationTags);
+        await audit('release.deploy.company_fanout_plan', fanPlan.blockers.length === 0 ? 'success' : 'denied', summarizePlan(fanPlan));
+        if (fanPlan.blockers.length > 0) throw new PreSwapAbort(`Company fan-out cannot proceed: ${fanPlan.blockers.join(' | ')}`);
+        if (fanMode === 'dry-run') {
+          await audit('release.deploy.company_fanout', 'success', { mode: 'dry-run', note: 'plan only; no backup taken, no Company touched', companiesWithPending: fanPlan.planned.filter((c) => c.pending.length > 0).map((c) => c.companyName) });
+        }
+      }
+
       // 2. Invariant I-8 — expand/contract migrations only. Scan the NEW
       //    migration files in this delta (from the verified CANDIDATE tree)
       //    for contraction DDL BEFORE running anything. A violation ALWAYS
@@ -483,10 +524,46 @@ export class ReleaseExecutionService {
         throw new PreSwapAbort(`Migration(s) are not expand/contract-safe: ${detail}`);
       }
 
+      // 2b. Company restore points (fan-out `on`) — taken/verified BEFORE any database (Platform included) is migrated, so a Company without one aborts the
+      //     deploy while nothing at all has changed yet.
+      if (fanMode === 'on' && fanPlan) {
+        try {
+          fanBackups = await this.companyFanout!.ensureBackups(fanPlan, actorUserId);
+          await audit('release.deploy.company_backups', 'success', { policy: this.config.releaseDeploy.companyBackupPolicy, backups: fanBackups });
+        } catch (err) {
+          if (err instanceof CompanyFanoutBlockedError) {
+            await audit('release.deploy.company_backups', 'denied', { policy: this.config.releaseDeploy.companyBackupPolicy, blockers: err.blockers });
+            throw new PreSwapAbort(err.message);
+          }
+          throw err;
+        }
+      }
+
       // 3. migrations — LATE, against the CANDIDATE's compiled migration set, immediately before the swap
       release.status = 'migrating';
       await releaseRepo.save(release);
       await this.runReleaseMigrations(release, candidatePath, migrationTags);
+
+      // 3a. Company fan-out (`on`) — Platform is migrated; now every applicable READY Company, one at a time, READY -> MIGRATING -> READY, stop at the first
+      //     failure. Still PRE-SWAP: a failure here aborts with ACTIVE untouched, and Companies already migrated stay migrated (forward-only; expand-only
+      //     migrations keep the still-active OLD code working against them).
+      if (fanMode === 'on' && fanPlan) {
+        fanResult = await this.companyFanout!.migrate(fanPlan, candidatePath, actorUserId, release.id, fanBackups);
+        await audit('release.deploy.company_fanout', fanResult.ok ? 'success' : 'failure', { mode: 'on', ...summarizeResult(fanResult) });
+        if (!fanResult.ok) {
+          const s = summarizeResult(fanResult);
+          throw new PreSwapAbort(
+            `Company fan-out failed — migrated: [${(s.migrated as string[]).join(', ')}]; failed: ${JSON.stringify(s.failed)}; not attempted: [${(s.notAttempted as string[]).join(', ')}]. ` +
+              'Refusing to swap. Companies already migrated remain migrated (forward-only, expand-only).',
+          );
+        }
+        const companiesStillPending = await this.companyFanout!.verify(fanPlan, candidatePath);
+        if (Object.keys(companiesStillPending).length > 0) {
+          await audit('release.deploy.company_fanout_verification_failed', 'denied', { companiesStillPending });
+          throw new PreSwapAbort(`Company fan-out reported success but ${Object.keys(companiesStillPending).length} Company(ies) still have pending migrations: ${JSON.stringify(companiesStillPending)}. Refusing to swap.`);
+        }
+        await audit('release.deploy.company_fanout_verified', 'success', { companies: fanResult.outcomes.map((o) => ({ company: o.companyName, status: o.status })) });
+      }
 
       // 3b. Production Incident 2026-09-22 — migration EXECUTION completing
       //     without error was previously trusted as proof the release's own
@@ -552,7 +629,7 @@ export class ReleaseExecutionService {
       release.status = 'failed';
       release.errorMessage = message;
       await releaseRepo.save(release);
-      await audit('release.deploy.failed', 'failure', { error: message, swapped });
+      await audit('release.deploy.failed', 'failure', { error: message, swapped, ...(fanResult ? { companyFanout: summarizeResult(fanResult) } : {}) });
 
       if (!swapped) {
         // I-2 — nothing was promoted; ACTIVE is bit-for-bit unchanged.

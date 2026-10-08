@@ -100,6 +100,12 @@ export interface ReleaseDeployConfig {
   notifyWebhook: string | null;
   /** `true` = CANDIDATE-slot + atomic-swap deploy path (CTO-P3); `false` = legacy in-place copy. */
   stagedActivation: boolean;
+  /** Company fan-out: `off` = Platform database only; `dry-run` = plan/report only; `on` = also upgrade every applicable READY Company database (staged path only). */
+  companyMigrations: 'off' | 'dry-run' | 'on';
+  /** Restore-point policy for each Company about to be migrated: take a fresh verified backup, or require a recent verified one. */
+  companyBackupPolicy: 'create' | 'require-recent';
+  /** `require-recent` only: how old (hours) a verified Company backup may be. */
+  companyBackupMaxAgeHours: number;
 }
 
 /**
@@ -229,6 +235,9 @@ export class AppConfigService {
       dependencyChangePolicy: this.configService.get<'block' | 'ack'>('RELEASE_DEPENDENCY_CHANGE_POLICY')!,
       notifyWebhook: nullable('RELEASE_NOTIFY_WEBHOOK'),
       stagedActivation: this.configService.get<boolean>('RELEASE_STAGED_ACTIVATION')!,
+      companyMigrations: this.configService.get<'off' | 'dry-run' | 'on'>('RELEASE_COMPANY_MIGRATIONS')!,
+      companyBackupPolicy: this.configService.get<'create' | 'require-recent'>('RELEASE_COMPANY_BACKUP_POLICY')!,
+      companyBackupMaxAgeHours: this.configService.get<number>('RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS')!,
     };
   }
 }
