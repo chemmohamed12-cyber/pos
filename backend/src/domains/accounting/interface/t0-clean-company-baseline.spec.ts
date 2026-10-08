@@ -24,6 +24,7 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 import { makeProductLifecycleGate } from '../../procurement/interface/product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from '../../procurement/interface/warehouse-lookup.test-helper';
 
 /**
  * T0 — Clean-Company functional/accounting BASELINE (CTO-approved 2026-10-04, ERP Integrity Audit).
@@ -110,7 +111,7 @@ run('T0 clean-company baseline — real-Postgres, disposable', () => {
       const valuation = new InventoryValuationService(new MovingAverageCostEngine(h.controlPlane));
       const inventory = new InventoryService(h.controlPlane, audit, products as never, inert, numbering, events, valuation as never);
       const treasury = new TreasuryService(h.controlPlane, numbering, audit, inert, events);
-      const purchaseOrders = new PurchaseOrderService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane));
+      const purchaseOrders = new PurchaseOrderService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane), makeWarehouseLookup(h.controlPlane));
       const goodsReceipts = new GoodsReceiptService(h.controlPlane, processEngine, numbering, audit, inventory, events, makeProductLifecycleGate(h.controlPlane));
       const supplierLedger = new SupplierLedgerService(h.controlPlane, numbering, audit);
       const invoices = new SupplierInvoiceService(h.controlPlane, numbering, processEngine, audit, supplierLedger, events);

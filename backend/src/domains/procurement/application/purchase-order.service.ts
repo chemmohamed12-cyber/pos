@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PurchaseOrder } from '../infrastructure/purchase-order.entity';
 import { PurchaseOrderLine } from '../infrastructure/purchase-order-line.entity';
@@ -9,6 +9,7 @@ import { ProcessInstance } from '../../../foundation/process-engine/process-inst
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { ProductLifecycleGate } from './product-lifecycle-gate.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { INVENTORY_RESERVATION_CONTRACT, InventoryReservationContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 
 const PO_DOCUMENT_TYPE = 'purchase_order';
 const PO_ENTITY_TYPE = 'purchase_order';
@@ -40,6 +41,7 @@ export class PurchaseOrderService {
     private readonly numbering: NumberingService,
     private readonly audit: AuditService,
     private readonly lifecycleGate: ProductLifecycleGate,
+    @Inject(INVENTORY_RESERVATION_CONTRACT) private readonly warehouses: Pick<InventoryReservationContract, 'getWarehouse'>,
   ) {}
 
   private async statesFor(ids: string[], manager?: EntityManager): Promise<Map<string, string>> {
@@ -69,6 +71,8 @@ export class PurchaseOrderService {
     const supplier = await (externalManager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: input.supplierId } });
     if (!supplier) throw new NotFoundException(`Supplier "${input.supplierId}" not found.`);
     if (supplier.status !== 'active') throw new ConflictException(`Supplier "${supplier.legalName}" is inactive — cannot raise a Purchase Order against it.`);
+    // `purchase_orders.warehouseId` has no FK — an unknown warehouse is rejected (404) before any mutation, same as an unknown supplier above.
+    await this.warehouses.getWarehouse(input.warehouseId, externalManager);
 
     await this.lifecycleGate.assertNoneDraft(input.lines.map((l) => l.productId), 'Cannot create this Purchase Order', externalManager); // D7 gate (before any mutation)
     await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO', true, externalManager);

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PurchaseRequest } from '../infrastructure/purchase-request.entity';
 import { PurchaseRequestLine } from '../infrastructure/purchase-request-line.entity';
@@ -11,6 +11,7 @@ import { ProcessInstance } from '../../../foundation/process-engine/process-inst
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { ProductLifecycleGate } from './product-lifecycle-gate.service';
+import { INVENTORY_RESERVATION_CONTRACT, InventoryReservationContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 
 const PR_ENTITY_TYPE = 'purchase_request';
 const PR_DOCUMENT_TYPE = 'purchase_request';
@@ -42,6 +43,7 @@ export class PurchaseRequestService {
     private readonly numbering: NumberingService,
     private readonly audit: AuditService,
     private readonly lifecycleGate: ProductLifecycleGate,
+    @Inject(INVENTORY_RESERVATION_CONTRACT) private readonly warehouses: Pick<InventoryReservationContract, 'getWarehouse'>,
   ) {}
 
   private async statesFor(
@@ -78,6 +80,9 @@ export class PurchaseRequestService {
         throw new BadRequestException('Every line quantity must be a positive number.');
       }
     }
+    // `purchase_requests.warehouseId` has no FK — an unknown warehouse is rejected here (404, the inventory contract's own error), BEFORE any
+    // numbering/mutation, in the caller's Company database. The F6 WarehouseScopeGuard deliberately leaves an unknown warehouse to the handler.
+    await this.warehouses.getWarehouse(input.warehouseId, manager);
 
     await this.numbering.registerDocumentType(PR_DOCUMENT_TYPE, 'PR', true, manager);
 

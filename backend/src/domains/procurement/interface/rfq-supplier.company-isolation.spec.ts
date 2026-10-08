@@ -16,6 +16,7 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 import { createAmbientDataSource } from '../../../foundation/testing/ambient-test-datasource';
 import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from './warehouse-lookup.test-helper';
 
 /**
  * Area 21 (2026-10-05, CTO-authorized) — real-Postgres Company isolation for `supplier.controller.ts` and
@@ -56,9 +57,9 @@ describe('SupplierController + RfqController Area 21 retrofit — real-Postgres 
     const numbering = new NumberingService(ambient);
     approvals = new ApprovalEngineService(ambient, process, audit, events, new PermissionService(inert, new AuthorizationService(inert, inert)), { get: () => 24 } as never);
     suppliers = new SupplierService(ambient, audit, approvals, numbering);
-    const pos = new PurchaseOrderService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient));
+    const pos = new PurchaseOrderService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient), makeWarehouseLookup(ambient));
     rfqs = new RfqService(ambient, process, numbering, audit, events, approvals, pos);
-    requests = new PurchaseRequestService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient));
+    requests = new PurchaseRequestService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient), makeWarehouseLookup(ambient));
     await suppliers.onModuleInit();
     await rfqs.onModuleInit();
 

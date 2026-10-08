@@ -6,6 +6,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { PurchaseOrder } from '../infrastructure/purchase-order.entity';
 import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from './warehouse-lookup.test-helper';
 import {
   setUpTwoCompanyHarness,
   TwoCompanyHarness,
@@ -61,7 +62,7 @@ describe('PurchaseOrderController Area 21 retrofit — real-Postgres Company iso
     const audit = new AuditService(h.controlPlane);
     const numbering = new NumberingService(h.controlPlane);
     const processEngine = new ProcessEngineService(h.controlPlane);
-    service = new PurchaseOrderService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane));
+    service = new PurchaseOrderService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane), makeWarehouseLookup(h.controlPlane));
   });
 
   afterAll(async () => {

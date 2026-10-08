@@ -15,6 +15,7 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
 import { setUpTwoCompanyHarness, TwoCompanyHarness, assertDataSourceNeverRequestedFor } from '../../../foundation/testing/two-company-real-pg-harness';
 import { createAmbientDataSource } from '../../../foundation/testing/ambient-test-datasource';
 import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from './warehouse-lookup.test-helper';
 
 /**
  * D6 (2026-10-05) — RFQ award visibility, real PostgreSQL, Company A with Company B as the untouched witness.
@@ -45,9 +46,9 @@ describe('D6 — RFQ award approval visibility (maker-checker unchanged) — rea
     const process = new ProcessEngineService(ambient);
     const numbering = new NumberingService(ambient);
     approvals = new ApprovalEngineService(ambient, process, audit, events, new PermissionService(inert, new AuthorizationService(inert, inert)), { get: () => 24 } as never);
-    const pos = new PurchaseOrderService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient));
+    const pos = new PurchaseOrderService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient), makeWarehouseLookup(ambient));
     rfqs = new RfqService(ambient, process, numbering, audit, events, approvals, pos);
-    requests = new PurchaseRequestService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient));
+    requests = new PurchaseRequestService(ambient, process, numbering, audit, makeProductLifecycleGate(ambient), makeWarehouseLookup(ambient));
     await rfqs.onModuleInit();
 
     maker = (await h.createUserWithAdminRoleIn('Award Maker', h.companyAId)).id;

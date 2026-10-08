@@ -233,6 +233,9 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     if (!isValidShippingMethod(shippingMethod)) {
       throw new BadRequestException(`Invalid shipping method "${shippingMethod}".`);
     }
+    // `sales_orders.warehouseId` has no FK — an unknown warehouse is rejected up front (404, the inventory contract's own error) instead of
+    // surfacing later as a misleading "insufficient stock" 409 from the reservation step, after the order/rep numbers were already consumed.
+    await this.inventory.getWarehouse(warehouseId, manager);
 
     // Resolved once, used for two related checks below: (1) a caller may
     // create the order under a DIFFERENT rep's name only when they hold

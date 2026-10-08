@@ -15,6 +15,7 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
 import { setUpTwoCompanyHarness, TwoCompanyHarness, assertDataSourceNeverRequestedFor } from '../../../foundation/testing/two-company-real-pg-harness';
 import { createAmbientDataSource } from '../../../foundation/testing/ambient-test-datasource';
 import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from './warehouse-lookup.test-helper';
 
 /**
  * D7 (2026-10-05, CTO decision) — New Item Request, real PostgreSQL, Company A with Company B as the witness.
@@ -51,8 +52,8 @@ describe('D7 — New Item Request + product lifecycle gate — real-Postgres, A/
     const products = new ProductsService(ambient, audit, events);
     items = new NewItemRequestService(ambient, audit, approvals, events, numbering, products);
     const gate = makeProductLifecycleGate(ambient);
-    requests = new PurchaseRequestService(ambient, process, numbering, audit, gate);
-    orders = new PurchaseOrderService(ambient, process, numbering, audit, gate);
+    requests = new PurchaseRequestService(ambient, process, numbering, audit, gate, makeWarehouseLookup(ambient));
+    orders = new PurchaseOrderService(ambient, process, numbering, audit, gate, makeWarehouseLookup(ambient));
     await items.onModuleInit();
 
     requester = (await h.createUserWithAdminRoleIn('Item Requester', h.companyAId)).id;
