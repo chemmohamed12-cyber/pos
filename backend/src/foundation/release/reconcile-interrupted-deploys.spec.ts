@@ -1,6 +1,7 @@
 import { ReleaseExecutionService } from './release-execution.service';
 import { Release } from './release.entity';
 import { ReleaseManifest } from './release-manifest';
+import { ReleaseMigrationRun } from './release-migration-run.entity';
 import { readAppVersion } from './app-version';
 
 jest.mock('./app-version', () => ({ readAppVersion: jest.fn() }));
@@ -21,10 +22,12 @@ const readAppVersionMock = readAppVersion as jest.Mock;
 describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
   let releases: Map<string, Release>;
   let auditCalls: Array<{ action: string; result: string; actorUserId?: string | null; after?: Record<string, unknown> }>;
-  let stagedActivationMock: { pruneSlots: jest.Mock };
+  let stagedActivationMock: { pruneSlots: jest.Mock; candidatePath: jest.Mock };
   let lkgMock: { read: jest.Mock; isSeeded: jest.Mock; seed: jest.Mock; commit: jest.Mock };
   let healthCheckMock: { check: jest.Mock };
   let service: ReleaseExecutionService;
+  let migrationRunCount = 0;
+  let companyMigrationsMode: string | undefined;
 
   function validManifest(overrides: Partial<ReleaseManifest> = {}): ReleaseManifest {
     return { version: '1.1.2', packageType: 'full', files: [], migrations: [], ...overrides };
@@ -67,19 +70,20 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
     const dataSourceMock = {
       getRepository: jest.fn((entity: unknown) => {
         if (entity === Release) return releaseRepoMock;
+        if (entity === ReleaseMigrationRun) return { count: jest.fn(async () => migrationRunCount) };
         return { find: jest.fn(async () => []), save: jest.fn(async (x: unknown) => x) };
       }),
     } as never;
 
     const configMock = {
       releaseExecution: { appRoot: 'C:/fake-app-root', stagingPath: 'C:/fake-staging', frontendRuntimePath: 'C:/fake-frontend', passengerRestartFile: 'C:/fake-restart.txt' },
-      releaseDeploy: { deployRoot: 'C:/fake-deploy-root', activeDirname: 'backend', manifestsPath: 'C:/fake-manifests', slotRetention: 3, lkgHistoryDepth: 5, stagedActivation: true },
+      releaseDeploy: { deployRoot: 'C:/fake-deploy-root', activeDirname: 'backend', manifestsPath: 'C:/fake-manifests', slotRetention: 3, lkgHistoryDepth: 5, stagedActivation: true, companyMigrations: companyMigrationsMode },
       releaseBuild: { nodeBin: 'node', npmBin: 'npm', maxThreads: 1 },
       database: { host: 'localhost', port: 5432, username: 'x', password: 'x', database: 'x' },
       entitlement: { mode: 'unlicensed-full', publicKeys: [], clockToleranceMinutes: 10 },
     } as never;
 
-    stagedActivationMock = { pruneSlots: jest.fn(async () => undefined) };
+    stagedActivationMock = { pruneSlots: jest.fn(async () => undefined), candidatePath: jest.fn((id: string) => `C:/fake-deploy-root/backend.next-${id}`) } as never;
     lkgMock = {
       read: jest.fn(async () => null), // not seeded by default — forces a commit attempt
       isSeeded: jest.fn(async () => true),
@@ -115,6 +119,8 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
 
   beforeEach(() => {
     releases = new Map();
+    migrationRunCount = 0;
+    companyMigrationsMode = undefined;
     jest.clearAllMocks();
     readAppVersionMock.mockReturnValue('1.1.2');
     service = buildService();
@@ -214,5 +220,59 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
 
     const statuses = [...releases.values()].map((r) => r.status).sort();
     expect(statuses).toEqual(['health_checking', 'succeeded']); // one left alone, one reconciled
+  });
+
+  describe('a deploy cut off BEFORE the swap (process killed while the candidate was being prepared — release 1.1.6 on the shared host)', () => {
+    it('stuck at "deploying", other version running, no migration run, not the LKG, fan-out off => recorded as FAILED with an audit record (and may be uploaded again)', async () => {
+      seedRelease('cut-off', { status: 'deploying', version: '1.1.6' }); // this process runs 1.1.2
+      await service.reconcileInterruptedDeploys();
+      const r = releases.get('cut-off')!;
+      expect(r.status).toBe('failed');
+      expect(r.errorMessage).toMatch(/interrupted before the swap/i);
+      expect(r.completedAt).not.toBeNull();
+      const rec = auditCalls.find((c) => c.action === 'release.deploy.interrupted');
+      expect(rec?.result).toBe('failure');
+      expect(rec?.actorUserId).toBeNull();
+      expect(lkgMock.commit).not.toHaveBeenCalled();
+      expect(stagedActivationMock.pruneSlots).not.toHaveBeenCalled(); // nothing on disk is deleted either
+    });
+
+    it('a migration run exists for it => untouched (the database may have changed: manual review)', async () => {
+      migrationRunCount = 1;
+      seedRelease('had-migration', { status: 'deploying', version: '1.1.6' });
+      await service.reconcileInterruptedDeploys();
+      expect(releases.get('had-migration')!.status).toBe('deploying');
+      expect(auditCalls.find((c) => c.action === 'release.deploy.interrupted')).toBeUndefined();
+    });
+
+    it('status "migrating" or "health_checking" => untouched (only "deploying" can be proven to have changed nothing)', async () => {
+      seedRelease('mig', { status: 'migrating', version: '1.1.6' });
+      seedRelease('hc', { status: 'health_checking', version: '1.1.6' });
+      await service.reconcileInterruptedDeploys();
+      expect(releases.get('mig')!.status).toBe('migrating');
+      expect(releases.get('hc')!.status).toBe('health_checking');
+    });
+
+    it('it is the LKG current release => untouched', async () => {
+      seedRelease('is-lkg', { status: 'deploying', version: '1.1.6' });
+      lkgMock.read.mockResolvedValue({ current: { release_id: 'is-lkg' } });
+      await service.reconcileInterruptedDeploys();
+      expect(releases.get('is-lkg')!.status).toBe('deploying');
+    });
+
+    it('Company fan-out is enabled => untouched (Company databases may have been migrated)', async () => {
+      companyMigrationsMode = 'dry-run';
+      service = buildService();
+      seedRelease('fanout', { status: 'deploying', version: '1.1.6' });
+      await service.reconcileInterruptedDeploys();
+      expect(releases.get('fanout')!.status).toBe('deploying');
+    });
+
+    it('the proof itself cannot be established (the lookup throws) => untouched, boot continues', async () => {
+      seedRelease('unprovable', { status: 'deploying', version: '1.1.6' });
+      lkgMock.read.mockRejectedValue(new Error('lkg file unreadable'));
+      await expect(service.reconcileInterruptedDeploys()).resolves.toBeUndefined();
+      expect(releases.get('unprovable')!.status).toBe('deploying');
+    });
   });
 });

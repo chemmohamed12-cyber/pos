@@ -199,6 +199,21 @@ export class ReleaseExecutionService {
     }
   }
 
+  /** True only when a release stuck at `deploying` provably changed nothing: no migration run row, never the LKG, and Company fan-out is off (it would have written to Company databases). */
+  private async interruptedBeforeAnyChange(release: Release): Promise<boolean> {
+    try {
+      if (release.status !== 'deploying') return false;
+      if (this.companyFanoutMode() !== 'off') return false;
+      const runs = await this.dataSource.getRepository(ReleaseMigrationRun).count({ where: { releaseId: release.id } });
+      if (runs > 0) return false;
+      const lkg = await this.lkg.read();
+      return !lkg || lkg.current.release_id !== release.id;
+    } catch (err) {
+      this.logger.warn(`reconcileInterruptedDeploys: could not prove release "${release.id}" changed nothing (${err instanceof Error ? err.message : String(err)}) — leaving it for manual review.`);
+      return false;
+    }
+  }
+
   /**
    * Boot-time self-reconciliation (Production Incident 2026-09-22).
    * `deployReleaseStaged()`'s post-swap sequence is: ATOMIC SWAP ->
@@ -238,6 +253,28 @@ export class ReleaseExecutionService {
     const currentVersion = readAppVersion();
     for (const release of stuck) {
       if (release.version !== currentVersion) {
+        // A deploy that was cut off BEFORE the swap (the process was killed while the candidate was being built — seen on a shared host, release 1.1.6): this process runs a
+        // DIFFERENT version, so the active tree is not this release. If it also never ran a migration, never touched a Company database and was never the LKG, nothing was changed
+        // anywhere — it can only be recorded as failed (and may then be uploaded again). Anything less certain is left for manual review, exactly as before.
+        if (await this.interruptedBeforeAnyChange(release)) {
+          const previousStatus = release.status;
+          release.status = 'failed';
+          release.errorMessage = `Deploy interrupted before the swap (the application process ended while the candidate was being prepared). No migration ran, no Company database was touched and the active release v${currentVersion} was never replaced. The release can be uploaded again.`;
+          release.completedAt = new Date();
+          await releaseRepo.save(release);
+          await this.audit.record({
+            actorUserId,
+            organizationId: null,
+            action: 'release.deploy.interrupted',
+            resource: 'release',
+            resourceId: release.id,
+            result: 'failure',
+            correlationId: null,
+            after: { previousStatus, runningVersion: currentVersion, reason: 'process ended before the swap; no migration run; not the LKG; Company fan-out off' },
+          });
+          this.logger.warn(`reconcileInterruptedDeploys: release "${release.id}" (v${release.version}) was interrupted before the swap with no change made anywhere — recorded as failed (this process runs v${currentVersion}). A stale candidate slot may remain on disk: ${this.stagedActivation.candidatePath(release.id)}.`);
+          continue;
+        }
         this.logger.warn(
           `reconcileInterruptedDeploys: release "${release.id}" (v${release.version}) is stuck at "${release.status}" but this process is running v${currentVersion} — not reconciling (version mismatch, needs manual review).`,
         );
