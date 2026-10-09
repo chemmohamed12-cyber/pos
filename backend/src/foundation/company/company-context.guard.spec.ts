@@ -14,7 +14,7 @@ describe('CompanyContextGuard — Multi-Company Area 5/6 (2026-09-23, locked dec
   let guard: CompanyContextGuard;
   const membershipsMock = { findActiveByUserAndCompany: jest.fn() };
   const companiesMock = { findById: jest.fn() };
-  const connectionsMock = { getDataSource: jest.fn() };
+  const connectionsMock = { getDataSource: jest.fn(), readRegistry: jest.fn(async () => undefined) }; // readRegistry: control-plane read only; undefined => getDataSource loads the registry itself
 
   beforeEach(() => {
     jest.clearAllMocks();

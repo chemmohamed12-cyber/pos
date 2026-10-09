@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { DatabaseRegistry } from './database-registry.entity';
 import { DatabaseRegistryService } from './database-registry.service';
 import { createCompanyDataSource } from './company-datasource-factory';
 
@@ -50,9 +51,17 @@ export class CompanyConnectionManagerService implements OnModuleDestroy {
     return null;
   }
 
+  /**
+   * The control-plane registry row only — no Company database is touched. Lets a caller read it concurrently with other control-plane checks and hand it back to
+   * `getDataSource` (which still refuses anything but an ACTIVE registry and still opens the Company connection only when called).
+   */
+  readRegistry(companyId: string): Promise<DatabaseRegistry | null> {
+    return this.databaseRegistry.findByCompanyId(companyId);
+  }
+
   /** A live, pooled `DataSource` connected to ONE Company's own database. Never the ambient/platform connection. */
-  async getDataSource(companyId: string): Promise<DataSource> {
-    const registry = await this.databaseRegistry.findByCompanyId(companyId);
+  async getDataSource(companyId: string, preloadedRegistry?: DatabaseRegistry | null): Promise<DataSource> {
+    const registry = preloadedRegistry !== undefined ? preloadedRegistry : await this.databaseRegistry.findByCompanyId(companyId);
     if (!registry) {
       throw new CompanyDatabaseNotProvisionedError(`Company ${companyId} has no DatabaseRegistry entry — never provisioned.`);
     }

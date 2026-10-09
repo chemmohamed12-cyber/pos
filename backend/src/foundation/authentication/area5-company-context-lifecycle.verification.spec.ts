@@ -44,7 +44,7 @@ describe('Area 5 Formal Verification — Company Context in Authentication lifec
   let companyContextGuard: CompanyContextGuard;
   let jwt: JwtService;
   const membershipsMock = { findActiveByUserAndCompany: jest.fn(), touchLastAccess: jest.fn().mockResolvedValue(undefined) };
-  const connectionsMock = { getDataSource: jest.fn() };
+  const connectionsMock = { getDataSource: jest.fn(), readRegistry: jest.fn(async () => undefined) }; // readRegistry: control-plane read only; undefined => getDataSource loads the registry itself
   const usersMock = { findById: jest.fn(), findByEmail: jest.fn() };
 
   function fakeHttpRequest(accessToken: string): AuthenticatedRequest {

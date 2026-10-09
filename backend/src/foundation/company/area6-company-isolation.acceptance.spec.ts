@@ -53,7 +53,7 @@ function fakeGuardContext(request: Partial<CompanyScopedRequest>): ExecutionCont
 
 describe('Area 6 acceptance — Company authorization isolation (composed guard chain, not mocked in isolation)', () => {
   const membershipsMock = { findActiveByUserAndCompany: jest.fn() };
-  const connectionsMock = { getDataSource: jest.fn() };
+  const connectionsMock = { getDataSource: jest.fn(), readRegistry: jest.fn(async () => undefined) }; // readRegistry: control-plane read only; undefined => getDataSource loads the registry itself
   let companyContextGuard: CompanyContextGuard;
   let rolesGuard: RolesGuard;
   let authorization: AuthorizationService;

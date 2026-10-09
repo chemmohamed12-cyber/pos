@@ -1,0 +1,7 @@
+PASS baseline: permitted + scoped user reads purchase requests (200) and sees the linked warehouse
+PASS scope revoked: warehouse hidden on the very next request and on the 7 after (no stale prepared plan/data) — [false,false,false,false,false,false,false,false]
+PASS scope re-granted: warehouse visible on the very next request
+PASS permission revoked (purchase-requests, a guarded read): refused on the very next request and on the 5 after — [404,404,404,404,404,404]
+PASS permission restored: allowed on the very next request
+PASS membership removed: refused on the very next request — status 403
+ALL PASS

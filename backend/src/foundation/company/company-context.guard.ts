@@ -53,7 +53,13 @@ export class CompanyContextGuard implements CanActivate {
       throw new ForbiddenException('This route requires a Company context. Call POST /auth/select-company first.');
     }
 
-    const membership = await this.memberships.findActiveByUserAndCompany(request.user.id, companyId); // F2: a suspended member is refused exactly like a non-member
+    // The Membership check and the control-plane registry row are independent READS, issued together (one round trip of latency instead of two). Reading the registry
+    // opens no Company database; the Company DataSource is still requested only after the Membership AND the Company status have been validated, in the original order,
+    // so every refusal, its precedence and its message are unchanged. Both reads stay live on EVERY request (no cache).
+    const [membership, registry] = await Promise.all([
+      this.memberships.findActiveByUserAndCompany(request.user.id, companyId), // F2: a suspended member is refused exactly like a non-member
+      this.connections.readRegistry(companyId),
+    ]);
     if (!membership) {
       throw new ForbiddenException('You are not a member of this Company.');
     }
@@ -73,7 +79,7 @@ export class CompanyContextGuard implements CanActivate {
       throw new CompanyNotReadyException();
     }
 
-    const dataSource = await this.connections.getDataSource(companyId);
+    const dataSource = await this.connections.getDataSource(companyId, registry);
     request.companyContext = { companyId, dataSource };
     return true;
   }

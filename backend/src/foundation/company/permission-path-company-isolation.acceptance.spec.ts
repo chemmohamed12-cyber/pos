@@ -75,7 +75,7 @@ function fakeGuardContext(request: Partial<CompanyScopedRequest>): ExecutionCont
 
 describe('Permission-path composed isolation — CompanyContextGuard → PermissionGuard → PermissionService → Company DataSource', () => {
   const membershipsMock = { findActiveByUserAndCompany: jest.fn() };
-  const connectionsMock = { getDataSource: jest.fn() };
+  const connectionsMock = { getDataSource: jest.fn(), readRegistry: jest.fn(async () => undefined) }; // readRegistry: control-plane read only; undefined => getDataSource loads the registry itself
   let companyContextGuard: CompanyContextGuard;
   let permissionGuard: PermissionGuard;
   let authorization: AuthorizationService;

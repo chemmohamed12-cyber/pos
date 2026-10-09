@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { AuthorizationService } from '../authorization/authorization.service';
@@ -8,6 +9,28 @@ import { WorkflowAccess } from '../authorization/workflow-access';
 import { CompanyScopedRequest } from '../company/company-context.guard';
 import { CompanyUserError } from '../company/company-user-roles';
 import { COMPANY_ORGANIZATION_MANAGE_NODE } from '../permission/company-nodes';
+
+/**
+ * Runs `text` as a NAMED (prepared) statement on the manager's PostgreSQL connection. This statement is the request's single authorization read and the most complex one
+ * (recursive unit closure + warehouse visibility + role grants): measured on the isolated database, PLANNING it cost ~1.1 ms on EVERY request (bind 1.0-1.4 ms vs 0.2 ms
+ * to execute) because an unnamed statement is re-planned each time. A named statement is parsed/planned once per pooled connection and reused. Same text, same parameters,
+ * same rows, same transaction semantics — nothing is cached across requests at the data level, so a grant or a revoke is still visible on the very next call.
+ * Falls back to `manager.query` for any runner that is not a PostgreSQL pool connection (unit-test doubles).
+ */
+async function queryPrepared<T>(manager: EntityManager, text: string, values: unknown[]): Promise<T[]> {
+  const connection = (manager as { connection?: { createQueryRunner?: () => unknown } }).connection;
+  if (!manager.queryRunner && typeof connection?.createQueryRunner !== 'function') return manager.query(text, values);
+  const own = !manager.queryRunner;
+  const runner = (manager.queryRunner ?? manager.connection.createQueryRunner()) as { connect: () => Promise<unknown>; release: () => Promise<void> };
+  try {
+    const client = (await runner.connect()) as { query?: (config: { name: string; text: string; values: unknown[] }) => Promise<{ rows: T[] }> };
+    if (typeof client?.query !== 'function') return manager.query(text, values);
+    const name = 'dq_' + createHash('sha1').update(text).digest('hex').slice(0, 24);
+    return (await client.query({ name, text, values })).rows;
+  } finally {
+    if (own) await runner.release();
+  }
+}
 
 /**
  * Authorization Foundation F6 (Blueprint §9) — the ONE definition of "which organization units may this user work with".
@@ -136,7 +159,8 @@ export class AccessScopeService {
    * the visibility of every warehouse. Throws 42P01 when the Company has no `warehouses` table (the caller falls back).
    */
   private async loadContextAndScope(userId: string, companyId: string | null, manager: EntityManager): Promise<{ ctx: AuthorizationContext; extra: AccessScope }> {
-    const rows: Array<{ k: string; a: string; b: string | null; c: string | null; d: string | null }> = await manager.query(
+    const rows = await queryPrepared<{ k: string; a: string; b: string | null; c: string | null; d: string | null }>(
+      manager,
       `${UNITS_CTE}
        SELECT 'r' AS "k", r."id"::text AS "a", r."key" AS "b", rp."nodeKey" AS "c", rp."access"::text AS "d"
        ${AUTHORIZATION_CONTEXT_FROM}
