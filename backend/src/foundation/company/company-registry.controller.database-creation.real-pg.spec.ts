@@ -39,7 +39,7 @@ describeIsolated('CompanyRegistryController.create — physical database creatio
     const entitlement = { isInstallationInitialized: jest.fn(async () => true) };
     const controller = new CompanyRegistryController(
       companyRegistry as never, {} as never, databaseRegistry as never, databaseProvisioning as never,
-      { database: { host: HOST, port: PORT, username, password, database: 'x' }, releaseExecution: { appRoot: process.cwd() } } as never, entitlement as never,
+      { database: { host: HOST, port: PORT, username, password, database: 'x' }, companyDatabase: { mode: 'create', maintenanceDatabase: 'postgres', adminUser: null, adminPassword: null, pool: [] }, releaseExecution: { appRoot: process.cwd() } } as never, entitlement as never,
     );
     return { controller, companyRegistry, databaseProvisioning };
   };

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CompanyDatabaseConfig, parseCompanyDatabasePool } from '../company/company-database-allocator';
 
 export interface DatabaseConfig {
   host: string;
@@ -139,6 +140,20 @@ export class AppConfigService {
       username: this.configService.get<string>('DB_USER')!,
       password: this.configService.get<string>('DB_PASSWORD')!,
       database: this.configService.get<string>('DB_NAME')!,
+    };
+  }
+
+  get companyDatabase(): CompanyDatabaseConfig {
+    const nullable = (k: string): string | null => {
+      const v = this.configService.get<string>(k);
+      return v === undefined || v === null || v === '' ? null : v;
+    };
+    return {
+      mode: this.configService.get<'create' | 'pool'>('COMPANY_DB_MODE') ?? 'create',
+      maintenanceDatabase: this.configService.get<string>('COMPANY_DB_MAINTENANCE_DATABASE') ?? 'postgres',
+      adminUser: nullable('COMPANY_DB_ADMIN_USER'),
+      adminPassword: nullable('COMPANY_DB_ADMIN_PASSWORD'),
+      pool: parseCompanyDatabasePool(this.configService.get<string>('COMPANY_DB_POOL')),
     };
   }
 

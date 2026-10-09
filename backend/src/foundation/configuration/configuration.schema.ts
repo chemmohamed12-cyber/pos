@@ -161,6 +161,14 @@ export const configurationValidationSchema = Joi.object({
   RELEASE_COMPANY_BACKUP_POLICY: Joi.string().valid('create', 'require-recent').default('create'),
   RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS: Joi.number().integer().min(1).default(24),
 
+  // Where a new Company's database comes from. create = CREATE DATABASE via the maintenance database (optionally with a dedicated admin role);
+  // pool = shared hosting where databases are created through the provider: pre-created EMPTY databases listed in COMPANY_DB_POOL are claimed one per Company.
+  COMPANY_DB_MODE: Joi.string().valid('create', 'pool').default('create'),
+  COMPANY_DB_MAINTENANCE_DATABASE: Joi.string().default('postgres'),
+  COMPANY_DB_ADMIN_USER: Joi.string().allow(null, '').default(null),
+  COMPANY_DB_ADMIN_PASSWORD: Joi.string().allow(null, '').default(null),
+  COMPANY_DB_POOL: Joi.string().allow(null, '').default(''),
+
   // Entitlement Engine (ERP Foundation P3) — DEPLOYMENT/verification config
   // (NOT business config; ADR-023 C5 keeps Edition/feature keys OUT of the
   // runtime Configuration Engine, but the manifest *verification* material

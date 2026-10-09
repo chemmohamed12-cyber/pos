@@ -20,7 +20,7 @@ const readAppVersionMock = readAppVersion as jest.Mock;
  */
 describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
   let releases: Map<string, Release>;
-  let auditCalls: Array<{ action: string; result: string; after?: Record<string, unknown> }>;
+  let auditCalls: Array<{ action: string; result: string; actorUserId?: string | null; after?: Record<string, unknown> }>;
   let stagedActivationMock: { pruneSlots: jest.Mock };
   let lkgMock: { read: jest.Mock; isSeeded: jest.Mock; seed: jest.Mock; commit: jest.Mock };
   let healthCheckMock: { check: jest.Mock };
@@ -92,8 +92,8 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
     const preflightMock = {};
     auditCalls = [];
     const auditMock = {
-      record: jest.fn(async (rec: { action: string; result: string; after?: Record<string, unknown> }) => {
-        auditCalls.push({ action: rec.action, result: rec.result, after: rec.after });
+      record: jest.fn(async (rec: { action: string; result: string; actorUserId?: string | null; after?: Record<string, unknown> }) => {
+        auditCalls.push({ action: rec.action, result: rec.result, actorUserId: rec.actorUserId, after: rec.after });
       }),
     };
     const packageValidatorMock = {};
@@ -133,6 +133,16 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
     const rec = auditCalls.find((c) => c.action === 'release.deploy.reconciled');
     expect(rec?.result).toBe('success');
     expect(rec?.after?.previousStatus).toBe('health_checking');
+  });
+
+  it('called at boot with no actor, the audit record carries a NULL actor — never the string "system" (audit_records.actorUserId is a uuid; production logged `invalid input syntax for type uuid: "system"`)', async () => {
+    seedRelease('release-a', { status: 'health_checking', version: '1.1.2' });
+
+    await service.reconcileInterruptedDeploys();
+
+    const rec = auditCalls.find((c) => c.action === 'release.deploy.reconciled');
+    expect(rec).toBeDefined();
+    expect(rec?.actorUserId).toBeNull();
   });
 
   it('also reconciles "migrating" and "deploying" statuses — the same interruption can land mid-migration or mid-deploy, not only mid-health-check', async () => {

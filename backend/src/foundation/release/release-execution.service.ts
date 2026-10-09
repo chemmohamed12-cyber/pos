@@ -230,7 +230,7 @@ export class ReleaseExecutionService {
    * now. Every failure here is caught and logged; it must never prevent
    * the application from finishing its own boot.
    */
-  async reconcileInterruptedDeploys(actorUserId = 'system'): Promise<void> {
+  async reconcileInterruptedDeploys(actorUserId: string | null = null): Promise<void> {
     const releaseRepo = this.dataSource.getRepository(Release);
     const stuck = await releaseRepo.find({ where: { status: In(['health_checking', 'migrating', 'deploying']) } });
     if (stuck.length === 0) return;

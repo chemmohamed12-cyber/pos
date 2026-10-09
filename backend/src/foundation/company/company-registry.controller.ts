@@ -2,8 +2,8 @@ import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { BadRequestException, Body, Controller, Get, HttpStatus, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { DaiiException } from '../error-contract/daii-exception';
 import { EntitlementService } from '../entitlement/entitlement.service';
-import { randomUUID } from 'crypto';
-import { DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
+import { allocateCompanyDatabase, CompanyDatabaseAllocationError, serializeAllocation } from './company-database-allocator';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
@@ -89,6 +89,8 @@ interface CompanyView {
 @Controller('installation/companies')
 @UseGuards(JwtAuthGuard, PlatformGuard)
 export class CompanyRegistryController {
+  private readonly logger = new Logger(CompanyRegistryController.name);
+
   constructor(
     private readonly companyRegistry: CompanyRegistryService,
     private readonly companyActivation: CompanyActivationService,
@@ -142,17 +144,25 @@ export class CompanyRegistryController {
     // Create the PHYSICAL database FIRST. `companies.status` has no edge out of PROVISIONING except READY, so a Company row inserted before a failure here could never
     // be marked failed and would stay behind as an orphan PROVISIONING record. If the database user cannot reach the maintenance database or lacks CREATEDB (typical of a
     // shared PostgreSQL host), nothing has been created yet and the operator gets the real reason instead of "An unexpected error occurred".
-    const databaseName = `company_${randomUUID().replace(/-/g, '')}`;
-    try {
-      await this.createPhysicalDatabase(databaseName);
-    } catch (err) {
-      throw new UnprocessableEntityException({
-        message: 'The Company database could not be created, so nothing was created. The database user needs permission to connect to the maintenance database and to CREATE DATABASE.',
-        code: 'COMPANY_DATABASE_CREATION_FAILED',
-        stage: 'create-database',
-        detail: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const cfg = this.config.companyDatabase;
+    const app = { host: this.config.database.host, port: this.config.database.port, username: this.config.database.username, password: this.config.database.password };
+    // Serialised so two concurrent creations cannot claim the same pooled database. The Company row follows the allocation, in the same critical section.
+    return serializeAllocation(async () => {
+      let allocated: { databaseName: string; origin: 'created' | 'pooled' };
+      try {
+        allocated = await allocateCompanyDatabase(cfg, app, () => this.databaseRegistry.usedDatabaseNames());
+      } catch (err) {
+        if (err instanceof CompanyDatabaseAllocationError) {
+          this.logger.error(`Company database allocation failed (${err.code}): ${err.detail}`);
+          throw new UnprocessableEntityException({ message: err.message, code: err.code, stage: cfg.mode === 'pool' ? 'claim-database' : 'create-database', detail: err.detail });
+        }
+        throw err;
+      }
+      return this.createCompanyOn(dto, allocated.databaseName);
+    });
+  }
+
+  private async createCompanyOn(dto: CreateCompanyDto, databaseName: string) {
     const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
 
     try {
@@ -232,26 +242,6 @@ export class CompanyRegistryController {
         throw new NotFoundException(`Company not found: ${id}`);
       }
       throw err;
-    }
-  }
-
-  /** Same admin-connection pattern this codebase's own real-PG test harnesses already use (`two-company-real-pg-harness.ts`'s `createDatabase`) — connect to the maintenance `postgres` database, issue `CREATE DATABASE`, disconnect. */
-  private async createPhysicalDatabase(name: string): Promise<void> {
-    const admin = new DataSource({
-      type: 'postgres',
-      host: this.config.database.host,
-      port: this.config.database.port,
-      username: this.config.database.username,
-      password: this.config.database.password,
-      database: 'postgres',
-      synchronize: false,
-      logging: false,
-    });
-    await admin.initialize();
-    try {
-      await admin.query(`CREATE DATABASE "${name}"`);
-    } finally {
-      await admin.destroy();
     }
   }
 

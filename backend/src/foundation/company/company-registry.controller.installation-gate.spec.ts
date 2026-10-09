@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { CompanyRegistryController } from './company-registry.controller';
+import * as allocator from './company-database-allocator';
 import { DaiiException } from '../error-contract/daii-exception';
 
 /**
@@ -12,7 +13,7 @@ describe('CompanyRegistryController.create — installation gate', () => {
     const databaseProvisioning = { provision: jest.fn() };
     const entitlement = { isInstallationInitialized: jest.fn(async () => initialized) };
     const controller = new CompanyRegistryController(
-      companyRegistry as never, {} as never, {} as never, databaseProvisioning as never, { database: {}, releaseExecution: {} } as never, entitlement as never,
+      companyRegistry as never, {} as never, {} as never, databaseProvisioning as never, { database: {}, companyDatabase: { mode: 'create', maintenanceDatabase: 'postgres', adminUser: null, adminPassword: null, pool: [] }, releaseExecution: {} } as never, entitlement as never,
     );
     return { controller, companyRegistry, databaseProvisioning, entitlement };
   }
@@ -32,8 +33,9 @@ describe('CompanyRegistryController.create — installation gate', () => {
 
   it('platform initialised => creation proceeds exactly as before (provision is reached with the singleton installation id)', async () => {
     const { controller, companyRegistry } = build(true);
-    // the physical-database step is covered against real Postgres in company-registry.controller.database-creation.real-pg.spec.ts
-    jest.spyOn(controller as unknown as { createPhysicalDatabase: (n: string) => Promise<void> }, 'createPhysicalDatabase').mockResolvedValue(undefined);
+    // the database-allocation step is covered against real Postgres in company-database-allocation.http.real-pg.spec.ts
+    (controller as unknown as { databaseRegistry: unknown }).databaseRegistry = { usedDatabaseNames: async () => [] };
+    jest.spyOn(allocator, 'allocateCompanyDatabase').mockResolvedValue({ databaseName: 'company_x', origin: 'created' });
     await expect(controller.create(dto)).rejects.toThrow('STOP-AFTER-PROVISION');
     expect(companyRegistry.provision).toHaveBeenCalledWith('installation', 'Acme');
   });
