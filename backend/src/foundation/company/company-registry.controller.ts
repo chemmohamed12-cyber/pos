@@ -144,6 +144,8 @@ export class CompanyRegistryController {
     // Create the PHYSICAL database FIRST. `companies.status` has no edge out of PROVISIONING except READY, so a Company row inserted before a failure here could never
     // be marked failed and would stay behind as an orphan PROVISIONING record. If the database user cannot reach the maintenance database or lacks CREATEDB (typical of a
     // shared PostgreSQL host), nothing has been created yet and the operator gets the real reason instead of "An unexpected error occurred".
+    // The initial administrator must exist BEFORE anything is allocated or created: failing here later would leave a PROVISIONING Company and a consumed database.
+    await this.assertInitialAdmin(dto.initialAdminUserId);
     const cfg = this.config.companyDatabase;
     const app = { host: this.config.database.host, port: this.config.database.port, username: this.config.database.username, password: this.config.database.password };
     // Serialised so two concurrent creations cannot claim the same pooled database. The Company row follows the allocation, in the same critical section.
@@ -162,8 +164,37 @@ export class CompanyRegistryController {
     });
   }
 
-  private async createCompanyOn(dto: CreateCompanyDto, databaseName: string) {
-    const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
+  /**
+   * Resume provisioning of a Company whose earlier attempt failed AFTER its database was allocated (migration / role-seeding fault). It reuses the SAME database and the
+   * SAME Company row — no new allocation, no duplicate Company — through the provisioning service's existing retry/resume path.
+   */
+  @RequirePlatform('platform.company.create', 'editable')
+  @Post(':id/retry-provisioning')
+  async retryProvisioning(@Param('id') id: string, @Body() dto: CreateCompanyDto) {
+    const company = await this.companyRegistry.findById(id);
+    if (!company) throw new NotFoundException(`Company not found: ${id}`);
+    if (company.status !== 'PROVISIONING') {
+      throw new UnprocessableEntityException({ message: `Company is ${company.status}, only a PROVISIONING Company can be retried.`, code: 'COMPANY_NOT_RETRYABLE' });
+    }
+    const registry = await this.databaseRegistry.findByCompanyId(id);
+    if (!registry) {
+      throw new UnprocessableEntityException({ message: 'No database was ever allocated to this Company, so there is nothing to resume. Create the Company again.', code: 'COMPANY_NOT_RETRYABLE' });
+    }
+    await this.assertInitialAdmin(dto.initialAdminUserId);
+    return this.createCompanyOn(dto, registry.databaseName, company);
+  }
+
+  private async assertInitialAdmin(userId: string): Promise<void> {
+    try {
+      await this.databaseProvisioning.assertInitialAdminExists(userId);
+    } catch (err) {
+      if (err instanceof NotFoundException) throw new BadRequestException(`initialAdminUserId does not reference an existing User: ${userId}`);
+      throw err;
+    }
+  }
+
+  private async createCompanyOn(dto: CreateCompanyDto, databaseName: string, existing?: Company) {
+    const company = existing ?? (await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name));
 
     try {
       // `DatabaseProvisioningService.provision()` runs migrations against

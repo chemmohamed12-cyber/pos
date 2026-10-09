@@ -143,6 +143,11 @@ export class DatabaseProvisioningService {
     private readonly users: UsersService,
   ) {}
 
+  /** Throws `NotFoundException` when the initial administrator does not exist. Lets a caller refuse BEFORE it allocates a database or creates a Company row. */
+  async assertInitialAdminExists(userId: string): Promise<void> {
+    await this.users.findById(userId);
+  }
+
   async provision(params: ProvisionCompanyDatabaseParams): Promise<ProvisionCompanyDatabaseResult> {
     const company = await this.companyRegistry.findById(params.companyId);
     if (!company) {

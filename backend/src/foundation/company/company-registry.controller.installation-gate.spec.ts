@@ -10,7 +10,7 @@ import { DaiiException } from '../error-contract/daii-exception';
 describe('CompanyRegistryController.create — installation gate', () => {
   function build(initialized: boolean) {
     const companyRegistry = { provision: jest.fn(async () => { throw new Error('STOP-AFTER-PROVISION'); }) };
-    const databaseProvisioning = { provision: jest.fn() };
+    const databaseProvisioning = { provision: jest.fn(), assertInitialAdminExists: jest.fn(async () => undefined) };
     const entitlement = { isInstallationInitialized: jest.fn(async () => initialized) };
     const controller = new CompanyRegistryController(
       companyRegistry as never, {} as never, {} as never, databaseProvisioning as never, { database: {}, companyDatabase: { mode: 'create', maintenanceDatabase: 'postgres', adminUser: null, adminPassword: null, pool: [] }, releaseExecution: {} } as never, entitlement as never,

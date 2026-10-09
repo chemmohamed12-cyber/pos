@@ -34,7 +34,7 @@ describeIsolated('CompanyRegistryController.create — physical database creatio
 
   const build = (username: string, password: string) => {
     const companyRegistry = { provision: jest.fn(async () => ({ id: 'company-1', name: 'Acme', status: 'PROVISIONING' })), findById: jest.fn(async () => ({ id: 'company-1', status: 'PROVISIONING', name: 'Acme' })) };
-    const databaseProvisioning = { provision: jest.fn(async (_p: { databaseName: string }) => { throw new Error('STOP-AFTER-PROVISIONING'); }) };
+    const databaseProvisioning = { provision: jest.fn(async (_p: { databaseName: string }) => { throw new Error('STOP-AFTER-PROVISIONING'); }), assertInitialAdminExists: jest.fn(async () => undefined) };
     const databaseRegistry = { findByCompanyId: jest.fn(async () => null) };
     const entitlement = { isInstallationInitialized: jest.fn(async () => true) };
     const controller = new CompanyRegistryController(

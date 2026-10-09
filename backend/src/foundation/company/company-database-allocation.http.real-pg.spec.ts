@@ -64,6 +64,7 @@ describeIsolated('POST /installation/companies — Company database allocation (
       findById: jest.fn(async (id: string) => ({ ...companies.find((c) => c.id === id)!, status: 'READY' })),
     };
     const databaseProvisioning = {
+      assertInitialAdminExists: jest.fn(async () => undefined),
       provision: jest.fn(async (p: { databaseName: string }) => { used.push(p.databaseName); provisioned.push(p.databaseName); return { migratedNames: [], roleSeedResult: {}, entitlementApplied: false, initialAdmin: { id: 'm1' } }; }),
     };
     const databaseRegistry = { usedDatabaseNames: jest.fn(async () => [...used]), findByCompanyId: jest.fn(async () => ({ status: 'ACTIVE' })) };
