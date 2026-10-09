@@ -72,3 +72,28 @@ New evidence: the host environment list shows `JWT_ACCESS_SECRET`/`JWT_REFRESH_S
 ## 5. Open items
 - Authorization Foundation final closure report: NOT written (separate work; known results HR 21/21, closure HTTP 23/23, security/mutation 40/41, scoped-perf gate failed +62% p95).
 - F-7 (verify the restored app over HTTP after a rollback), UI surfacing of `DEPLOYED_UNVERIFIED`, merge/push of `release-company-fanout`, unique index on `database_registries."databaseName"` if multi-worker.
+
+## 6. Addendum — multi-worker safety and per-stage retry (commit c060e7e)
+- Migration `1790011000000-DatabaseRegistryUniqueDatabaseName`: UNIQUE index on `database_registries."databaseName"`. If duplicates already exist it **stops and names them**, changing nothing. It is additive (core-tagged, so it also lands in each Company database's own, empty, `database_registries`).
+- `create()` handles the cross-process race: on a unique violation another worker won the pooled database, so the next one is claimed for the SAME Company; if the pool is then empty the bare Company row (PROVISIONING, no registry row, no membership) is discarded and the 422 is returned. A Company that owns a registry row is never deleted.
+- Test with 6 separate OS processes and 3 pooled databases: exactly 3 Companies, each database registered once, 0 PROVISIONING Companies left behind. Not shown: that the conflict branch itself was hit in that run (timing-dependent); the index test and migration-refusal test prove the database-level guard independently.
+- Resume after a failure was tested for each stage (migrations, role-seeding, initial-admin, health-check returning not-ok, health-check throwing): same Company, same database, no second allocation. A health check that THROWS used to leave the registry row PROVISIONING; it now marks it FAILED (resumable).
+- Build note: `createMigrationDataSource` reads `dist/`; real-PG provisioning specs use the built output, so run `nest build` before them after changing a migration.
+
+## 7. Items that need the host (I cannot do them)
+| Item | Needed from the host |
+|---|---|
+| Audit break at seq 1 | output of the three read-only queries in §2 |
+| 503 at the 1.1.4 swap | cPanel "Application mode"/NODE_ENV, Passenger log lines at the time of the swap (`~/logs`, `stderr.log` before the `backend.prev-*` rename) |
+| Backups already damaged | read-only: `SELECT id,"startedAt",status FROM backup_runs` plus a listing of the storage directory, to compare |
+
+### Secret rotation plan (nothing executed)
+The environment pasted in the thread exposed values; classify by what rotating costs:
+1. `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` — safe to rotate (stateless tokens). Effect: every user is signed out. Rotate in a quiet window; generate >= 32 random characters each (the production schema requires it).
+2. `DB_PASSWORD` (it was blank in the paste, but treat the account as exposed if it was shared) — change it in cPanel first, then in the Node app environment, then restart; pooled/Company databases use the same role.
+3. `INTEGRATION_ENCRYPTION_KEY` — encrypts stored integration credentials. **Do not just replace it.** Needs a re-encryption step (decrypt with the old key, re-encrypt with the new) that does not exist as a tool yet; until then keep it and restrict who can read the environment.
+4. `DATABASE_CREDENTIAL_ENCRYPTION_KEY` — encrypts every Company's database credentials in `database_credentials`. Same rule: **never replace it without re-encrypting**; losing it makes every Company unreachable. Keep it stable.
+Order: (a) JWT pair, (b) DB password, (c) build and test a re-encryption tool on a copy, then (d) rotate the two encryption keys under an approved plan with a verified backup. With the schema's production rules, `NODE_ENV=production` will refuse secrets shorter than 32 characters, so switching the application mode on requires doing (a)-(b) and lengthening the encryption keys (the latter again via (c)).
+
+## 8. Authorization Foundation
+The closure report already exists in the main checkout (`AUTHORIZATION-FOUNDATION-FINAL-CLOSURE-REPORT-2026-10-08.md`, uncommitted, with a 2026-10-09 addendum). Its state is **BLOCKED** (not CLOSED): HTTP-proven scope bypass in `GET /inventory/reports/stock/export` for scoped users, fix proposed but not authorised; B2 partly done; scoped-user p95 gate previously failed. Those changes (including migrations 1790012/1790013) are **not** in branch `release-company-fanout`, so a 1.1.6 built from this branch carries Authorization F1-F6 as already deployed in 1.1.5, **including that known export bypass** (it only matters for users that hold a warehouse scope).
