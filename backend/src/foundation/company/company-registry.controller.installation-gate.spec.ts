@@ -32,6 +32,8 @@ describe('CompanyRegistryController.create — installation gate', () => {
 
   it('platform initialised => creation proceeds exactly as before (provision is reached with the singleton installation id)', async () => {
     const { controller, companyRegistry } = build(true);
+    // the physical-database step is covered against real Postgres in company-registry.controller.database-creation.real-pg.spec.ts
+    jest.spyOn(controller as unknown as { createPhysicalDatabase: (n: string) => Promise<void> }, 'createPhysicalDatabase').mockResolvedValue(undefined);
     await expect(controller.create(dto)).rejects.toThrow('STOP-AFTER-PROVISION');
     expect(companyRegistry.provision).toHaveBeenCalledWith('installation', 'Acme');
   });

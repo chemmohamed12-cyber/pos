@@ -139,9 +139,22 @@ export class CompanyRegistryController {
         HttpStatus.CONFLICT,
       );
     }
+    // Create the PHYSICAL database FIRST. `companies.status` has no edge out of PROVISIONING except READY, so a Company row inserted before a failure here could never
+    // be marked failed and would stay behind as an orphan PROVISIONING record. If the database user cannot reach the maintenance database or lacks CREATEDB (typical of a
+    // shared PostgreSQL host), nothing has been created yet and the operator gets the real reason instead of "An unexpected error occurred".
+    const databaseName = `company_${randomUUID().replace(/-/g, '')}`;
+    try {
+      await this.createPhysicalDatabase(databaseName);
+    } catch (err) {
+      throw new UnprocessableEntityException({
+        message: 'The Company database could not be created, so nothing was created. The database user needs permission to connect to the maintenance database and to CREATE DATABASE.',
+        code: 'COMPANY_DATABASE_CREATION_FAILED',
+        stage: 'create-database',
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
     const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
 
-    const databaseName = `company_${randomUUID().replace(/-/g, '')}`;
     try {
       // `DatabaseProvisioningService.provision()` runs migrations against
       // `databaseName` — it does NOT create the physical Postgres database
@@ -150,8 +163,6 @@ export class CompanyRegistryController {
       // existing real-PG caller (`database-provisioning.service.spec.ts`,
       // `two-company-real-pg-harness.ts`) creates it first — this is that
       // same, already-established step, not a new one invented here.
-      await this.createPhysicalDatabase(databaseName);
-
       const result = await this.databaseProvisioning.provision({
         companyId: company.id,
         host: this.config.database.host,
