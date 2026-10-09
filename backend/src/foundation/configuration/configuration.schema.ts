@@ -119,6 +119,12 @@ export const configurationValidationSchema = Joi.object({
   // Base URL + endpoints for the post-deploy HTTP health probes (each 2xx).
   RELEASE_HEALTH_BASE_URL: Joi.string().default((parent) => `http://localhost:${parent.PORT ?? 3000}`),
   RELEASE_HEALTH_ENDPOINTS: Joi.string().default('["/api/health","/api/health/deep","/api/health/db"]'),
+  // Post-swap APPLICATION READINESS (post-incident review of release 1.1.4): the PUBLIC base URL the restarted application answers on (e.g. https://daii.xnexustech.com
+  // — through Passenger, NOT localhost:PORT; Passenger assigns its own socket). When set, the engine polls RELEASE_HEALTH_ENDPOINTS against it after the restart trigger
+  // (the first request is also what makes Passenger start the new process) and a deploy whose application does not answer 2xx within RELEASE_READINESS_TIMEOUT_SECONDS
+  // is rolled back automatically. When NOT set the engine cannot know the application started: it still deploys, but records the outcome as DEPLOYED_UNVERIFIED.
+  RELEASE_READINESS_URL: Joi.string().uri().allow(null, '').default(null),
+  RELEASE_READINESS_TIMEOUT_SECONDS: Joi.number().integer().min(5).max(900).default(90),
   // Read-only post-deploy smoke: GET each, expect 2xx. The list that would
   // have caught the v1.0.3 404s — as config, not a .ts literal. Empty in dev.
   RELEASE_SMOKE_GET_ENDPOINTS: Joi.string().default('[]'),

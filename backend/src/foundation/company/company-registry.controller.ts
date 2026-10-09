@@ -1,5 +1,7 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpStatus, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { DaiiException } from '../error-contract/daii-exception';
+import { EntitlementService } from '../entitlement/entitlement.service';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
@@ -93,6 +95,7 @@ export class CompanyRegistryController {
     private readonly databaseRegistry: DatabaseRegistryService,
     private readonly databaseProvisioning: DatabaseProvisioningService,
     private readonly config: AppConfigService,
+    private readonly entitlement: EntitlementService,
   ) {}
 
   @RequirePlatform('platform.company.view')
@@ -127,6 +130,15 @@ export class CompanyRegistryController {
   @RequirePlatform('platform.company.create', 'editable')
   @Post()
   async create(@Body() dto: CreateCompanyDto) {
+    // A Company's `installationId` is a foreign key to the platform installation row. Refuse BEFORE anything is created, with the real reason — the raw foreign-key
+    // violation used to reach the operator as "An unexpected error occurred" (post-incident review of release 1.1.4).
+    if (!(await this.entitlement.isInstallationInitialized())) {
+      throw new DaiiException(
+        'INSTALLATION_NOT_INITIALIZED',
+        'The platform installation is not initialised, so a Company cannot be created yet. With ENTITLEMENT_MODE=unlicensed-full it is initialised automatically when the application starts; with ENTITLEMENT_MODE=enforced a signed entitlement manifest must be applied first (POST /api/admin/entitlement/apply).',
+        HttpStatus.CONFLICT,
+      );
+    }
     const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
 
     const databaseName = `company_${randomUUID().replace(/-/g, '')}`;

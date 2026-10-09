@@ -2,6 +2,8 @@ import { ConflictException, Injectable, Logger, NotFoundException, Optional } fr
 import { DataSource, In, MigrationExecutor } from 'typeorm';
 import { copyFile, cp, mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { dirname, join, resolve, sep } from 'path';
 import { randomUUID } from 'crypto';
 import { Release } from './release.entity';
@@ -55,6 +57,26 @@ class PreSwapAbort extends Error {
     this.name = 'PreSwapAbort';
   }
 }
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * A POST-swap readiness failure, classified (post-incident review of release 1.1.4: "file deployment" success is not "application started" is not "initialised"):
+ *   `startup`        the restarted application did not answer 2xx on its health endpoints in time  -> APPLICATION_STARTUP_FAILED
+ *   `initialization` the application answers but the platform is not initialised (no installation)  -> INITIALIZATION_FAILED
+ * Thrown after the swap, so the existing automatic rollback (I-3) takes over.
+ */
+export class PostSwapReadinessError extends Error {
+  constructor(
+    readonly kind: 'startup' | 'initialization',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PostSwapReadinessError';
+  }
+}
+
+export type DeployOutcome = 'DEPLOYMENT_VERIFIED' | 'DEPLOYED_UNVERIFIED' | 'DEPLOYMENT_FAILED' | 'APPLICATION_STARTUP_FAILED' | 'INITIALIZATION_FAILED' | 'POST_DEPLOYMENT_VALIDATION_FAILED';
 
 @Injectable()
 export class ReleaseExecutionService {
@@ -417,6 +439,9 @@ export class ReleaseExecutionService {
     let swapped = false;
     let entitlementApplied: { manifest: EntitlementManifest; signatureB64: string; prevText: string | null } | null = null;
     const migrationHeadBefore = await this.getMigrationHead();
+    const installationPresentBefore = await this.readInstallationPresent();
+    let readiness: { status: 'verified' | 'unverified'; detail: Record<string, unknown> } = { status: 'unverified', detail: {} };
+    let functional: { status: 'ok' | 'warning' | 'skipped'; detail: Record<string, unknown> } = { status: 'skipped', detail: { reason: 'application startup was not verified' } };
     // Company fan-out state (CTO 2026-10-08) — declared here so the failure audit below can report exactly who was migrated.
     const fanMode = this.companyFanoutMode();
     let fanPlan: CompanyFanoutPlan | null = null;
@@ -447,6 +472,16 @@ export class ReleaseExecutionService {
       await audit('release.deploy.artifact_integrity', integrity.ok ? 'success' : 'denied', { violations: integrity.violations });
       if (!integrity.ok) {
         throw new PreSwapAbort(formatArtifactIntegrityViolations(release.id, integrity.violations));
+      }
+
+      // 1a3. ENVIRONMENT - the new release must be able to start with THIS host's environment (it validates its own configuration at boot and exits otherwise,
+      //      which Passenger shows as HTTP 503). Checked BEFORE the swap, so a missing variable aborts with ACTIVE untouched and the exact names instead.
+      const envCheck = await this.verifyCandidateEnvironment(candidatePath);
+      await audit('release.deploy.environment_check', envCheck.status === 'invalid' ? 'denied' : 'success', { status: envCheck.status, errors: envCheck.errors, ...(envCheck.detail ? { detail: envCheck.detail } : {}) });
+      if (envCheck.status === 'invalid') {
+        throw new PreSwapAbort(
+          `ENVIRONMENT_INVALID: release ${release.version} cannot start with this host's environment - fix the host configuration first (cPanel > Setup Node.js App > environment variables): ${envCheck.errors.join(' | ')}`,
+        );
       }
 
       // 1b. ERP Foundation P6 — apply the Edition entitlement manifest
@@ -594,6 +629,12 @@ export class ReleaseExecutionService {
       await audit('release.deploy.swapped', 'success', { previousPath, activePath: res.activePath });
       await this.triggerPassengerRestart(release.id, actorUserId, 'deploy');
 
+      // 5a. APPLICATION READINESS (startup, then functional) - post-swap; failure -> ROLLBACK (I-3). Verified over HTTP when RELEASE_READINESS_URL is set.
+      release.status = 'health_checking';
+      await releaseRepo.save(release);
+      readiness = await this.verifyApplicationReadiness();
+      if (readiness.status === 'verified') functional = await this.verifyFunctionalReadiness(installationPresentBefore);
+
       // 5. health + smoke — post-swap; failure → ROLLBACK
       release.status = 'health_checking';
       await releaseRepo.save(release);
@@ -621,7 +662,18 @@ export class ReleaseExecutionService {
       release.status = 'succeeded';
       release.completedAt = new Date();
       await releaseRepo.save(release);
-      await audit('release.deploy.succeeded', 'success', { swapped: true });
+      const outcome: DeployOutcome = readiness.status === 'verified' ? 'DEPLOYMENT_VERIFIED' : 'DEPLOYED_UNVERIFIED';
+      await audit('release.deploy.evidence', 'success', {
+        outcome,
+        engineVersion: readAppVersion(),
+        releaseVersion: release.version,
+        layers: {
+          deployment: 'ok (files swapped, migrations verified, health check ok)',
+          applicationStartup: readiness.status === 'verified' ? { status: 'verified', ...readiness.detail } : { status: 'UNVERIFIED', ...readiness.detail },
+          functionalReadiness: functional,
+        },
+      });
+      await audit('release.deploy.succeeded', 'success', { swapped: true, outcome });
       return release;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -629,7 +681,7 @@ export class ReleaseExecutionService {
       release.status = 'failed';
       release.errorMessage = message;
       await releaseRepo.save(release);
-      await audit('release.deploy.failed', 'failure', { error: message, swapped, ...(fanResult ? { companyFanout: summarizeResult(fanResult) } : {}) });
+      await audit('release.deploy.failed', 'failure', { error: message, swapped, outcome: ReleaseExecutionService.classifyFailure(err, swapped), ...(fanResult ? { companyFanout: summarizeResult(fanResult) } : {}) });
 
       if (!swapped) {
         // I-2 — nothing was promoted; ACTIVE is bit-for-bit unchanged.
@@ -832,6 +884,100 @@ export class ReleaseExecutionService {
    * status code. The default is `[]` (no GET smoke); the in-process
    * `ReleaseHealthCheckService.check()` is the real post-swap gate.
    */
+  /**
+   * PRE-SWAP environment check (post-incident review of release 1.1.4, HTTP 503). A release validates ITS OWN configuration schema at boot and exits when the host's
+   * environment lacks something it requires (1.1.4 newly required DATABASE_CREDENTIAL_ENCRYPTION_KEY in production; a host configured for 1.1.2 then answers 503 right
+   * after the swap). The engine runs inside the same application, so its process environment IS what the new process will receive: validate the CANDIDATE's schema
+   * against it BEFORE the swap and refuse with the exact names. Runs in a child process (the candidate's code never enters this one). A candidate without a schema file
+   * (an older layout) is reported `skipped`, not passed.
+   */
+  private async verifyCandidateEnvironment(candidatePath: string): Promise<{ status: 'valid' | 'invalid' | 'skipped'; errors: string[]; detail?: string }> {
+    const schemaFile = join(candidatePath, 'dist', 'foundation', 'configuration', 'configuration.schema.js');
+    if (!existsSync(schemaFile)) return { status: 'skipped', errors: [], detail: 'candidate has no configuration schema file' };
+    const script =
+      "const m=require(process.argv[1]);const s=m.configurationValidationSchema;" +
+      "if(!s||typeof s.validate!=='function'){console.log(JSON.stringify({skipped:true}));process.exit(0)}" +
+      "const r=s.validate(process.env,{abortEarly:false,allowUnknown:true});" +
+      "console.log(JSON.stringify({errors:r.error?r.error.details.map(function(d){return d.message}):[]}))";
+    try {
+      const { stdout } = await execFileAsync(this.config.releaseBuild.nodeBin, ['-e', script, schemaFile], { cwd: candidatePath, env: process.env, timeout: 30_000 });
+      const parsed = JSON.parse(stdout.trim().split('\n').pop() ?? '{}') as { skipped?: boolean; errors?: string[] };
+      if (parsed.skipped) return { status: 'skipped', errors: [], detail: 'candidate schema has no validate()' };
+      const errors = (parsed.errors ?? []).map((m) => m.slice(0, 200));
+      return { status: errors.length > 0 ? 'invalid' : 'valid', errors };
+    } catch (err) {
+      return { status: 'invalid', errors: [`the candidate's configuration schema could not be evaluated: ${err instanceof Error ? err.message.split('\n')[0].slice(0, 200) : String(err)}`] };
+    }
+  }
+
+  /**
+   * Layer 2 - APPLICATION STARTUP. After the restart trigger the new process must actually ANSWER. Under Passenger the first request is also what starts it, so polling
+   * is both the trigger and the proof. Configured by `RELEASE_READINESS_URL` (public URL); every `RELEASE_HEALTH_ENDPOINTS` path must return 2xx before the timeout.
+   * Not configured => `unverified` (the engine cannot know), never a silent "ok".
+   */
+  private async verifyApplicationReadiness(): Promise<{ status: 'verified' | 'unverified'; detail: Record<string, unknown> }> {
+    const { readinessUrl, readinessTimeoutSeconds, healthEndpoints } = this.config.releaseDeploy;
+    if (!readinessUrl) {
+      this.logger.warn('RELEASE_READINESS_URL is not set: the engine cannot verify that the restarted application answers. The deploy is recorded DEPLOYED_UNVERIFIED.');
+      return { status: 'unverified', detail: { reason: 'RELEASE_READINESS_URL not configured' } };
+    }
+    const deadline = Date.now() + readinessTimeoutSeconds * 1000;
+    const results: Record<string, string> = {};
+    for (const path of healthEndpoints) {
+      const url = readinessUrl.replace(/\/$/, '') + path;
+      let ok = false;
+      let last = 'no response';
+      while (!ok && Date.now() < deadline) {
+        try {
+          const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10_000) });
+          last = `HTTP ${res.status}`;
+          ok = res.ok;
+        } catch (err) {
+          last = err instanceof Error ? err.message : String(err);
+        }
+        if (!ok && Date.now() < deadline) await new Promise((r) => setTimeout(r, 2_000));
+      }
+      results[path] = ok ? 'ok' : last;
+      if (!ok) {
+        throw new PostSwapReadinessError('startup', `APPLICATION_STARTUP_FAILED: ${path} did not answer 2xx within ${readinessTimeoutSeconds}s (last: ${last}) at ${readinessUrl}`);
+      }
+    }
+    return { status: 'verified', detail: { url: readinessUrl, endpoints: results } };
+  }
+
+  /** Is the platform `installation` row (target of `companies.installationId`) present? `null` when it cannot be read (table missing). */
+  private async readInstallationPresent(): Promise<boolean | null> {
+    try {
+      const rows: unknown[] = await this.dataSource.query(`SELECT 1 FROM "installation" WHERE "id" = 'installation'`);
+      return rows.length > 0;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Layer 3 - FUNCTIONAL READINESS: the platform is initialised. Only meaningful once the new application has booted (it initialises the implicit installation at
+   * boot), so it runs after a VERIFIED startup. `unlicensed-full` must have a row (the application is expected to create it). `enforced` without a licence is a
+   * licensing state, not a deploy defect: a warning - unless the row EXISTED before this deploy and is gone now.
+   */
+  private async verifyFunctionalReadiness(installationPresentBefore: boolean | null): Promise<{ status: 'ok' | 'warning'; detail: Record<string, unknown> }> {
+    const present = await this.readInstallationPresent();
+    const mode = this.config.entitlement.mode;
+    if (present) return { status: 'ok', detail: { installation: 'present', mode } };
+    if (mode === 'unlicensed-full' || installationPresentBefore === true) {
+      throw new PostSwapReadinessError(
+        'initialization',
+        `INITIALIZATION_FAILED: the platform installation row is missing after the deploy (mode ${mode}${installationPresentBefore ? ', it existed before' : ''}) - Companies cannot be created.`,
+      );
+    }
+    return { status: 'warning', detail: { installation: 'absent', mode, note: 'ENTITLEMENT_MODE=enforced and no licence applied: apply a signed entitlement manifest (pre-existing state).' } };
+  }
+
+  private static classifyFailure(err: unknown, swapped: boolean): DeployOutcome {
+    if (err instanceof PostSwapReadinessError) return err.kind === 'startup' ? 'APPLICATION_STARTUP_FAILED' : 'INITIALIZATION_FAILED';
+    return swapped ? 'POST_DEPLOYMENT_VALIDATION_FAILED' : 'DEPLOYMENT_FAILED';
+  }
+
   private async runSmokeGet(): Promise<string[]> {
     const { healthBaseUrl, smokeGetEndpoints } = this.config.releaseDeploy;
     const failures: string[] = [];

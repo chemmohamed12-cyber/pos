@@ -7,6 +7,7 @@ import { readEnabledModules } from '../../database/enabled-modules';
 import { AppConfigService } from '../configuration/app-config.service';
 import { Edition, EditionFeature, EditionLimit, EditionModule } from './edition.entity';
 import { EntitlementService } from './entitlement.service';
+import { InstallationBootstrapService } from './installation-bootstrap.service';
 import { EntitlementController } from './entitlement.controller';
 import { ENTITLEMENT_RESOLVER } from '../module-registry/entitlement-resolver.token';
 import { RequireModuleGuard } from '../module-registry/require-module.decorator';
@@ -39,6 +40,7 @@ import { PermissionModule } from '../permission/permission.module';
   ],
   controllers: [EntitlementController],
   providers: [
+    InstallationBootstrapService,
     EntitlementService,
     { provide: ENTITLEMENT_RESOLVER, useExisting: EntitlementService },
     RequireModuleGuard,
