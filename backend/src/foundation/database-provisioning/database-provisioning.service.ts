@@ -58,10 +58,9 @@ export interface ProvisionCompanyDatabaseParams {
    */
   initialAdminUserId: string;
   /**
-   * F3 / D17 — which administrator role a NEW Company is born with. `'admin'` (default for now) is the pre-existing operational administrator;
-   * `'company_admin'` is the administration-only system role (users, roles, backups, audit — no operational/critical power). The default stays `'admin'`
-   * until the legacy role checks are migrated (F5): ~89 backend call-sites still demand the key `admin` (e.g. Organization writes), so a `company_admin`-only
-   * Company would 403 on them. Flip the default when F5 closes (CTO decision recorded in the F3 report).
+   * CTO Decision 3 (2026-10-07) — which administrator role a NEW Company is born with. DEFAULT: `'company_admin'` — the administration-only system role (users,
+   * roles, scopes, organization, backups, audit; NO `wf.*` workflow, operational or critical power). `'admin'` is the legacy operational administrator, kept only as an
+   * EXPLICIT opt-in for compatibility (Decision 2: transitional alias, no new dependency on it); the initial administrator is never both.
    */
   administratorRole?: 'admin' | 'company_admin';
 }
@@ -197,8 +196,8 @@ export class DatabaseProvisioningService {
     let roleSeedResult: CompanyRoleSeedResult;
     try {
       roleSeedResult = await seedCompanyRoleTemplates(databaseConfig, params.roleModuleCodes ?? []);
-      if (params.administratorRole === 'company_admin') await seedCompanyAdministratorRole(databaseConfig);
-      else await seedCompanyAdminRole(databaseConfig, params.roleModuleCodes ?? []);
+      if (params.administratorRole === 'admin') await seedCompanyAdminRole(databaseConfig, params.roleModuleCodes ?? []);
+      else await seedCompanyAdministratorRole(databaseConfig);
     } catch (err) {
       await this.databaseRegistry.markStatus(registry.id, 'FAILED');
       throw new ProvisioningFailedError('role-seeding', err instanceof Error ? err.message : String(err));
@@ -228,7 +227,7 @@ export class DatabaseProvisioningService {
     // `CompanyMembershipProvisioningService`/`CompanyConnectionManagerService`,
     // which require the registry to already be `'ACTIVE'` (not true yet
     // at this point in the sequence).
-    const adminRoleKey = params.administratorRole === 'company_admin' ? COMPANY_ADMIN_ROLE_KEY : ADMIN_ROLE_KEY;
+    const adminRoleKey = params.administratorRole === 'admin' ? ADMIN_ROLE_KEY : COMPANY_ADMIN_ROLE_KEY;
     let initialAdmin: Membership;
     try {
       await this.users.findById(params.initialAdminUserId);

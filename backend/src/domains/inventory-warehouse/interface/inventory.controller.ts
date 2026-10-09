@@ -531,7 +531,9 @@ export class InventoryController {
   async stockReportExport(@Req() req: CompanyScopedRequest, @Res() res: Response, @Query('warehouseId') warehouseId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const stock = await this.inventory.getStockReport(warehouseId, manager);
+    // F6 — the export must honour the caller's warehouse scope exactly like the JSON twin (`stockReport`); it used to ignore it (HTTP-proven scope bypass).
+    const visible = await this.visibleWarehouses(req);
+    const stock = await this.inventory.getStockReport(warehouseId, manager, visible === 'ALL' ? undefined : visible);
     const { warehouseNames } = await this.buildNameMaps(manager);
     const rows = await Promise.all(
       stock.map(async (s) => {

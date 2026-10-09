@@ -155,12 +155,19 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
       // Area 6 — role templates were actually seeded into THIS company's own database.
       const roleRows: Array<{ key: string }> = await companyDs.query(`SELECT "key" FROM "roles" WHERE "key" LIKE 'sales.%'`);
       expect(roleRows.length).toBeGreaterThan(0);
-      // Area 20 — the initial admin's UserRole was actually granted inside THIS company's own database.
-      const adminGrantRows: Array<{ count: string }> = await companyDs.query(
-        `SELECT count(*)::text AS count FROM "user_roles" ur JOIN "roles" r ON r.id = ur."roleId" WHERE ur."userId" = $1 AND r."key" = 'admin'`,
-        [adminUserId],
-      );
-      expect(Number(adminGrantRows[0].count)).toBe(1);
+      // Area 20 — the initial admin's UserRole was actually granted inside THIS company's own database. CTO Decision 3 (2026-10-07): the default
+      // administrator is `company_admin`, and the legacy `admin` role is NOT granted to the initial administrator.
+      const grantCount = async (roleKey: string): Promise<number> =>
+        Number(
+          (
+            await companyDs.query(
+              `SELECT count(*)::text AS count FROM "user_roles" ur JOIN "roles" r ON r.id = ur."roleId" WHERE ur."userId" = $1 AND r."key" = $2`,
+              [adminUserId, roleKey],
+            )
+          )[0].count,
+        );
+      expect(await grantCount('company_admin')).toBe(1);
+      expect(await grantCount('admin')).toBe(0);
 
       // ADR-073 Option D — the Company DB's own user_roles FK to its local
       // users table is genuinely gone (not just working around a still-present
@@ -186,12 +193,12 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
     );
     expect(platformFkRows.length).toBe(1);
 
-    // Proof point — the initial admin's Membership also exists in the Platform DB.
-    const membershipRows: Array<{ count: string }> = await controlPlane.query(
-      `SELECT count(*)::text AS count FROM "user_company_memberships" WHERE "userId" = $1 AND "companyId" = $2 AND "roleKey" = 'admin'`,
+    // Proof point — the initial admin's Membership also exists in the Platform DB, carrying `company_admin` (CTO Decision 3), never the legacy `admin`.
+    const membershipRows: Array<{ roleKey: string }> = await controlPlane.query(
+      `SELECT "roleKey" FROM "user_company_memberships" WHERE "userId" = $1 AND "companyId" = $2`,
       [adminUserId, company.id],
     );
-    expect(Number(membershipRows[0].count)).toBe(1);
+    expect(membershipRows).toEqual([{ roleKey: 'company_admin' }]);
   });
 
   it('ADR-073 negative integrity proof — an unknown Platform User is rejected BEFORE any Company-DB write, even with no local FK to catch it', async () => {

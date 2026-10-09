@@ -12,6 +12,7 @@ import { permissionCatalogNodes } from '../permission/permission-catalog';
 import { CompanyContextGuard, CompanyScopedRequest } from './company-context.guard';
 import { MembershipService } from './membership.service';
 import { COMPANY_MEMBERS_MANAGE_NODE } from './company-role-seeding';
+import { CompanyUserError } from './company-user-roles';
 
 class ScopeGrantDto {
   @IsUUID()
@@ -66,9 +67,12 @@ export class CompanyAccessScopeController {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     await this.assertMember(req, userId);
     const manager = req.companyContext.dataSource.manager;
+    const member = await this.memberships.findActiveByUserAndCompany(userId, req.companyContext.companyId);
+    if (member?.kind === 'support') throw new CompanyUserError('SUPPORT_ACCESS_FIXED', 'Support access is fixed (read-only, time-boxed); it cannot be given an access scope.'); // Decision 4-C: support never broadens itself
     const actorScope = await this.scopes.forRequest(req);
+    const organizationAdmin = await this.scopes.canAdministerAllUnits(req);
     const { before, after } = await manager.transaction(async (tx) => {
-      const result = await this.scopes.replaceGrants(actorScope, userId, dto.grants.map((g) => ({ orgUnitId: g.orgUnitId, includeDescendants: g.includeDescendants !== false })), req.user!.id, tx);
+      const result = await this.scopes.replaceGrants(actorScope, userId, dto.grants.map((g) => ({ orgUnitId: g.orgUnitId, includeDescendants: g.includeDescendants !== false })), req.user!.id, tx, { organizationAdmin });
       await this.audit.record(
         { actorUserId: req.user!.id, organizationId: null, action: 'company.user.scopes_changed', resource: 'access_scope', resourceId: userId, result: 'success', correlationId: randomUUID(), before: { grants: result.before }, after: { grants: result.after } },
         tx,

@@ -7,6 +7,8 @@ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/c
 import { SHIPPING_METHODS, ShippingMethod } from '../domain/shipping-method';
 import { RequireModule, RequireModuleGuard } from '../../../foundation/module-registry/require-module.decorator';
 import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { AuthorizationContextService } from '../../../foundation/authorization/authorization-context.service';
+import { WorkflowAccess } from '../../../foundation/authorization/workflow-access';
 import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
 import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 
@@ -168,7 +170,16 @@ export class SalesOrdersController {
   constructor(
     private readonly salesOrders: SalesOrdersService,
     private readonly scopes: AccessScopeService,
+    private readonly contexts: AuthorizationContextService,
   ) {}
+
+  /**
+   * B2 (2026-10-08): the caller's workflow rules from the request's ALREADY-LOADED authorization context (memoized on the request by the guard chain) —
+   * handed to the service so it does not load the same context a second time. Same user, same Company database: the decision is identical.
+   */
+  private async access(req: CompanyScopedRequest): Promise<WorkflowAccess> {
+    return new WorkflowAccess(await this.contexts.forRequest(req));
+  }
 
   /** F6 — the caller's visible warehouses for the list filter (`undefined` = unrestricted). An order with no warehouse (legacy) is unscoped. */
   private async visibleOnly(req: CompanyScopedRequest): Promise<string[] | undefined> {
@@ -191,6 +202,7 @@ export class SalesOrdersController {
       dto.shippingMethod,
       dto.skipDeposit ?? false,
       manager,
+      await this.access(req),
     );
     return { ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) };
   }
@@ -212,14 +224,14 @@ export class SalesOrdersController {
     const manager = req.companyContext.dataSource.manager;
     const visibleWarehouseIds = await this.visibleOnly(req);
     if (!page && !pageSize) {
-      const orders = await this.salesOrders.listOrders(req.user.id, manager, visibleWarehouseIds);
+      const orders = await this.salesOrders.listOrders(req.user.id, manager, visibleWarehouseIds, await this.access(req));
       return Promise.all(
         orders.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
       );
     }
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
-    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize, visibleWarehouseIds }, manager);
+    const { rows, total } = await this.salesOrders.listOrdersPage(req.user.id, { page: parsedPage, pageSize: parsedPageSize, visibleWarehouseIds }, manager, await this.access(req));
     const enriched = await Promise.all(
       rows.map(async (order) => ({ ...order, status: await this.salesOrders.getOrderStatus(order.id, manager) })),
     );
@@ -231,7 +243,7 @@ export class SalesOrdersController {
   async get(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const order = await this.salesOrders.getOrderDetailView(id, req.user.id, manager);
+    const order = await this.salesOrders.getOrderDetailView(id, req.user.id, manager, await this.access(req));
     const lines = await this.salesOrders.getOrderLines(id, manager);
     return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
@@ -240,7 +252,7 @@ export class SalesOrdersController {
   @Post(':id/transition')
   async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    const status = await this.salesOrders.transitionOrder(id, dto.action, req.user.id, req.companyContext.dataSource.manager);
+    const status = await this.salesOrders.transitionOrder(id, dto.action, req.user.id, req.companyContext.dataSource.manager, await this.access(req));
     return { orderId: id, status };
   }
 
@@ -250,7 +262,7 @@ export class SalesOrdersController {
   async updateLines(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateOrderLinesDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const order = await this.salesOrders.updateOrderLines(id, dto.lines, req.user.id, dto.reason, manager);
+    const order = await this.salesOrders.updateOrderLines(id, dto.lines, req.user.id, dto.reason, manager, await this.access(req));
     const lines = await this.salesOrders.getOrderLines(id, manager);
     return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
@@ -269,7 +281,7 @@ export class SalesOrdersController {
   async editDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: EditDraftOrderDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const order = await this.salesOrders.editDraftOrder(id, dto.lines, req.user.id, manager);
+    const order = await this.salesOrders.editDraftOrder(id, dto.lines, req.user.id, manager, await this.access(req));
     const lines = await this.salesOrders.getOrderLines(id, manager);
     return { ...order, status: await this.salesOrders.getOrderStatus(id, manager), lines };
   }
@@ -279,7 +291,7 @@ export class SalesOrdersController {
   @Post(':id/delete')
   async deleteDraft(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    await this.salesOrders.deleteDraftOrder(id, req.user.id, req.companyContext.dataSource.manager);
+    await this.salesOrders.deleteDraftOrder(id, req.user.id, req.companyContext.dataSource.manager, await this.access(req));
     return { orderId: id, deleted: true };
   }
 }

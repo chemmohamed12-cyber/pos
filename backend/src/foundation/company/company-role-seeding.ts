@@ -59,7 +59,7 @@ export interface CompanyAdminRoleSeedResult {
 
 /** The literal, always-entitled node §3.1 verified against the real permission engine — never a wildcard, and not part of `MODULE_ROLE_TEMPLATES` (Area 6/20 CTO decision, 2026-09-24). */
 export { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE } from '../permission/company-nodes';
-import { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, COMPANY_ADMINISTRATION_NODES } from '../permission/company-nodes';
+import { COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, COMPANY_ADMINISTRATION_NODES, COMPANY_ORGANIZATION_MANAGE_NODE } from '../permission/company-nodes';
 import { COMPANY_ADMIN_ROLE_KEY, COMPANY_ADMIN_ROLE_META } from '../module-registry/role-templates';
 import { WORKFLOW_NODES } from '../authorization/workflow-rules';
 /** Backup/DR Architecture V1 (2026-09-24, Track D §Step 10) — same grandfathered `core.*` node convention as `COMPANY_MEMBERS_MANAGE_NODE` above, never a wildcard. */
@@ -102,7 +102,7 @@ export async function seedCompanyAdminRole(database: DatabaseConfig, moduleCodes
     }
 
     // F5: the legacy administrator also holds every workflow capability (it passed every role-list check implicitly).
-    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, ...WORKFLOW_NODES];
+    const nodes = [...moduleCodes, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_ROLES_MANAGE_NODE, COMPANY_ORGANIZATION_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE, ...WORKFLOW_NODES];
     let grants = 0;
     for (const node of nodes) {
       const existing = await permRepo.findOne({ where: { roleId: role.id, nodeKey: node } });
@@ -120,8 +120,8 @@ export async function seedCompanyAdminRole(database: DatabaseConfig, moduleCodes
 }
 
 /**
- * F3 / D17 — seeds the Company ADMINISTRATION system role `company_admin` (idempotent): the four `core.company.*` administration nodes at `editable`
- * and NOTHING operational — no module-wide grant, no critical node. Unlike `seedCompanyAdminRole` it never extends with the Company's modules, and a package
+ * F3 / D17 — seeds the Company ADMINISTRATION system role `company_admin` (idempotent): the `core.company.*` administration nodes at `editable`
+ * (CTO ruling B1: Organization administration is one of them) and NOTHING operational — no workflow (`wf.*`) capability — no module-wide grant, no critical node. Unlike `seedCompanyAdminRole` it never extends with the Company's modules, and a package
  * upgrade never adds to it (the only automatic grants to an administrator are administration nodes, Blueprint E2/A3).
  */
 export async function seedCompanyAdministratorRole(database: DatabaseConfig): Promise<CompanyAdminRoleSeedResult> {

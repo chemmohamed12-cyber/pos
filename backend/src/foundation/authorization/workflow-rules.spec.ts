@@ -27,9 +27,15 @@ function grantsFor(keys: string[]) {
 }
 
 describe('F5 workflow rules — Capability Diff = empty', () => {
-  it('the migration snapshot is exactly the rule map (node, legacy roles) — no drift', () => {
+  it('the migration snapshot is exactly the rule map (node, legacy roles) — no drift, except the ONE node later reclassified out of the workflow namespace', () => {
     const fromRules = WORKFLOW_RULES.map((r) => [r.node, [...r.legacyRoles]] as [string, string[]]);
-    expect(migrationSnapshot()).toEqual(fromRules);
+    // CTO ruling B1 (2026-10-08): `wf.core.organization.manage` became the Company administration node `core.company.organization.manage`
+    // (migration 1790013000000 moves every grant). The F5 migration is committed history and stays frozen; this is the only permitted difference.
+    const RECLASSIFIED: Array<[string, string[]]> = [['wf.core.organization.manage', []]];
+    const reclassifiedNodes = new Set(RECLASSIFIED.map(([n]) => n));
+    expect(migrationSnapshot().filter(([n]) => reclassifiedNodes.has(n))).toEqual(RECLASSIFIED);
+    expect(migrationSnapshot().filter(([n]) => !reclassifiedNodes.has(n))).toEqual(fromRules);
+    expect(WORKFLOW_NODES.filter((n) => reclassifiedNodes.has(n))).toEqual([]); // no rule reads a reclassified node any more
     expect(new Set(WORKFLOW_NODES).size).toBe(WORKFLOW_NODES.length); // unique nodes
     expect(new Set(WORKFLOW_RULES.map((r) => r.key)).size).toBe(WORKFLOW_RULES.length); // unique keys
   });

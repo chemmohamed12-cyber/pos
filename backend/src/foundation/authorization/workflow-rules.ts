@@ -73,7 +73,6 @@ export const WORKFLOW_RULES: readonly WorkflowRule[] = [
   W('inventory.warehouse_tx.reverse', 'wf.inventory.warehouse_tx.reverse', 'inventory', ['warehouse_supervisor'], 'sensitive', 'Reverse a warehouse transaction', 'عكس حركة مخزنية'),
   // ── Core ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   W('core.scope.unrestricted', 'wf.core.scope.unrestricted', 'core', [], 'sensitive', 'Unrestricted data scope (all records)', 'نطاق بيانات غير مقيّد (كل السجلات)'),
-  W('core.organization.manage', 'wf.core.organization.manage', 'core', [], 'sensitive', 'Manage the organization tree', 'إدارة الهيكل التنظيمي'),
   // ── Navigation (the sidebar item used to be gated by these role lists) ─────────────────────────────────────────────────────────────────────────
   W('nav.warehouse', 'wf.inventory.nav.warehouse', 'inventory', WH_NAV, 'low', 'See the warehouse screens in the menu', 'إظهار شاشات المخازن في القائمة'),
   W('nav.fulfillment', 'wf.inventory.nav.fulfillment', 'inventory', ['warehouse_worker'], 'low', 'See Fulfilment in the menu', 'إظهار التجهيز في القائمة'),

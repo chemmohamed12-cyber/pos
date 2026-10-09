@@ -14,9 +14,11 @@ jest.mock('../release-orchestration/company-migration-runner', () => ({
 
 const seedCompanyRoleTemplatesMock = jest.fn();
 const seedCompanyAdminRoleMock = jest.fn();
+const seedCompanyAdministratorRoleMock = jest.fn();
 jest.mock('../company/company-role-seeding', () => ({
   seedCompanyRoleTemplates: (...args: unknown[]) => seedCompanyRoleTemplatesMock(...args),
   seedCompanyAdminRole: (...args: unknown[]) => seedCompanyAdminRoleMock(...args),
+  seedCompanyAdministratorRole: (...args: unknown[]) => seedCompanyAdministratorRoleMock(...args),
 }));
 
 const provisionUserRoleForMembershipMock = jest.fn();
@@ -82,6 +84,7 @@ describe('DatabaseProvisioningService — mocked sequencing logic (supplementary
     runMigrationsForDatabaseMock.mockResolvedValue({ success: true, ranMigrationNames: ['M1'], error: null });
     seedCompanyRoleTemplatesMock.mockResolvedValue({ roles: 2, grants: 3 });
     seedCompanyAdminRoleMock.mockResolvedValue({ created: true, grants: 2 });
+    seedCompanyAdministratorRoleMock.mockResolvedValue({ created: true, grants: 5 });
     applyEntitlementManifestToCompanyMock.mockResolvedValue(undefined);
     provisionUserRoleForMembershipMock.mockResolvedValue(undefined);
     healthCheckMock.mockResolvedValue({ ok: true, components: {}, detail: {} });
@@ -128,13 +131,25 @@ describe('DatabaseProvisioningService — mocked sequencing logic (supplementary
     expect(databaseRegistryMock.updateConnection).not.toHaveBeenCalled();
     expect(runMigrationsForDatabaseMock).toHaveBeenCalledWith('/fake', { host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['core']);
     expect(seedCompanyRoleTemplatesMock).toHaveBeenCalledWith({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['sales']);
-    expect(seedCompanyAdminRoleMock).toHaveBeenCalledWith({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['sales']);
+    // CTO Decision 3 (2026-10-07): the DEFAULT administrator of a new Company is `company_admin` — the legacy `admin` role is never seeded for it nor granted
+    expect(seedCompanyAdministratorRoleMock).toHaveBeenCalledWith({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' });
+    expect(seedCompanyAdminRoleMock).not.toHaveBeenCalled();
+    expect(provisionUserRoleForMembershipMock).toHaveBeenCalledWith(expect.anything(), 'admin-user-1', 'company_admin');
     expect(callOrder).toEqual(['migrations', 'role-seeding', 'initial-admin', 'health-check']);
     expect(databaseRegistryMock.markStatus).toHaveBeenCalledWith('registry-1', 'ACTIVE');
     expect(companyRegistryMock.transitionTo).toHaveBeenCalledWith('company-1', 'READY');
     expect(result.readyMarked).toBe(true);
     expect(result.migratedNames).toEqual(['M1']);
     expect(result.roleSeedResult).toEqual({ roles: 2, grants: 3 });
+    expect(result.initialAdmin).toMatchObject({ userId: 'admin-user-1', companyId: 'company-1', roleKey: 'company_admin' });
+  });
+
+  it('CTO Decisions 2/3: the legacy `admin` administrator is an EXPLICIT opt-in only — it seeds the legacy role (with the module codes) and never company_admin', async () => {
+    const result = await service.provision({ ...params, administratorRole: 'admin' });
+
+    expect(seedCompanyAdminRoleMock).toHaveBeenCalledWith({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['sales']);
+    expect(seedCompanyAdministratorRoleMock).not.toHaveBeenCalled();
+    expect(provisionUserRoleForMembershipMock).toHaveBeenCalledWith(expect.anything(), 'admin-user-1', 'admin');
     expect(result.initialAdmin).toMatchObject({ userId: 'admin-user-1', companyId: 'company-1', roleKey: 'admin' });
   });
 
@@ -150,12 +165,12 @@ describe('DatabaseProvisioningService — mocked sequencing logic (supplementary
     });
 
     it('is retry-safe: reuses an existing Membership row instead of erroring on a repeat attempt', async () => {
-      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'membership-1', userId: 'admin-user-1', companyId: 'company-1', roleKey: 'admin' });
+      membershipsMock.findByUserAndCompany.mockResolvedValue({ id: 'membership-1', userId: 'admin-user-1', companyId: 'company-1', roleKey: 'company_admin' });
 
       const result = await service.provision(params);
 
       expect(membershipsMock.create).not.toHaveBeenCalled();
-      expect(result.initialAdmin).toMatchObject({ userId: 'admin-user-1', roleKey: 'admin' });
+      expect(result.initialAdmin).toMatchObject({ id: 'membership-1', userId: 'admin-user-1', roleKey: 'company_admin' });
     });
 
     it('Company-DB grant failure marks FAILED, never transitions the Company to READY, throws with stage "initial-admin"', async () => {

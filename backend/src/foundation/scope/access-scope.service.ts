@@ -3,8 +3,11 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { AuthorizationContext } from '../authorization/authorization-context';
 import { AuthorizationContextService } from '../authorization/authorization-context.service';
+import { AUTHORIZATION_CONTEXT_FROM, AuthorizationContextRow, buildAuthorizationContext } from '../authorization/authorization-context.loader';
 import { WorkflowAccess } from '../authorization/workflow-access';
 import { CompanyScopedRequest } from '../company/company-context.guard';
+import { CompanyUserError } from '../company/company-user-roles';
+import { COMPANY_ORGANIZATION_MANAGE_NODE } from '../permission/company-nodes';
 
 /**
  * Authorization Foundation F6 (Blueprint §9) — the ONE definition of "which organization units may this user work with".
@@ -23,6 +26,11 @@ export interface AccessScope {
   unrestricted: boolean;
   /** Closure of the accessible units (meaningful only when not unrestricted). */
   unitIds: ReadonlySet<string>;
+  /**
+   * Every warehouse of the Company -> may this user see it (its EFFECTIVE unit — own link, else its parent's — is unlinked or accessible)? Resolved in the SAME statement
+   * as `unitIds`, so list filters and warehouse guards cost no further query. Absent when the Company has no inventory module (no `warehouses` table) or when unrestricted.
+   */
+  warehouses?: ReadonlyMap<string, boolean>;
 }
 
 export interface AccessScopeGrant {
@@ -31,6 +39,30 @@ export interface AccessScopeGrant {
 }
 
 const REQUEST_SCOPE = Symbol('daii.accessScope');
+/** Per database connection: when the `warehouses` table did not exist (a Company without the inventory module) — avoids a failing statement on every request; re-checked after the TTL. */
+const NO_WAREHOUSES = new WeakMap<object, number>();
+const NO_WAREHOUSES_TTL_MS = 60_000;
+
+/** `$1` = user id. The accessible units: the closure of the user's org memberships and explicit grants (descendants only where granted). */
+const UNITS_CTE = `WITH RECURSIVE seed("id") AS (
+         SELECT m."orgUnitId" FROM "org_memberships" m WHERE m."userId" = $1
+         UNION
+         SELECT s."orgUnitId" FROM "access_scopes" s WHERE s."userId" = $1 AND s."includeDescendants" = true
+       ), tree("id") AS (
+         SELECT "id" FROM seed
+         UNION
+         SELECT u."id" FROM "org_units" u INNER JOIN tree t ON u."parentId" = t."id"
+       ), units("id") AS (
+         SELECT "id" FROM tree
+         UNION
+         SELECT s."orgUnitId" FROM "access_scopes" s WHERE s."userId" = $1 AND s."includeDescendants" = false
+       )`;
+/** Every warehouse -> visible? (its EFFECTIVE unit — own link, else its parent's — is unlinked or inside `units`). */
+const WAREHOUSE_VISIBILITY = `SELECT w."id"::text AS "id", (COALESCE(w."orgUnitId", p."orgUnitId") IS NULL OR COALESCE(w."orgUnitId", p."orgUnitId") IN (SELECT "id" FROM units)) AS "v"
+             FROM "warehouses" w LEFT JOIN "warehouses" p ON p."id" = w."parentWarehouseId"`;
+
+const errorCode = (err: unknown): string | undefined =>
+  (err as { code?: string; driverError?: { code?: string } }).code ?? (err as { driverError?: { code?: string } }).driverError?.code;
 
 @Injectable()
 export class AccessScopeService {
@@ -45,7 +77,12 @@ export class AccessScopeService {
     return manager ?? this.dataSource;
   }
 
-  /** The scope of the request's caller, memoized on the request (one resolution per request however many enforcement points run); reuses the request's authorization context, so an unrestricted caller costs no extra statement. */
+  /**
+   * The scope of the request's caller, memoized on the request (one resolution per request however many enforcement points run).
+   * B2 (2026-10-08): when the request has not loaded its authorization context yet, the context AND the scope rows are read in ONE statement (one round trip
+   * instead of two); the context is memoized for every later guard / handler, and the scope rows are used only if the context says the caller is restricted —
+   * the decision is exactly `resolve()`'s. When the context is already loaded, `resolve()` reuses it (an unrestricted caller then costs no extra statement).
+   */
   forRequest(req: CompanyScopedRequest): Promise<AccessScope> {
     if (!req.user || !req.companyContext) return Promise.reject(new Error('AccessScope requires an authenticated Company request.'));
     const bag = req as unknown as Record<symbol, Promise<AccessScope> | undefined>;
@@ -53,8 +90,23 @@ export class AccessScopeService {
     if (hit) return hit;
     const manager = req.companyContext.dataSource.manager;
     const promise = (async () => {
+      const userId = req.user!.id;
+      const known = NO_WAREHOUSES.get(this.connectionOf(manager));
+      const combined = this.contexts && !(known && Date.now() - known < NO_WAREHOUSES_TTL_MS)
+        ? this.contexts.forRequestWith(req, manager, (uid, companyId) => this.loadContextAndScope(uid, companyId, manager))
+        : null;
+      if (combined) {
+        try {
+          const ctx = await combined.ctx;
+          if (new WorkflowAccess(ctx).allows('core.scope.unrestricted')) return { userId, unrestricted: true, unitIds: new Set<string>() } as AccessScope;
+          return await combined.extra;
+        } catch (err) {
+          if (errorCode(err) !== '42P01') throw err; // only "relation does not exist" (a Company without the inventory module) falls back to the separate statements
+          NO_WAREHOUSES.set(this.connectionOf(manager), Date.now());
+        }
+      }
       const ctx = this.contexts ? await this.contexts.forRequest(req, manager) : undefined;
-      return this.resolve(req.user!.id, manager, ctx);
+      return this.resolve(userId, manager, ctx);
     })();
     promise.catch(() => {
       if (bag[REQUEST_SCOPE] === promise) bag[REQUEST_SCOPE] = undefined; // never cache a failure
@@ -63,24 +115,80 @@ export class AccessScopeService {
     return promise;
   }
 
+  /**
+   * CTO Decision 3 — the Company administrator (`company_admin`) manages Organization and Scopes WITHOUT being a data-unrestricted user: holding the Organization
+   * administration node (`core.company.organization.manage`, CTO ruling B1) lets a caller place people on ANY unit of the tree they administer. It is the administrative reach over the org tree, not a data privilege.
+   */
+  async canAdministerAllUnits(req: CompanyScopedRequest): Promise<boolean> {
+    if (!this.contexts || !req.user || !req.companyContext) return false;
+    const ctx = await this.contexts.forRequest(req, req.companyContext.dataSource.manager);
+    return ctx.hasAtLeast(COMPANY_ORGANIZATION_MANAGE_NODE, 'editable');
+  }
+
+  /** The connection a runner belongs to (the key of the per-connection "no warehouses table" memo). */
+  private connectionOf(manager?: EntityManager): object {
+    const runner = this.runner(manager);
+    return (runner as { connection?: object }).connection ?? (runner as unknown as object);
+  }
+
+  /**
+   * B2 — ONE statement: the caller's roles and grants (the very rows `loadAuthorizationContext` reads, `AUTHORIZATION_CONTEXT_FROM`) + the accessible units +
+   * the visibility of every warehouse. Throws 42P01 when the Company has no `warehouses` table (the caller falls back).
+   */
+  private async loadContextAndScope(userId: string, companyId: string | null, manager: EntityManager): Promise<{ ctx: AuthorizationContext; extra: AccessScope }> {
+    const rows: Array<{ k: string; a: string; b: string | null; c: string | null; d: string | null }> = await manager.query(
+      `${UNITS_CTE}
+       SELECT 'r' AS "k", r."id"::text AS "a", r."key" AS "b", rp."nodeKey" AS "c", rp."access"::text AS "d"
+       ${AUTHORIZATION_CONTEXT_FROM}
+       UNION ALL
+       SELECT 'u', "id"::text, NULL, NULL, NULL FROM units
+       UNION ALL
+       SELECT 'w', vis."id", NULL, NULL, vis."v"::text FROM (${WAREHOUSE_VISIBILITY}) vis`,
+      [userId],
+    );
+    const contextRows: AuthorizationContextRow[] = rows
+      .filter((r) => r.k === 'r')
+      .map((r) => ({ roleId: r.a, key: r.b as string, nodeKey: r.c, access: r.d as AuthorizationContextRow['access'] }));
+    return {
+      ctx: buildAuthorizationContext(contextRows, userId, companyId),
+      extra: {
+        userId,
+        unrestricted: false,
+        unitIds: new Set(rows.filter((r) => r.k === 'u').map((r) => r.a)),
+        warehouses: new Map(rows.filter((r) => r.k === 'w').map((r) => [r.a, r.d === 'true'])),
+      },
+    };
+  }
+
   async resolve(userId: string, manager?: EntityManager, ctx?: AuthorizationContext): Promise<AccessScope> {
     const access = ctx ? new WorkflowAccess(ctx) : await this.authorization.workflowAccess(userId, manager);
     if (access.allows('core.scope.unrestricted')) return { userId, unrestricted: true, unitIds: new Set() };
-    const rows: Array<{ id: string }> = await this.runner(manager).query(
-      `WITH RECURSIVE seed("id") AS (
-         SELECT m."orgUnitId" FROM "org_memberships" m WHERE m."userId" = $1
-         UNION
-         SELECT s."orgUnitId" FROM "access_scopes" s WHERE s."userId" = $1 AND s."includeDescendants" = true
-       ), tree("id") AS (
-         SELECT "id" FROM seed
-         UNION
-         SELECT u."id" FROM "org_units" u INNER JOIN tree t ON u."parentId" = t."id"
-       )
-       SELECT "id" FROM tree
-       UNION
-       SELECT s."orgUnitId" AS "id" FROM "access_scopes" s WHERE s."userId" = $1 AND s."includeDescendants" = false`,
-      [userId],
-    );
+    const runner = this.runner(manager);
+    const UNITS = UNITS_CTE;
+    const conn = this.connectionOf(manager);
+    const known = NO_WAREHOUSES.get(conn);
+    if (!(known && Date.now() - known < NO_WAREHOUSES_TTL_MS)) {
+      try {
+        // ONE statement: the accessible units AND the visibility of every warehouse (own link, else the parent's)
+        const rows: Array<{ k: string; id: string; v: boolean | null }> = await runner.query(
+          `${UNITS}
+           SELECT 'u' AS "k", "id"::text AS "id", NULL::boolean AS "v" FROM units
+           UNION ALL
+           SELECT 'w', vis."id", vis."v" FROM (${WAREHOUSE_VISIBILITY}) vis`,
+          [userId],
+        );
+        return {
+          userId,
+          unrestricted: false,
+          unitIds: new Set(rows.filter((r) => r.k === 'u').map((r) => r.id)),
+          warehouses: new Map(rows.filter((r) => r.k === 'w').map((r) => [r.id, r.v === true])),
+        };
+      } catch (err) {
+        if (errorCode(err) !== '42P01') throw err; // only "relation does not exist" (a Company without the inventory module) falls back
+        NO_WAREHOUSES.set(conn, Date.now());
+      }
+    }
+    const rows: Array<{ id: string }> = await runner.query(`${UNITS} SELECT "id" FROM units`, [userId]);
     return { userId, unrestricted: false, unitIds: new Set(rows.map((r) => r.id)) };
   }
 
@@ -100,6 +208,7 @@ export class AccessScopeService {
    */
   async visibleWarehouseIds(scope: AccessScope, manager?: EntityManager): Promise<'ALL' | string[]> {
     if (scope.unrestricted) return 'ALL';
+    if (scope.warehouses) return [...scope.warehouses].filter(([, visible]) => visible).map(([id]) => id); // resolved with the scope: no further statement
     const rows: Array<{ id: string }> = await this.runner(manager).query(
       `SELECT w."id" FROM "warehouses" w LEFT JOIN "warehouses" p ON p."id" = w."parentWarehouseId"
         WHERE COALESCE(w."orgUnitId", p."orgUnitId") IS NULL OR COALESCE(w."orgUnitId", p."orgUnitId") = ANY($1::uuid[])`,
@@ -120,6 +229,11 @@ export class AccessScopeService {
   /** Detail / create / edit / approve / post / reverse on a warehouse-keyed record: 404 when the warehouse is outside the scope. A missing warehouse is not a scope matter (the caller reports it). */
   async assertWarehouse(scope: AccessScope, warehouseId: string | null | undefined, manager?: EntityManager): Promise<void> {
     if (scope.unrestricted || !warehouseId) return;
+    if (scope.warehouses) {
+      // resolved with the scope: an id that is not a warehouse is not a scope matter; a warehouse the caller cannot see is a 404
+      if (scope.warehouses.get(warehouseId) === false) throw new NotFoundException();
+      return;
+    }
     const unit = await this.warehouseUnit(warehouseId, manager);
     if (unit === undefined) return;
     this.assertUnit(scope, unit);
@@ -169,6 +283,7 @@ export class AccessScopeService {
     grants: AccessScopeGrant[],
     actorUserId: string,
     manager: EntityManager,
+    opts: { organizationAdmin?: boolean } = {},
   ): Promise<{ before: AccessScopeGrant[]; after: AccessScopeGrant[] }> {
     const unique = new Map<string, AccessScopeGrant>();
     for (const g of grants) {
@@ -188,7 +303,9 @@ export class AccessScopeService {
     for (const g of wanted) {
       const old = beforeMap.get(g.orgUnitId);
       const widened = !old || (g.includeDescendants && !old.includeDescendants);
-      if (widened && !actorScope.unrestricted && !actorScope.unitIds.has(g.orgUnitId)) throw new NotFoundException(); // the unit is outside the actor's own scope: never confirm it exists
+      // NO SELF-ELEVATION (CTO Decisions 3 / 4-C, also for Company administrators): nobody may add to or widen THEIR OWN scope; narrowing or removing it is always allowed.
+      if (widened && targetUserId === actorUserId) throw new CompanyUserError('SELF_SCOPE_CHANGE', 'You cannot add to or widen your own access scope; ask another administrator.');
+      if (widened && !actorScope.unrestricted && !opts.organizationAdmin && !actorScope.unitIds.has(g.orgUnitId)) throw new NotFoundException(); // the unit is outside the actor's own scope: never confirm it exists
     }
     await manager.query(`DELETE FROM "access_scopes" WHERE "userId" = $1 AND NOT ("orgUnitId" = ANY($2::uuid[]))`, [targetUserId, wanted.map((g) => g.orgUnitId)]);
     for (const g of wanted) {

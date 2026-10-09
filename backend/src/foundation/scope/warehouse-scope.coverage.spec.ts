@@ -40,6 +40,14 @@ describe('F6 — warehouse-scope coverage of the pilot controllers', () => {
         expect(undeclared).toEqual([]);
       });
 
+      it('every @WarehouseScopeFiltered handler actually APPLIES the callers scope (declaring it is not enough: GET reports/stock/export declared it and ignored it)', () => {
+        const ignoring = routes(ctor)
+          .filter((r) => Reflect.getMetadata(WAREHOUSE_SCOPE_FILTERED_KEY, r.handler))
+          .filter((r) => !/visibleWarehouses|visibleWarehouseIds|visibleOnly|\.scopes|scope|actorAccess|forRequest/i.test(Function.prototype.toString.call(r.handler)))
+          .map((r) => `${String(r.path)} (${r.name})`);
+        expect(ignoring).toEqual([]);
+      });
+
       it('every exemption carries a non-empty reason', () => {
         for (const r of routes(ctor)) {
           const reason = Reflect.getMetadata(WAREHOUSE_SCOPE_EXEMPT_KEY, r.handler);

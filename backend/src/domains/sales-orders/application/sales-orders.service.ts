@@ -10,6 +10,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { ScopeService } from '../../../foundation/scope/scope.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
+import { WorkflowAccess } from '../../../foundation/authorization/workflow-access';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import {
   ProcessDefinition,
@@ -221,6 +222,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     shippingMethod: ShippingMethod,
     skipDeposit = false,
     manager?: EntityManager,
+    actorAccess?: WorkflowAccess,
   ): Promise<SalesOrder> {
     if (lines.length === 0) {
       throw new BadRequestException('A Sales Order must have at least one line item.');
@@ -240,7 +242,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // were always forced to be the same person); a plain sales_rep may
     // only ever create their own orders, same as before this change.
     // (2) whether any line's `managerPrice` may be honored at all.
-    const actorCanSetManagerPrice = actorUserId ? (await this.authorization.workflowAccess(actorUserId, manager)).allows('sales.order.set_manager_price') : false;
+    const actorCanSetManagerPrice = actorUserId ? (actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager))).allows('sales.order.set_manager_price') : false;
     if (salesRepUserId !== actorUserId && !actorCanSetManagerPrice) {
       throw new ForbiddenException('Only a sales manager or admin may create an order under a different Sales Representative.');
     }
@@ -395,8 +397,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * governing the review actions themselves.
    */
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
-  async listOrders(actorUserId: string, manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<SalesOrder[]> {
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+  async listOrders(actorUserId: string, manager?: EntityManager, visibleWarehouseIds?: string[], actorAccess?: WorkflowAccess): Promise<SalesOrder[]> {
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     // REAL BUG FOUND LIVE (CTO directive — Fulfillment dashboard rework):
     // `warehouse_worker` was never in this "sees everything" set, so a
     // real fulfillment operator opening the Fulfillment screen's
@@ -431,8 +433,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * screen's own table specifically; same Scope-vs-Role visibility split
    * as `listOrders`.
    */
-  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number; visibleWarehouseIds?: string[] }, manager?: EntityManager): Promise<{ rows: SalesOrder[]; total: number }> {
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+  async listOrdersPage(actorUserId: string, options: { page: number; pageSize: number; visibleWarehouseIds?: string[] }, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<{ rows: SalesOrder[]; total: number }> {
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     const isReviewerOrAdmin = access.allows('sales.order.list_all');
     const repo = (manager ?? this.dataSource).getRepository(SalesOrder);
     const [rows, total] = await repo.findAndCount({
@@ -451,8 +453,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * `transitionOrder` directly, so this exact same gap sat latent until
    * the operational UI's order-detail screen needed it).
    */
-  async getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<SalesOrder> {
-    const access = await this.authorization.workflowAccess(requestingUserId, manager);
+  async getOrder(orderId: string, requestingUserId: string, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<SalesOrder> {
+    const access = actorAccess ?? (await this.authorization.workflowAccess(requestingUserId, manager));
     // warehouse_worker included for the same reason as listOrders above —
     // a fulfillment operator needs to open an order's detail from the
     // Fulfillment dashboard even though Scope was only ever granted to
@@ -492,7 +494,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * contract (`CustomersService.getCustomerSnapshot`, `UsersService.
    * findById`) — never a direct query into CRM's or Identity's tables.
    */
-  async getOrderDetailView(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<
+  async getOrderDetailView(orderId: string, requestingUserId: string, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<
     SalesOrder & {
       customerName: string | null;
       customerPhone: string | null;
@@ -503,7 +505,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       warehouseName: string | null;
     }
   > {
-    const order = await this.getOrder(orderId, requestingUserId, manager);
+    const order = await this.getOrder(orderId, requestingUserId, manager, actorAccess);
     const [customer, salesRep, createdBy, warehouse] = await Promise.all([
       this.customers.getCustomerSnapshot(order.customerId, manager),
       this.safeFindUser(order.salesRepUserId),
@@ -640,7 +642,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * isn't available, the entire edit is rejected and nothing changes,
    * including any OTHER line in the same request.
    */
-  async updateOrderLines(orderId: string, lineUpdates: UpdateOrderLineInput[], actorUserId: string, reason?: string | null, manager?: EntityManager): Promise<SalesOrder> {
+  async updateOrderLines(orderId: string, lineUpdates: UpdateOrderLineInput[], actorUserId: string, reason?: string | null, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<SalesOrder> {
     if (lineUpdates.length === 0) throw new BadRequestException('At least one line update is required.');
 
     const { order } = await this.getOrderAndDefinition(orderId, manager);
@@ -650,7 +652,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     if (!requiredRoles || !editRule) {
       throw new ConflictException(`This order cannot be edited while it is in status "${currentState}".`);
     }
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     if (!access.allows(editRule)) {
       throw new ForbiddenException(`Role required to edit an order in status "${currentState}": one of [${requiredRoles.join(', ')}].`);
     }
@@ -896,7 +898,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * themselves — an insufficient-stock line on a newly-added item rolls
    * back the whole edit, same as order creation.
    */
-  async editDraftOrder(orderId: string, lines: DraftOrderLineInput[], actorUserId: string, manager?: EntityManager): Promise<SalesOrder> {
+  async editDraftOrder(orderId: string, lines: DraftOrderLineInput[], actorUserId: string, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<SalesOrder> {
     if (lines.length === 0) throw new BadRequestException('A Sales Order must have at least one line item.');
 
     const { order } = await this.getOrderAndDefinition(orderId, manager);
@@ -904,7 +906,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be edited this way while it is in "draft" status (currently "${currentState}").`);
     }
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     if (order.salesRepUserId !== actorUserId && !access.allows('sales.order.edit_any_draft')) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may edit it while in draft.");
     }
@@ -1029,13 +1031,13 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * database's own already-declared constraint keeps this a one-directional
    * dependency, same as everywhere else in this domain.
    */
-  async deleteDraftOrder(orderId: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+  async deleteDraftOrder(orderId: string, actorUserId: string, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<void> {
     const { order } = await this.getOrderAndDefinition(orderId, manager);
     const currentState = await this.getOrderStatus(orderId, manager);
     if (currentState !== 'draft') {
       throw new ConflictException(`This order can only be deleted while it is in "draft" status (currently "${currentState}").`);
     }
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     if (order.salesRepUserId !== actorUserId && !access.allows('sales.order.delete_any_draft')) {
       throw new ForbiddenException("Only this order's own sales representative (or admin) may delete it while in draft.");
     }
@@ -1101,7 +1103,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * client action, "Submit for Review"), or straight to 'released' for an
    * 'open_account' order (no review, no deposit gate).
    */
-  async transitionOrder(orderId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+  async transitionOrder(orderId: string, action: string, actorUserId: string, manager?: EntityManager, actorAccess?: WorkflowAccess): Promise<string> {
     // Scope is enforced only for the originating rep's own actions
     // (submit/resubmit) — NOT for supervisor/manager review actions.
     // REAL GAP FOUND DURING LIVE E2E VERIFICATION (not caught by unit
@@ -1138,7 +1140,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       await this.scope.assertAccess(actorUserId, ENTITY_TYPE, orderId, manager);
     }
 
-    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const access = actorAccess ?? (await this.authorization.workflowAccess(actorUserId, manager));
     if (!access.allows(ORDER_ACTION_RULES[action])) {
       throw new ForbiddenException(`Role required for action "${action}": one of [${requiredRoles.join(', ')}].`);
     }

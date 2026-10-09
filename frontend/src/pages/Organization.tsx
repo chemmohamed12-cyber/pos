@@ -102,7 +102,7 @@ export function Organization() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {can('wf.core.organization.manage', 'editable') && (
+      {can('core.company.organization.manage', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
@@ -164,7 +164,7 @@ export function Organization() {
                     ))}
                     {(members[u.id] ?? []).length === 0 && <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>—</span>}
                   </div>
-                  {can('wf.core.organization.manage', 'editable') && (
+                  {can('core.company.organization.manage', 'editable') && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <select
                         value={memberSelections[u.id] ?? ''}

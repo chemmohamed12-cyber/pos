@@ -8,9 +8,10 @@ import { AuthenticationModule } from '../authentication/authentication.module';
 import { CompanyModule } from '../company/company.module';
 import { DatabaseRegistryModule } from '../database-registry/database-registry.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { PermissionModule } from '../permission/permission.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([OrgUnit, OrgMembership]), AuthenticationModule, AuthorizationModule, CompanyModule, DatabaseRegistryModule],
+  imports: [TypeOrmModule.forFeature([OrgUnit, OrgMembership]), AuthenticationModule, AuthorizationModule, PermissionModule, CompanyModule, DatabaseRegistryModule],
   controllers: [OrganizationController],
   providers: [OrganizationService],
   exports: [OrganizationService],

@@ -446,7 +446,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // present (ADR-023 — "core is implicit and never listed" in
       // depends_on), so entitlement never restricts these; `roles` is
       // the whole gate, exactly as it is on their actual routes today.
-      { to: '/organization', code: 'nav.organization', workflowRule: 'core.organization.manage' },
+      // CTO ruling B1 (2026-10-08): Organization administration is the Company administration node `core.company.organization.manage` (formerly the workflow rule `core.organization.manage`).
+      { to: '/organization', code: 'nav.organization', permissionNode: 'core.company.organization.manage' },
       // F2 (2026-10-07): the Company's own user directory, invitations and roles. `/company/users*` is gated by `core.company.members.manage` (read for the directory, editable for writes) on every route, so nav visibility and route access use the same axis.
       { to: '/company-users', code: 'nav.company_users', permissionNode: 'core.company.members.manage' },
       // F3: roles, templates and capabilities of the Company. Every `/company/roles*` route is gated by `core.company.roles.manage` (read for lists, editable for writes).

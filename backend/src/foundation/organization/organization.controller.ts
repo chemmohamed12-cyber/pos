@@ -3,9 +3,11 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 import { OrganizationService } from './organization.service';
 import { OrgUnitType } from './org-unit.entity';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
-import { RolesGuard } from '../authorization/roles.guard';
-import { RequireWorkflow } from '../authorization/require-role.decorator';
+import { PermissionGuard } from '../permission/permission.guard';
+import { RequirePermission } from '../permission/require-permission.decorator';
+import { COMPANY_ORGANIZATION_MANAGE_NODE } from '../permission/company-nodes';
 import { CompanyContextGuard, CompanyScopedRequest } from '../company/company-context.guard';
+import { CompanyUserError } from '../company/company-user-roles';
 
 class CreateUnitDto {
   @IsIn(['company', 'branch', 'department', 'team', 'warehouse'])
@@ -38,6 +40,9 @@ class AssignMemberDto {
  * and its member ids. Now: JWT -> `CompanyContextGuard` (membership + Company status validated) -> the Company's OWN DataSource; the ambient tables are
  * never reached over HTTP. Authorization semantics are otherwise unchanged (reads: any Company member, as before; writes: role `admin` — now resolved
  * from the Company's roles via the guard chain). Redesigning the Organization module is out of scope for F1.
+ * CTO ruling B1 (2026-10-08): writes require the Company ADMINISTRATION node `core.company.organization.manage` (formerly the workflow rule
+ * `core.organization.manage`). An org-unit membership is a SCOPE SOURCE (`AccessScopeService`), so nobody may add THEMSELVES to a unit (no self-elevation,
+ * same rule as `SELF_SCOPE_CHANGE` on explicit grants); removing oneself is narrowing and stays allowed.
  */
 @UseGuards(JwtAuthGuard, CompanyContextGuard)
 export class OrganizationController {
@@ -53,8 +58,8 @@ export class OrganizationController {
     return this.organization.listUnits(this.manager(req));
   }
 
-  @UseGuards(RolesGuard)
-  @RequireWorkflow('core.organization.manage')
+  @UseGuards(PermissionGuard)
+  @RequirePermission(COMPANY_ORGANIZATION_MANAGE_NODE, 'editable')
   @Post('units')
   async createUnit(@Req() req: CompanyScopedRequest, @Body() dto: CreateUnitDto) {
     return this.organization.createUnit(dto.type, dto.name, dto.parentId ?? null, null, this.manager(req));
@@ -65,16 +70,18 @@ export class OrganizationController {
     return this.organization.getMemberIds(id, this.manager(req));
   }
 
-  @UseGuards(RolesGuard)
-  @RequireWorkflow('core.organization.manage')
+  @UseGuards(PermissionGuard)
+  @RequirePermission(COMPANY_ORGANIZATION_MANAGE_NODE, 'editable')
   @Post('units/:id/members')
   async assignMember(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: AssignMemberDto) {
+    if (!req.user) throw new UnauthorizedException();
+    if (dto.userId === req.user.id) throw new CompanyUserError('SELF_SCOPE_CHANGE', 'You cannot add yourself to an organization unit (it widens your own access scope); ask another administrator.');
     await this.organization.assignMember(dto.userId, id, this.manager(req));
     return { assigned: true };
   }
 
-  @UseGuards(RolesGuard)
-  @RequireWorkflow('core.organization.manage')
+  @UseGuards(PermissionGuard)
+  @RequirePermission(COMPANY_ORGANIZATION_MANAGE_NODE, 'editable')
   @Delete('units/:id/members')
   async removeMember(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Query('userId') userId: string) {
     await this.organization.removeMember(userId, id, this.manager(req));

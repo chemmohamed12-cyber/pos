@@ -60,7 +60,14 @@ export class SupportAccessService {
     const hoursRaw = input.hours === undefined || input.hours === null ? SUPPORT_DEFAULT_HOURS : Number(input.hours);
     if (!Number.isFinite(hoursRaw) || hoursRaw <= 0 || hoursRaw > SUPPORT_MAX_HOURS) throw new CompanyUserError('INVALID_INPUT', `Support access lasts at most ${SUPPORT_MAX_HOURS} hours.`);
     const expiresAt = new Date(Date.now() + hoursRaw * 3_600_000);
-    const targetId = input.userId ?? actorUserId;
+    // CTO Decision 4-C (2026-10-07): SELF-GRANT IS PROHIBITED. Support may ask for access; it can never open, approve, extend or broaden its own. The grantee must be
+    // named (no default to "myself") and must be a DIFFERENT person from the one who authorizes the access. The refusal is itself audited.
+    const targetId = input.userId;
+    if (!targetId) throw new CompanyUserError('INVALID_INPUT', 'Name the platform user who needs support access; access can never be opened for yourself.');
+    if (targetId === actorUserId) {
+      await this.audit.record({ actorUserId, organizationId: null, action: 'platform.support_access.self_grant_denied', resource: 'company', resourceId: input.companyId, result: 'denied', correlationId: randomUUID(), after: { userId: targetId } });
+      throw new CompanyUserError('SELF_GRANT_PROHIBITED', 'Support access cannot be granted, approved or extended by the person who receives it; another authorized platform user must do it.');
+    }
     const target = await this.users.findById(targetId);
     const company = await this.companies.findById(input.companyId);
     if (!company) throw new CompanyUserError('NOT_A_MEMBER', 'Company not found.');

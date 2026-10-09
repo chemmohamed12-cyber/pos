@@ -50,6 +50,33 @@ export class AuthorizationContextService {
   }
 
   /**
+   * B2 (2026-10-08) — the FIRST load of the request's context, performed by `combined` together with other rows the caller needs (one statement, one round
+   * trip, e.g. the access scope). The context is memoized exactly like `forRequest` (same cache entry, same never-cache-a-failure rule), so every later guard /
+   * handler reuses it. Returns `null` when the request already holds a context for this manager — the caller then loads its own rows separately.
+   * `combined` must build the context with `buildAuthorizationContext` from `AUTHORIZATION_CONTEXT_FROM` rows (the one definition of "what a user holds").
+   */
+  forRequestWith<T>(
+    req: ContextRequest,
+    manager: EntityManager,
+    combined: (userId: string, companyId: string | null) => Promise<{ ctx: AuthorizationContext; extra: T }>,
+  ): { ctx: Promise<AuthorizationContext>; extra: Promise<T> } | null {
+    if (!req.user) return null;
+    const bag = req as unknown as Record<symbol, CachedEntry | undefined>;
+    const hit = bag[REQUEST_CACHE];
+    if (hit && hit.managerKey === manager) return null;
+    const companyId = req.companyContext?.companyId ?? req.user.companyId ?? null;
+    const both = combined(req.user.id, companyId);
+    const promise = both.then((r) => r.ctx);
+    promise.catch(() => {
+      if (bag[REQUEST_CACHE]?.promise === promise) bag[REQUEST_CACHE] = undefined;
+    });
+    bag[REQUEST_CACHE] = { managerKey: manager, promise };
+    const extra = both.then((r) => r.extra);
+    extra.catch(() => undefined); // observed: a caller that stops at the context's failure must not leave an unhandled rejection (awaiting callers still receive it)
+    return { ctx: promise, extra };
+  }
+
+  /**
    * Uncached load for callers with no request object (batch jobs, tests).
    *
    * ONE statement: the user's roles joined to every `role_permissions` row of those roles (LEFT JOIN, so a role with no grants still appears as a

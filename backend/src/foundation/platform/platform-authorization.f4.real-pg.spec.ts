@@ -228,14 +228,14 @@ describe('F4 — platform authorization and support access (real Postgres)', () 
     });
 
     it('validation: reason ≥ 10 chars, ≤ 8 hours, platform users only, not for an ordinary member; the role is fixed and read-only', async () => {
-      const base = { companyId: h.companyAId, reason: 'Investigating invoice posting issue #4411' };
-      await expectCode(support.grant(U.support, { ...base, reason: 'short' }), 'INVALID_INPUT');
-      await expectCode(support.grant(U.support, { ...base, hours: 9 }), 'INVALID_INPUT');
-      await expectCode(support.grant(U.support, { ...base, hours: 0 }), 'INVALID_INPUT');
-      await expectCode(support.grant(U.support, { ...base, userId: U.nobody }), 'INVALID_INPUT'); // not a platform user
-      await expectCode(support.grant(U.support, { ...base, userId: U.companyAdmin }), 'INVALID_INPUT'); // a Company admin is not a platform user either
+      const base = { companyId: h.companyAId, userId: supportUser, reason: 'Investigating invoice posting issue #4411' };
+      await expectCode(support.grant(U.companyManager, { ...base, reason: 'short' }), 'INVALID_INPUT');
+      await expectCode(support.grant(U.companyManager, { ...base, hours: 9 }), 'INVALID_INPUT');
+      await expectCode(support.grant(U.companyManager, { ...base, hours: 0 }), 'INVALID_INPUT');
+      await expectCode(support.grant(U.companyManager, { ...base, userId: U.nobody }), 'INVALID_INPUT'); // not a platform user
+      await expectCode(support.grant(U.companyManager, { ...base, userId: U.companyAdmin }), 'INVALID_INPUT'); // a Company admin is not a platform user either
       await h.memberships.create({ userId: U.auditor, companyId: h.companyAId, roleKey: 'admin' });
-      await expectCode(support.grant(U.support, { ...base, userId: U.auditor }), 'ALREADY_MEMBER'); // regular member: no support access on top
+      await expectCode(support.grant(U.companyManager, { ...base, userId: U.auditor }), 'ALREADY_MEMBER'); // regular member: no support access on top
       await h.memberships.revoke(U.auditor, h.companyAId);
     });
 
@@ -282,8 +282,24 @@ describe('F4 — platform authorization and support access (real Postgres)', () 
       expect(await support.expireDue()).toBe(0); // idempotent
     });
 
+    it('CTO Decision 4-C — SELF-GRANT IS PROHIBITED: nobody opens, approves, extends or broadens their OWN support access (the grantee must be named and must differ from the grantor); the refusal is audited; nothing is created', async () => {
+      const base = { companyId: h.companyAId, reason: 'Trying to open access for myself, which is not allowed' };
+      await expectCode(support.grant(U.support, { ...base, userId: U.support }), 'SELF_GRANT_PROHIBITED'); // a support operator granting itself
+      await expectCode(support.grant(U.superAdmin, { ...base, userId: U.superAdmin }), 'SELF_GRANT_PROHIBITED'); // not even the Platform Super Admin
+      await expectCode(support.grant(U.companyManager, { ...base, userId: U.companyManager }), 'SELF_GRANT_PROHIBITED');
+      await expectCode(support.grant(U.support, base), 'INVALID_INPUT'); // the old default ("for myself") is gone: the grantee must be named
+      expect(await memberships.findByUserAndCompany(U.support, h.companyAId)).toBeNull(); // nothing was opened
+      // extension is the same act: with a live access, the holder still cannot extend it
+      await support.grant(U.companyManager, { companyId: h.companyAId, userId: supportUser, reason: 'Opened by someone else, for 1 hour', hours: 1 });
+      const before = (await memberships.findByUserAndCompany(supportUser, h.companyAId))!.expiresAt!.getTime();
+      await expectCode(support.grant(supportUser, { companyId: h.companyAId, userId: supportUser, reason: 'Extending my own access, which is not allowed', hours: 8 }), 'SELF_GRANT_PROHIBITED');
+      expect((await memberships.findByUserAndCompany(supportUser, h.companyAId))!.expiresAt!.getTime()).toBe(before); // unchanged
+      expect((await cp.query(`SELECT 1 FROM audit_records WHERE action = 'platform.support_access.self_grant_denied' AND result = 'denied'`)).length).toBeGreaterThanOrEqual(4);
+      await support.revoke(U.companyManager, h.companyAId, supportUser, 'platform');
+    });
+
     it('re-grant extends; the Company can end the access at any time (audited in its own chain); a platform user can revoke it too; chains verify', async () => {
-      await support.grant(U.support, { companyId: h.companyAId, reason: 'Second investigation window for ticket 4412', hours: 1 });
+      await support.grant(U.companyManager, { companyId: h.companyAId, userId: supportUser, reason: 'Second investigation window for ticket 4412', hours: 1 });
       const first = (await memberships.findByUserAndCompany(supportUser, h.companyAId))!.expiresAt!.getTime();
       await support.grant(U.companyManager, { companyId: h.companyAId, userId: supportUser, reason: 'Extended after the customer asked', hours: 3 });
       const second = (await memberships.findByUserAndCompany(supportUser, h.companyAId))!;
@@ -291,12 +307,13 @@ describe('F4 — platform authorization and support access (real Postgres)', () 
       expect(second.reason).toBe('Extended after the customer asked');
       // the Company administrator ends it
       const A = { userId: U.companyAdmin, authz: await contexts.load(U.companyAdmin, null, dsA.manager) };
+      const revokedBefore = (await dsA.query(`SELECT 1 FROM audit_records WHERE action = 'support_access.revoked'`)).length; // (the Decision 4-C test above ended its own access: that record is not this one)
       await mgmt.removeMember(A, h.companyAId, dsA, supportUser);
       expect(await memberships.findByUserAndCompany(supportUser, h.companyAId)).toBeNull();
-      expect((await dsA.query(`SELECT 1 FROM audit_records WHERE action = 'support_access.revoked'`)).length).toBe(1);
+      expect((await dsA.query(`SELECT 1 FROM audit_records WHERE action = 'support_access.revoked'`)).length).toBe(revokedBefore + 1);
       // platform revoke path
-      await support.grant(U.support, { companyId: h.companyAId, reason: 'One more short window to confirm the fix', hours: 1 });
-      await support.revoke(U.support, h.companyAId, supportUser, 'platform');
+      await support.grant(U.companyManager, { companyId: h.companyAId, userId: supportUser, reason: 'One more short window to confirm the fix', hours: 1 });
+      await support.revoke(U.support, h.companyAId, supportUser, 'platform'); // ending one's OWN access is narrowing, never elevation: allowed
       expect(await memberships.findByUserAndCompany(supportUser, h.companyAId)).toBeNull();
       await expectCode(support.revoke(U.support, h.companyAId, supportUser, 'platform'), 'NOT_A_MEMBER');
       expect(await support.list(h.companyAId)).toEqual([]);
