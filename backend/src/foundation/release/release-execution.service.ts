@@ -1,9 +1,11 @@
 import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, In, MigrationExecutor } from 'typeorm';
 import { copyFile, cp, mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { runCapture } from './capture-process';
 import { dirname, join, resolve, sep } from 'path';
 import { randomUUID } from 'crypto';
 import { Release } from './release.entity';
@@ -517,7 +519,9 @@ export class ReleaseExecutionService {
       await audit('release.deploy.environment_check', envCheck.status === 'invalid' ? 'denied' : 'success', { status: envCheck.status, errors: envCheck.errors, ...(envCheck.detail ? { detail: envCheck.detail } : {}) });
       if (envCheck.status === 'invalid') {
         throw new PreSwapAbort(
-          `ENVIRONMENT_INVALID: release ${release.version} cannot start with this host's environment - fix the host configuration first (cPanel > Setup Node.js App > environment variables): ${envCheck.errors.join(' | ')}`,
+          envCheck.evaluationFailed
+            ? `ENVIRONMENT_CHECK_FAILED: the pre-swap environment check of release ${release.version} could not run - ${envCheck.errors.join(' | ')}. Nothing was changed and the active release was not touched. This is a failure of the check itself, not proof that the host environment is wrong.`
+            : `ENVIRONMENT_INVALID: release ${release.version} cannot start with this host's environment - fix the host configuration first (cPanel > Setup Node.js App > environment variables): ${envCheck.errors.join(' | ')}`,
         );
       }
 
@@ -928,22 +932,31 @@ export class ReleaseExecutionService {
    * against it BEFORE the swap and refuse with the exact names. Runs in a child process (the candidate's code never enters this one). A candidate without a schema file
    * (an older layout) is reported `skipped`, not passed.
    */
-  private async verifyCandidateEnvironment(candidatePath: string): Promise<{ status: 'valid' | 'invalid' | 'skipped'; errors: string[]; detail?: string }> {
+  private async verifyCandidateEnvironment(candidatePath: string): Promise<{ status: 'valid' | 'invalid' | 'skipped'; errors: string[]; detail?: string; evaluationFailed?: boolean }> {
     const schemaFile = join(candidatePath, 'dist', 'foundation', 'configuration', 'configuration.schema.js');
     if (!existsSync(schemaFile)) return { status: 'skipped', errors: [], detail: 'candidate has no configuration schema file' };
+    // The child writes its verdict to a FILE and the parent reads that file: nothing depends on how this runtime hands back a child's stdout (on the shared host
+    // `promisify(execFile)` returned `stdout === undefined`, release 1.1.7).
     const script =
+      "const fs=require('fs');const out=process.argv[2];" +
       "const m=require(process.argv[1]);const s=m.configurationValidationSchema;" +
-      "if(!s||typeof s.validate!=='function'){console.log(JSON.stringify({skipped:true}));process.exit(0)}" +
+      "if(!s||typeof s.validate!=='function'){fs.writeFileSync(out,JSON.stringify({skipped:true}));process.exit(0)}" +
       "const r=s.validate(process.env,{abortEarly:false,allowUnknown:true});" +
-      "console.log(JSON.stringify({errors:r.error?r.error.details.map(function(d){return d.message}):[]}))";
+      "fs.writeFileSync(out,JSON.stringify({errors:r.error?r.error.details.map(function(d){return d.message}):[]}))";
+    const workDir = mkdtempSync(join(tmpdir(), 'daii-envcheck-'));
+    const outFile = join(workDir, 'verdict.json');
     try {
-      const { stdout } = await execFileAsync(this.config.releaseBuild.nodeBin, ['-e', script, schemaFile], { cwd: candidatePath, env: process.env, timeout: 30_000 });
-      const parsed = JSON.parse(stdout.trim().split('\n').pop() ?? '{}') as { skipped?: boolean; errors?: string[] };
+      await runCapture(this.config.releaseBuild.nodeBin, ['-e', script, schemaFile, outFile], { cwd: candidatePath, env: process.env, timeout: 30_000 });
+      const parsed = JSON.parse(readFileSync(outFile, 'utf8')) as { skipped?: boolean; errors?: string[] };
       if (parsed.skipped) return { status: 'skipped', errors: [], detail: 'candidate schema has no validate()' };
       const errors = (parsed.errors ?? []).map((m) => m.slice(0, 200));
       return { status: errors.length > 0 ? 'invalid' : 'valid', errors };
     } catch (err) {
-      return { status: 'invalid', errors: [`the candidate's configuration schema could not be evaluated: ${err instanceof Error ? err.message.split('\n')[0].slice(0, 200) : String(err)}`] };
+      // The CHECK itself failed (tooling), which proves nothing about the host's environment: it still refuses (fail closed, nothing was changed) but says so.
+      const detail = err instanceof Error ? [err.message.split('\n')[0], (err as Error & { stderr?: string }).stderr?.trim().split('\n').pop()].filter(Boolean).join(' | ') : String(err);
+      return { status: 'invalid', evaluationFailed: true, errors: [`the candidate's configuration schema could not be evaluated: ${detail.slice(0, 300)}`] };
+    } finally {
+      rmSync(workDir, { recursive: true, force: true });
     }
   }
 

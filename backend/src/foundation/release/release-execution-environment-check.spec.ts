@@ -129,6 +129,14 @@ describe('ReleaseExecutionService — pre-swap environment check of the candidat
     const r = await check(build(broken), broken);
     expect(r.status).toBe('invalid');
     expect(r.errors[0]).toContain('could not be evaluated');
+    expect((r as { evaluationFailed?: boolean }).evaluationFailed).toBe(true); // a failure of the CHECK, reported as such (not as a bad host environment)
+  });
+
+  it('a genuine missing variable is NOT flagged as an evaluation failure', async () => {
+    setEnv(host112);
+    const r = await check(build(realSchemaRoot), realSchemaRoot);
+    expect(r.status).toBe('invalid');
+    expect((r as { evaluationFailed?: boolean }).evaluationFailed).toBeUndefined();
   });
 
   it('IN THE DEPLOY: an invalid candidate environment aborts PRE-SWAP — no migration, no swap, ACTIVE untouched — with the variable named; classified DEPLOYMENT_FAILED', async () => {
