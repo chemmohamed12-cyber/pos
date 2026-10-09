@@ -36,6 +36,8 @@ const APP_ROOT = process.cwd();
 
 const CONTROL_PLANE_DB = 'daii_test_area4_control_plane';
 const COMPANY_DB = 'daii_test_area4_company';
+// One physical database belongs to exactly ONE Company (unique index on database_registries.databaseName), so each test that provisions its own Company gets its own database.
+const EXTRA_DBS = ['daii_test_area4_company_unknown_admin', 'daii_test_area4_company_retry'];
 const INSTALLATION_ID = 'installation';
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
@@ -72,6 +74,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
   beforeAll(async () => {
     await createDatabase(CONTROL_PLANE_DB);
     await createDatabase(COMPANY_DB);
+    for (const d of EXTRA_DBS) await createDatabase(d);
 
     const { runMigrationsForDatabase } = await import('../release-orchestration/company-migration-runner');
     const migrated = await runMigrationsForDatabase(APP_ROOT, { host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: CONTROL_PLANE_DB }, ['core']);
@@ -117,6 +120,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
     await controlPlane.destroy();
     await dropDatabase(CONTROL_PLANE_DB);
     await dropDatabase(COMPANY_DB);
+    for (const d of EXTRA_DBS) await dropDatabase(d);
   });
 
   it('provisions a Company end-to-end: registers the database, migrates it, health-checks it, marks READY (proof points 1, 2, 7)', async () => {
@@ -210,7 +214,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
         companyId: company.id,
         host: HOST,
         port: PORT,
-        databaseName: COMPANY_DB,
+        databaseName: 'daii_test_area4_company_unknown_admin',
         username: USERNAME,
         password: PASSWORD,
         appRoot: APP_ROOT,
@@ -223,7 +227,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
     // Never reached the Company-DB UserRole write for this identity — the
     // Platform-level UsersService.findById check fails first, exactly the
     // invariant ADR-073 §7 requires now that no local FK exists to catch it.
-    const companyDs = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: COMPANY_DB, synchronize: false, logging: false });
+    const companyDs = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'daii_test_area4_company_unknown_admin', synchronize: false, logging: false });
     await companyDs.initialize();
     try {
       const rows: Array<{ count: string }> = await companyDs.query(`SELECT count(*)::text AS count FROM "user_roles" WHERE "userId" = $1`, [unknownUserId]);
@@ -270,7 +274,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
         companyId: company.id,
         host: HOST,
         port: 1, // unreachable, first attempt fails
-        databaseName: COMPANY_DB,
+        databaseName: 'daii_test_area4_company_retry',
         username: USERNAME,
         password: PASSWORD,
         appRoot: APP_ROOT,
@@ -284,7 +288,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
       companyId: company.id,
       host: HOST,
       port: PORT, // corrected
-      databaseName: COMPANY_DB,
+      databaseName: 'daii_test_area4_company_retry',
       username: USERNAME,
       password: PASSWORD,
       appRoot: APP_ROOT,

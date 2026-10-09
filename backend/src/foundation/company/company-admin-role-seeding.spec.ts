@@ -82,7 +82,7 @@ import { seedCompanyAdminRole, COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAG
  * wildcard).
  */
 import { WORKFLOW_NODES } from '../authorization/workflow-rules';
-const FIXED_CORE_NODE_COUNT = 4 + WORKFLOW_NODES.length; // the four core.company.* nodes + (F5) every workflow capability the legacy administrator passed implicitly
+const FIXED_CORE_NODE_COUNT = 5 + WORKFLOW_NODES.length; // the five core.company.* administration nodes (members, roles, organization [B1], backup, audit) + (F5) every workflow capability the legacy administrator passed implicitly
 
 describe('seedCompanyAdminRole — §3.1 verified decision (2026-09-24)', () => {
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe('seedCompanyAdminRole — §3.1 verified decision (2026-09-24)', () => 
     const result = await seedCompanyAdminRole({ host: 'h', port: 1, username: 'u', password: 'p', database: 'd' }, ['sales', 'inventory']);
 
     expect(result.created).toBe(true);
-    expect(result.grants).toBe(2 + FIXED_CORE_NODE_COUNT); // sales, inventory + the four core.company.* administration nodes (members, roles [F3], backup, audit)
+    expect(result.grants).toBe(2 + FIXED_CORE_NODE_COUNT); // sales, inventory + the five core.company.* administration nodes (members, roles [F3], organization [B1], backup, audit)
     const grants = [...grantsStoreMock.values()].map((g) => g.nodeKey);
     expect(grants).toEqual(expect.arrayContaining(['sales', 'inventory', COMPANY_MEMBERS_MANAGE_NODE, COMPANY_BACKUP_MANAGE_NODE, COMPANY_AUDIT_VIEW_NODE]));
     expect(grants.every((n) => n !== '*')).toBe(true); // never a wildcard — §3.1
