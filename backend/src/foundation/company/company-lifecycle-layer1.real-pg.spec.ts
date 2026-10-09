@@ -151,8 +151,8 @@ describe('WP-4.1 — DP-9 Layer 1 (READY-only operational access), real-Postgres
     expect(req.companyContext?.companyId).toBe(h.companyBId);
     expect(await dbOf(req)).toBe(h.companyBDbName);
     expect(getDataSourceSpy).toHaveBeenCalledTimes(1);
-    expect(getDataSourceSpy).toHaveBeenCalledWith(h.companyBId);
-    expect(getDataSourceSpy).not.toHaveBeenCalledWith(h.companyAId);
+    // the guard now hands the already-read registry row as a 2nd argument; what matters is WHICH Company's DataSource was requested (first argument): B's only, never A's
+    expect(getDataSourceSpy.mock.calls.map((c) => c[0])).toEqual([h.companyBId]);
 
     // User B holds no Membership in A: even though A is non-READY, B's user is told nothing about A's state.
     await expect(auth.selectCompany(userBId, h.companyAId)).rejects.toThrow(/not a member/);
