@@ -64,3 +64,16 @@ Retry is simple: the failed release is re-registerable (`failed` ∈ `REPLACEABL
 
 ## Environment adaptations (Windows, not engine behaviour)
 Symlinks need a privilege this account lacks, and `fs.cp` cannot recreate a junction → the installed tree has a **real** `node_modules`. A directory cannot be renamed while it is a process's working directory → the harness runs from `host/` (whose `package.json` mirrors the installed version, because the engine reads `process.cwd()/package.json`).
+
+---
+## Addendum — rehearsal on disposable clones (2026-10-09; nothing here touched `daii_dev` or any Company)
+Purpose: strengthen the evidence behind the options, without applying any. Two throwaway databases (`daii_test_clone_orig`, `daii_test_clone_split`) were restored from the fresh `daii_dev` dump on the **isolated** instance (252 migrations each = `daii_dev`'s exact schema). The release package was unpacked twice under `D:\DAII-LOCAL-DEPLOY\ct\` — `orig` as shipped, and `split` where only the two flagged statements were split into consecutive `ALTER TABLE` statements **in the same column order** (a scratch edit of the compiled files; the repository is unchanged).
+
+| Check | `orig` (as shipped) | `split` |
+|---|---|---|
+| Guard over the **33 pending migrations** (the engine's scan scope) | **2 violations** (F2 `1790003…`, F3 `1790005…`) | **none** |
+| All 33 pending migrations applied to the clone with the engine's own primitive (`runMigrationsForDatabase`), incl. the 22 older than the head | SUCCESS, 33 executed, 1.2 s | SUCCESS, 33 executed, 1.1 s |
+| `pg_dump --schema-only` of the two results | identical — the **only** diff is pg_dump 18's random per-run `\restrict` token | |
+| `migrations` (285 names), `roles` (29 rows), `user_company_memberships` (8 rows) fingerprints | identical | identical |
+
+Conclusions: (1) the denial is limited to exactly those two migrations; (2) every pending migration is applicable to `daii_dev`'s real schema; (3) an **order-preserving split** (not a reorder) changes nothing in the resulting schema — not even physical column order — so Option 1 is safe in that form. Note the rows of the 6 other old (2025/early-Oct) migrations the guard also matches when scanning the *whole* tree are already applied history and outside the engine's scan scope.
