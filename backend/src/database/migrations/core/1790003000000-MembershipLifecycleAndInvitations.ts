@@ -17,6 +17,9 @@ export class MembershipLifecycleAndInvitations1790003000000 implements Migration
   name = 'MembershipLifecycleAndInvitations1790003000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // The membership columns are added in consecutive statements (one per run of required / optional columns), in the original column order, so every required
+    // column carries its DEFAULT inside the SAME statement. The release engine's expand/contract scan reads statements, not individual columns, and could not
+    // otherwise see that. The resulting schema is byte-for-byte the one a single multi-column ALTER produces.
     await queryRunner.query(`
       DO $$
       BEGIN
@@ -24,9 +27,11 @@ export class MembershipLifecycleAndInvitations1790003000000 implements Migration
            AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_company_memberships' AND column_name = 'joinedAt') THEN
           ALTER TABLE "user_company_memberships"
             ADD COLUMN "status" VARCHAR(16) NOT NULL DEFAULT 'active',
-            ADD COLUMN "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+            ADD COLUMN "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE "user_company_memberships"
             ADD COLUMN "invitedBy" UUID NULL,
-            ADD COLUMN "lastAccessAt" TIMESTAMPTZ NULL,
+            ADD COLUMN "lastAccessAt" TIMESTAMPTZ NULL;
+          ALTER TABLE "user_company_memberships"
             ADD COLUMN "authzVersion" INTEGER NOT NULL DEFAULT 1;
           UPDATE "user_company_memberships" SET "joinedAt" = "createdAt";
           ALTER TABLE "user_company_memberships"

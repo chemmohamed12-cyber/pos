@@ -88,3 +88,77 @@ describe('scanForContraction — DROP CONSTRAINT same-name redefinition', () => 
     ]);
   });
 });
+
+/**
+ * 2026-10-09 false-positive found by the first production-path rehearsal on a copy of daii_dev: the F2 (`1790003000000-MembershipLifecycleAndInvitations`) and
+ * F3 (`1790005000000-RoleMetadataAndRolesManageNode`) migrations add several columns in ONE `ALTER TABLE`, every required column carrying its own DEFAULT — fully
+ * expand-safe — yet the guard refused them, because its regex looked for the DEFAULT only on the same line as the `ADD` it started from and let the match run on
+ * into a later column's NOT NULL. The rule is now judged per column definition. The first two cases below are those migrations' ORIGINAL statements, verbatim.
+ */
+describe('scanForContraction — ADD COLUMN NOT NULL is judged per column, not per line', () => {
+  const scan = (sql: string) =>
+    scanForContraction([{ path: 'src/database/migrations/core/x.ts', source: `export class X { async up(q) { await q.query(\`${sql}\`); } async down(q) {} }` }]);
+
+  it('does NOT flag the original F2 statement (required columns with DEFAULT, optional columns interleaved)', () => {
+    expect(
+      scan(`
+        DO $$ BEGIN
+          ALTER TABLE "user_company_memberships"
+            ADD COLUMN "status" VARCHAR(16) NOT NULL DEFAULT 'active',
+            ADD COLUMN "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+            ADD COLUMN "invitedBy" UUID NULL,
+            ADD COLUMN "lastAccessAt" TIMESTAMPTZ NULL,
+            ADD COLUMN "authzVersion" INTEGER NOT NULL DEFAULT 1;
+        END $$;`),
+    ).toEqual([]);
+  });
+
+  it('does NOT flag the original F3 statement (twelve columns, three required, each with DEFAULT)', () => {
+    expect(
+      scan(`
+        ALTER TABLE "roles"
+          ADD COLUMN "type" VARCHAR(16) NOT NULL DEFAULT 'custom',
+          ADD COLUMN "templateKey" VARCHAR(64) NULL,
+          ADD COLUMN "templateVersion" INTEGER NULL,
+          ADD COLUMN "templateIgnoredVersion" INTEGER NULL,
+          ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true,
+          ADD COLUMN "customized" BOOLEAN NULL,
+          ADD COLUMN "nameAr" VARCHAR(120) NULL,
+          ADD COLUMN "nameEn" VARCHAR(120) NULL,
+          ADD COLUMN "descriptionAr" TEXT NULL,
+          ADD COLUMN "descriptionEn" TEXT NULL,
+          ADD COLUMN "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          ADD COLUMN "createdBy" UUID NULL;`),
+    ).toEqual([]);
+  });
+
+  it('the verdict no longer depends on column ORDER or on where the DEFAULT sits (same columns, reordered and DEFAULT on the next line)', () => {
+    expect(scan(`ALTER TABLE "t" ADD COLUMN "a" INTEGER NULL, ADD COLUMN "b" INTEGER NOT NULL DEFAULT 1;`)).toEqual([]);
+    expect(scan(`ALTER TABLE "t" ADD COLUMN "b" INTEGER NOT NULL DEFAULT 1, ADD COLUMN "a" INTEGER NULL;`)).toEqual([]);
+    expect(scan(`ALTER TABLE "t"\n  ADD COLUMN "b" INTEGER NOT NULL\n    DEFAULT 1;`)).toEqual([]);
+  });
+
+  it('commas inside parentheses or quotes do not split a column definition (DEFAULT coalesce(x, 1), DEFAULT \'a,b\', NUMERIC(10,2))', () => {
+    expect(scan(`ALTER TABLE "t" ADD COLUMN "a" NUMERIC(10,2) NOT NULL DEFAULT coalesce(0, 1), ADD COLUMN "b" TEXT NOT NULL DEFAULT 'a,b';`)).toEqual([]);
+  });
+
+  it('STILL flags a plain required column with no DEFAULT (with or without the COLUMN keyword)', () => {
+    expect(scan(`ALTER TABLE "t" ADD COLUMN "x" INTEGER NOT NULL;`)).toHaveLength(1);
+    expect(scan(`ALTER TABLE "t" ADD "x" INTEGER NOT NULL;`)).toHaveLength(1);
+  });
+
+  it('STILL flags the required column that lacks a DEFAULT inside a multi-column statement — wherever it sits', () => {
+    expect(scan(`ALTER TABLE "t"\n  ADD COLUMN "a" INTEGER NULL,\n  ADD COLUMN "b" INTEGER NOT NULL;`)).toHaveLength(1);
+    expect(scan(`ALTER TABLE "t"\n  ADD COLUMN "a" INTEGER NOT NULL,\n  ADD COLUMN "b" INTEGER NOT NULL DEFAULT 1;`)).toHaveLength(1);
+  });
+
+  it('STILL flags a required column whose DEFAULT belongs to a DIFFERENT column on the same line (the old regex let this one through)', () => {
+    expect(scan(`ALTER TABLE "t" ADD COLUMN "a" INTEGER NOT NULL, ADD COLUMN "b" INTEGER DEFAULT 1;`)).toHaveLength(1);
+  });
+
+  it('does not mistake constraints or IF NOT EXISTS for required columns', () => {
+    expect(scan(`ALTER TABLE "t" ADD CONSTRAINT "chk" CHECK ("a" IS NOT NULL);`)).toEqual([]);
+    expect(scan(`ALTER TABLE "t" ADD COLUMN IF NOT EXISTS "x" JSONB NULL;`)).toEqual([]);
+    expect(scan(`ALTER TABLE "t" ADD COLUMN IF NOT EXISTS "x" JSONB NOT NULL DEFAULT '[]';`)).toEqual([]);
+  });
+});

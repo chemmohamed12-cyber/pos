@@ -24,24 +24,27 @@ export class RoleMetadataAndRolesManageNode1790005000000 implements MigrationInt
   private readonly legacyKeys = ['admin', 'driver', 'finance', 'inventory_controller', 'sales_manager', 'sales_rep', 'sales_supervisor', 'warehouse_supervisor', 'warehouse_worker'];
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Columns are added in consecutive statements in the original order (see 1790003000000-MembershipLifecycleAndInvitations): each required column carries its
+    // DEFAULT in the same statement, which the release engine's expand/contract scan needs to see. The resulting schema is unchanged.
     await queryRunner.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'roles')
            AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'roles' AND column_name = 'type') THEN
+          ALTER TABLE "roles" ADD COLUMN "type" VARCHAR(16) NOT NULL DEFAULT 'custom';
           ALTER TABLE "roles"
-            ADD COLUMN "type" VARCHAR(16) NOT NULL DEFAULT 'custom',
             ADD COLUMN "templateKey" VARCHAR(64) NULL,
             ADD COLUMN "templateVersion" INTEGER NULL,
-            ADD COLUMN "templateIgnoredVersion" INTEGER NULL,
-            ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true,
+            ADD COLUMN "templateIgnoredVersion" INTEGER NULL;
+          ALTER TABLE "roles" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
+          ALTER TABLE "roles"
             ADD COLUMN "customized" BOOLEAN NULL,
             ADD COLUMN "nameAr" VARCHAR(120) NULL,
             ADD COLUMN "nameEn" VARCHAR(120) NULL,
             ADD COLUMN "descriptionAr" TEXT NULL,
-            ADD COLUMN "descriptionEn" TEXT NULL,
-            ADD COLUMN "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-            ADD COLUMN "createdBy" UUID NULL;
+            ADD COLUMN "descriptionEn" TEXT NULL;
+          ALTER TABLE "roles" ADD COLUMN "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE "roles" ADD COLUMN "createdBy" UUID NULL;
           ALTER TABLE "roles" ADD CONSTRAINT "CHK_roles_type" CHECK ("type" IN ('system','template','custom','legacy'));
           UPDATE "roles" SET "type" = 'template', "templateKey" = "key", "templateVersion" = 1 WHERE "key" = ANY($1::text[]);
           UPDATE "roles" SET "type" = 'legacy' WHERE "key" = ANY($2::text[]);
