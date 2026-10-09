@@ -1,0 +1,2 @@
+# Shell scripts must be LF on every checkout (a CRLF build-release.sh / verify-deploy.sh fails under bash).
+*.sh text eol=lf

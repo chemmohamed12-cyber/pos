@@ -43,6 +43,11 @@ export class DatabaseRegistryService {
     return this.registries.findOne({ where: { id } });
   }
 
+  /** Every database name already assigned to a Company, whatever its status — a pooled database is never handed out twice. */
+  async usedDatabaseNames(): Promise<string[]> {
+    return (await this.registries.find({ select: { databaseName: true } })).map((r) => r.databaseName);
+  }
+
   /** Added for Area 9's Company Connection Manager — every Company whose database is provisioned and reachable, the sweep set for a company-scoped background job. */
   async findAllActive(): Promise<DatabaseRegistry[]> {
     return this.registries.find({ where: { status: 'ACTIVE' } });

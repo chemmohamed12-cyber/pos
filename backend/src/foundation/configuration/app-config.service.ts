@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CompanyDatabaseConfig, parseCompanyDatabasePool } from '../company/company-database-allocator';
 
 export interface DatabaseConfig {
   host: string;
@@ -100,6 +101,16 @@ export interface ReleaseDeployConfig {
   notifyWebhook: string | null;
   /** `true` = CANDIDATE-slot + atomic-swap deploy path (CTO-P3); `false` = legacy in-place copy. */
   stagedActivation: boolean;
+  /** Public base URL the restarted application answers on; `null` = readiness cannot be verified over HTTP (the deploy is then recorded DEPLOYED_UNVERIFIED). */
+  readinessUrl: string | null;
+  /** How long the engine waits for the restarted application to answer 2xx on every health endpoint before rolling back. */
+  readinessTimeoutSeconds: number;
+  /** Company fan-out: `off` = Platform database only; `dry-run` = plan/report only; `on` = also upgrade every applicable READY Company database (staged path only). */
+  companyMigrations: 'off' | 'dry-run' | 'on';
+  /** Restore-point policy for each Company about to be migrated: take a fresh verified backup, or require a recent verified one. */
+  companyBackupPolicy: 'create' | 'require-recent';
+  /** `require-recent` only: how old (hours) a verified Company backup may be. */
+  companyBackupMaxAgeHours: number;
 }
 
 /**
@@ -129,6 +140,20 @@ export class AppConfigService {
       username: this.configService.get<string>('DB_USER')!,
       password: this.configService.get<string>('DB_PASSWORD')!,
       database: this.configService.get<string>('DB_NAME')!,
+    };
+  }
+
+  get companyDatabase(): CompanyDatabaseConfig {
+    const nullable = (k: string): string | null => {
+      const v = this.configService.get<string>(k);
+      return v === undefined || v === null || v === '' ? null : v;
+    };
+    return {
+      mode: this.configService.get<'create' | 'pool'>('COMPANY_DB_MODE') ?? 'create',
+      maintenanceDatabase: this.configService.get<string>('COMPANY_DB_MAINTENANCE_DATABASE') ?? 'postgres',
+      adminUser: nullable('COMPANY_DB_ADMIN_USER'),
+      adminPassword: nullable('COMPANY_DB_ADMIN_PASSWORD'),
+      pool: parseCompanyDatabasePool(this.configService.get<string>('COMPANY_DB_POOL')),
     };
   }
 
@@ -229,6 +254,11 @@ export class AppConfigService {
       dependencyChangePolicy: this.configService.get<'block' | 'ack'>('RELEASE_DEPENDENCY_CHANGE_POLICY')!,
       notifyWebhook: nullable('RELEASE_NOTIFY_WEBHOOK'),
       stagedActivation: this.configService.get<boolean>('RELEASE_STAGED_ACTIVATION')!,
+      readinessUrl: nullable('RELEASE_READINESS_URL'),
+      readinessTimeoutSeconds: this.configService.get<number>('RELEASE_READINESS_TIMEOUT_SECONDS')!,
+      companyMigrations: this.configService.get<'off' | 'dry-run' | 'on'>('RELEASE_COMPANY_MIGRATIONS')!,
+      companyBackupPolicy: this.configService.get<'create' | 'require-recent'>('RELEASE_COMPANY_BACKUP_POLICY')!,
+      companyBackupMaxAgeHours: this.configService.get<number>('RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS')!,
     };
   }
 }

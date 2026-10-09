@@ -22,6 +22,21 @@ export class CompanyService {
     return this.companies.save(company);
   }
 
+  /**
+   * Removes a Company row that never got any further than being created: still PROVISIONING, no database registered, no membership. Used only when a pooled database was lost
+   * to a concurrent request and the pool had nothing else to give. Anything else (a Company that owns a registry row) is never touched; returns whether a row was removed.
+   */
+  async deleteIfUnprovisioned(id: string): Promise<boolean> {
+    const rows: Array<{ id: string }> = await this.companies.query(
+      `DELETE FROM "companies" c WHERE c."id" = $1 AND c."status" = 'PROVISIONING'
+         AND NOT EXISTS (SELECT 1 FROM "database_registries" r WHERE r."companyId" = c."id")
+         AND NOT EXISTS (SELECT 1 FROM "user_company_memberships" m WHERE m."companyId" = c."id")
+       RETURNING c."id"`,
+      [id],
+    );
+    return rows.length > 0;
+  }
+
   async findById(id: string): Promise<Company | null> {
     return this.companies.findOne({ where: { id } });
   }

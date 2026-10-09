@@ -27,7 +27,24 @@ import { MODULE_REGISTRY } from '../foundation/module-registry/module-registry';
  *      (fail-closed); otherwise (default `unlicensed-full`) → every tag
  *      (the implicit DAII_STANDARD edition — current product unchanged).
  */
-export const MIGRATION_TAGS = ['core', 'sales', 'inventory', 'logistics', 'finance', 'hr'] as const;
+// MUST list every `migrations/<tag>/` directory (`reporting` has none): a tag missing here is
+// silently never globbed for an entitled installation (and `tagsForModules` filters through it).
+// `enabled-modules.spec.ts` pins this to the directory tree + MODULE_REGISTRY + data-source.ts.
+export const MIGRATION_TAGS = [
+  'core',
+  'sales',
+  'inventory',
+  'logistics',
+  'finance',
+  'hr',
+  'accounting',
+  'procurement',
+  'manufacturing',
+  'attendance',
+  'payroll',
+  'targets',
+  'commission',
+] as const;
 export type MigrationTag = (typeof MIGRATION_TAGS)[number];
 
 export interface ReadEnabledModulesOptions {

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Installation, INSTALLATION_SINGLETON_ID } from './installation.entity';
@@ -10,6 +10,7 @@ import { MODULE_REGISTRY } from '../module-registry/module-registry';
 import { AppConfigService } from '../configuration/app-config.service';
 import { AuditService } from '../audit/audit.service';
 import { EventBusService } from '../events/event-bus.service';
+import { InstallationBootstrapService } from './installation-bootstrap.service';
 
 export interface ResolvedEntitlement {
   editionCode: string;
@@ -40,9 +41,13 @@ export class EntitlementService implements OnModuleInit, EntitlementResolver {
     private readonly config: AppConfigService,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
+    /** Optional only so unit specs can construct the service by hand; under Nest DI it is always present. */
+    @Optional() private readonly bootstrap?: InstallationBootstrapService,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // make the database say what the application is about to run (the implicit unlicensed edition) BEFORE resolving it — see InstallationBootstrapService
+    await this.bootstrap?.ensure();
     await this.reload();
   }
 
@@ -71,6 +76,11 @@ export class EntitlementService implements OnModuleInit, EntitlementResolver {
 
   resolve(): ResolvedEntitlement {
     return this.cache;
+  }
+
+  /** Is the platform `installation` row (the target of `companies.installationId`) present? Used to refuse creating a Company with a clear error instead of a foreign-key violation. */
+  async isInstallationInitialized(): Promise<boolean> {
+    return (await this.installations.count({ where: { id: INSTALLATION_SINGLETON_ID } })) > 0;
   }
 
   async reload(): Promise<void> {

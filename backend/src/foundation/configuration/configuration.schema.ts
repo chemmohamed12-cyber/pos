@@ -119,6 +119,12 @@ export const configurationValidationSchema = Joi.object({
   // Base URL + endpoints for the post-deploy HTTP health probes (each 2xx).
   RELEASE_HEALTH_BASE_URL: Joi.string().default((parent) => `http://localhost:${parent.PORT ?? 3000}`),
   RELEASE_HEALTH_ENDPOINTS: Joi.string().default('["/api/health","/api/health/deep","/api/health/db"]'),
+  // Post-swap APPLICATION READINESS (post-incident review of release 1.1.4): the PUBLIC base URL the restarted application answers on (e.g. https://daii.xnexustech.com
+  // — through Passenger, NOT localhost:PORT; Passenger assigns its own socket). When set, the engine polls RELEASE_HEALTH_ENDPOINTS against it after the restart trigger
+  // (the first request is also what makes Passenger start the new process) and a deploy whose application does not answer 2xx within RELEASE_READINESS_TIMEOUT_SECONDS
+  // is rolled back automatically. When NOT set the engine cannot know the application started: it still deploys, but records the outcome as DEPLOYED_UNVERIFIED.
+  RELEASE_READINESS_URL: Joi.string().uri().allow(null, '').default(null),
+  RELEASE_READINESS_TIMEOUT_SECONDS: Joi.number().integer().min(5).max(900).default(90),
   // Read-only post-deploy smoke: GET each, expect 2xx. The list that would
   // have caught the v1.0.3 404s — as config, not a .ts literal. Empty in dev.
   RELEASE_SMOKE_GET_ENDPOINTS: Joi.string().default('[]'),
@@ -142,6 +148,26 @@ export const configurationValidationSchema = Joi.object({
   // Where a FAILED-SAFE alarm is POSTed (in addition to the audit row).
   // null → audit + log only.
   RELEASE_NOTIFY_WEBHOOK: Joi.string().uri().allow(null, '').default(null),
+
+  // Company fan-out (CTO 2026-10-08). Whether a staged deploy also upgrades the EXISTING READY Company databases, not only the Platform database.
+  //   off     = Platform only; no Company database is read or written (audited as such). The default — the capability is enabled deliberately.
+  //   dry-run = plan only: discover READY Companies, derive each one's tags, report each one's pending migrations. Reads, never writes.
+  //   on      = back up each affected Company, move it READY -> MIGRATING, migrate it, MIGRATING -> READY; stop at the first failure (pre-swap, ACTIVE untouched).
+  // Requires RELEASE_STAGED_ACTIVATION=true (the legacy in-place path has no pre-swap point at which to run it).
+  RELEASE_COMPANY_MIGRATIONS: Joi.string().valid('off', 'dry-run', 'on').default('off'),
+  // How each affected Company gets its restore point before it is migrated.
+  //   create         = the engine takes (and verifies) a `pre_update` backup of that Company's own database first.
+  //   require-recent = a verified backup of that Company no older than RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS must already exist.
+  RELEASE_COMPANY_BACKUP_POLICY: Joi.string().valid('create', 'require-recent').default('create'),
+  RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS: Joi.number().integer().min(1).default(24),
+
+  // Where a new Company's database comes from. create = CREATE DATABASE via the maintenance database (optionally with a dedicated admin role);
+  // pool = shared hosting where databases are created through the provider: pre-created EMPTY databases listed in COMPANY_DB_POOL are claimed one per Company.
+  COMPANY_DB_MODE: Joi.string().valid('create', 'pool').default('create'),
+  COMPANY_DB_MAINTENANCE_DATABASE: Joi.string().default('postgres'),
+  COMPANY_DB_ADMIN_USER: Joi.string().allow(null, '').default(null),
+  COMPANY_DB_ADMIN_PASSWORD: Joi.string().allow(null, '').default(null),
+  COMPANY_DB_POOL: Joi.string().allow(null, '').default(''),
 
   // Entitlement Engine (ERP Foundation P3) — DEPLOYMENT/verification config
   // (NOT business config; ADR-023 C5 keeps Edition/feature keys OUT of the

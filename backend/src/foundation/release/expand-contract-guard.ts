@@ -35,15 +35,39 @@ export interface ContractionViolation {
   rule: string;
 }
 
-const CONTRACTION_PATTERNS: Array<{ re: RegExp; rule: string }> = [
+/**
+ * Does the statement ADD a column that is NOT NULL **without a DEFAULT of its own**? Every `ADD [COLUMN] <definition>` of a multi-column `ALTER TABLE` is judged on
+ * its OWN definition, which runs from its `ADD` to the next `ADD` (or the first `;`, or the end): one statement may legitimately mix required columns (each with its
+ * DEFAULT) and optional ones, in any order. The earlier single regex looked for the DEFAULT only on the same LINE as the `ADD` it started from, but let its match run
+ * across lines into a LATER column's `NOT NULL`, so a correct, fully-defaulted `ALTER TABLE` was refused depending on where its NULL columns happened to sit
+ * (2026-10-09, F2/F3 migrations); and it let `ADD a INT NOT NULL, ADD b INT DEFAULT 1` through because b's DEFAULT was on a's line. Slicing by `ADD` (not by commas
+ * or parentheses) also holds when the statement is still wrapped in the `await queryRunner.query(...)` call. Constraint additions (`ADD CONSTRAINT`,
+ * `ADD PRIMARY KEY`, ...) are not columns and never match.
+ */
+export function addsRequiredColumnWithoutDefault(statement: string): boolean {
+  const adds = [...statement.matchAll(/\bADD\s+/gi)];
+  for (let i = 0; i < adds.length; i++) {
+    const from = (adds[i].index ?? 0) + adds[i][0].length;
+    const to = i + 1 < adds.length ? (adds[i + 1].index ?? statement.length) : statement.length;
+    let definition = statement.slice(from, to);
+    const semi = definition.indexOf(';');
+    if (semi !== -1) definition = definition.slice(0, semi);
+    definition = definition.replace(/^COLUMN\s+/i, '');
+    if (/^(?:CONSTRAINT|PRIMARY|FOREIGN|UNIQUE|CHECK|EXCLUDE)\b/i.test(definition)) continue;
+    if (/\bNOT\s+NULL\b/i.test(definition) && !/\bDEFAULT\b/i.test(definition)) return true;
+  }
+  return false;
+}
+
+const CONTRACTION_PATTERNS: Array<{ re?: RegExp; test?: (statement: string) => boolean; rule: string }> = [
   { re: /\bDROP\s+COLUMN\b/i, rule: 'DROP COLUMN — the outgoing release may still read it; drop in a later delta' },
   { re: /\bDROP\s+TABLE\b/i, rule: 'DROP TABLE — the outgoing release may still read it; drop in a later delta' },
   { re: /\bALTER\s+COLUMN\s+.+\s+TYPE\b/i, rule: 'ALTER COLUMN … TYPE — not backward-compatible; add a new column + backfill instead' },
   { re: /\bALTER\s+TABLE\s+.+\s+RENAME\s+COLUMN\b/i, rule: 'RENAME COLUMN — breaks the outgoing release; add the new name, keep the old' },
   { re: /\bALTER\s+TABLE\s+.+\s+RENAME\s+TO\b/i, rule: 'RENAME TABLE — breaks the outgoing release' },
   { re: /\bALTER\s+COLUMN\s+.+\s+SET\s+NOT\s+NULL\b/i, rule: 'SET NOT NULL on an existing column — outgoing-release writes may violate it mid-swap' },
-  // ADD COLUMN ... NOT NULL with no DEFAULT in the same statement
-  { re: /\bADD\s+(?:COLUMN\s+)?(?!.*\bDEFAULT\b)[^;()]*\bNOT\s+NULL\b/i, rule: 'ADD COLUMN NOT NULL without DEFAULT — outgoing-release inserts omit it and fail' },
+  // ADD COLUMN ... NOT NULL with no DEFAULT — judged PER COLUMN DEFINITION (see addsRequiredColumnWithoutDefault)
+  { test: addsRequiredColumnWithoutDefault, rule: 'ADD COLUMN NOT NULL without DEFAULT — outgoing-release inserts omit it and fail' },
   { re: /\bDROP\s+(?:NOT\s+NULL\s+)?DEFAULT\b/i, rule: 'DROP DEFAULT — outgoing-release inserts that omit the column will fail' },
 ];
 
@@ -127,8 +151,8 @@ export function scanForContraction(files: Array<{ path: string; source: string }
     const up = extractUpBody(cleaned);
     for (const stmt of splitStatements(up)) {
       const code = stmt;
-      for (const { re, rule } of CONTRACTION_PATTERNS) {
-        if (re.test(code)) {
+      for (const { re, test, rule } of CONTRACTION_PATTERNS) {
+        if (re ? re.test(code) : test!(code)) {
           out.push({ file: f.path, statement: stmt.replace(/\s+/g, ' ').trim().slice(0, 240), rule });
           break; // one violation per statement is enough to flag it
         }

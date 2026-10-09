@@ -426,15 +426,37 @@ export class BackupManagerService {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const candidates = allRuns.slice(MIN_KEEP_RUNS).filter((r) => r.startedAt < cutoff);
 
+    // A backup a release still points at is that release's restore point (`releases.backupRunId` FK, no cascade) — never a retention candidate. Production
+    // (1.1.5): retention hit `releases_backupRunId_fkey` AFTER it had already deleted the backup files, leaving a run whose files were gone.
+    const referenced = new Set<string>();
+    if (candidates.length > 0) {
+      const rows: Array<{ backupRunId: string }> = (await this.dataSource.query(`SELECT DISTINCT "backupRunId" FROM releases WHERE "backupRunId" IS NOT NULL`)) ?? [];
+      for (const r of rows) referenced.add(r.backupRunId);
+    }
+
     let deletedRuns = 0;
     for (const run of candidates) {
-      const artifacts = await artifactRepo.find({ where: { backupRunId: run.id } });
-      for (const artifact of artifacts) {
-        await rm(join(storagePath, artifact.filePath), { force: true });
+      if (referenced.has(run.id)) {
+        this.logger.log(`Retention: backup run "${run.id}" is referenced by a release — kept (its files and records are untouched).`);
+        continue;
       }
-      await rm(join(storagePath, 'manifests', `${run.id}.json`), { force: true });
-      await artifactRepo.remove(artifacts);
-      await runRepo.remove(run);
+      try {
+        const artifacts = await artifactRepo.find({ where: { backupRunId: run.id } });
+        // Database records FIRST, files after: if the records cannot be removed nothing has been destroyed, and the next sweep retries.
+        await artifactRepo.remove(artifacts);
+        await runRepo.remove(run);
+        // The records are gone and the run is no longer a backup anyone can select; a file that then cannot be deleted is only disk left behind, never a lost restore point.
+        for (const file of [...artifacts.map((a) => join(storagePath, a.filePath)), join(storagePath, 'manifests', `${run.id}.json`)]) {
+          try {
+            await rm(file, { force: true });
+          } catch (err) {
+            this.logger.warn(`Retention: backup run "${run.id}" was removed from the records but "${file}" could not be deleted (left on disk): ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Retention: backup run "${run.id}" could not be removed — left intact: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
       deletedRuns++;
       await this.audit.record({
         actorUserId: null,

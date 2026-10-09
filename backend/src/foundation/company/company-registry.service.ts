@@ -29,6 +29,11 @@ export class CompanyRegistryService {
     return this.companies.create({ installationId, name, status: 'PROVISIONING' });
   }
 
+  /** See `CompanyService.deleteIfUnprovisioned`. */
+  discardUnprovisioned(id: string): Promise<boolean> {
+    return this.companies.deleteIfUnprovisioned(id);
+  }
+
   async findById(id: string): Promise<Company | null> {
     return this.companies.findById(id);
   }

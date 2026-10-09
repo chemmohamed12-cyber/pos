@@ -46,13 +46,20 @@ export interface RecordAuditInput {
  * its own transaction has already committed, so this change is
  * backward-compatible for them.
  */
+/** Arbitrary constant, unique to the audit chain; the lock is released automatically at the end of the writer's transaction. */
+const AUDIT_CHAIN_LOCK_KEY = 7_419_203_511;
+
 @Injectable()
 export class AuditService {
   constructor(private readonly dataSource: DataSource) {}
 
   async record(input: RecordAuditInput, manager?: EntityManager): Promise<AuditRecord> {
     const run = async (m: EntityManager): Promise<AuditRecord> => {
-      const rows = await m.query('SELECT hash FROM audit_records ORDER BY seq DESC LIMIT 1 FOR UPDATE');
+      // Serialise every writer on one transaction-scoped advisory lock BEFORE reading the chain head. `SELECT ... FOR UPDATE` alone is not enough: a concurrent writer that
+      // waited on the head row is handed that SAME (now stale) row once the first commits, so both chain onto one prevHash and the chain forks. Observed on daii_dev: seq 13
+      // and seq 14 share a prevHash, so verifyChain reports the chain broken at 14 although nothing was tampered with.
+      await m.query('SELECT pg_advisory_xact_lock($1)', [AUDIT_CHAIN_LOCK_KEY]);
+      const rows = await m.query('SELECT hash FROM audit_records ORDER BY seq DESC LIMIT 1');
       const prevHash: string = rows[0]?.hash ?? GENESIS_HASH;
 
       // seq is DB-assigned on insert; we need it for the hash, so insert
