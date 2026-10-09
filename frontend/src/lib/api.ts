@@ -14,12 +14,84 @@ export class ApiError extends Error {
 }
 
 let accessToken: string | null = localStorage.getItem('daii_access_token');
+let refreshToken: string | null = localStorage.getItem('daii_refresh_token');
 let onUnauthorized: (() => void) | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
   if (token) localStorage.setItem('daii_access_token', token);
-  else localStorage.removeItem('daii_access_token');
+  else {
+    // no access token = no session: the refresh token goes with it
+    localStorage.removeItem('daii_access_token');
+    refreshToken = null;
+    localStorage.removeItem('daii_refresh_token');
+  }
+}
+
+/** A freshly issued token pair (login / select-company / refresh). The refresh token is ROTATED by the server on every use, so the newest one must always replace the stored one. */
+export function setSession(tokens: { accessToken: string; refreshToken?: string }) {
+  setAccessToken(tokens.accessToken);
+  if (tokens.refreshToken) {
+    refreshToken = tokens.refreshToken;
+    localStorage.setItem('daii_refresh_token', tokens.refreshToken);
+  }
+}
+
+export function getRefreshToken() {
+  return refreshToken;
+}
+
+/** Seconds until the access token's `exp`, or null when it cannot be read (treated as "unknown": the server stays the judge). */
+function secondsToExpiry(token: string | null): number | null {
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp - Date.now() / 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Silent session renewal. The access token lives 15 minutes; without this the user was signed out in the middle of work (and of a release deployment that takes minutes).
+ * ONE refresh at a time (concurrent requests share it). Returns true when a new pair was stored; false when there is nothing to refresh with or the server refused
+ * (expired / revoked / reused refresh token). A network or 5xx failure is not a refusal and never discards the stored token.
+ */
+let refreshing: Promise<boolean> | null = null;
+export function refreshSession(): Promise<boolean> {
+  if (!refreshToken) return Promise.resolve(false);
+  if (!refreshing) {
+    const used = refreshToken;
+    refreshing = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: used }) });
+        if (!res.ok) return false;
+        const json = await res.json();
+        if (!json.success || !json.data?.accessToken) return false;
+        setSession(json.data);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshing = null;
+      }
+    })();
+  }
+  return refreshing;
+}
+
+/** Renew shortly BEFORE expiry so a request never goes out with a token the server will refuse. */
+async function ensureFreshToken() {
+  const left = secondsToExpiry(accessToken);
+  if (left !== null && left < 30 && refreshToken) await refreshSession();
+}
+
+/** Sends a request; on a 401 renews the session ONCE and repeats it with the new token. The caller decides what a remaining 401 means. */
+async function sendWithRefresh(make: (token: string | null) => Promise<Response>, canRefresh: boolean): Promise<Response> {
+  if (canRefresh) await ensureFreshToken();
+  const res = await make(accessToken);
+  if (res.status === 401 && canRefresh && refreshToken && (await refreshSession())) return make(accessToken);
+  return res;
 }
 
 export function getAccessToken() {
@@ -31,14 +103,16 @@ export function setUnauthorizedHandler(fn: () => void) {
 }
 
 export async function apiFetch<T>(method: string, path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  // A route that answers 401 for "not a member of this Company" (skipUnauthorizedHandler) must not be retried with a renewed token: that 401 is about THAT action, not the session.
+  const res = await sendWithRefresh(
+    (token) =>
+      fetch(`${API_BASE}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }),
+    !opts?.skipUnauthorizedHandler && path !== '/auth/login' && path !== '/auth/refresh',
+  );
 
   let json: { success: boolean; data?: T; error?: { code: string; message: string } };
   try {
@@ -64,10 +138,7 @@ export async function apiFetch<T>(method: string, path: string, body?: unknown, 
 export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const formData = new FormData();
   formData.append('file', file);
-  const headers: Record<string, string> = {};
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: formData });
+  const res = await sendWithRefresh((token) => fetch(`${API_BASE}${path}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: formData }), true);
   let json: { success: boolean; data?: T; error?: { code: string; message: string } };
   try {
     json = await res.json();
@@ -94,9 +165,7 @@ export const api = {
  * `<a>` tag can't carry it — the caller turns the Blob into an object URL.
  */
 export async function downloadBlob(path: string): Promise<Blob> {
-  const headers: Record<string, string> = {};
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-  const res = await fetch(`${API_BASE}${path}`, { headers });
+  const res = await sendWithRefresh((token) => fetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }), true);
   if (res.status === 401 && onUnauthorized) onUnauthorized();
   if (!res.ok) throw new ApiError(res.status, 'DOWNLOAD_FAILED', `Failed to download (status ${res.status}).`);
   return res.blob();

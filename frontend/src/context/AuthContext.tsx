@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, setAccessToken, getAccessToken, setUnauthorizedHandler } from '../lib/api';
+import { api, setAccessToken, setSession, getAccessToken, getRefreshToken, setUnauthorizedHandler } from '../lib/api';
 import { canFrom, inScopeFrom, type AccessLevel, type AuthzView, type ScopeKind } from '../lib/authz';
 
 export interface CurrentUser {
@@ -114,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const tokens = await api.post<{ accessToken: string }>('/auth/login', { email, password });
-    setAccessToken(tokens.accessToken);
+    const tokens = await api.post<{ accessToken: string; refreshToken?: string }>('/auth/login', { email, password });
+    setSession(tokens);
     setCompanyContext(null);
     setMemberships(null);
     await loadMe();
@@ -127,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    // revoke the refresh token on the server (best effort — the local session ends either way)
+    const rt = getRefreshToken();
+    if (rt) void api.post('/auth/logout', { refreshToken: rt }, { skipUnauthorizedHandler: true }).catch(() => undefined);
     setAccessToken(null);
     setUser(null);
     setCompanyContext(null);
@@ -180,8 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function enterCompany(membership: CompanyMembership) {
-    const tokens = await api.post<{ accessToken: string }>('/auth/select-company', { companyId: membership.companyId }, { skipUnauthorizedHandler: true });
-    setAccessToken(tokens.accessToken);
+    const tokens = await api.post<{ accessToken: string; refreshToken?: string }>('/auth/select-company', { companyId: membership.companyId }, { skipUnauthorizedHandler: true });
+    setSession(tokens);
     setCompanyContext({ companyId: membership.companyId, companyName: membership.companyName, status: membership.status, roleKey: membership.roleKey });
     await refreshAuthz(); // the Company token changes the authorization domain: capabilities/scopes are the NEW Company's
     try {
@@ -199,8 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const membership = memberships?.find((m) => m.companyId === companyId);
     if (membership) return enterCompany(membership);
     // Unknown to the loaded list: still let the server decide (it rejects a non-member).
-    const tokens = await api.post<{ accessToken: string }>('/auth/select-company', { companyId }, { skipUnauthorizedHandler: true });
-    setAccessToken(tokens.accessToken);
+    const tokens = await api.post<{ accessToken: string; refreshToken?: string }>('/auth/select-company', { companyId }, { skipUnauthorizedHandler: true });
+    setSession(tokens);
     // The Company was not in the loaded list (e.g. just joined via an invitation): reload the list and derive the Company session from the SERVER's row.
     const rows = await loadMemberships();
     const joined = rows?.find((m) => m.companyId === companyId);
