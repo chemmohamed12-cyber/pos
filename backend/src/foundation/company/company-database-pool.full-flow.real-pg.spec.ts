@@ -22,6 +22,10 @@ import { UsersService } from '../identity/users.service';
 import { User } from '../identity/user.entity';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { PlatformGuard } from '../platform/platform.guard';
+import * as roleSeeding from './company-role-seeding';
+import * as membershipRole from './membership-role-provisioning';
+import { ReleaseHealthCheckService } from '../release/release-health-check.service';
+import * as migrationRunner from '../release-orchestration/company-migration-runner';
 
 /**
  * Pool mode, FULL flow, nothing mocked below the HTTP layer: real control-plane database (migrated), real CompanyRegistry / DatabaseRegistry / DatabaseProvisioning
@@ -178,4 +182,39 @@ describeIsolated('Company database pool — full provisioning flow over HTTP (re
     expect(again.body.code).toBe('COMPANY_NOT_RETRYABLE');
     await app.close();
   });
+
+  // Every provisioning stage, failed on purpose AFTER the database was allocated, then resumed: same Company, same database, no duplicate, no second allocation.
+  const stages: Array<{ stage: string; inject: () => jest.SpyInstance }> = [
+    { stage: 'migrations', inject: () => jest.spyOn(migrationRunner, 'runMigrationsForDatabase').mockResolvedValueOnce({ success: false, error: 'injected migration fault', ranMigrationNames: [] } as never) },
+    { stage: 'role-seeding', inject: () => jest.spyOn(roleSeeding, 'seedCompanyRoleTemplates').mockRejectedValueOnce(new Error('injected role-seeding fault')) },
+    { stage: 'initial-admin', inject: () => jest.spyOn(membershipRole, 'provisionUserRoleForMembership').mockRejectedValueOnce(new Error('injected initial-admin fault')) },
+    { stage: 'health-check', inject: () => jest.spyOn(ReleaseHealthCheckService.prototype, 'check').mockResolvedValueOnce({ ok: false, detail: { injected: true } } as never) },
+    { stage: 'health-check', inject: () => jest.spyOn(ReleaseHealthCheckService.prototype, 'check').mockRejectedValueOnce(new Error('injected health-check crash')) },
+  ];
+  it.each(stages.map((s, i) => [`${s.stage} (case ${i + 1})`, s.stage, s.inject] as const))(
+    'fault injected at stage %s: FAILED + resumable on the SAME Company and database',
+    async (_label, stage, inject) => {
+      const db = `pool_s_${randomUUID().slice(0, 8)}`, spare = `pool_x_${randomUUID().slice(0, 8)}`;
+      await mkPooled(db); await mkPooled(spare);
+      const before = await companiesCount();
+      const app = await bootApp([db, spare]);
+      const spy = inject();
+      const failed = await request(app.getHttpServer()).post('/installation/companies').send(body({ name: `Stage-${stage}` }));
+      spy.mockRestore();
+      expect(failed.status).toBe(422);
+      expect(failed.body.stage).toBe(stage);
+      const companyId: string = failed.body.companyId;
+      expect(await companiesCount()).toBe(before + 1);
+      expect((await cp.query(`SELECT status FROM database_registries WHERE "companyId"=$1`, [companyId]))[0].status).toBe('FAILED');
+
+      const resumed = await request(app.getHttpServer()).post(`/installation/companies/${companyId}/retry-provisioning`).send(body());
+      expect(resumed.status).toBe(201);
+      expect(resumed.body.data.company.id).toBe(companyId);
+      expect(resumed.body.data.company.status).toBe('READY');
+      expect(await companiesCount()).toBe(before + 1);
+      expect(await cp.query(`SELECT "databaseName", status FROM database_registries WHERE "companyId"=$1`, [companyId])).toEqual([{ databaseName: db, status: 'ACTIVE' }]);
+      expect(await tablesIn(spare)).toBe(0); // no second allocation
+      await app.close();
+    },
+  );
 });

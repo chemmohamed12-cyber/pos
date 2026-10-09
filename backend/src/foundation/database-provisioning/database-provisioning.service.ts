@@ -266,6 +266,10 @@ export class DatabaseProvisioningService {
     try {
       await healthCheckDataSource.initialize();
       healthCheck = await new ReleaseHealthCheckService(healthCheckDataSource).check();
+    } catch (err) {
+      // A health check that cannot even run is a failed stage like any other: FAILED (resumable), never left looking like an attempt still in progress.
+      await this.databaseRegistry.markStatus(registry.id, 'FAILED');
+      throw new ProvisioningFailedError('health-check', err instanceof Error ? err.message : String(err));
     } finally {
       if (healthCheckDataSource.isInitialized) {
         await healthCheckDataSource.destroy();

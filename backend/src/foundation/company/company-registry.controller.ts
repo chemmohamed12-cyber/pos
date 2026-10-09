@@ -3,7 +3,7 @@ import { BadRequestException, Body, Controller, Get, HttpStatus, NotFoundExcepti
 import { DaiiException } from '../error-contract/daii-exception';
 import { EntitlementService } from '../entitlement/entitlement.service';
 import { Logger } from '@nestjs/common';
-import { allocateCompanyDatabase, CompanyDatabaseAllocationError, serializeAllocation } from './company-database-allocator';
+import { allocateCompanyDatabase, CompanyDatabaseAllocationError, CompanyDatabaseConfig, ConnectionTarget, serializeAllocation } from './company-database-allocator';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
@@ -48,6 +48,14 @@ class CreateCompanyDto {
   @ArrayNotEmpty()
   @IsString({ each: true })
   roleModuleCodes?: string[];
+}
+
+/** PostgreSQL unique violation (23505) on `database_registries.databaseName`. */
+function isDatabaseNameTaken(err: unknown): boolean {
+  const e = err as { code?: string; driverError?: { code?: string; constraint?: string }; constraint?: string };
+  const code = e?.driverError?.code ?? e?.code;
+  const constraint = e?.driverError?.constraint ?? e?.constraint ?? '';
+  return code === '23505' && /databaseName/i.test(constraint);
 }
 
 interface CompanyView {
@@ -150,18 +158,37 @@ export class CompanyRegistryController {
     const app = { host: this.config.database.host, port: this.config.database.port, username: this.config.database.username, password: this.config.database.password };
     // Serialised so two concurrent creations cannot claim the same pooled database. The Company row follows the allocation, in the same critical section.
     return serializeAllocation(async () => {
-      let allocated: { databaseName: string; origin: 'created' | 'pooled' };
-      try {
-        allocated = await allocateCompanyDatabase(cfg, app, () => this.databaseRegistry.usedDatabaseNames());
-      } catch (err) {
-        if (err instanceof CompanyDatabaseAllocationError) {
-          this.logger.error(`Company database allocation failed (${err.code}): ${err.detail}`);
-          throw new UnprocessableEntityException({ message: err.message, code: err.code, stage: cfg.mode === 'pool' ? 'claim-database' : 'create-database', detail: err.detail });
+      let allocated = await this.allocate(cfg, app);
+      const company = await this.companyRegistry.provision(INSTALLATION_SINGLETON_ID, dto.name);
+      // The in-process lock above does not cover other Node workers. The unique index on `database_registries.databaseName` is the real guard: if another worker registered the
+      // database we just picked first, take the next one for the SAME Company; when the pool has nothing left, the still-bare Company row is discarded (never one that owns a registry row).
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await this.createCompanyOn(dto, allocated.databaseName, company);
+        } catch (err) {
+          if (cfg.mode !== 'pool' || !isDatabaseNameTaken(err) || attempt >= 10) throw err;
+          this.logger.warn(`Pooled database "${allocated.databaseName}" was taken by a concurrent request; claiming the next one.`);
+          try {
+            allocated = await this.allocate(cfg, app);
+          } catch (exhausted) {
+            await this.companyRegistry.discardUnprovisioned(company.id);
+            throw exhausted;
+          }
         }
-        throw err;
       }
-      return this.createCompanyOn(dto, allocated.databaseName);
     });
+  }
+
+  private async allocate(cfg: CompanyDatabaseConfig, app: ConnectionTarget): Promise<{ databaseName: string; origin: 'created' | 'pooled' }> {
+    try {
+      return await allocateCompanyDatabase(cfg, app, () => this.databaseRegistry.usedDatabaseNames());
+    } catch (err) {
+      if (err instanceof CompanyDatabaseAllocationError) {
+        this.logger.error(`Company database allocation failed (${err.code}): ${err.detail}`);
+        throw new UnprocessableEntityException({ message: err.message, code: err.code, stage: cfg.mode === 'pool' ? 'claim-database' : 'create-database', detail: err.detail });
+      }
+      throw err;
+    }
   }
 
   /**

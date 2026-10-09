@@ -445,10 +445,14 @@ export class BackupManagerService {
         // Database records FIRST, files after: if the records cannot be removed nothing has been destroyed, and the next sweep retries.
         await artifactRepo.remove(artifacts);
         await runRepo.remove(run);
-        for (const artifact of artifacts) {
-          await rm(join(storagePath, artifact.filePath), { force: true });
+        // The records are gone and the run is no longer a backup anyone can select; a file that then cannot be deleted is only disk left behind, never a lost restore point.
+        for (const file of [...artifacts.map((a) => join(storagePath, a.filePath)), join(storagePath, 'manifests', `${run.id}.json`)]) {
+          try {
+            await rm(file, { force: true });
+          } catch (err) {
+            this.logger.warn(`Retention: backup run "${run.id}" was removed from the records but "${file}" could not be deleted (left on disk): ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
-        await rm(join(storagePath, 'manifests', `${run.id}.json`), { force: true });
       } catch (err) {
         this.logger.error(`Retention: backup run "${run.id}" could not be removed — left intact: ${err instanceof Error ? err.message : String(err)}`);
         continue;

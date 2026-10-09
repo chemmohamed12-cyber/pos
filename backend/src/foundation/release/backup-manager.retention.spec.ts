@@ -76,4 +76,24 @@ describe('BackupManagerService.applyRetentionPolicy — referenced backups and o
     expect(await exists(join(storage, 'fk-run.dump'))).toBe(true);
     expect(await exists(join(storage, 'manifests', 'fk-run.json'))).toBe(true);
   });
+
+  it('records removed but a file cannot be deleted => the run is still counted and audited, the stray file is only logged (no restore point is lost: the records are gone first)', async () => {
+    await mkdir(join(storage, 'manifests'), { recursive: true });
+    await mkdir(join(storage, 'stuck-run.dump'), { recursive: true }); // a non-empty directory where a file is expected: rm() without recursive throws
+    await writeFile(join(storage, 'stuck-run.dump', 'inner'), 'x');
+    const { service, removedRuns, audit } = build([...padding(10), { id: 'stuck-run', startedAt: old }], []);
+    const r = await service.applyRetentionPolicy();
+    expect(r.deletedRuns).toBe(1);
+    expect(removedRuns).toEqual(['stuck-run']);
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(await exists(join(storage, 'stuck-run.dump', 'inner'))).toBe(true);
+  });
+
+  it('one failing run does not stop the sweep: the next old run is still removed', async () => {
+    await seedFiles('ok-run');
+    const { service, removedRuns } = build([...padding(10), { id: 'ref-run', startedAt: old }, { id: 'ok-run', startedAt: old }], ['ref-run']);
+    const r = await service.applyRetentionPolicy();
+    expect(r.deletedRuns).toBe(1);
+    expect(removedRuns).toEqual(['ok-run']);
+  });
 });

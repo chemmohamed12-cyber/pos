@@ -26,6 +26,8 @@ export class DatabaseRegistry {
   @Column({ type: 'int' })
   port!: number;
 
+  /** One physical database per Company — enforced by the unique index `UQ_database_registries_databaseName` (migration 1790011000000). */
+  @Index('UQ_database_registries_databaseName', { unique: true })
   @Column({ type: 'varchar', length: 63 })
   databaseName!: string;
 
