@@ -1,12 +1,12 @@
 # Release Engine — Company fan-out (capability) and the daii_dev production-path upgrade (rehearsal)
 
-**Date:** 2026-10-09 · **Branch:** `release-company-fanout` (local, **not pushed**) · **Commits:** `6c50459` (capability + harness), `3527b7b` (version 1.1.3), on top of the cherry-picked H3 engine fixes (`d5f6c3d` registry/RB-1, `83a9162` build script tracked, `6c5fb6a` LF, `c5825cb`).
+**Date:** 2026-10-09 · **Branch:** `release-company-fanout` (local, **not pushed**) · **Commits:** `6c50459` (capability + harness), `3527b7b` (1.1.3), `1cd6d37` (guard per-column fix + F2/F3 statement split), `3f41d6b` (1.1.4), on top of the cherry-picked H3 engine fixes (`d5f6c3d` registry/RB-1, `83a9162` build script tracked, `6c5fb6a` LF, `c5825cb`).
 **Scope split (CTO 2026-10-08):** **A** = upgrade `daii_dev` only, through the real engine. **B** = give the engine the capability to upgrade existing Company databases in a future production deployment. The two were kept separate; **no Company database (Alpha/Beta/Gamma/Delta) was touched by either.**
 
 | | Status |
 |---|---|
 | **B — Company fan-out capability** | **IMPLEMENTED · VERIFIED** (tests + 7/7 mutations killed). Disabled by default; never run against a current Company database. |
-| **A — `daii_dev` upgraded through the engine** | **BLOCKED** at the engine's own expand/contract gate — a **false positive in the gate** (proved below). Nothing was changed on `daii_dev` apart from the engine's bookkeeping rows. |
+| **A — `daii_dev` upgraded through the engine** | **VERIFIED.** First attempt (1.1.3) was stopped by a **false positive in the engine's expand/contract guard** (proved below; `daii_dev` untouched). After the CTO chose "split statements", release **1.1.4** deployed through the real engine: `succeeded`, 285 migrations (252 + 33), no manual SQL, Company databases untouched in substance (see Addendum 2). |
 
 ---
 ## B — What the engine can now do
@@ -77,3 +77,27 @@ Purpose: strengthen the evidence behind the options, without applying any. Two t
 | `migrations` (285 names), `roles` (29 rows), `user_company_memberships` (8 rows) fingerprints | identical | identical |
 
 Conclusions: (1) the denial is limited to exactly those two migrations; (2) every pending migration is applicable to `daii_dev`'s real schema; (3) an **order-preserving split** (not a reorder) changes nothing in the resulting schema — not even physical column order — so Option 1 is safe in that form. Note the rows of the 6 other old (2025/early-Oct) migrations the guard also matches when scanning the *whole* tree are already applied history and outside the engine's scan scope.
+
+---
+## Addendum 2 — the upgrade of `daii_dev` through the engine (release 1.1.4)
+**Decision (CTO, 2026-10-09):** "split statements". Applied: (1) the two flagged migrations split into consecutive `ALTER TABLE` statements in the **same column order**; (2) the guard's `ADD COLUMN NOT NULL without DEFAULT` rule is now judged **per column definition** (each `ADD` to the next `ADD`/first `;`), with 8 new specs incl. the original F2/F3 statements and negative controls (13/13). Verdicts on all 570 migration files (ts+js) are otherwise unchanged; on the originals: old guard 1 violation each / new guard 0, on the split files both 0. Version bumped to **1.1.4** (the project's own rule: never reuse a version that went through a verification attempt).
+**Package:** `Daii-Release-v1.1.4-2026-10-09.zip`, SHA-256 `f28348d55d6d2502903fd0c094994fc205e2d070b79403dec57fe54812fcd84b`, from `3f41d6b`, `VERIFY: PASSED`.
+
+**Engine run (all gates, in order):** host preflight · candidate build + verification · artifact integrity · migration preflight · expand/contract scan (**passed**) · **33 migrations** (33/33 recorded successful in `release_migration_runs`) · atomic swap · restart trigger · health · LKG commit → `release.status = succeeded` (audit trail seq 2315–2324).
+
+**Verification**
+| Check | Result |
+|---|---|
+| Migration state | 252 → **285**, head `AddWarehouseOrgUnit1790011000000`; F2/F3 columns 7/7 present |
+| Slots | ACTIVE = 1.1.4; `app.prev-…` = 1.1.2 (rollback source); LKG = 1.1.4, "health ok" |
+| Schema vs an independent clone migrated with the migration primitive | identical in substance — the only differences are 51 `CHECK … ANY(ARRAY…)` lines on old tables rendered in two equivalent textual forms (identical after normalising casts/parentheses); verified with a working filter and a control that detects a single altered line |
+| Smoke on `daii_dev` with the upgraded app (clean run, tracked PID, 12.9 s) | **8/8**: `/api/health`, `/health/db`, `/health/deep` (database healthy), frontend index + bundle, `auth/me` 401, bad login 401, release API 401 |
+| Companies (Alpha/Beta/Gamma/Delta) through the engine deploy | migrations, tables, every table's content and DML counters **unchanged** |
+| Companies through the app boot | content unchanged; each Company's insert counter rose by exactly **27** — fully explained and reproduced on isolated copies: TypeORM's per-connection `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"` fails (the repo's own `UuidGenerateV4Compatibility` already defines `uuid_generate_v4()`) and rolls back, leaving 27 **dead** catalog tuples (`pg_depend` 17, `pg_proc` 8, `pg_description` 1, `pg_extension` 1) and no extension. Pre-existing behaviour of every build on every connection; no persisted change. A clean 12.9 s run moved no Company counter at all |
+| Platform side effects of the app's own boot seeding | `roles` 29→45, `role_permissions` 175→317, `integration_providers` 0→1, `audit_records` (matrix-rule / registry-sync entries): the new build seeding its role templates and catalogs |
+
+**Incident disclosed:** my first smoke attempt left a backend running for ~2 minutes (Git-Bash PID ≠ Windows PID, so `taskkill` missed it). It was found by an anomalous "up after 0.1 s", killed by its real PID, and its effect on the Companies was measured and explained as above. The process handling was corrected (PowerShell `Start-Process -PassThru` + `Stop-Process`).
+
+**Regression (full backend suite, isolated instance, `3f41d6b`):** 173 suites / 1222 tests → 169 suites pass; 4 not "passed", **all classified, none a regression**: `closing-snapshot-key-rotation`, `fiscal-period-closing-workflow`, `closing-snapshot-recovery` — TEST/ENVIRONMENT ISSUE (the worktree has no `.env`, so no `CLOSING_SNAPSHOT_SIGNING_*`; the service fails closed; with the key loaded all three pass, 11/11); `t0-clean-company-baseline` — skipped by design (1 skipped, 0 failures). Effective result: **0 failures**.
+
+**Environment adaptations / limits of this rehearsal:** the HTTP controller + auth layer were not exercised (the installed build's real engine *services* were driven directly, no credentials involved); the deployment was performed by the *previous* engine (build 1.1.2, which has no fan-out), so it upgraded the Platform only, exactly as production does today; the fan-out capability itself remains disabled by default and was proven only on disposable databases.
