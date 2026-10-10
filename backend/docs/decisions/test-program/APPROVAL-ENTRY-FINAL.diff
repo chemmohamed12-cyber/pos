@@ -1,0 +1,50 @@
+diff --git a/backend/tools/testing/approved-test-databases.json b/backend/tools/testing/approved-test-databases.json
+index 3896c57..941821e 100644
+--- a/backend/tools/testing/approved-test-databases.json
++++ b/backend/tools/testing/approved-test-databases.json
+@@ -1,7 +1,44 @@
+ {
+   "version": 1,
+   "rule": "Default DENY. An entry counts ONLY when it has id, host, port, approvedBy, approvedOn, identityEvidence and databases/databasePatterns. The hard denials in db-guard.js (daii_dev, port 5433, production-like names, non-loopback hosts) cannot be overridden here. Adding or changing an entry is a reviewed commit = the approval record.",
+-  "approved": [],
++  "approved": [
++    {
++      "id": "isolated-5544-biz",
++      "host": "127.0.0.1",
++      "port": 5544,
++      "adminDatabases": [
++        "postgres"
++      ],
++      "databases": [],
++      "databasePatterns": [
++        "^daii_test_biz_t[0-9]{2}[a-z0-9_]*$"
++      ],
++      "rolePatterns": [],
++      "approvedBy": "CTO - Phase 6 execution decision of 2026-10-10 (CTO EXECUTION DECISION - PHASE 6; recorded by the project lead)",
++      "approvedOn": "2026-10-10",
++      "identityEvidence": "D2-IDENTITY-EVIDENCE-2026-10-10.md + evidence-2026-10-10-d2/* (system_identifier 7692905965783805068; data dir D:/DAII-ISOLATED-PG/data; listen_addresses 127.0.0.1; pg_hba scram loopback only; PostgreSQL 18.6)",
++      "expectedSystemIdentifier": "7692905965783805068",
++      "scope": {
++        "postgres": "ADMINISTRATIVE ONLY: exact CREATE/DROP DATABASE of names matching databasePatterns + read-only SELECT/SHOW; business tests can never run against it",
++        "businessTests": "fresh disposable databases created by the approved harness for this run only; names must match databasePatterns",
++        "blockedAlways": [
++          "daii_test_ambient",
++          "daii_test_fanout_ambient",
++          "daii_test_h3_ambient",
++          "daii_dev (and any name containing it)",
++          "restore_old_daii_dev",
++          "restore_quiet_daii_dev",
++          "restore_*",
++          "template0",
++          "template1",
++          "port 5433",
++          "port 5656",
++          "non-loopback hosts"
++        ],
++        "roles": "no role patterns approved: CREATE/ALTER/DROP ROLE|USER refused"
++      }
++    }
++  ],
+   "proposedNotApproved": [
+     {
+       "id": "isolated-5544",

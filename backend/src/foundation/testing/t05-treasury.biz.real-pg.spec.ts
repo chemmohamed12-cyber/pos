@@ -1,4 +1,5 @@
 import { abortBiz, attempt, auditChainValid, finishBiz, record, result, tally, widePool } from './biz-support';
+import { reconcileAndRecord } from './biz-reconcile';
 import { FinEnv, glLinesFor, setUpFinance } from './biz-finance-support';
 
 /**
@@ -58,15 +59,17 @@ describe('T-05 — concurrent treasury withdrawals never exceed the balance', ()
         `SELECT ga.code, sum(jl."debitBase")::text AS dr, sum(jl."creditBase")::text AS cr FROM accounting_journal_lines jl JOIN accounting_gl_accounts ga ON ga.id = jl."accountId" GROUP BY 1 ORDER BY 1`,
       );
       const bank = gl.find((r: { code: string }) => r.code === '1102');
+      const clearing = gl.find((r: { code: string }) => r.code === '1199');
       const unbalanced = await e.dsA.query(`SELECT "journalEntryId" FROM accounting_journal_lines GROUP BY 1 HAVING SUM("debitBase") <> SUM("creditBase")`);
       record(e, 'T-05-gl.json', { gl, unbalanced });
-      const glOk = !!bank && Number(bank.cr) === 3 * 3 * 30 && unbalanced.length === 0; // 3 rounds x 3 successes x 30.00 credited to 1102
+      const glOk = !!bank && Number(bank.cr) === 3 * 3 * 30 && !!clearing && Number(clearing.dr) === 3 * 3 * 30 && unbalanced.length === 0; // 3 rounds x 3 successes x 30.00: Cr 1102 bank / Dr 1199 clearing
       result(e, 'T-05-gl', glOk ? 'PASS' : 'STOP', JSON.stringify({ bank, unbalanced: unbalanced.length }));
       void glLinesFor;
 
       if (!stop) result(e, 'T-05', 'PASS', '3 rounds: exactly 3 of 10 withdrawals succeed, balance 10.00, 7 refused with the insufficient-balance error, movements 1+3, events POSTED');
       result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
 
+      await reconcileAndRecord(e, { nonGlTreasury: 300, notes: ['3 opening cash-ins of 100.00 are deliberately non-emitting (no GL event)'] });
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);
     } catch (err) {

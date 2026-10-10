@@ -94,7 +94,7 @@ export async function seedProduct(ds: DataSource, sku: string): Promise<string> 
   return id;
 }
 
-export async function setUpBiz(testId: string, prefix: string, opts: { tags?: string[] } = {}): Promise<BizEnv & { warehouseId: string }> {
+export async function setUpBiz(testId: string, prefix: string, opts: { tags?: string[]; roleModuleCodes?: string[] } = {}): Promise<BizEnv & { warehouseId: string }> {
   const run = ev.createRun(testId);
   const policyEntry = guard.loadPolicy().approved[0];
   if (!policyEntry) throw new Error('STOP: no approved test-database entry (the DB guard would refuse anyway)');
@@ -111,7 +111,7 @@ export async function setUpBiz(testId: string, prefix: string, opts: { tags?: st
   const databases = ['control_plane', 'company_a', 'company_b'].map((s) => `daii_test_${prefix}_${s}`);
   for (const n of databases) if (dbNamesBefore.some((d) => d.datname === n)) throw new Error(`STOP: ${n} already exists (fresh databases only)`);
 
-  const h = await setUpTwoCompanyHarness({ namePrefix: prefix, extraCompanyTags: opts.tags ?? COMPANY_TAGS });
+  const h = await setUpTwoCompanyHarness({ namePrefix: prefix, extraCompanyTags: opts.tags ?? COMPANY_TAGS, ...(opts.roleModuleCodes ? { roleModuleCodes: opts.roleModuleCodes } : {}) });
   const dsA = await h.connections.getDataSource(h.companyAId);
   const actor = randomUUID();
   const { warehouseId } = await seedBase(dsA, actor, 'A1');

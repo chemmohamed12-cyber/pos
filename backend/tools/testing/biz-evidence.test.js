@@ -53,3 +53,19 @@ test('fingerprint: equal for unchanged data, different after a change, "absent" 
   assert.deepEqual(none, { nope: 'absent' });
   await assert.rejects(() => ev.fingerprint(ds, ['x; drop table y']), /bad table name/);
 });
+
+test('a credential value inside any evidence file fails finalize (STOP before cleanup); a clean run passes', () => {
+  const saved = process.env.DB_PASSWORD;
+  process.env.DB_PASSWORD = 'Sup3r-Secret-Value';
+  try {
+    const clean = ev.createRun('_selftest');
+    ev.writeHeader(clean, {});
+    ev.writeJson(clean, 'raw.json', { ok: true });
+    assert.doesNotThrow(() => ev.finalize(clean));
+    const leaky = ev.createRun('_selftest');
+    ev.writeJson(leaky, 'raw.json', { connection: 'user:Sup3r-Secret-Value@host' });
+    assert.throws(() => ev.finalize(leaky), /contains a credential value/);
+  } finally {
+    if (saved === undefined) delete process.env.DB_PASSWORD; else process.env.DB_PASSWORD = saved;
+  }
+});

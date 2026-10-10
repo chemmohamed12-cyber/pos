@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { abortBiz, attempt, auditChainValid, finishBiz, record, result, tally, widePool } from './biz-support';
+import { reconcileAndRecord } from './biz-reconcile';
 import { FinEnv, seedPostedInvoice, setUpFinance } from './biz-finance-support';
 
 /**
@@ -53,6 +54,7 @@ describe('T-08 — concurrent applications of one payment never exceed its unapp
 
       result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
       void randomUUID;
+      await reconcileAndRecord(e, { nonGlTreasury: 10000, notes: ['10000.00 funding cash-in is deliberately non-emitting'] });
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);
     } catch (err) {

@@ -34,6 +34,8 @@ export interface FinEnv extends BizEnv {
   idempotency: IdempotencyService;
   events: EventBusService;
   bankAccountId: string; // mapped to GL 1102
+  /** the live accounting configuration the financial-event engine reads (fixture only — tests may unset a key to provoke a REJECTED event) */
+  cfg: Record<string, unknown>;
   customerId: string;
 }
 
@@ -47,7 +49,9 @@ export async function setUpFinance(testId: string, prefix: string): Promise<FinE
   const numbering = new NumberingService(h.controlPlane);
   const events = new EventBusService(inert, h.connections);
   const processEngine = new ProcessEngineService(h.controlPlane);
-  const config = { get: () => undefined } as unknown as ConfigurationEngineService;
+  // accounting configuration required by the cash-movement event handler: a postable, NON-control clearing account (fixture, not a criterion)
+  const cfg: Record<string, unknown> = { 'accounting.cash_movement_clearing_account_code': '1199' };
+  const config = { get: (k: string) => cfg[k] } as unknown as ConfigurationEngineService;
   const currencies = new CurrencyService(h.controlPlane, audit);
   const glAccounts = new GLAccountService(h.controlPlane, audit, events, inert, inert, currencies);
   const fiscalPeriods = new FiscalPeriodService(h.controlPlane, processEngine, audit, inert, events, inert, inert);
@@ -59,6 +63,7 @@ export async function setUpFinance(testId: string, prefix: string): Promise<FinE
   const year = new Date().toISOString().slice(0, 4);
   for (const [code, name, type, normal, fn] of [
     ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'], ['1102', 'Bank', 'asset', 'debit', 'bank'], ['1110', 'Accounts Receivable', 'asset', 'debit', 'ar'], ['2101', 'Accounts Payable', 'liability', 'credit', 'ap'],
+    ['1199', 'Cash Movement Clearing', 'asset', 'debit', null],
   ]) {
     await dsA.query(
       `INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive","controlFunction") VALUES ($1,$2,$3,$4,$5,true,false,true,$6)`,
@@ -91,7 +96,7 @@ export async function setUpFinance(testId: string, prefix: string): Promise<FinE
   const customerId = randomUUID();
   await dsA.query(`INSERT INTO "customers" ("id","code","name","creditLimit") VALUES ($1,$2,'Biz Customer','1000000.00')`, [customerId, `BIZ-CUST-${testId}`]);
 
-  return Object.assign(base, { treasury, payments, idempotency, events, bankAccountId: acct.id, customerId }) as FinEnv;
+  return Object.assign(base, { treasury, payments, idempotency, events, bankAccountId: acct.id, customerId, cfg }) as FinEnv;
 }
 
 /** A posted sales invoice for the customer (direct seed, same shape as the D2 spec) — returns its id. */

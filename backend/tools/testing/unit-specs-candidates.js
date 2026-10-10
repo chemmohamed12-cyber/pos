@@ -25,8 +25,8 @@ const kept = [];
 const dropped = [];
 for (const f of all) {
   const t = fs.readFileSync(f, 'utf8');
-  const hit = EXCLUDE.find((re) => re.test(t));
   const rel = 'src/' + path.relative(SRC, f).split(path.sep).join('/');
+  const hit = /real-pg|\.biz\./.test(rel) ? /real-pg-or-biz-file-name/ : EXCLUDE.find((re) => re.test(t));
   if (hit) dropped.push([rel, String(hit)]);
   else kept.push(rel);
 }

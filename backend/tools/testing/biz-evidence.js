@@ -97,7 +97,17 @@ async function readSystemIdentifier(adminDs) {
 }
 
 /** Writes MANIFEST.sha256, then RE-READS every file and recomputes hashes. Throws on any mismatch/missing file (=> STOP before cleanup). */
+/** No evidence file may contain the database credential (or any other secret passed in). Throws => STOP before cleanup. */
+function assertNoSecrets(run, secrets = []) {
+  const values = [process.env.DB_PASSWORD, process.env.ISOLATED_PG_PASSWORD, ...secrets].filter((v) => typeof v === 'string' && v.length >= 4);
+  for (const name of fs.readdirSync(run.dir)) {
+    const text = fs.readFileSync(path.join(run.dir, name), 'utf8');
+    for (const s of values) if (text.includes(s)) throw new Error(`evidence file ${name} contains a credential value`);
+  }
+}
+
 function finalize(run) {
+  assertNoSecrets(run);
   const lines = [];
   for (const name of [...run.files].sort()) {
     const buf = fs.readFileSync(path.join(run.dir, name));
@@ -116,4 +126,4 @@ function writeResult(run, results) {
   return writeJson(run, 'result.json', { testId: run.testId, runId: run.runId, finishedAt: new Date().toISOString(), results });
 }
 
-module.exports = { createRun, writeJson, writeHeader, writeResult, finalize, fingerprint, diffFingerprints, readSystemIdentifier, assertInside, EVIDENCE_BASE, RESULTS, ROOT };
+module.exports = { assertNoSecrets, createRun, writeJson, writeHeader, writeResult, finalize, fingerprint, diffFingerprints, readSystemIdentifier, assertInside, EVIDENCE_BASE, RESULTS, ROOT };

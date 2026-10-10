@@ -21,7 +21,8 @@ const ROOT = path.resolve(__dirname, '..', '..', '..'); // .../release-new
 const ALLOWED_PORT = 5544;
 const ALLOWED_DBS = new Set(['postgres']); // maintenance database only (administrative, read-only). daii_test_ambient is hard-denied by the guard since 2026-10-10; its inspection evidence is already recorded.
 const USER = 'isolated_admin';
-const PASSWORD = process.env.ISOLATED_PG_PASSWORD || 'isolated_only_pw'; // the project's own isolated-test credential (provision-isolated-ambient-db.js)
+const PASSWORD = process.env.ISOLATED_PG_PASSWORD; // supplied by the operator at run time; there is deliberately NO default value (CTO 2026-10-10)
+if (!PASSWORD) { console.error('REFUSED: set ISOLATED_PG_PASSWORD (an authorised local isolated credential); no default is used'); process.exit(2); }
 
 function arg(name, all = false) {
   const out = [];

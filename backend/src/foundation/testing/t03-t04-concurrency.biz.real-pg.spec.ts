@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
 import { BizEnv, abortBiz, approvedDoc, attempt, auditChainValid, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
+import { reconcileAndRecord } from './biz-reconcile';
 
 /**
  * T-03 (reservation concurrency), T-04 (issue-posting concurrency) and T-04b (mixed) — FROZEN in
@@ -105,6 +106,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
       const chain = await auditChainValid(e);
       result(e, 'invariant-audit-chain-valid', chain ? 'PASS' : 'STOP');
 
+      await reconcileAndRecord(e, {});
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);
     } catch (err) {

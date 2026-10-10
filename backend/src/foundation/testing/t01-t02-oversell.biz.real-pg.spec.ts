@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { BizEnv, abortBiz, approvedDoc, attempt, auditChainValid, finishBiz, fp, fpDiff, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, seedWarehouse, setUpBiz } from './biz-support';
+import { reconcileAndRecord } from './biz-reconcile';
 
 /**
  * T-01 (REQ-INV-002) and T-02 (REQ-INV-002/005) — FROZEN in docs/decisions/test-program/T-PLAN-FROZEN-2026-10-10.md.
@@ -83,6 +84,7 @@ describe('T-01 / T-02 — over-issue, over-transfer and over-reservation are ref
       expect(await auditChainValid(e)).toBe(true);
       result(e, 'invariant-no-negative-stock', (await negativeStockPairs(e)) === 0 ? 'PASS' : 'STOP');
 
+      await reconcileAndRecord(e, {});
       await finishBiz(e);
       const failed = e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP');
       expect(failed).toEqual([]);
