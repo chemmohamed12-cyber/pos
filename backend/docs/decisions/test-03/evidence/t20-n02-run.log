@@ -1,0 +1,16 @@
+
+=== T-20: src/foundation/testing/n02-probes.biz.real-pg.spec.ts
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\tools\testing\biz-evidence.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+PASS src/foundation/testing/n02-probes.biz.real-pg.spec.ts (96.232 s)
+  N-02 probes — plain-manager hypotheses for the remaining primitives
+    √ records the observed behaviour of both calling styles for H1-H4 (32758 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        96.389 s
+Ran all test suites matching /src\\foundation\\testing\\n02-probes.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED
