@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { BizEnv, COMPANY_TAGS, FINGERPRINT_TABLES, abortBiz, auditChainValid, finishBiz, fp, fpDiff, negativeStockPairs, onHand, receive, record, result, seedBase, seedProduct, setUpBiz } from './biz-support';
+import { BizEnv, COMPANY_TAGS, FINGERPRINT_TABLES, abortBiz, auditProbe, finishBiz, fp, fpDiff, negativeStockPairs, onHand, receive, record, result, seedBase, seedProduct, setUpBiz } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { InventoryService } from '../../domains/inventory-warehouse/application/inventory.service';
 import { InventoryController } from '../../domains/inventory-warehouse/interface/inventory.controller';
@@ -185,7 +185,7 @@ describe('T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)', 
       const neg = await negativeStockPairs(e);
       record(e, 'T-09-final-state.json', { negativeStockPairs: neg, onHand: await onHand(e, W1, P) });
       result(e, 'observation-negative-stock-after-run', neg === 0 ? 'PASS' : 'FAIL-DEFECT', `pairs with negative on-hand after the closed-type attempts: ${neg} (a defect measurement, not a harness fault)`);
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
+      await auditProbe(e, 'final');
       await reconcileAndRecord(e, { explainedPairs: [], notes: ['T-09 against today\'s code may legitimately leave ledger/valuation divergence created by the defect itself; any R failure here is reported as a finding with the E-case that caused it'] });
       await finishBiz(e);
       const hard = e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP');

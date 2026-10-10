@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { BizEnv, abortBiz, approvedDoc, attempt, auditChainValid, finishBiz, fp, fpDiff, onHand, receive, record, result, seedProduct, setUpBiz } from './biz-support';
+import { BizEnv, abortBiz, approvedDoc, attempt, auditProbe, finishBiz, fp, fpDiff, onHand, receive, record, result, seedProduct, setUpBiz } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
 
@@ -87,7 +87,7 @@ describe('T-12 — a connection killed in the middle of a posting leaves no part
         if (!(okKill && okRetry)) break;
       }
 
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
+      await auditProbe(e, 'final');
       await reconcileAndRecord(e, {});
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { abortBiz, attempt, auditChainValid, finishBiz, record, result, tally, widePool } from './biz-support';
+import { abortBiz, attempt, auditProbe, finishBiz, record, result, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { FinEnv, glLinesFor, seedPostedInvoice, setUpFinance } from './biz-finance-support';
 
@@ -83,7 +83,7 @@ describe('T-06 — a replayed collection request has exactly one financial effec
       record(e, 'T-06x-treasury-cashin.json', { before, afterRows: rows, tally: tally(xs) });
       result(e, 'T-06x-INFO', rows === 1 ? 'PASS' : 'FAIL-DEFECT', `treasury cash-in with the SAME idempotency key sent 5x concurrently produced ${rows} treasury movement(s) (INFORMATIONAL — outside the frozen T-06 scope)`);
 
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
+      await auditProbe(e, 'final');
       await reconcileAndRecord(e, { nonGlTreasury: 5000, notes: ['5000.00 funding cash-in is deliberately non-emitting'] });
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);

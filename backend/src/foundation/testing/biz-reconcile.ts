@@ -15,6 +15,8 @@ export interface Declared {
   explainedPairs?: string[];
   /** event ids that are intentionally not POSTED at reconciliation time (e.g. T-11 before re-drive) */
   explainedEvents?: string[];
+  /** independent expectation of the net CREDIT balance of the tax control accounts (output tax payable − input tax receivable); default 0 */
+  expectedTaxNet?: number;
   /** oracle: expected on-hand per `${warehouseId}:${productId}` computed independently by the test */
   oracleOnHand?: Record<string, number>;
   /** sub-ledgers/GL that this run legitimately never touched (reported, not skipped silently) */
@@ -115,13 +117,16 @@ export async function runReconciliation(env: BizEnv, declared: Declared = {}): P
     out.push({ id: 'R7', status: unexplained.length === 0 && postedNoJournal === 0 && dup.length === 0 && missing === 0 && orphanJournals === 0 ? 'PASS' : 'STOP', detail: { events: evidenceOfEvents, notPosted: notPosted.length, unexplainedNotPosted: unexplained, postedWithoutJournal: postedNoJournal, duplicateIdempotencyKeys: dup.length, movementsWithoutEvent: missing, journalsWithoutEvent: orphanJournals, explained: notPosted.filter((e) => (declared.explainedEvents ?? []).includes(e.id)) } });
   } else out.push({ id: 'R7', status: 'PASS', detail: 'not applicable: no financial-event tables in this run' });
 
-  // ---- R8: GRNI / WIP / PPV / VAT control accounts untouched by these scenarios (reported, not assumed) ----
+  // ---- R8: GRNI / WIP / PPV / VAT control accounts equal the scenario's independent expectation (default: untouched = 0) ----
   if (await hasTable(env, 'accounting_journal_lines')) {
-    const touched = await q(
-      `SELECT ga.code, ga."controlFunction", count(*)::int AS lines FROM accounting_journal_lines jl JOIN accounting_gl_accounts ga ON ga.id = jl."accountId"
-        WHERE ga."controlFunction" IN ('grni','wip','tax_payable','tax_receivable') OR ga.code LIKE '5301%' GROUP BY 1,2`,
+    const rows: Array<{ code: string; fn: string | null; net: string }> = await q(
+      `SELECT ga.code, ga."controlFunction" AS fn, coalesce(sum(jl."creditBase" - jl."debitBase"),0)::text AS net FROM accounting_journal_lines jl JOIN accounting_gl_accounts ga ON ga.id = jl."accountId"
+        WHERE ga."controlFunction" IN ('grni','wip','tax_payable','tax_receivable') OR ga.code LIKE '5301%' GROUP BY 1,2 ORDER BY 1`,
     );
-    out.push({ id: 'R8', status: touched.length === 0 ? 'PASS' : 'STOP', detail: touched.length === 0 ? 'no GRNI/WIP/PPV/VAT activity in this run (those flows are outside T-01…T-12); balances therefore 0' : { touched } });
+    const taxNet = rows.filter((r) => r.fn === 'tax_payable' || r.fn === 'tax_receivable').reduce((s, r) => s + num(r.net), 0);
+    const otherNonZero = rows.filter((r) => r.fn !== 'tax_payable' && r.fn !== 'tax_receivable' && !near(num(r.net), 0));
+    const expectedTax = declared.expectedTaxNet ?? 0;
+    out.push({ id: 'R8', status: near(taxNet, expectedTax) && otherNonZero.length === 0 ? 'PASS' : 'STOP', detail: { taxNetCredit: taxNet, expectedTaxNetCredit: expectedTax, grniWipPpvNonZero: otherNonZero, accountsSeen: rows } });
   } else out.push({ id: 'R8', status: 'PASS', detail: 'not applicable' });
 
   out.push({ id: 'R9', status: 'PASS', detail: 'reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: ' + (declared.notes?.join('; ') || 'none declared') });

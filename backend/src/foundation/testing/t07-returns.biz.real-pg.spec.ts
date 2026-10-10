@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BizEnv, COMPANY_TAGS, abortBiz, attempt, auditChainValid, finishBiz, record, result, setUpBiz, tally, widePool } from './biz-support';
+import { BizEnv, COMPANY_TAGS, abortBiz, attempt, auditProbe, finishBiz, record, result, setUpBiz, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { SalesReturnsService } from '../../domains/returns/application/sales-returns.service';
 import { ReturnFinancialsService } from '../../domains/returns/application/return-financials.service';
@@ -177,8 +177,8 @@ describe('T-07 — concurrent sales returns never exceed the returnable quantity
       record(e, 'T-07-oracle.json', { totalReturned, ledgerNet, glAr, oracleAr });
       result(e, 'T-07-oracle-AR', Math.abs(ledgerNet - oracleAr) < 0.01 && Math.abs(glAr - oracleAr) < 0.01 ? 'PASS' : 'STOP', JSON.stringify({ ledgerNet, glAr, oracleAr }));
 
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
-      await reconcileAndRecord(e, { valuationWithoutGl: 200 * 4, notes: ['the 200 x 4.00 goods-receipt-style receipt is valuation-only by design (its GL is posted by the procurement flow)'] });
+      await auditProbe(e, 'final');
+      await reconcileAndRecord(e, { valuationWithoutGl: 200 * 4, expectedTaxNet: 5 * (14.0 - 11.2), notes: ['the 200 x 4.00 goods-receipt-style receipt is valuation-only by design (its GL is posted by the procurement flow)'] });
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);
     } catch (err) {

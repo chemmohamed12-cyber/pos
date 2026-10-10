@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { abortBiz, attempt, auditChainValid, finishBiz, record, result, tally, widePool } from './biz-support';
+import { abortBiz, attempt, auditProbe, finishBiz, record, result, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { FinEnv, seedPostedInvoice, setUpFinance } from './biz-finance-support';
 
@@ -31,8 +31,8 @@ describe('T-08 — concurrent applications of one payment never exceed its unapp
       for (const variant of ['a-two-invoices', 'b-same-invoice'] as const) {
         for (let round = 1; round <= 10 && !stop; round += 1) {
           const pay = await e.payments.recordOnAccountPayment(e.customerId, null, '500.00', 'bank_transfer', e.bankAccountId, `T08-${variant}-${round}`, e.actor, e.manager);
-          const i1 = await seedPostedInvoice(e, e.dsA, '600.00', `${variant}-${round}-1`);
-          const i2 = variant === 'a-two-invoices' ? await seedPostedInvoice(e, e.dsA, '600.00', `${variant}-${round}-2`) : i1;
+          const i1 = await seedPostedInvoice(e, e.dsA, '600.00', `${variant[0]}${round}a`);
+          const i2 = variant === 'a-two-invoices' ? await seedPostedInvoice(e, e.dsA, '600.00', `${variant[0]}${round}b`) : i1;
           const outs = await Promise.all([i1, i2].map((inv) => attempt(() => e.payments.applyPayment(pay.id, inv, '300.00', e.actor, wide.manager))));
           const unapplied = await e.payments.getUnappliedBalance(pay.id, e.manager);
           const appRows = (await e.dsA.query(`SELECT count(*)::int AS n FROM customer_ledger_entries WHERE "paymentId" = $1 AND "entryType" = 'payment_application'`, [pay.id]))[0].n;
@@ -52,7 +52,7 @@ describe('T-08 — concurrent applications of one payment never exceed its unapp
       const glAr = (await e.dsA.query(`SELECT coalesce(sum(jl."debitBase" - jl."creditBase"),0)::text AS t FROM accounting_journal_lines jl JOIN accounting_gl_accounts ga ON ga.id = jl."accountId" WHERE ga."controlFunction" = 'ar'`))[0].t;
       record(e, 'T-08-ar-reconciliation-input.json', { customerLedgerNet: subledger, glArNet: glAr, note: 'seeded posted invoices (direct inserts) have no ledger/GL rows by construction; R3 is evaluated in T-10 on the declared baseline' });
 
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
+      await auditProbe(e, 'final');
       void randomUUID;
       await reconcileAndRecord(e, { nonGlTreasury: 10000, notes: ['10000.00 funding cash-in is deliberately non-emitting'] });
       await finishBiz(e);

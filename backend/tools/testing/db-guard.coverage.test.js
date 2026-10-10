@@ -11,7 +11,7 @@ const path = require('path');
 const BACKEND = path.join(__dirname, '..', '..');
 const DB_CAPABLE = /(require\(['"]pg['"]\)|require\([^)]*node_modules\/pg['"]\)|from ['"]pg['"]|new DataSource\(|new Client\(|new Pool\(|child_process|execFile|spawn\(|createConnection)/;
 const GUARDED = /db-guard/;
-const OWN = new Set(['db-guard.js', 'db-guard-process.js', 'db-guard-register.js', 'jest-db-guard-global.js', 'jest-db-guard-setup.js', 'db-guard.test.js', 'db-guard-process.test.js', 'db-guard-statements.test.js', 'db-guard-admin.test.js', 'db-guard-final-entry.test.js', 'biz-evidence.js', 'biz-run.js', 'biz-evidence.test.js', 'db-guard.coverage.test.js', 'blocked-db-driver.js', 'unit-mode-setup.js', 'unit-mode-blocked.js', 'unit-specs-candidates.js', 'unit-mode.test.js', 'probe.spec.js', 'jest.probe.config.js']);
+const OWN = new Set(['db-guard.js', 'db-guard-process.js', 'db-guard-register.js', 'jest-db-guard-global.js', 'jest-db-guard-setup.js', 'db-guard.test.js', 'db-guard-process.test.js', 'db-guard-statements.test.js', 'db-guard-admin.test.js', 'db-guard-final-entry.test.js', 'biz-evidence.js', 'biz-run.js', 'biz-cluster-setup.js', 'biz-evidence.test.js', 'db-guard.coverage.test.js', 'blocked-db-driver.js', 'unit-mode-setup.js', 'unit-mode-blocked.js', 'unit-specs-candidates.js', 'unit-mode.test.js', 'probe.spec.js', 'jest.probe.config.js']);
 
 // Operator tools: intentionally NOT guarded (they act on real/target databases chosen by the operator). Never run these from tests.
 const OPERATOR = {

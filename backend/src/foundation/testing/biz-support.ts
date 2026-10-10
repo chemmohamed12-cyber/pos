@@ -164,11 +164,11 @@ export async function approvedDoc(
   return txn.id;
 }
 
-export interface Outcome { ok: boolean; kind: string; message?: string }
+export interface Outcome { ok: boolean; kind: string; message?: string; pgCode?: string; detail?: string }
 export function classify(e: unknown): Outcome {
-  const err = e as { constructor?: { name?: string }; message?: string; status?: number; getStatus?: () => number };
+  const err = e as { constructor?: { name?: string }; message?: string; status?: number; getStatus?: () => number; driverError?: { code?: string; detail?: string; routine?: string } };
   const status = typeof err.getStatus === 'function' ? err.getStatus() : err.status;
-  return { ok: false, kind: `${err.constructor?.name ?? 'Error'}${status ? `:${status}` : ''}`, message: String(err.message ?? '').slice(0, 200) };
+  return { ok: false, kind: `${err.constructor?.name ?? 'Error'}${status ? `:${status}` : ''}`, message: String(err.message ?? '').slice(0, 200), pgCode: err.driverError?.code, detail: err.driverError?.detail ? String(err.driverError.detail).slice(0, 200) : undefined };
 }
 export async function attempt(fn: () => Promise<unknown>): Promise<Outcome> {
   try {
@@ -229,4 +229,29 @@ export async function abortBiz(env: BizEnv, reason: unknown): Promise<void> {
     for (const ds of env.extraDataSources) if (ds.isInitialized) await ds.destroy();
     await env.h.teardown();
   }
+}
+
+/**
+ * Audit-chain probe (an EXTRA check of this program, not a frozen T-xx criterion): verifies the Company audit hash chain and, when it is not valid,
+ * preserves the non-secret facts needed to find the cause (position of the break, neighbouring rows, forks, gaps). A broken chain is reported as a
+ * candidate defect (FAIL-DEFECT) with evidence — it never silently passes and it does not rewrite any frozen criterion.
+ */
+export async function auditProbe(env: BizEnv, label: string): Promise<boolean> {
+  const verdict = await env.audit.verifyCompanyChain(env.manager);
+  const q = (sql: string, p: unknown[] = []) => env.dsA.query(sql, p);
+  const stats = (await q('SELECT count(*)::int AS n, min(seq)::int AS min, max(seq)::int AS max FROM audit_records'))[0];
+  const detail: Record<string, unknown> = { label, valid: verdict.valid, brokenAtSeq: verdict.brokenAtSeq, ...stats };
+  if (!verdict.valid) {
+    const b = verdict.brokenAtSeq as number;
+    detail.neighbours = await q(
+      `SELECT seq, left("prevHash", 12) AS prev12, left(hash, 12) AS hash12, "timestamp"::text AS ts, action, resource, result FROM audit_records WHERE seq BETWEEN $1 AND $2 ORDER BY seq`, [b - 3, b + 3],
+    );
+    detail.forks = await q(`SELECT left("prevHash", 12) AS prev12, count(*)::int AS n, array_agg(seq ORDER BY seq) AS seqs FROM audit_records GROUP BY "prevHash" HAVING count(*) > 1 LIMIT 20`);
+    detail.gaps = await q(`SELECT seq + 1 AS gap_after FROM (SELECT seq, lead(seq) OVER (ORDER BY seq) AS nxt FROM audit_records) x WHERE nxt IS NOT NULL AND nxt <> seq + 1 LIMIT 20`);
+    detail.firstRecord = (await q(`SELECT seq, left("prevHash", 12) AS prev12, "timestamp"::text AS ts, action FROM audit_records ORDER BY seq LIMIT 1`))[0];
+    detail.timestampColumn = (await q(`SELECT data_type FROM information_schema.columns WHERE table_name = 'audit_records' AND column_name = 'timestamp'`))[0];
+  }
+  record(env, `audit-chain-${label}.json`, detail);
+  result(env, `audit-chain-${label}`, verdict.valid ? 'PASS' : 'FAIL-DEFECT', verdict.valid ? undefined : `candidate defect: audit hash chain invalid (first break at seq ${verdict.brokenAtSeq}) after ${label}`);
+  return verdict.valid;
 }

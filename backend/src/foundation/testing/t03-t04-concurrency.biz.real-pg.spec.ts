@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
-import { BizEnv, abortBiz, approvedDoc, attempt, auditChainValid, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
+import { BizEnv, abortBiz, approvedDoc, auditProbe, attempt, auditChainValid, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 
 /**
@@ -46,6 +46,8 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
         record(e, `T-03-N${N}-rounds.json`, t03[`N${N}`]);
       }
 
+      await auditProbe(e, 'after-T-03');
+
       // ===================== T-04: N concurrent postings of 1-unit issue documents from on-hand 5 =====================
       const t04: Record<string, unknown[]> = {};
       for (const N of [10, 25]) {
@@ -75,6 +77,8 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
         record(e, `T-04-N${N}-rounds.json`, t04[`N${N}`]);
       }
 
+      await auditProbe(e, 'after-T-04');
+
       // ===================== T-04b: 5 reservations + 5 issue postings compete for 5 units =====================
       const t04b: unknown[] = [];
       for (let round = 1; round <= 20 && !stop; round += 1) {
@@ -103,8 +107,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
       // ===================== global invariants =====================
       const neg = await negativeStockPairs(e);
       result(e, 'invariant-no-negative-stock', neg === 0 ? 'PASS' : 'STOP', `pairs with negative on-hand: ${neg}`);
-      const chain = await auditChainValid(e);
-      result(e, 'invariant-audit-chain-valid', chain ? 'PASS' : 'STOP');
+      await auditProbe(e, 'after-T-04b');
 
       await reconcileAndRecord(e, {});
       await finishBiz(e);

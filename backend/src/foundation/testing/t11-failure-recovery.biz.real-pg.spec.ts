@@ -1,4 +1,4 @@
-import { abortBiz, approvedDoc, attempt, auditChainValid, finishBiz, record, result } from './biz-support';
+import { abortBiz, approvedDoc, attempt, auditProbe, finishBiz, record, result } from './biz-support';
 import { InvGlEnv, eventsOfKind, journalCount, journalLines, setUpInventoryGl, valuationOf } from './biz-inventory-gl-support';
 import { reconcileAndRecord } from './biz-reconcile';
 
@@ -76,7 +76,7 @@ describe('T-11 — a failed accounting event is visible, re-drivable and never d
       const ok4 = ev4.length === 2 && ev4.every((x) => x.status === 'POSTED') && journals4 === journals3 && val4.qty === 3 && val4.value === 12;
       result(e, 'T-11-4', ok4 ? 'PASS' : 'STOP', JSON.stringify({ again, journals3, journals4, val4 }));
 
-      result(e, 'invariant-audit-chain-valid', (await auditChainValid(e)) ? 'PASS' : 'STOP');
+      await auditProbe(e, 'final');
       await reconcileAndRecord(e, { notes: ['T-11 step (2) intentionally left one REJECTED event; it was re-driven in steps (3)-(4), so no event remains unexplained at reconciliation time'] });
       await finishBiz(e);
       expect(e.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP')).toEqual([]);

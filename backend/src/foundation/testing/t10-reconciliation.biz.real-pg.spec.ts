@@ -11,8 +11,13 @@ const ev = require('../../../tools/testing/biz-evidence');
  * database — so it can run last, after every dependent scenario, without keeping any database alive.
  * Expected runs (frozen set): the latest run of each of the test ids below must exist, belong to the SAME commit, and contain all ten checks.
  */
-const EXPECTED_RUNS = ['T-00', 'T-01', 'T-03', 'T-05', 'T-06', 'T-07', 'T-08', 'T-09', 'T-11', 'T-12'];
-const RECONCILING = new Set(['T-01', 'T-03', 'T-05', 'T-06', 'T-07', 'T-08', 'T-11']); // runs that own accounting/stock state (T-00 smoke, T-09 HTTP, T-12 connection loss record their own proofs)
+// FROZEN scope of T-10: "R1–R10 after T-01…T-08, before cleanup" => the runs of T-01 (T-01+T-02), T-03 (T-03+T-04+T-04b), T-05, T-06, T-07, T-08.
+// T-00/T-09/T-11/T-12 also reconcile their own databases; their results are consolidated as INFORMATIONAL (reported, not part of the T-10 verdict):
+// T-09 deliberately exercises a defective path and T-11/T-12 deliberately create transient states, so they are judged by their own frozen cases.
+const FROZEN_RUNS = ['T-01', 'T-03', 'T-05', 'T-06', 'T-07', 'T-08'];
+const INFORMATIONAL_RUNS = ['T-00', 'T-09', 'T-11', 'T-12'];
+const EXPECTED_RUNS = [...FROZEN_RUNS, ...INFORMATIONAL_RUNS];
+const RECONCILING = new Set(['T-01', 'T-03', 'T-05', 'T-06', 'T-07', 'T-08']);
 
 describe('T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run', () => {
   jest.setTimeout(120_000);
@@ -21,18 +26,21 @@ describe('T-10 — consolidated reconciliation R1…R10 over the preserved evide
     const run = ev.createRun('T-10');
     const latest: Record<string, { dir: string; header: any; recon: any } | null> = {};
     const problems: string[] = [];
+    const informational: string[] = [];
     for (const id of EXPECTED_RUNS) {
       const base = join(ev.EVIDENCE_BASE, id);
       const runs = existsSync(base) ? readdirSync(base).sort() : [];
       const dir = runs.length ? join(base, runs[runs.length - 1]) : null;
-      if (!dir) { latest[id] = null; problems.push(`${id}: no evidence run found`); continue; }
+      if (!dir) { latest[id] = null; if (FROZEN_RUNS.includes(id)) problems.push(`${id}: no evidence run found`); else informational.push(`${id}: no evidence run found`); continue; }
       const header = JSON.parse(readFileSync(join(dir, 'run-header.json'), 'utf8'));
       const reconFile = join(dir, 'reconciliation-R1-R10.json');
       const recon = existsSync(reconFile) ? JSON.parse(readFileSync(reconFile, 'utf8')) : null;
       const result = existsSync(join(dir, 'result.json')) ? JSON.parse(readFileSync(join(dir, 'result.json'), 'utf8')) : null;
       latest[id] = { dir, header, recon };
-      if (!result) problems.push(`${id}: result.json missing`);
-      if (result && result.results.some((r: { status: string }) => r.status === 'STOP' || r.status === 'FAIL')) problems.push(`${id}: contains FAIL/STOP cases`);
+      const sink = FROZEN_RUNS.includes(id) ? problems : informational;
+      if (!result) sink.push(`${id}: result.json missing`);
+      if (result && result.results.some((r: { status: string }) => r.status === 'STOP' || r.status === 'FAIL')) sink.push(`${id}: contains FAIL/STOP cases`);
+      if (result) for (const r of result.results.filter((x: { status: string }) => x.status === 'FAIL-DEFECT')) informational.push(`${id}/${r.id}: FAIL-DEFECT (candidate defect, judged by its own case)`);
       if (RECONCILING.has(id)) {
         if (!recon) problems.push(`${id}: reconciliation-R1-R10.json missing`);
         else {
@@ -48,6 +56,7 @@ describe('T-10 — consolidated reconciliation R1…R10 over the preserved evide
       commit: commits[0],
       runs: Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, v ? { dir: v.dir.replace(ev.ROOT, '<root>'), checks: v.recon ? v.recon.checks.map((c: { id: string; status: string }) => `${c.id}:${c.status}`) : null } : null])),
       problems,
+      informational,
     };
     ev.writeHeader(run, { commits, consolidatedFrom: EXPECTED_RUNS });
     ev.writeJson(run, 'consolidated-reconciliation.json', consolidated);

@@ -27,6 +27,9 @@ const STEPS = [
   ['T-11', 'src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts'],
   ['T-12', 'src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts'],
   ['T-10', 'src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts'],
+  // informational reproducers of candidate defects (outside the frozen T-xx set; they never change a frozen verdict)
+  ['F-AUD-002', 'src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts'],
+  ['F-TRS-001', 'src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts'],
 ];
 
 const only = (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : '').split(',').filter(Boolean);
@@ -50,11 +53,18 @@ try {
   process.exit(2);
 }
 
+const keepGoing = process.argv.includes('--continue-after-failure'); // only for steps already triaged as independent; failures are still reported and the exit code stays non-zero
+let failures = 0;
 for (const [id, spec] of STEPS) {
   if (only.length && !only.some((o) => id.split('+').includes(o) || id === o)) continue;
   if (!fs.existsSync(path.join(BACKEND, spec))) { console.error(`NOT-WRITTEN: ${id} (${spec}) — run stops here`); process.exit(3); }
   console.log(`\n=== ${id}: ${spec}`);
   const r = spawnSync(process.execPath, [path.join(BACKEND, 'node_modules', 'jest', 'bin', 'jest.js'), '--runInBand', '--testTimeout=1800000', spec], { cwd: BACKEND, env, stdio: 'inherit' });
-  if (r.status !== 0) { console.error(`\nSTOP: ${id} did not pass (exit ${r.status}). Later steps were not run.`); process.exit(r.status || 1); }
+  if (r.status !== 0) {
+    if (!keepGoing) { console.error(`\nSTOP: ${id} did not pass (exit ${r.status}). Later steps were not run.`); process.exit(r.status || 1); }
+    failures += 1;
+    console.error(`\nFAILED (continuing, flag --continue-after-failure): ${id} exit ${r.status}`);
+  }
 }
+if (failures) { console.error(`\n${failures} step(s) failed.`); process.exit(1); }
 console.log('\nALL REQUESTED STEPS PASSED');
