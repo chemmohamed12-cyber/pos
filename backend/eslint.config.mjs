@@ -52,6 +52,18 @@ export default tseslint.config(
     },
   },
   {
+    // R2 (TEST-03, 2026-10-11) — the real-database test HARNESS (src/foundation/testing/**) exists precisely to wire real services of several domains together and to talk to
+    // the CommonJS evidence/guard tools, so it may import domain internals, use `require` and loosely-typed pg results. This is the ONLY exemption: production code and the
+    // domain specs keep every rule (the domain-boundary rule stays an error everywhere else). Reviewed: nothing under src/domains or any foundation module is exempted.
+    files: ['src/foundation/testing/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-function-type': 'off',
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**', 'tools/**'],
   },
 );

@@ -1,0 +1,13 @@
+# UI Verification Report — V1 Release
+
+All checks performed against a real running frontend (Vite dev server) and backend, driven through an actual browser (not just `tsc`/build output).
+
+| Check | Status | Evidence |
+|---|---|---|
+| Sidebar accordion (opening one group closes any other) | **PASS** | `Layout.tsx` rewritten around a single `openGroup: string \| null` state. Live-verified: clicked "المبيعات" → its 3 items appeared; clicked "المخازن" → المبيعات's items disappeared and المخازن's 5 items appeared, confirmed via the page's accessibility tree both times. |
+| Interactive Sales Orders report (clicking an order number opens its detail page) | **PASS** | `Reports.tsx` — Sales Orders report rows are clickable, order-number cell styled as a link. Live-verified: clicked "SO-2026-000027" in the report table → navigated straight to that order's detail page, which also rendered its full price breakdown correctly. |
+| Frontend production build | **PASS** | `vite build`: 68 modules, clean, 0 errors, 383.60 kB bundle (96.45 kB gzipped). |
+| Frontend typecheck | **PASS** | `tsc --noEmit` / `tsc -b`: clean, 0 errors, run after every code change this session. |
+| Arabic-first terminology on Sales Order Create | **PASS, after one transient environment issue** | On first live pass, 9 field labels on the Sales Order Create screen (`field.sales_rep`, `field.select_warehouse`, `field.available_stock`, `field.price_list_price`, `field.rep_price`, `field.manager_price`, `field.total_items`, `field.total_discount`, `field.total_price`) rendered as raw codes instead of Arabic text. Investigated as a possible real regression (the same class of bug fixed earlier this session) — traced to a **database-state issue, not a code or seed-data defect**: the Postgres instance reachable at the time was a separate, older instance missing the last several migrations (including the one seeding these exact codes). Running `migration:run` against it resolved all 9 immediately, confirmed both via the terminology API directly and by reloading the screen in the browser — every label now renders correctly in Arabic. No source change was needed. |
+| RTL layout | **PASS** | All screens tested this round rendered correctly right-to-left; no LTR leakage observed on Sales Order Create/Detail, Reports, Warehouses, Inventory, or the sidebar. |
+| No hardcoded English in Arabic mode | **PASS**, on the screens exercised this round | Sales Order Create/Detail, Reports, Warehouse screens, Inventory Grid — no raw English strings found outside of intentionally-English data (SKUs, warehouse codes, product names entered by users). |

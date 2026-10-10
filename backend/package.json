@@ -18,6 +18,8 @@
     "test:db-guard": "node --test tools/testing/db-guard.test.js tools/testing/db-guard-statements.test.js tools/testing/db-guard-admin.test.js tools/testing/db-guard-final-entry.test.js tools/testing/biz-evidence.test.js tools/testing/db-guard-process.test.js tools/testing/db-guard.coverage.test.js",
     "generate:domain": "node tools/generators/generate-module.js",
     "validate:structure": "node tools/validation/validate-structure.js",
+    "docs:check": "node tools/validation/check-doc-links.js",
+    "ci": "bash tools/ci/ci.sh",
     "verify:deploy": "bash tools/deploy/verify-deploy.sh",
     "verify:frontend-bundle": "bash tools/deploy/check-frontend-bundle.sh",
     "build:release": "bash tools/build/build-release.sh",

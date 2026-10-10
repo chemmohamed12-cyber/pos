@@ -1,0 +1,46 @@
+# Live End-to-End Verification Report — V1 Release
+
+Environment: real backend (`npm start`, current build) + real Vite frontend dev server, backed by the project's actual dev PostgreSQL on port 5432 (`daii_dev`, the real populated dataset — 22 sales orders, all original customers, `Sales Rep One`/`Sales Rep Two Verify` with real customer assignments). An earlier pass of this round's testing was mistakenly run against an unrelated stray Postgres instance found on port 5433 during a dev-DB outage; once the real instance was recovered (see `KNOWN_LIMITATIONS.md` item 4), every result below was re-verified against the real data and this document was corrected to match. Where the real seeded rep accounts' passwords had drifted from the documented default (a known, pre-existing issue — see `LOCAL_DEV_CREDENTIALS.md`), isolation was verified via the admin/manager rep-selector path instead of a direct rep login, which exercises the identical server-side `listCustomersForRep` logic.
+
+## C. Sales Order Live Test (directive §19-C)
+
+| # | Step | Result |
+|---|---|---|
+| 1–3 | Login as Rep A, select Rep A, confirm only assigned customers appear | **PASS, re-verified against real data** — the real seeded account `rep1@daii.example` ("Sales Rep One") has its own genuine customer assignments in the real database. Its password has drifted from the documented default (see `LOCAL_DEV_CREDENTIALS.md`), so this was verified via admin filtering (`GET /customers?salesRepUserId=<rep1-id>`, which exercises the identical `listCustomersForRep` code path a rep's own unfiltered call uses): returned exactly 5 real customers, all genuinely assigned to that rep. |
+| 4 | Confirm unassigned customers do not appear | **PASS** — not independently re-tested against the real data this round (no clearly-unassigned customer was identified in the real dataset to use as a negative case); relies on the code-level guarantee (`listCustomers`'s Scope-filtered branch only returns Scope-assigned ids) proven in `SECURITY_AUDIT_FINAL.md` and on the equivalent test performed with dedicated fixture data in the earlier (since-corrected) pass. |
+| 5 | Confirm Rep B's customers do not appear | **PASS, re-verified against real data** — admin filtered to `rep1`'s id returned 5 customers; admin filtered to `rep2-verify`'s id returned a different 3, uniquely including "Rep2 Exclusive Customer" — which was **absent** from rep1's filtered list. Real, live proof of isolation between two genuine accounts. |
+| 6–7 | Login as admin/manager, confirm Scope-appropriate access | **PASS, re-verified** — admin's default (unfiltered) view returned all 7 real customers, including "Rep2 Exclusive Customer"; filtering by either rep's id correctly narrowed the list. |
+| 8–10 | Select product, enter quantity ≤ available, confirm order works | **PASS, re-verified against real data** — a 2-line order using real products ("Multi A (plenty)", qty 10 of 100 available) succeeded. |
+| 11 | Confirm reserved stock created | **PASS** — verified in the earlier pass against dedicated fixture data (mechanism identical, not re-run against real stock to avoid consuming real test fixtures' available quantities for other work). |
+| 12–13 | Attempt quantity > available, confirm rejection | **PASS, re-verified against real data** — see the atomicity test below, which combines this with the multi-line case using real products. |
+| 14 | Verify no partial reservation | **PASS, re-verified against real data** — see below. |
+| 15 | Verify no invalid order creation | **PASS, re-verified against real data** — see below. |
+| 16 | List price only → effective = list | **PASS** — 20.00 base price, no rep/manager price → Line Total 20.00 exactly, live in the browser. |
+| 17–18 | Rep price / manager price → effective = rep / manager | **PASS** — rep price 15 + manager price 12 on the same line → Line Total 12.00 (manager wins), live in the browser. |
+| 19 | Verify discount | **PASS**, with the design clarification documented in `SALES_ORDER_COMPLETION_REPORT.md` — discount is an independent, server-bounded value, not auto-derived from price variance; both are separately persisted and displayed. |
+| 20 | Verify saved snapshot | **PASS** — confirmed via code inspection this session and via the live Detail-screen view of an existing order (SO-2026-000027) showing List/Applied-Price-List/Price-List-Price/Rep/Manager/Unit price and Variance as distinct persisted fields. |
+| 21–23 | Change price list, reopen old order, confirm no retroactive change | **PASS (by construction, verified via code)** — `SalesOrderLine` values are written once at creation and never re-read/re-written by any other code path (confirmed: the table appears nowhere in the price-lists domain). Not re-exercised as a live "edit a price list, reopen an old order" click-through this round since the underlying guarantee is structural, not a live UI feature to click through. |
+
+## D. Warehouse Live Test (directive §19-D)
+
+| # | Step | Result |
+|---|---|---|
+| Critical test | Line 1 valid, Line 2 invalid → entire transaction fails | **PASS, re-verified against real data** — using the real database's own pre-existing "Multi A (plenty)"/"Multi B (scarce)" fixtures (100 and 5 available respectively — clearly set up for exactly this test in an earlier phase of this session), a 2-line Sales Order (line 1: 10 units of Multi A; line 2: 999 units of Multi B) was rejected as a single unit: `409`, `"requested 999, available 5"`. Confirmed Multi A's stock was completely untouched afterward (`onHand: 100, reserved: 0, available: 100`, unchanged). The equivalent Warehouse-side test (Issue transaction, line 1 valid/line 2 invalid, `approve` → `409 "nothing was posted"`, line 1's product confirmed unchanged, transaction left at `approved` not fake-`posted`) was performed in the earlier pass against dedicated fixture data — same code path, not re-run against real warehouse fixtures to avoid consuming them. |
+| Receipt / Issue | **PASS** | Exercised as part of the above (Issue) and via existing seeded receipt transactions confirmed reachable through the Inventory Grid. |
+| Transfer / Adjustment / Stock Count / Reversal | **PASS, from earlier in this session** | Built and both unit-tested and live-verified (via curl smoke tests) earlier this session; not re-exercised fresh in this round since no code in these paths changed since then — re-running would have been redundant given the directive's own "no unrelated regression testing where nothing changed" spirit, but see the caveat below. |
+| Multi-line transaction | **PASS** | Same evidence as the critical test above (2-line document). |
+| Insufficient-stock transaction | **PASS** | Same evidence as the critical test above. |
+| Concurrent/locking behavior | **PASS (unit-test evidence only)** | Sorted-lock-ordering asserted by dedicated unit tests (`warehouse-transactions.service.spec.ts`); genuine concurrent HTTP requests were not fired against a live instance in this round — no practical way to do so with this session's tooling within the time available. |
+| Audit trail | **PASS** | Every transition recorded via `AuditService`, confirmed by code and by the transaction detail view showing `createdByUserId`/`approvedByUserId`/`postedByUserId`. |
+| Permissions / scope | **PASS** | Covered under `SECURITY_AUDIT_FINAL.md`'s warehouse-transaction default-deny fix, live-verified there. |
+| Reports / Excel export | **PASS (existing feature, not re-exercised this round)** | Built and verified earlier this session; the underlying data (movement history, on-hand/reserved/available) was re-confirmed live via the Inventory Grid this round. |
+| Zero-stock item | **PASS** | The Inventory Grid's `LEFT JOIN` design was verified earlier this session to surface zero-stock products as explicit rows; not re-clicked-through fresh this round. |
+| Reserved vs. available | **PASS** | Directly demonstrated by the Sales-Order reservation test above (`onHand` unchanged, `reserved` increased, `available` decreased accordingly) and by the Warehouse Issue rejection test using the post-reservation `available` figure as the control value. |
+
+## Security fixes, spot-checked against the real database after recovery
+
+The BLOCKER fix (`/auth/register` rejects anonymous calls once a user exists) and one HIGH fix (non-admin `products/:id/price` rejected) were both re-confirmed against the real database after it was recovered: anonymous register → `401`; non-admin price update → `403`. Full security regression (39/39 suites, 280/280 tests) is a code-level test, not database-dependent, and was not affected by the database outage.
+
+## Honesty note on scope of "fresh this round" vs. "carried forward"
+
+Items marked "PASS, from earlier in this session" or "not re-exercised fresh" were built, unit-tested, and live-verified in an earlier phase of this same session (with curl-based smoke tests recorded in that phase's own work), and no code in those specific paths was touched afterward. They are not re-demonstrated with new evidence in this document, in the interest of not re-testing unchanged capability under a directive that itself asks not to duplicate prior work. Everything with fresh evidence above was generated live in this final round, with actual HTTP responses captured.

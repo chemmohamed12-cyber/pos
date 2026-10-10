@@ -1,0 +1,73 @@
+{
+ "filesScanned": 82,
+ "referencesChecked": 112,
+ "unresolved": [
+  {
+   "file": "LOCAL_DEVELOPMENT.md",
+   "ref": "LOCAL_DEV_CREDENTIALS.md"
+  },
+  {
+   "file": "planning/v1-release/DEPLOYMENT_GUIDE.md",
+   "ref": "./storage/media"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_PACKAGE_2026-08-24.md",
+   "ref": "../../LOCAL_DEV_CREDENTIALS.md"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/database/migrations/1755848800000-AddTreasuryAccountTypeHierarchy.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/database/migrations/1755848900000-SeedTreasuryAccountTypeTerminology.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/domains/treasury/application/treasury.service.spec.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/domains/inventory-warehouse/application/inventory.service.spec.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/domains/sales-orders/application/sales-orders.service.spec.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../backend/src/database/migrations/1755849600000-SeedOrderEditTerminology.ts"
+  },
+  {
+   "file": "planning/v1-release/HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE.md",
+   "ref": "../../../LOCAL_DEV_CREDENTIALS.md"
+  }
+ ],
+ "knownExternal": [
+  {
+   "file": "README.md",
+   "ref": "../baseline/",
+   "why": "XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README \"Daii is NOT a clone of …\")"
+  },
+  {
+   "file": "README.md",
+   "ref": "../30/",
+   "why": "XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README \"Daii is NOT a clone of …\")"
+  },
+  {
+   "file": "README.md",
+   "ref": "../xnexus-website/",
+   "why": "XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README \"Daii is NOT a clone of …\")"
+  },
+  {
+   "file": "README.md",
+   "ref": "../xnexus-website/server/server.js",
+   "why": "XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README \"Daii is NOT a clone of …\")"
+  },
+  {
+   "file": "MASTER_HANDOVER.md",
+   "ref": "../xnexus-website/",
+   "why": "XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README \"Daii is NOT a clone of …\")"
+  }
+ ]
+}

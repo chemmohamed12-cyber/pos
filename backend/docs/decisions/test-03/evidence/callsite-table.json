@@ -1,0 +1,1162 @@
+{
+ "summary": {
+  "processEngine.transition | CALLER-MANAGER | reachable from a controller": 29,
+  "processEngine.transition | CALLER-MANAGER | no direct controller caller": 17,
+  "processEngine.transition | TX-CALLBACK": 26,
+  "numbering.getNextNumber | TX-CALLBACK": 11,
+  "numbering.getNextNumber | CALLER-MANAGER | reachable from a controller": 26,
+  "numbering.getNextNumber | CALLER-MANAGER | no direct controller caller": 6
+ },
+ "rows": [
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 250,
+   "method": "activateFiscalYear",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 311,
+   "method": "applyPeriodTransition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 603,
+   "method": "applyApprovedYearClose",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset-disposal.service.ts",
+   "line": 238,
+   "method": "onApprovalApproved",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset-disposal.service.ts",
+   "line": 280,
+   "method": "onJournalReversed",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset.service.ts",
+   "line": 344,
+   "method": "linkAcquisitionInternal",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 261,
+   "method": "updateEntry",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 313,
+   "method": "submitEntry",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 435,
+   "method": "postEntry",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 447,
+   "method": "postEntry",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 564,
+   "method": "reverseEntry",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/commerce/application/price-lists.service.ts",
+   "line": 78,
+   "method": "createPriceList",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/commerce/application/price-lists.service.ts",
+   "line": 177,
+   "method": "getOrCreateGeneralList",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 432,
+   "method": "submitApprovalBatch",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 505,
+   "method": "onApprovalApproved",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 529,
+   "method": "onApprovalRejected",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/crm/application/customers.service.ts",
+   "line": 146,
+   "method": "createCustomer",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/customer-ledger.service.ts",
+   "line": 70,
+   "method": "postEntry",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/customer-ledger.service.ts",
+   "line": 231,
+   "method": "reverseEntry",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 198,
+   "method": "createDraftInvoice",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 288,
+   "method": "postInvoice",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 354,
+   "method": "voidInvoice",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 369,
+   "method": "voidInvoice",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 428,
+   "method": "recomputeStatus",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 430,
+   "method": "recomputeStatus",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/payments.service.ts",
+   "line": 101,
+   "method": "recordPayment",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/payments.service.ts",
+   "line": 206,
+   "method": "recordOnAccountPayment",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 68,
+   "method": "createFulfillmentOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 236,
+   "method": "transitionPickTask",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 282,
+   "method": "getOrCreatePreparationWarehouse",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 436,
+   "method": "transitionPackTask",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/hr/application/hr.service.ts",
+   "line": 132,
+   "method": "createDepartment",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/hr/application/hr.service.ts",
+   "line": 195,
+   "method": "createEmployee",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/inventory.service.ts",
+   "line": 1632,
+   "method": "assembleProduct",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 105,
+   "method": "createTransaction",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 166,
+   "method": "startCount",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 400,
+   "method": "transition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 403,
+   "method": "transition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 408,
+   "method": "transition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 599,
+   "method": "postTransaction",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 627,
+   "method": "reverseTransaction",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 632,
+   "method": "reverseTransaction",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 657,
+   "method": "reverseTransaction",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 213,
+   "method": "createWorkOrder",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 308,
+   "method": "release",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 401,
+   "method": "materialIssue",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 791,
+   "method": "hold",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 801,
+   "method": "resume",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 833,
+   "method": "complete",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 865,
+   "method": "cancel",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 255,
+   "method": "calculate",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 335,
+   "method": "calculate",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 356,
+   "method": "review",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 459,
+   "method": "onApprovalApproved",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 460,
+   "method": "onApprovalApproved",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/goods-receipt.service.ts",
+   "line": 90,
+   "method": "post",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/goods-receipt.service.ts",
+   "line": 169,
+   "method": "post",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/new-item-request.service.ts",
+   "line": 120,
+   "method": "create",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-order.service.ts",
+   "line": 81,
+   "method": "create",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-order.service.ts",
+   "line": 148,
+   "method": "transition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 90,
+   "method": "create",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 137,
+   "method": "transition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 175,
+   "method": "createRfqFromRequest",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 182,
+   "method": "createRfqFromRequest",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 120,
+   "method": "onAwardApproved",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 178,
+   "method": "send",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 184,
+   "method": "cancel",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 225,
+   "method": "recordQuotation",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 210,
+   "method": "createDraftInvoice",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 285,
+   "method": "postInvoice",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 368,
+   "method": "voidInvoice",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 389,
+   "method": "voidInvoice",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 440,
+   "method": "recomputeStatus",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 442,
+   "method": "recomputeStatus",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-ledger.service.ts",
+   "line": 52,
+   "method": "postEntry",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-ledger.service.ts",
+   "line": 145,
+   "method": "reverseEntry",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-payment.service.ts",
+   "line": 82,
+   "method": "recordPayment",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier.service.ts",
+   "line": 133,
+   "method": "create",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 94,
+   "method": "createReturnRequest",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 201,
+   "method": "initiateCustodyReturn",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 226,
+   "method": "initiateCustodyReturn",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 245,
+   "method": "initiateCustodyReturn",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 281,
+   "method": "authorize",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 287,
+   "method": "reject",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 303,
+   "method": "receiveAtWarehouse",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 322,
+   "method": "inspect",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 332,
+   "method": "getOrCreateReturnSubLocation",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 418,
+   "method": "recordDisposition",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/returns/application/sales-returns.service.ts",
+   "line": 131,
+   "method": "createSalesReturn",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/sales-returns.service.ts",
+   "line": 240,
+   "method": "completeSalesReturn",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/returns/application/shipment-returns.service.ts",
+   "line": 93,
+   "method": "createShipmentReturn",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/returns/application/shipment-returns.service.ts",
+   "line": 226,
+   "method": "completeShipmentReturn",
+   "managerArg": "txManager",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/sales/application/sales.service.ts",
+   "line": 31,
+   "method": "createSalesRepProfile",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 273,
+   "method": "createOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 281,
+   "method": "createOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1152,
+   "method": "transitionOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1164,
+   "method": "transitionOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1180,
+   "method": "transitionOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1217,
+   "method": "releaseAfterDepositVerified",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1249,
+   "method": "expireHoldForOrder",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 127,
+   "method": "provisionCustodianResources",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 128,
+   "method": "provisionCustodianResources",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 183,
+   "method": "createShipment",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 185,
+   "method": "createShipment",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 284,
+   "method": "assignDriver",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 518,
+   "method": "transitionShipment",
+   "managerArg": "m",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 141,
+   "method": "submitForApproval",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 178,
+   "method": "onApprovalApproved",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 205,
+   "method": "onApprovalRejected",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "numbering.getNextNumber",
+   "file": "domains/treasury/application/treasury.service.ts",
+   "line": 372,
+   "method": "insertLeg",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": true,
+   "calledFromController": false
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 341,
+   "method": "decide",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 358,
+   "method": "decide",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 406,
+   "method": "withdraw",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 420,
+   "method": "escalate",
+   "managerArg": "tx",
+   "class": "TX-CALLBACK",
+   "methodDeclaresManager": true,
+   "calledFromController": true
+  },
+  {
+   "primitive": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 462,
+   "method": "expire",
+   "managerArg": "manager",
+   "class": "CALLER-MANAGER",
+   "methodDeclaresManager": false,
+   "calledFromController": false
+  }
+ ]
+}

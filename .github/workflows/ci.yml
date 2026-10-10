@@ -1,0 +1,27 @@
+name: ci
+# R2 (TEST-03). Database-free checks on every push and pull request. The real-PostgreSQL regression (business suite, isolation specs) runs on the dedicated, guarded
+# cluster described in backend/docs/decisions/test-program/ (the DB guard pins the cluster identity, so a hosted runner cannot silently stand in for it).
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Run the CI script (install, build, lint, structure, doc links, unit, db-guard)
+        run: bash tools/ci/ci.sh
+      - name: Keep the step logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-output
+          path: backend/ci-output/
