@@ -1,0 +1,28 @@
+started 2026-10-10T16:46:10Z
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+FAIL src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (32.497 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    × creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (8221 ms)
+
+  ● T-00 harness smoke — fresh disposable databases from the current migration set › creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases
+
+    QueryFailedError: permission denied to terminate process
+
+      at PostgresQueryRunner.query (driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (data-source/DataSource.ts:541:20)
+      at foundation/testing/two-company-real-pg-harness.ts:86:5
+      at withAdminConnection (foundation/testing/two-company-real-pg-harness.ts:71:12)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:85:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:170:5)
+      at Object.<anonymous> (foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts:104:14)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        32.598 s, estimated 44 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+STOP: T-00 did not pass (exit 1). Later steps were not run.
+EXIT 1
+finished 2026-10-10T16:46:44Z

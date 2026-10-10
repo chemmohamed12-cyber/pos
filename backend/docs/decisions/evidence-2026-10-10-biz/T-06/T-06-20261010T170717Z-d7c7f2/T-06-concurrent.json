@@ -1,0 +1,19 @@
+{
+  "tally": {
+    "OK": 5
+  },
+  "effects": {
+    "payments": 1,
+    "treasuryRows": 1,
+    "treasuryTotal": "400.00",
+    "ledgerEntries": 1,
+    "remaining": "600.00",
+    "gl": {
+      "status": "POSTED",
+      "lines": [
+        "1102 D 400.00",
+        "1110 C 400.00"
+      ]
+    }
+  }
+}

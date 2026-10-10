@@ -1,0 +1,29 @@
+{
+  "request": {
+    "warehouseId": "302a2842-3ad0-4a00-8e78-8473de096f40",
+    "productId": "2075018f-ddeb-45ad-991d-8ba81bcbe40d",
+    "quantity": -2,
+    "movementType": "adjustment"
+  },
+  "user": "6d1d49b8-8816-4500-92bb-892404e6092d",
+  "status": 201,
+  "body": {
+    "id": "3921deb1-f608-4a1d-8f60-14570ea9c4cf",
+    "warehouseId": "302a2842-3ad0-4a00-8e78-8473de096f40",
+    "productId": "2075018f-ddeb-45ad-991d-8ba81bcbe40d",
+    "quantity": -2,
+    "movementType": "adjustment",
+    "referenceType": null,
+    "referenceId": null,
+    "createdByUserId": "6d1d49b8-8816-4500-92bb-892404e6092d",
+    "createdAt": "2026-10-10T17:09:41.996Z"
+  },
+  "fingerprintDiffA": [
+    {
+      "table": "stock_movements",
+      "before": "6:1ff6dd2d3b6e92cac99c582efcbcb397",
+      "after": "7:63ffc10864fbdaa064d0f9ecfe48d1dd"
+    }
+  ],
+  "fingerprintDiffB": []
+}

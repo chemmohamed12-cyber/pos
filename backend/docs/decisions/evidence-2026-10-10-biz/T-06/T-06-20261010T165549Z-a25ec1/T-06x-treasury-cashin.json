@@ -1,0 +1,8 @@
+{
+  "before": 0,
+  "afterRows": 2,
+  "tally": {
+    "QueryFailedError": 3,
+    "OK": 2
+  }
+}

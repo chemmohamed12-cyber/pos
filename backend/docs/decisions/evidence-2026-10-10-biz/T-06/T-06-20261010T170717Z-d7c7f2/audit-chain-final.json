@@ -1,0 +1,93 @@
+{
+  "label": "final",
+  "valid": false,
+  "brokenAtSeq": 32,
+  "n": 37,
+  "min": 1,
+  "max": 37,
+  "neighbours": [
+    {
+      "seq": 29,
+      "prev12": "f9c6b5cd9db9",
+      "hash12": "b0f500f83e0d",
+      "ts": "2026-10-10 20:07:25.282+03",
+      "action": "accounting.financial_event.posted",
+      "resource": "financial_event",
+      "result": "success"
+    },
+    {
+      "seq": 30,
+      "prev12": "b0f500f83e0d",
+      "hash12": "3e51446e0da1",
+      "ts": "2026-10-10 20:07:25.285+03",
+      "action": "accounting.financial_event.posted",
+      "resource": "financial_event",
+      "result": "success"
+    },
+    {
+      "seq": 31,
+      "prev12": "3e51446e0da1",
+      "hash12": "b139546f2474",
+      "ts": "2026-10-10 20:07:25.289+03",
+      "action": "accounting.financial_event.posted",
+      "resource": "financial_event",
+      "result": "success"
+    },
+    {
+      "seq": 32,
+      "prev12": "3e51446e0da1",
+      "hash12": "7fd62b2c5cf4",
+      "ts": "2026-10-10 20:07:25.288+03",
+      "action": "treasury.cash_in",
+      "resource": "treasury_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 33,
+      "prev12": "7fd62b2c5cf4",
+      "hash12": "70362bd6dad4",
+      "ts": "2026-10-10 20:07:25.298+03",
+      "action": "treasury.cash_in",
+      "resource": "treasury_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 34,
+      "prev12": "70362bd6dad4",
+      "hash12": "a22049562022",
+      "ts": "2026-10-10 20:07:25.308+03",
+      "action": "accounting.journal.created",
+      "resource": "journal_entry",
+      "result": "success"
+    },
+    {
+      "seq": 35,
+      "prev12": "a22049562022",
+      "hash12": "e52800d04110",
+      "ts": "2026-10-10 20:07:25.335+03",
+      "action": "accounting.journal.posted",
+      "resource": "journal_entry",
+      "result": "success"
+    }
+  ],
+  "forks": [
+    {
+      "prev12": "3e51446e0da1",
+      "n": 2,
+      "seqs": [
+        31,
+        32
+      ]
+    }
+  ],
+  "gaps": [],
+  "firstRecord": {
+    "seq": 1,
+    "prev12": "000000000000",
+    "ts": "2026-10-10 20:07:24.25+03",
+    "action": "treasury.account.created"
+  },
+  "timestampColumn": {
+    "data_type": "timestamp with time zone"
+  }
+}

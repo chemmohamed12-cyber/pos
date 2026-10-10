@@ -1,0 +1,14 @@
+[
+  {
+    "datname": "postgres",
+    "oid": "5"
+  },
+  {
+    "datname": "template0",
+    "oid": "4"
+  },
+  {
+    "datname": "template1",
+    "oid": "1"
+  }
+]

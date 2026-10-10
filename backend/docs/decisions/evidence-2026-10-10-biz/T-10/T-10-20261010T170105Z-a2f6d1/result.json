@@ -1,0 +1,12 @@
+{
+  "testId": "T-10",
+  "runId": "T-10-20261010T170105Z-a2f6d1",
+  "finishedAt": "2026-10-10T17:01:05.571Z",
+  "results": [
+    {
+      "id": "T-10",
+      "status": "STOP",
+      "note": "T-07: contains FAIL/STOP cases | T-07/R8: STOP {\"touched\":[{\"code\":\"2120\",\"controlFunction\":\"tax_payable\",\"lines\":15}]} | T-08: contains FAIL/STOP cases | T-08: reconciliation-R1-R10.json missing"
+    }
+  ]
+}

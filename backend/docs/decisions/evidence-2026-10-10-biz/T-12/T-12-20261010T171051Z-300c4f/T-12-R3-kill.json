@@ -1,0 +1,17 @@
+{
+  "tag": "biz-t12-T-12-20261010T171051Z-300c4f-r3",
+  "waiting": 1,
+  "matching": 1,
+  "killedRows": 1,
+  "outcome": {
+    "ok": false,
+    "kind": "QueryFailedError",
+    "message": "terminating connection due to administrator command",
+    "pgCode": "57P01"
+  },
+  "state": "approved",
+  "movements": 0,
+  "onHandBefore": 3,
+  "onHandAfter": 3,
+  "fingerprintDiff": []
+}

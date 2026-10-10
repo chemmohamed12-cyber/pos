@@ -1,0 +1,22 @@
+{
+  "request": {
+    "warehouseId": "302a2842-3ad0-4a00-8e78-8473de096f40",
+    "productId": "2075018f-ddeb-45ad-991d-8ba81bcbe40d",
+    "quantity": 1,
+    "movementType": "receipt",
+    "unitCostBase": "4.00",
+    "reasonCode": "FOUND_STOCK"
+  },
+  "user": "fef01eea-342f-447a-a166-aaaa9e3fe763",
+  "status": 404,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "NOT_FOUND",
+      "message": "Not Found"
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

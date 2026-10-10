@@ -1,0 +1,72 @@
+{
+  "testId": "T-05",
+  "runId": "T-05-20261010T170630Z-803740",
+  "finishedAt": "2026-10-10T17:06:38.940Z",
+  "results": [
+    {
+      "id": "T-05-R2",
+      "status": "FAIL-DEFECT",
+      "note": "CANDIDATE PRODUCT DEFECT F-TRS-001 (unexpected error kinds under concurrency); root cause by code reading: TreasuryService.run(manager, fn) runs fn directly on the supplied manager (no transaction) and the controller supplies dataSource.manager, so the per-account advisory lock is not held across the balance check and the insert. {\"round\":2,\"tally\":{\"OK\":1,\"QueryFailedError\":9},\"errorsByMessage\":[[\"QueryFailedError | 23505 | duplicate key value violates unique constraint \\\"IDX_treasury_transactions_number\\\"\",9]],\"balance\":\"70.00\",\"treasuryMovements\":2,\"cashOutTotal\":\"30.00\",\"events\":[{\"status\":\"POSTED\",\"n\":1}]}"
+    },
+    {
+      "id": "T-05-gl",
+      "status": "PASS",
+      "note": "{\"bank\":{\"code\":\"1102\",\"dr\":\"0.0000\",\"cr\":\"120.0000\"},\"clearing\":{\"code\":\"1199\",\"dr\":\"120.0000\",\"cr\":\"0.0000\"},\"outTotal\":120,\"unbalanced\":0}"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "FAIL-DEFECT",
+      "note": "candidate defect: audit hash chain invalid (first break at seq 13) after final"
+    },
+    {
+      "id": "T-10/T-05/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":0,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-05/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-05/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-05/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-05/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":80,\"declaredNonGlTreasury\":200,\"expectedGl\":-120,\"glNet\":-120}"
+    },
+    {
+      "id": "T-10/T-05/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-05/R7",
+      "status": "PASS",
+      "note": "{\"events\":4,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-05/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-05/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 2 opening cash-in(s) of 100.00 are deliberately non-emitting (no GL event)"
+    },
+    {
+      "id": "T-10/T-05/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

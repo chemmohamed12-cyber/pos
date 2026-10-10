@@ -1,0 +1,239 @@
+started 2026-10-10T17:03:25Z
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+PASS src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (32.39 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    √ creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (9004 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        32.45 s, estimated 33 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+PASS src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (42.995 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    √ T-01 + T-02 (9110 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        43.06 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (66.576 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    √ T-03 + T-04 + T-04b (31689 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        66.645 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+PASS src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (45.162 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    √ 10 x 30.00 from 100.00 (9887 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        45.231 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (44.597 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    √ same key replayed: one effect; different key: a second effect (10090 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        44.666 s, estimated 46 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+PASS src/foundation/testing/t07-returns.biz.real-pg.spec.ts (47.124 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    √ two concurrent returns of 4 against 6 remaining (11641 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        47.191 s, estimated 51 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+=== T-08: src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts (44.642 s)
+  T-08 — concurrent applications of one payment never exceed its unapplied amount
+    × 300 + 300 against 500 unapplied (9557 ms)
+
+  ● T-08 — concurrent applications of one payment never exceed its unapplied amount › 300 + 300 against 500 unapplied
+
+    cases failed: T-08-a-two-invoices-R2=STOP
+
+    [0m [90m 215 |[39m   [36mif[39m ([33m![39mgone [33m||[39m [33m![39mothersUnchanged) [36mthrow[39m [36mnew[39m [33mError[39m([32m'STOP: cleanup did not leave the instance as found'[39m)[33m;[39m
+     [90m 216 |[39m   [36mconst[39m bad [33m=[39m env[33m.[39mresults[33m.[39mfilter((r) [33m=>[39m r[33m.[39mstatus [33m===[39m [32m'FAIL'[39m [33m||[39m r[33m.[39mstatus [33m===[39m [32m'STOP'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 217 |[39m   [36mif[39m (bad[33m.[39mlength) [36mthrow[39m [36mnew[39m [33mError[39m([32m`cases failed: ${bad.map((b) => `${b.id}=${b.status}`).join(', ')}`[39m)[33m;[39m
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 218 |[39m }
+     [90m 219 |[39m
+     [90m 220 |[39m [90m/** Called from afterAll when a test threw before finishBiz: records what exists as STOP evidence, then removes this run's databases only. */[39m[0m
+
+      at finishBiz (foundation/testing/biz-support.ts:217:25)
+      at Object.<anonymous> (foundation/testing/t08-payment-apply.biz.real-pg.spec.ts:58:7)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        44.706 s, estimated 53 s
+Ran all test suites matching /src\\foundation\\testing\\t08-payment-apply.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-08 exit 1
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+[31m[Nest] 23160  - [39m١٠‏/١٠‏/٢٠٢٦، ٨:٠٩:٤٢ م [31m  ERROR[39m [38;5;3m[AllExceptionsFilter] [39m[31mUnhandled exception[39m
+QueryFailedError: insert or update on table "stock_movements" violates foreign key constraint "stock_movements_warehouseId_fkey"
+    at PostgresQueryRunner.query (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\driver\postgres\PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at InsertQueryBuilder.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\query-builder\InsertQueryBuilder.ts:164:33)
+    at SubjectExecutor.executeInsertOperations (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:435:42)
+    at SubjectExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:137:9)
+    at EntityPersistExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\EntityPersistExecutor.ts:182:21)
+    at InventoryService.recordMovement (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\domains\inventory-warehouse\application\inventory.service.ts:240:22)
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17
+[31m[Nest] 23160  - [39m١٠‏/١٠‏/٢٠٢٦، ٨:٠٩:٤٢ م [31m  ERROR[39m [38;5;3m[AllExceptionsFilter] [39m[31mUnhandled exception[39m
+QueryFailedError: insert or update on table "stock_movements" violates foreign key constraint "stock_movements_productId_fkey"
+    at PostgresQueryRunner.query (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\driver\postgres\PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at InsertQueryBuilder.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\query-builder\InsertQueryBuilder.ts:164:33)
+    at SubjectExecutor.executeInsertOperations (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:435:42)
+    at SubjectExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:137:9)
+    at EntityPersistExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\EntityPersistExecutor.ts:182:21)
+    at InventoryService.recordMovement (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\domains\inventory-warehouse\application\inventory.service.ts:240:22)
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17
+[31m[Nest] 23160  - [39m١٠‏/١٠‏/٢٠٢٦، ٨:٠٩:٤٢ م [31m  ERROR[39m [38;5;3m[AllExceptionsFilter] [39m[31mUnhandled exception[39m
+QueryFailedError: insert or update on table "stock_movements" violates foreign key constraint "stock_movements_warehouseId_fkey"
+    at PostgresQueryRunner.query (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\driver\postgres\PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at InsertQueryBuilder.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\query-builder\InsertQueryBuilder.ts:164:33)
+    at SubjectExecutor.executeInsertOperations (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:435:42)
+    at SubjectExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\SubjectExecutor.ts:137:9)
+    at EntityPersistExecutor.execute (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\persistence\EntityPersistExecutor.ts:182:21)
+    at InventoryService.recordMovement (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\domains\inventory-warehouse\application\inventory.service.ts:240:22)
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17
+FAIL src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (39.576 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    × E1–E14 (10627 ms)
+
+  ● T-09 — POST /api/inventory/movements: frozen contract (F-INV-001) › E1–E14
+
+    cases failed: T-10/T-09/R1=STOP
+
+    [0m [90m 215 |[39m   [36mif[39m ([33m![39mgone [33m||[39m [33m![39mothersUnchanged) [36mthrow[39m [36mnew[39m [33mError[39m([32m'STOP: cleanup did not leave the instance as found'[39m)[33m;[39m
+     [90m 216 |[39m   [36mconst[39m bad [33m=[39m env[33m.[39mresults[33m.[39mfilter((r) [33m=>[39m r[33m.[39mstatus [33m===[39m [32m'FAIL'[39m [33m||[39m r[33m.[39mstatus [33m===[39m [32m'STOP'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 217 |[39m   [36mif[39m (bad[33m.[39mlength) [36mthrow[39m [36mnew[39m [33mError[39m([32m`cases failed: ${bad.map((b) => `${b.id}=${b.status}`).join(', ')}`[39m)[33m;[39m
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 218 |[39m }
+     [90m 219 |[39m
+     [90m 220 |[39m [90m/** Called from afterAll when a test threw before finishBiz: records what exists as STOP evidence, then removes this run's databases only. */[39m[0m
+
+      at finishBiz (foundation/testing/biz-support.ts:217:25)
+      at Object.<anonymous> (foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts:190:7)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        39.646 s, estimated 56 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-09 exit 1
+
+=== T-11: src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts
+PASS src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts (36.61 s)
+  T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect
+    √ issue -> rejected event -> restore configuration -> re-drive (x3) (10248 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.679 s, estimated 53 s
+Ran all test suites matching /src\\foundation\\testing\\t11-failure-recovery.biz.real-pg.spec.ts/i.
+
+=== T-12: src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+PASS src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts (36.753 s)
+  T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once
+    √ kill the posting backend while it waits inside its transaction (10633 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.841 s, estimated 50 s
+Ran all test suites matching /src\\foundation\\testing\\t12-connection-loss.biz.real-pg.spec.ts/i.
+
+=== T-10: src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts (23.979 s)
+  T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run
+    × every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained (179 ms)
+
+  ● T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run › every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "T-08: contains FAIL/STOP cases",
+    + ]
+
+    [0m [90m 63 |[39m     ev[33m.[39mwriteResult(run[33m,[39m [{ id[33m:[39m [32m'T-10'[39m[33m,[39m status[33m:[39m problems[33m.[39mlength [33m===[39m [35m0[39m [33m?[39m [32m'PASS'[39m [33m:[39m [32m'STOP'[39m[33m,[39m note[33m:[39m problems[33m.[39mjoin([32m' | '[39m)[33m.[39mslice([35m0[39m[33m,[39m [35m800[39m) }])[33m;[39m
+     [90m 64 |[39m     ev[33m.[39mfinalize(run)[33m;[39m
+    [31m[1m>[22m[39m[90m 65 |[39m     expect(problems)[33m.[39mtoEqual([])[33m;[39m
+     [90m    |[39m                      [31m[1m^[22m[39m
+     [90m 66 |[39m   })[33m;[39m
+     [90m 67 |[39m })[33m;[39m
+     [90m 68 |[39m[0m
+
+      at Object.<anonymous> (foundation/testing/t10-reconciliation.biz.real-pg.spec.ts:65:22)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        24.062 s, estimated 34 s
+Ran all test suites matching /src\\foundation\\testing\\t10-reconciliation.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-10 exit 1
+
+=== F-AUD-002: src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts (36.044 s)
+  F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager
+    √ records the observed behaviour of both calling styles (11210 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.112 s, estimated 47 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-reproducer.biz.real-pg.spec.ts/i.
+
+=== F-TRS-001: src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts (36.101 s)
+  F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager
+    √ records overdraft occurrences for both calling styles (10652 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.169 s, estimated 45 s
+Ran all test suites matching /src\\foundation\\testing\\f-trs-reproducer.biz.real-pg.spec.ts/i.
+
+3 step(s) failed.
+EXIT 1
+finished 2026-10-10T17:12:43Z

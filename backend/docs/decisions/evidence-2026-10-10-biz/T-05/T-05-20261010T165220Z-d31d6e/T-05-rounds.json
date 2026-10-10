@@ -1,0 +1,24 @@
+[
+  {
+    "round": 1,
+    "tally": {
+      "OK": 4,
+      "ConflictException:409": 6
+    },
+    "errorsByMessage": [
+      [
+        "ConflictException:409 | - | Insufficient treasury balance: requested 30.00, available -20.00, short by 50.00.",
+        6
+      ]
+    ],
+    "balance": "-20.00",
+    "treasuryMovements": 5,
+    "cashOutTotal": "120.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 4
+      }
+    ]
+  }
+]

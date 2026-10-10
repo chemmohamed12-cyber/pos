@@ -1,0 +1,84 @@
+{
+  "label": "final",
+  "valid": false,
+  "brokenAtSeq": 21,
+  "n": 23,
+  "min": 1,
+  "max": 23,
+  "neighbours": [
+    {
+      "seq": 18,
+      "prev12": "fc70d992f8a6",
+      "hash12": "ad3e848d5636",
+      "ts": "2026-10-10 20:09:01.295+03",
+      "action": "accounting.financial_event.posted",
+      "resource": "financial_event",
+      "result": "success"
+    },
+    {
+      "seq": 19,
+      "prev12": "ad3e848d5636",
+      "hash12": "804da76227ea",
+      "ts": "2026-10-10 20:09:01.316+03",
+      "action": "customer_finance.ledger_entry.posted",
+      "resource": "customer_ledger_entry",
+      "result": "success"
+    },
+    {
+      "seq": 20,
+      "prev12": "804da76227ea",
+      "hash12": "93ddb8c463b9",
+      "ts": "2026-10-10 20:09:01.323+03",
+      "action": "customer_finance.ledger_entry.posted",
+      "resource": "customer_ledger_entry",
+      "result": "success"
+    },
+    {
+      "seq": 21,
+      "prev12": "804da76227ea",
+      "hash12": "0119c4660b69",
+      "ts": "2026-10-10 20:09:01.325+03",
+      "action": "customer_finance.ledger_entry.posted",
+      "resource": "customer_ledger_entry",
+      "result": "success"
+    },
+    {
+      "seq": 22,
+      "prev12": "0119c4660b69",
+      "hash12": "e69bea51d1a3",
+      "ts": "2026-10-10 20:09:01.338+03",
+      "action": "customer_finance.ledger_entry.posted",
+      "resource": "customer_ledger_entry",
+      "result": "success"
+    },
+    {
+      "seq": 23,
+      "prev12": "e69bea51d1a3",
+      "hash12": "3aeb25774c2c",
+      "ts": "2026-10-10 20:09:01.35+03",
+      "action": "customer_finance.payment.applied",
+      "resource": "customer_payment",
+      "result": "success"
+    }
+  ],
+  "forks": [
+    {
+      "prev12": "804da76227ea",
+      "n": 2,
+      "seqs": [
+        20,
+        21
+      ]
+    }
+  ],
+  "gaps": [],
+  "firstRecord": {
+    "seq": 1,
+    "prev12": "000000000000",
+    "ts": "2026-10-10 20:09:00.756+03",
+    "action": "treasury.account.created"
+  },
+  "timestampColumn": {
+    "data_type": "timestamp with time zone"
+  }
+}

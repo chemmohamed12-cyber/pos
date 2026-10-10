@@ -1,0 +1,29 @@
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (44.678 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    × 10 x 30.00 from 100.00 (9890 ms)
+
+  ● T-05 — concurrent treasury withdrawals never exceed the balance › 10 x 30.00 from 100.00
+
+    cases failed: T-05-R1=STOP, T-05-gl=STOP, T-10/T-05/R5=STOP
+
+    [0m [90m 215 |[39m   [36mif[39m ([33m![39mgone [33m||[39m [33m![39mothersUnchanged) [36mthrow[39m [36mnew[39m [33mError[39m([32m'STOP: cleanup did not leave the instance as found'[39m)[33m;[39m
+     [90m 216 |[39m   [36mconst[39m bad [33m=[39m env[33m.[39mresults[33m.[39mfilter((r) [33m=>[39m r[33m.[39mstatus [33m===[39m [32m'FAIL'[39m [33m||[39m r[33m.[39mstatus [33m===[39m [32m'STOP'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 217 |[39m   [36mif[39m (bad[33m.[39mlength) [36mthrow[39m [36mnew[39m [33mError[39m([32m`cases failed: ${bad.map((b) => `${b.id}=${b.status}`).join(', ')}`[39m)[33m;[39m
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 218 |[39m }
+     [90m 219 |[39m
+     [90m 220 |[39m [90m/** Called from afterAll when a test threw before finishBiz: records what exists as STOP evidence, then removes this run's databases only. */[39m[0m
+
+      at finishBiz (foundation/testing/biz-support.ts:217:25)
+      at Object.<anonymous> (foundation/testing/t05-treasury.biz.real-pg.spec.ts:74:7)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        44.739 s, estimated 55 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+STOP: T-05 did not pass (exit 1). Later steps were not run.
+EXIT 1

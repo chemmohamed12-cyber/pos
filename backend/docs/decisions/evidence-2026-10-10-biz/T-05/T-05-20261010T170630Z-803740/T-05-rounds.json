@@ -1,0 +1,46 @@
+[
+  {
+    "round": 1,
+    "tally": {
+      "OK": 3,
+      "ConflictException:409": 7
+    },
+    "errorsByMessage": [
+      [
+        "ConflictException:409 | - | Insufficient treasury balance: requested 30.00, available 10.00, short by 20.00.",
+        7
+      ]
+    ],
+    "balance": "10.00",
+    "treasuryMovements": 4,
+    "cashOutTotal": "90.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 3
+      }
+    ]
+  },
+  {
+    "round": 2,
+    "tally": {
+      "OK": 1,
+      "QueryFailedError": 9
+    },
+    "errorsByMessage": [
+      [
+        "QueryFailedError | 23505 | duplicate key value violates unique constraint \"IDX_treasury_transactions_number\"",
+        9
+      ]
+    ],
+    "balance": "70.00",
+    "treasuryMovements": 2,
+    "cashOutTotal": "30.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 1
+      }
+    ]
+  }
+]

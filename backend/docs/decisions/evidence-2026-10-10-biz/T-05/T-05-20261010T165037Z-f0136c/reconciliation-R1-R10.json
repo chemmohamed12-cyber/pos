@@ -1,0 +1,92 @@
+{
+  "declared": {
+    "nonGlTreasury": 300,
+    "notes": [
+      "3 opening cash-ins of 100.00 are deliberately non-emitting (no GL event)"
+    ]
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "status": "PASS",
+      "detail": {
+        "pairs": 0,
+        "differences": [],
+        "negativePairs": 0
+      }
+    },
+    {
+      "id": "R2",
+      "status": "PASS",
+      "detail": {
+        "valuationRows": 0,
+        "valuationTotal": 0,
+        "glInventory": 0,
+        "differences": [],
+        "explainedByDeclaredEvents": []
+      }
+    },
+    {
+      "id": "R3",
+      "status": "PASS",
+      "detail": {
+        "customerLedgerNet": 0,
+        "glArNet": 0
+      }
+    },
+    {
+      "id": "R4",
+      "status": "PASS",
+      "detail": {
+        "supplierLedgerNet": 0,
+        "glApNet": 0
+      }
+    },
+    {
+      "id": "R5",
+      "status": "STOP",
+      "detail": {
+        "treasuryNetMapped": 50,
+        "declaredNonGlTreasury": 300,
+        "expectedGl": -250,
+        "glNet": -150
+      }
+    },
+    {
+      "id": "R6",
+      "status": "PASS",
+      "detail": {
+        "unbalancedEntries": 0
+      }
+    },
+    {
+      "id": "R7",
+      "status": "PASS",
+      "detail": {
+        "events": 5,
+        "notPosted": 0,
+        "unexplainedNotPosted": [],
+        "postedWithoutJournal": 0,
+        "duplicateIdempotencyKeys": 0,
+        "movementsWithoutEvent": 0,
+        "journalsWithoutEvent": 0,
+        "explained": []
+      }
+    },
+    {
+      "id": "R8",
+      "status": "PASS",
+      "detail": "no GRNI/WIP/PPV/VAT activity in this run (those flows are outside T-01…T-12); balances therefore 0"
+    },
+    {
+      "id": "R9",
+      "status": "PASS",
+      "detail": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 3 opening cash-ins of 100.00 are deliberately non-emitting (no GL event)"
+    },
+    {
+      "id": "R10",
+      "status": "PASS",
+      "detail": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

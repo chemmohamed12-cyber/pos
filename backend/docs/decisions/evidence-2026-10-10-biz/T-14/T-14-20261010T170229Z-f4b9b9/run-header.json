@@ -1,0 +1,62 @@
+{
+  "testId": "T-14",
+  "runId": "T-14-20261010T170229Z-f4b9b9",
+  "startedAt": "2026-10-10T17:02:29.925Z",
+  "commit": "85ad10dd2f6304b8108c4dbe1e23b703875d0d06",
+  "branch": "master",
+  "dirtyPaths": [
+    "M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.spec.ts",
+    " M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.spec.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.ts",
+    " M backend/src/foundation/audit/company-audit-access.real-pg.spec.ts",
+    " M backend/src/foundation/audit/installation-audit.controller.ts",
+    " M backend/src/foundation/testing/biz-reconcile.ts",
+    " M backend/src/foundation/testing/biz-support.ts",
+    " M backend/src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t05-treasury.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t07-returns.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts",
+    " M backend/src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts",
+    " M backend/tools/testing/biz-run.js",
+    " M backend/tools/testing/db-guard.coverage.test.js",
+    "?? backend/src/foundation/company/company-lifecycle-admission.real-pg.spec.ts",
+    "?? backend/src/foundation/company/company-lifecycle-admission.ts",
+    "?? backend/src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts",
+    "?? backend/src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts"
+  ],
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new",
+  "systemIdentifier": "7695079006474257732",
+  "databases": [
+    "daii_test_biz_t14_control_plane",
+    "daii_test_biz_t14_company_a",
+    "daii_test_biz_t14_company_b"
+  ],
+  "prefix": "biz_t14",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

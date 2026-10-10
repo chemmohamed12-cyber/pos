@@ -1,0 +1,72 @@
+{
+  "testId": "T-05",
+  "runId": "T-05-20261010T165037Z-f0136c",
+  "finishedAt": "2026-10-10T16:50:45.696Z",
+  "results": [
+    {
+      "id": "T-05-R2",
+      "status": "STOP",
+      "note": "{\"round\":2,\"tally\":{\"QueryFailedError\":8,\"OK\":2},\"balance\":\"40.00\",\"treasuryMovements\":3,\"cashOutTotal\":\"60.00\",\"events\":[{\"status\":\"POSTED\",\"n\":2}]}"
+    },
+    {
+      "id": "T-05-gl",
+      "status": "STOP",
+      "note": "{\"bank\":{\"code\":\"1102\",\"dr\":\"0.0000\",\"cr\":\"150.0000\"},\"unbalanced\":0}"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "FAIL-DEFECT",
+      "note": "candidate defect: audit hash chain invalid (first break at seq 8) after final"
+    },
+    {
+      "id": "T-10/T-05/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":0,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-05/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-05/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-05/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-05/R5",
+      "status": "STOP",
+      "note": "{\"treasuryNetMapped\":50,\"declaredNonGlTreasury\":300,\"expectedGl\":-250,\"glNet\":-150}"
+    },
+    {
+      "id": "T-10/T-05/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-05/R7",
+      "status": "PASS",
+      "note": "{\"events\":5,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-05/R8",
+      "status": "PASS",
+      "note": "no GRNI/WIP/PPV/VAT activity in this run (those flows are outside T-01…T-12); balances therefore 0"
+    },
+    {
+      "id": "T-10/T-05/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 3 opening cash-ins of 100.00 are deliberately non-emitting (no GL event)"
+    },
+    {
+      "id": "T-10/T-05/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

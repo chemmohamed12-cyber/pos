@@ -1,0 +1,53 @@
+started 2026-10-10T16:40:03Z
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+PASS src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (43.84 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    √ creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (10676 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        43.907 s, estimated 71 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+PASS src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (54.744 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    √ T-01 + T-02 (10662 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        54.817 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (73.192 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    × T-03 + T-04 + T-04b (31216 ms)
+
+  ● T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock › T-03 + T-04 + T-04b
+
+    cases failed: invariant-audit-chain-valid=STOP
+
+    [0m [90m 215 |[39m   [36mif[39m ([33m![39mgone [33m||[39m [33m![39mothersUnchanged) [36mthrow[39m [36mnew[39m [33mError[39m([32m'STOP: cleanup did not leave the instance as found'[39m)[33m;[39m
+     [90m 216 |[39m   [36mconst[39m bad [33m=[39m env[33m.[39mresults[33m.[39mfilter((r) [33m=>[39m r[33m.[39mstatus [33m===[39m [32m'FAIL'[39m [33m||[39m r[33m.[39mstatus [33m===[39m [32m'STOP'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 217 |[39m   [36mif[39m (bad[33m.[39mlength) [36mthrow[39m [36mnew[39m [33mError[39m([32m`cases failed: ${bad.map((b) => `${b.id}=${b.status}`).join(', ')}`[39m)[33m;[39m
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 218 |[39m }
+     [90m 219 |[39m
+     [90m 220 |[39m [90m/** Called from afterAll when a test threw before finishBiz: records what exists as STOP evidence, then removes this run's databases only. */[39m[0m
+
+      at finishBiz (foundation/testing/biz-support.ts:217:25)
+      at Object.<anonymous> (foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts:110:7)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        73.263 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+STOP: T-03+T-04 did not pass (exit 1). Later steps were not run.
+EXIT 1
+finished 2026-10-10T16:43:02Z
