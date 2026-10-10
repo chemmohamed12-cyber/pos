@@ -3,10 +3,10 @@
  * Sequential runner for the business-test program: T-00, then T-01…T-12 in the FROZEN order, each as its own jest invocation
  * (--runInBand) under the DB guard. Stops at the first failing step (no later test runs on an unproven environment).
  *
- *   ISOLATED_PG_PASSWORD=<isolated test credential> node tools/testing/biz-run.js [--only T-00,T-01]
+ *   node tools/testing/biz-run.js [--only T-00,T-01]
  *
- * It refuses to start unless the DB guard accepts the configuration: the approved list must contain the entry for 127.0.0.1:5544.
- * It sets only: DB_HOST=127.0.0.1 DB_PORT=5544 DB_USER=isolated_admin DB_PASSWORD (from ISOLATED_PG_PASSWORD) DB_NAME=daii_test_biz_t00_unused.
+ * It refuses to start unless the DB guard accepts the configuration: the approved list must contain the entry for the dedicated cluster 127.0.0.1:5546.
+ * It sets only: DB_HOST=127.0.0.1 DB_PORT=5546 DB_USER=daii_biz_test DB_PASSWORD (User-scope DAII_BIZ_PG_PASSWORD) DB_NAME=daii_test_biz_t00_unused.
  */
 const path = require('path');
 const fs = require('fs');
@@ -30,11 +30,18 @@ const STEPS = [
 ];
 
 const only = (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : '').split(',').filter(Boolean);
+// Credentials: the dedicated test role's password lives ONLY in the Windows User-scope variable DAII_BIZ_PG_PASSWORD (set by biz-cluster-setup.js).
+// It is read here into memory and handed to the jest child through its environment — never printed, never written to a file or an argument list.
+function userVar(name) {
+  if (process.env[name]) return process.env[name];
+  const r = spawnSync('powershell', ['-NoProfile', '-Command', `[Environment]::GetEnvironmentVariable('${name}','User')`], { encoding: 'utf8' });
+  return (r.stdout || '').trim() || undefined;
+}
 const env = {
   ...process.env,
-  DB_HOST: '127.0.0.1', DB_PORT: '5544', DB_USER: 'isolated_admin', DB_PASSWORD: process.env.ISOLATED_PG_PASSWORD || '', DB_NAME: 'daii_test_biz_t00_unused',
+  DB_HOST: '127.0.0.1', DB_PORT: String(userVar('DAII_BIZ_PG_PORT') || 5546), DB_USER: 'daii_biz_test', DB_PASSWORD: userVar('DAII_BIZ_PG_PASSWORD') || '', DB_NAME: 'daii_test_biz_t00_unused',
 };
-if (!env.DB_PASSWORD) { console.error('REFUSED: set ISOLATED_PG_PASSWORD (the isolated test credential)'); process.exit(2); }
+if (!env.DB_PASSWORD) { console.error('REFUSED: DAII_BIZ_PG_PASSWORD is not set (run tools/testing/biz-cluster-setup.js setup, or supply an authorised credential)'); process.exit(2); }
 
 try {
   guard.preflight({ env, dotenv: {} });

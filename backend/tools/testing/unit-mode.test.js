@@ -54,5 +54,5 @@ test('npm scripts: test stays the guarded DB run; test:unit is the separate data
 test('the database-backed config refuses to run with the shipped (empty) approval list, for the ambient configuration the app would use', () => {
   const guard = require('./db-guard');
   assert.throws(() => guard.preflight({ env: {}, dotenv: { DB_HOST: 'localhost', DB_PORT: '5433', DB_NAME: 'daii_dev' } }), /REFUSED/);
-  assert.equal(guard.loadPolicy().approved.length, 0);
+  assert.equal(guard.loadPolicy().approved.length, 1); // only the dedicated 5546 cluster; the .env configuration (daii_dev:5433) is still refused above
 });

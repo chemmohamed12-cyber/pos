@@ -8,7 +8,7 @@ const path = require('path');
 const guard = require('./db-guard');
 
 const BACKEND = path.join(__dirname, '..', '..');
-const proposed = JSON.parse(fs.readFileSync(path.join(BACKEND, 'docs', 'decisions', 'test-program', 'APPROVAL-ENTRY-PROPOSED.json'), 'utf8')).entry;
+const proposed = JSON.parse(fs.readFileSync(path.join(BACKEND, 'docs', 'decisions', 'test-program', 'SUPERSEDED-APPROVAL-ENTRY-PROPOSED-5544.json'), 'utf8')).entry;
 // the proposal with the placeholders filled, as the reviewer's commit would do (the guard ignores incomplete entries by design)
 const entry = { ...proposed, approvedBy: 'cto (test fixture)', approvedOn: '2026-10-10' };
 const complete = (over) => ({ approved: [{ ...entry, ...over }], incomplete: 0 });
@@ -17,7 +17,7 @@ const T = (database, port = 5544, host = '127.0.0.1') => ({ host, port, database
 const admin = (sql) => guard.checkAdminStatement(sql, T('postgres'), policy) || guard.checkStatement(sql, T('postgres'), policy);
 
 test('the proposed entry: complete once approvedBy/approvedOn are filled; incomplete (ignored) as shipped; no role patterns; postgres only as admin', () => {
-  assert.equal(guard.loadPolicy().approved.length, 0, 'the shipped approval list still approves nothing');
+  assert.equal(guard.loadPolicy().approved.length, 1, 'the shipped approval list has exactly the dedicated-cluster entry (this file tests the SUPERSEDED 5544 proposal as a fixture)');
   assert.equal(JSON.stringify(proposed.rolePatterns), '[]');
   assert.deepEqual(proposed.adminDatabases, ['postgres']);
   assert.deepEqual(proposed.databases, []);

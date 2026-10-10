@@ -69,9 +69,11 @@ test('an unreadable approval list fails closed', () => {
   assert.throws(() => guard.loadPolicy('Z:/does/not/exist.json'), guard.DbGuardError);
 });
 
-test('the shipped approval list approves nothing yet (D-2 not decided)', () => {
+test('the shipped approval list approves exactly one entry: the dedicated 5546 cluster (never 5433/5544/5656)', () => {
   const p = guard.loadPolicy();
-  assert.equal(p.approved.length, 0, 'no approved entries until the CTO commits one');
+  assert.equal(p.approved.length, 1);
+  assert.equal(p.approved[0].port, 5546);
+  for (const bad of [5433, 5544, 5656]) assert.equal(guard.evaluate({ host: '127.0.0.1', port: bad, database: 'daii_test_biz_t01' }, p).allowed, false, String(bad));
 });
 
 test('ambient resolution: unset variables fall back to the application default daii_dev, which is refused', () => {

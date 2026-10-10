@@ -1,0 +1,73 @@
+{
+  "createdAt": "2026-10-10T16:37:01.447Z",
+  "host": "127.0.0.1",
+  "port": 5546,
+  "dataDirectory": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.test-cluster\\pg5546\\data",
+  "testRole": "daii_biz_test",
+  "bootstrapRole": "daii_bootstrap",
+  "passwordsPersistedAs": {
+    "testRole": "User env DAII_BIZ_PG_PASSWORD",
+    "bootstrap": "User env DAII_BIZ_PG_BOOTSTRAP_PASSWORD"
+  },
+  "version": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit",
+  "systemIdentifier": "7695079006474257732",
+  "settings": {
+    "data_directory": "D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/.test-cluster/pg5546/data",
+    "fsync": "off",
+    "hba_file": "D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/.test-cluster/pg5546/data/pg_hba.conf",
+    "listen_addresses": "127.0.0.1",
+    "max_connections": "200",
+    "password_encryption": "scram-sha-256",
+    "port": "5546"
+  },
+  "hba": [
+    {
+      "type": "host",
+      "database": [
+        "all"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "127.0.0.1",
+      "auth_method": "scram-sha-256"
+    },
+    {
+      "type": "host",
+      "database": [
+        "all"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "::1",
+      "auth_method": "scram-sha-256"
+    }
+  ],
+  "roles": [
+    {
+      "rolname": "daii_biz_test",
+      "rolsuper": false,
+      "rolcreatedb": true,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolcanlogin": true,
+      "rolbypassrls": false
+    },
+    {
+      "rolname": "daii_bootstrap",
+      "rolsuper": true,
+      "rolcreatedb": true,
+      "rolcreaterole": true,
+      "rolreplication": true,
+      "rolcanlogin": true,
+      "rolbypassrls": true
+    }
+  ],
+  "databases": [
+    "postgres",
+    "template0",
+    "template1"
+  ],
+  "testRoleCanExecuteControlSystem": true
+}

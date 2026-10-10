@@ -17,6 +17,7 @@ const OWN = new Set(['db-guard.js', 'db-guard-process.js', 'db-guard-register.js
 const OPERATOR = {
   'tools/maintenance/apply-manufacturing-master-data-migrations.js': 'operator maintenance tool for a real database',
   'tools/maintenance/relax-company-user-fks.js': 'operator maintenance tool for real Company databases',
+  'tools/testing/biz-cluster-setup.js': 'environment provisioning of the DEDICATED business-test cluster (loopback, port 5546, data dir inside the project root); creates/starts/stops only that cluster; not a test program',
   'tools/release-sim/local-deploy-harness.js': 'local release simulation against the operator-chosen host database (SIM_TARGET_DB); not a test program',
 };
 
