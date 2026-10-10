@@ -1,0 +1,723 @@
+{
+  "total": 79,
+  "summary": {
+    "module->module": 57,
+    "service->service": 19,
+    "other->service": 1,
+    "service->domain-type": 1,
+    "entity->domain-type": 1
+  },
+  "edges": [
+    {
+      "from": "domains/accounting/accounting.module.ts",
+      "fromDomain": "accounting",
+      "toDomain": "customer-finance",
+      "target": "domains/customer-finance/customer-finance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/accounting/accounting.module.ts",
+      "fromDomain": "accounting",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/accounting/accounting.module.ts",
+      "fromDomain": "accounting",
+      "toDomain": "inventory-valuation",
+      "target": "domains/inventory-valuation/inventory-valuation.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/accounting/accounting.module.ts",
+      "fromDomain": "accounting",
+      "toDomain": "procurement",
+      "target": "domains/procurement/procurement.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/accounting/accounting.module.ts",
+      "fromDomain": "accounting",
+      "toDomain": "manufacturing",
+      "target": "domains/manufacturing/manufacturing.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/attendance/application/attendance.service.ts",
+      "fromDomain": "attendance",
+      "toDomain": "hr",
+      "target": "domains/hr/application/hr.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/attendance/attendance.module.ts",
+      "fromDomain": "attendance",
+      "toDomain": "hr",
+      "target": "domains/hr/hr.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/commission/application/commission.service.ts",
+      "fromDomain": "commission",
+      "toDomain": "hr",
+      "target": "domains/hr/application/hr.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/commission/application/commission.service.ts",
+      "fromDomain": "commission",
+      "toDomain": "targets",
+      "target": "domains/targets/application/target.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/commission/commission.module.ts",
+      "fromDomain": "commission",
+      "toDomain": "hr",
+      "target": "domains/hr/hr.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/commission/commission.module.ts",
+      "fromDomain": "commission",
+      "toDomain": "targets",
+      "target": "domains/targets/targets.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/customer-finance/application/payments.service.ts",
+      "fromDomain": "customer-finance",
+      "toDomain": "treasury",
+      "target": "domains/treasury/application/treasury.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/customer-finance/customer-finance.module.ts",
+      "fromDomain": "customer-finance",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/customer-finance/customer-finance.module.ts",
+      "fromDomain": "customer-finance",
+      "toDomain": "crm",
+      "target": "domains/crm/crm.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/customer-finance/customer-finance.module.ts",
+      "fromDomain": "customer-finance",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/customer-finance/customer-finance.module.ts",
+      "fromDomain": "customer-finance",
+      "toDomain": "accounting",
+      "target": "domains/accounting/tax-engine.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/application/delivery.service.ts",
+      "fromDomain": "delivery",
+      "toDomain": "shipment",
+      "target": "domains/shipment/application/shipment.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "shipment",
+      "target": "domains/shipment/shipment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "fulfillment",
+      "target": "domains/fulfillment/fulfillment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/delivery/delivery.module.ts",
+      "fromDomain": "delivery",
+      "toDomain": "customer-finance",
+      "target": "domains/customer-finance/customer-finance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/deposit-control/application/deposits.service.ts",
+      "fromDomain": "deposit-control",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/application/sales-orders.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/deposit-control/deposit-control.module.ts",
+      "fromDomain": "deposit-control",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/deposit-control/deposit-control.module.ts",
+      "fromDomain": "deposit-control",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/deposit-control/deposit-control.module.ts",
+      "fromDomain": "deposit-control",
+      "toDomain": "customer-finance",
+      "target": "domains/customer-finance/customer-finance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/fulfillment/application/fulfillment.service.ts",
+      "fromDomain": "fulfillment",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/application/inventory.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/fulfillment/fulfillment.module.ts",
+      "fromDomain": "fulfillment",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/inventory-warehouse/inventory-warehouse.module.ts",
+      "fromDomain": "inventory-warehouse",
+      "toDomain": "commerce",
+      "target": "domains/commerce/commerce.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/inventory-warehouse/inventory-warehouse.module.ts",
+      "fromDomain": "inventory-warehouse",
+      "toDomain": "inventory-valuation",
+      "target": "domains/inventory-valuation/inventory-valuation.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/manufacturing/application/work-order.service.ts",
+      "fromDomain": "manufacturing",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/application/inventory.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/manufacturing/manufacturing.module.ts",
+      "fromDomain": "manufacturing",
+      "toDomain": "commerce",
+      "target": "domains/commerce/commerce.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/manufacturing/manufacturing.module.ts",
+      "fromDomain": "manufacturing",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/manufacturing/manufacturing.module.ts",
+      "fromDomain": "manufacturing",
+      "toDomain": "inventory-valuation",
+      "target": "domains/inventory-valuation/inventory-valuation.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/application/payroll.service.ts",
+      "fromDomain": "payroll",
+      "toDomain": "hr",
+      "target": "domains/hr/application/hr.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/application/payroll.service.ts",
+      "fromDomain": "payroll",
+      "toDomain": "attendance",
+      "target": "domains/attendance/application/attendance.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/application/payroll.service.ts",
+      "fromDomain": "payroll",
+      "toDomain": "commission",
+      "target": "domains/commission/application/commission.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/payroll.module.ts",
+      "fromDomain": "payroll",
+      "toDomain": "hr",
+      "target": "domains/hr/hr.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/payroll.module.ts",
+      "fromDomain": "payroll",
+      "toDomain": "attendance",
+      "target": "domains/attendance/attendance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/payroll.module.ts",
+      "fromDomain": "payroll",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/payroll/payroll.module.ts",
+      "fromDomain": "payroll",
+      "toDomain": "commission",
+      "target": "domains/commission/commission.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/procurement/application/goods-receipt.service.ts",
+      "fromDomain": "procurement",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/application/inventory.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/procurement/interface/warehouse-lookup.test-helper.ts",
+      "fromDomain": "procurement",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/application/inventory.service",
+      "kind": "other",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/procurement/procurement.module.ts",
+      "fromDomain": "procurement",
+      "toDomain": "commerce",
+      "target": "domains/commerce/commerce.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/procurement/procurement.module.ts",
+      "fromDomain": "procurement",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/procurement/procurement.module.ts",
+      "fromDomain": "procurement",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "crm",
+      "target": "domains/crm/crm.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "deposit-control",
+      "target": "domains/deposit-control/deposit-control.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "returns",
+      "target": "domains/returns/returns.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "fulfillment",
+      "target": "domains/fulfillment/fulfillment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "shipment",
+      "target": "domains/shipment/shipment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "delivery",
+      "target": "domains/delivery/delivery.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/reports/reports.module.ts",
+      "fromDomain": "reports",
+      "toDomain": "customer-finance",
+      "target": "domains/customer-finance/customer-finance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/application/returns.service.ts",
+      "fromDomain": "returns",
+      "toDomain": "shipment",
+      "target": "domains/shipment/application/shipment.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/application/returns.service.ts",
+      "fromDomain": "returns",
+      "toDomain": "delivery",
+      "target": "domains/delivery/application/delivery.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/application/shipment-returns.service.ts",
+      "fromDomain": "returns",
+      "toDomain": "shipment",
+      "target": "domains/shipment/application/shipment.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "shipment",
+      "target": "domains/shipment/shipment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "delivery",
+      "target": "domains/delivery/delivery.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "customer-finance",
+      "target": "domains/customer-finance/customer-finance.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/returns/returns.module.ts",
+      "fromDomain": "returns",
+      "toDomain": "crm",
+      "target": "domains/crm/crm.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/application/sales-orders.service.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "commerce",
+      "target": "domains/commerce/application/products.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/application/sales-orders.service.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "commerce",
+      "target": "domains/commerce/application/price-lists.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/application/sales-orders.service.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "crm",
+      "target": "domains/crm/application/customers.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/application/sales-orders.service.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "crm",
+      "target": "domains/crm/domain/order-workflow-policy",
+      "kind": "service",
+      "targetKind": "domain-type",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/infrastructure/sales-order.entity.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "crm",
+      "target": "domains/crm/domain/order-workflow-policy",
+      "kind": "entity",
+      "targetKind": "domain-type",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/sales-orders.module.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "commerce",
+      "target": "domains/commerce/commerce.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/sales-orders.module.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "crm",
+      "target": "domains/crm/crm.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/sales-orders/sales-orders.module.ts",
+      "fromDomain": "sales-orders",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/shipment/shipment.module.ts",
+      "fromDomain": "shipment",
+      "toDomain": "inventory-warehouse",
+      "target": "domains/inventory-warehouse/inventory-warehouse.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/shipment/shipment.module.ts",
+      "fromDomain": "shipment",
+      "toDomain": "fulfillment",
+      "target": "domains/fulfillment/fulfillment.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/shipment/shipment.module.ts",
+      "fromDomain": "shipment",
+      "toDomain": "treasury",
+      "target": "domains/treasury/treasury.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/shipment/shipment.module.ts",
+      "fromDomain": "shipment",
+      "toDomain": "sales-orders",
+      "target": "domains/sales-orders/sales-orders.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/shipment/shipment.module.ts",
+      "fromDomain": "shipment",
+      "toDomain": "crm",
+      "target": "domains/crm/crm.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/targets/application/target.service.ts",
+      "fromDomain": "targets",
+      "toDomain": "hr",
+      "target": "domains/hr/application/hr.service",
+      "kind": "service",
+      "targetKind": "service",
+      "typeOnly": false
+    },
+    {
+      "from": "domains/targets/targets.module.ts",
+      "fromDomain": "targets",
+      "toDomain": "hr",
+      "target": "domains/hr/hr.module",
+      "kind": "module",
+      "targetKind": "module",
+      "typeOnly": false
+    }
+  ]
+}

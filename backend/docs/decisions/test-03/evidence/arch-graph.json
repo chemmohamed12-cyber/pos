@@ -1,0 +1,887 @@
+{
+  "generatedFor": "src/ (non-spec)",
+  "files": 978,
+  "modules": 64,
+  "moduleLoc": {
+    "app.module.ts": 136,
+    "database": 14987,
+    "domains/accounting": 15849,
+    "domains/attendance": 1656,
+    "domains/commerce": 1844,
+    "domains/commission": 1028,
+    "domains/crm": 1495,
+    "domains/customer-finance": 2011,
+    "domains/delivery": 762,
+    "domains/deposit-control": 535,
+    "domains/fulfillment": 852,
+    "domains/hr": 1087,
+    "domains/inventory-valuation": 783,
+    "domains/inventory-warehouse": 3825,
+    "domains/manufacturing": 2112,
+    "domains/payroll": 1226,
+    "domains/procurement": 4481,
+    "domains/reports": 782,
+    "domains/returns": 2742,
+    "domains/sales": 169,
+    "domains/sales-orders": 1962,
+    "domains/shipment": 2315,
+    "domains/targets": 374,
+    "domains/treasury": 1600,
+    "foundation/admin": 212,
+    "foundation/approval-engine": 1060,
+    "foundation/audit": 432,
+    "foundation/authentication": 957,
+    "foundation/authorization": 762,
+    "foundation/company": 3948,
+    "foundation/configuration": 575,
+    "foundation/configuration-engine": 1228,
+    "foundation/crypto": 86,
+    "foundation/database-provisioning": 314,
+    "foundation/database-registry": 471,
+    "foundation/entitlement": 941,
+    "foundation/error-contract": 379,
+    "foundation/events": 389,
+    "foundation/excel": 125,
+    "foundation/identity": 158,
+    "foundation/integrations": 1472,
+    "foundation/inventory-posting-policy": 71,
+    "foundation/limit-engine": 527,
+    "foundation/localization": 98,
+    "foundation/media": 382,
+    "foundation/module-lifecycle": 214,
+    "foundation/module-registry": 4163,
+    "foundation/module-role-templates": 122,
+    "foundation/navigation": 598,
+    "foundation/numbering": 145,
+    "foundation/observability": 133,
+    "foundation/organization": 282,
+    "foundation/permission": 472,
+    "foundation/plans": 763,
+    "foundation/platform": 650,
+    "foundation/process-engine": 310,
+    "foundation/release": 7443,
+    "foundation/release-orchestration": 48,
+    "foundation/scope": 766,
+    "foundation/terminology": 145,
+    "foundation/testing": 1143,
+    "health": 56,
+    "main.ts": 99,
+    "security-headers.middleware.ts": 16
+  },
+  "moduleEdges": 556,
+  "foundationToDomain": [
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/accounting",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/accounting/accounting-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/customer-finance/customer-finance-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/treasury/treasury-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/inventory-valuation",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/inventory-valuation/inventory-valuation-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/inventory-warehouse",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/inventory-warehouse/inventory-warehouse-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/procurement",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/procurement/procurement-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/sales-orders/sales-orders-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/shipment",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/shipment/shipment-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/returns",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/returns/returns-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/commerce",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/commerce/commerce-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/crm/crm-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/fulfillment",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/fulfillment/fulfillment-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/delivery",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/delivery/delivery-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/deposit-control",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/deposit-control/deposit-control-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/manufacturing",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/manufacturing/manufacturing-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/hr",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/hr/hr-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/targets",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/targets/targets-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/attendance",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/attendance/attendance-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/commission",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/commission/commission-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/payroll",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/payroll/payroll-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/database-registry",
+      "to": "domains/sales",
+      "count": 1,
+      "samples": [
+        "foundation/database-registry/company-entity-registry.ts -> domains/sales/sales-company-entities.ts"
+      ]
+    },
+    {
+      "from": "foundation/integrations",
+      "to": "domains/commerce",
+      "count": 2,
+      "samples": [
+        "foundation/integrations/application/integrations.service.ts -> domains/commerce/application/products.service.ts",
+        "foundation/integrations/integrations.module.ts -> domains/commerce/commerce.module.ts"
+      ]
+    },
+    {
+      "from": "foundation/integrations",
+      "to": "domains/crm",
+      "count": 2,
+      "samples": [
+        "foundation/integrations/application/integrations.service.ts -> domains/crm/application/customers.service.ts",
+        "foundation/integrations/integrations.module.ts -> domains/crm/crm.module.ts"
+      ]
+    },
+    {
+      "from": "foundation/integrations",
+      "to": "domains/sales-orders",
+      "count": 2,
+      "samples": [
+        "foundation/integrations/application/integrations.service.ts -> domains/sales-orders/application/sales-orders.service.ts",
+        "foundation/integrations/integrations.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "foundation/integrations",
+      "to": "domains/inventory-warehouse",
+      "count": 2,
+      "samples": [
+        "foundation/integrations/application/integrations.service.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "foundation/integrations/integrations.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "foundation/testing/biz-finance-support.ts -> domains/treasury/application/treasury.service.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/customer-finance",
+      "count": 3,
+      "samples": [
+        "foundation/testing/biz-finance-support.ts -> domains/customer-finance/application/payments.service.ts",
+        "foundation/testing/biz-finance-support.ts -> domains/customer-finance/application/customer-ledger.service.ts",
+        "foundation/testing/biz-finance-support.ts -> domains/customer-finance/application/invoices.service.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "foundation/testing/biz-finance-support.ts -> domains/crm/application/customers.service.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/accounting",
+      "count": 15,
+      "samples": [
+        "foundation/testing/biz-finance-support.ts -> domains/accounting/application/journal-entry.service.ts",
+        "foundation/testing/biz-finance-support.ts -> domains/accounting/application/financial-events/financial-event.service.ts",
+        "foundation/testing/biz-finance-support.ts -> domains/accounting/application/financial-events/handler-registry.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/inventory-warehouse",
+      "count": 5,
+      "samples": [
+        "foundation/testing/biz-inventory-gl-support.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "foundation/testing/biz-inventory-gl-support.ts -> domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+        "foundation/testing/biz-support.ts -> domains/inventory-warehouse/application/inventory.service.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/commerce",
+      "count": 3,
+      "samples": [
+        "foundation/testing/biz-inventory-gl-support.ts -> domains/commerce/application/products.service.ts",
+        "foundation/testing/biz-support.ts -> domains/commerce/application/bom.service.ts",
+        "foundation/testing/biz-support.ts -> domains/commerce/application/products.service.ts"
+      ]
+    },
+    {
+      "from": "foundation/testing",
+      "to": "domains/inventory-valuation",
+      "count": 2,
+      "samples": [
+        "foundation/testing/biz-inventory-gl-support.ts -> domains/inventory-valuation/application/inventory-valuation.service.ts",
+        "foundation/testing/biz-inventory-gl-support.ts -> domains/inventory-valuation/application/moving-average-cost-engine.service.ts"
+      ]
+    }
+  ],
+  "domainToDomain": [
+    {
+      "from": "domains/sales-orders",
+      "to": "domains/crm",
+      "count": 4,
+      "samples": [
+        "domains/sales-orders/application/sales-orders.service.ts -> domains/crm/application/customers.service.ts",
+        "domains/sales-orders/application/sales-orders.service.ts -> domains/crm/domain/order-workflow-policy.ts",
+        "domains/sales-orders/infrastructure/sales-order.entity.ts -> domains/crm/domain/order-workflow-policy.ts"
+      ]
+    },
+    {
+      "from": "domains/procurement",
+      "to": "domains/inventory-warehouse",
+      "count": 3,
+      "samples": [
+        "domains/procurement/application/goods-receipt.service.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "domains/procurement/interface/warehouse-lookup.test-helper.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "domains/procurement/procurement.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/shipment",
+      "count": 3,
+      "samples": [
+        "domains/returns/application/returns.service.ts -> domains/shipment/application/shipment.service.ts",
+        "domains/returns/application/shipment-returns.service.ts -> domains/shipment/application/shipment.service.ts",
+        "domains/returns/returns.module.ts -> domains/shipment/shipment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/sales-orders",
+      "to": "domains/commerce",
+      "count": 3,
+      "samples": [
+        "domains/sales-orders/application/sales-orders.service.ts -> domains/commerce/application/products.service.ts",
+        "domains/sales-orders/application/sales-orders.service.ts -> domains/commerce/application/price-lists.service.ts",
+        "domains/sales-orders/sales-orders.module.ts -> domains/commerce/commerce.module.ts"
+      ]
+    },
+    {
+      "from": "domains/attendance",
+      "to": "domains/hr",
+      "count": 2,
+      "samples": [
+        "domains/attendance/application/attendance.service.ts -> domains/hr/application/hr.service.ts",
+        "domains/attendance/attendance.module.ts -> domains/hr/hr.module.ts"
+      ]
+    },
+    {
+      "from": "domains/commission",
+      "to": "domains/hr",
+      "count": 2,
+      "samples": [
+        "domains/commission/application/commission.service.ts -> domains/hr/application/hr.service.ts",
+        "domains/commission/commission.module.ts -> domains/hr/hr.module.ts"
+      ]
+    },
+    {
+      "from": "domains/commission",
+      "to": "domains/targets",
+      "count": 2,
+      "samples": [
+        "domains/commission/application/commission.service.ts -> domains/targets/application/target.service.ts",
+        "domains/commission/commission.module.ts -> domains/targets/targets.module.ts"
+      ]
+    },
+    {
+      "from": "domains/customer-finance",
+      "to": "domains/treasury",
+      "count": 2,
+      "samples": [
+        "domains/customer-finance/application/payments.service.ts -> domains/treasury/application/treasury.service.ts",
+        "domains/customer-finance/customer-finance.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/shipment",
+      "count": 2,
+      "samples": [
+        "domains/delivery/application/delivery.service.ts -> domains/shipment/application/shipment.service.ts",
+        "domains/delivery/delivery.module.ts -> domains/shipment/shipment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/deposit-control",
+      "to": "domains/sales-orders",
+      "count": 2,
+      "samples": [
+        "domains/deposit-control/application/deposits.service.ts -> domains/sales-orders/application/sales-orders.service.ts",
+        "domains/deposit-control/deposit-control.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/fulfillment",
+      "to": "domains/inventory-warehouse",
+      "count": 2,
+      "samples": [
+        "domains/fulfillment/application/fulfillment.service.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "domains/fulfillment/fulfillment.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/manufacturing",
+      "to": "domains/inventory-warehouse",
+      "count": 2,
+      "samples": [
+        "domains/manufacturing/application/work-order.service.ts -> domains/inventory-warehouse/application/inventory.service.ts",
+        "domains/manufacturing/manufacturing.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/payroll",
+      "to": "domains/hr",
+      "count": 2,
+      "samples": [
+        "domains/payroll/application/payroll.service.ts -> domains/hr/application/hr.service.ts",
+        "domains/payroll/payroll.module.ts -> domains/hr/hr.module.ts"
+      ]
+    },
+    {
+      "from": "domains/payroll",
+      "to": "domains/attendance",
+      "count": 2,
+      "samples": [
+        "domains/payroll/application/payroll.service.ts -> domains/attendance/application/attendance.service.ts",
+        "domains/payroll/payroll.module.ts -> domains/attendance/attendance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/payroll",
+      "to": "domains/commission",
+      "count": 2,
+      "samples": [
+        "domains/payroll/application/payroll.service.ts -> domains/commission/application/commission.service.ts",
+        "domains/payroll/payroll.module.ts -> domains/commission/commission.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/delivery",
+      "count": 2,
+      "samples": [
+        "domains/returns/application/returns.service.ts -> domains/delivery/application/delivery.service.ts",
+        "domains/returns/returns.module.ts -> domains/delivery/delivery.module.ts"
+      ]
+    },
+    {
+      "from": "domains/targets",
+      "to": "domains/hr",
+      "count": 2,
+      "samples": [
+        "domains/targets/application/target.service.ts -> domains/hr/application/hr.service.ts",
+        "domains/targets/targets.module.ts -> domains/hr/hr.module.ts"
+      ]
+    },
+    {
+      "from": "domains/accounting",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "domains/accounting/accounting.module.ts -> domains/customer-finance/customer-finance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/accounting",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/accounting/accounting.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/accounting",
+      "to": "domains/inventory-valuation",
+      "count": 1,
+      "samples": [
+        "domains/accounting/accounting.module.ts -> domains/inventory-valuation/inventory-valuation.module.ts"
+      ]
+    },
+    {
+      "from": "domains/accounting",
+      "to": "domains/procurement",
+      "count": 1,
+      "samples": [
+        "domains/accounting/accounting.module.ts -> domains/procurement/procurement.module.ts"
+      ]
+    },
+    {
+      "from": "domains/accounting",
+      "to": "domains/manufacturing",
+      "count": 1,
+      "samples": [
+        "domains/accounting/accounting.module.ts -> domains/manufacturing/manufacturing.module.ts"
+      ]
+    },
+    {
+      "from": "domains/customer-finance",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "domains/customer-finance/customer-finance.module.ts -> domains/crm/crm.module.ts"
+      ]
+    },
+    {
+      "from": "domains/customer-finance",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "domains/customer-finance/customer-finance.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/customer-finance",
+      "to": "domains/accounting",
+      "count": 1,
+      "samples": [
+        "domains/customer-finance/customer-finance.module.ts -> domains/accounting/tax-engine.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/fulfillment",
+      "count": 1,
+      "samples": [
+        "domains/delivery/delivery.module.ts -> domains/fulfillment/fulfillment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "domains/delivery/delivery.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/delivery/delivery.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/inventory-warehouse",
+      "count": 1,
+      "samples": [
+        "domains/delivery/delivery.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/delivery",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "domains/delivery/delivery.module.ts -> domains/customer-finance/customer-finance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/deposit-control",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/deposit-control/deposit-control.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/deposit-control",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "domains/deposit-control/deposit-control.module.ts -> domains/customer-finance/customer-finance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/inventory-warehouse",
+      "to": "domains/commerce",
+      "count": 1,
+      "samples": [
+        "domains/inventory-warehouse/inventory-warehouse.module.ts -> domains/commerce/commerce.module.ts"
+      ]
+    },
+    {
+      "from": "domains/inventory-warehouse",
+      "to": "domains/inventory-valuation",
+      "count": 1,
+      "samples": [
+        "domains/inventory-warehouse/inventory-warehouse.module.ts -> domains/inventory-valuation/inventory-valuation.module.ts"
+      ]
+    },
+    {
+      "from": "domains/manufacturing",
+      "to": "domains/commerce",
+      "count": 1,
+      "samples": [
+        "domains/manufacturing/manufacturing.module.ts -> domains/commerce/commerce.module.ts"
+      ]
+    },
+    {
+      "from": "domains/manufacturing",
+      "to": "domains/inventory-valuation",
+      "count": 1,
+      "samples": [
+        "domains/manufacturing/manufacturing.module.ts -> domains/inventory-valuation/inventory-valuation.module.ts"
+      ]
+    },
+    {
+      "from": "domains/payroll",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/payroll/payroll.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/procurement",
+      "to": "domains/commerce",
+      "count": 1,
+      "samples": [
+        "domains/procurement/procurement.module.ts -> domains/commerce/commerce.module.ts"
+      ]
+    },
+    {
+      "from": "domains/procurement",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/procurement/procurement.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/crm/crm.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/deposit-control",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/deposit-control/deposit-control.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/returns",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/returns/returns.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/fulfillment",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/fulfillment/fulfillment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/shipment",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/shipment/shipment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/delivery",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/delivery/delivery.module.ts"
+      ]
+    },
+    {
+      "from": "domains/reports",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "domains/reports/reports.module.ts -> domains/customer-finance/customer-finance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/inventory-warehouse",
+      "count": 1,
+      "samples": [
+        "domains/returns/returns.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "domains/returns/returns.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/customer-finance",
+      "count": 1,
+      "samples": [
+        "domains/returns/returns.module.ts -> domains/customer-finance/customer-finance.module.ts"
+      ]
+    },
+    {
+      "from": "domains/returns",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "domains/returns/returns.module.ts -> domains/crm/crm.module.ts"
+      ]
+    },
+    {
+      "from": "domains/sales-orders",
+      "to": "domains/inventory-warehouse",
+      "count": 1,
+      "samples": [
+        "domains/sales-orders/sales-orders.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/shipment",
+      "to": "domains/inventory-warehouse",
+      "count": 1,
+      "samples": [
+        "domains/shipment/shipment.module.ts -> domains/inventory-warehouse/inventory-warehouse.module.ts"
+      ]
+    },
+    {
+      "from": "domains/shipment",
+      "to": "domains/fulfillment",
+      "count": 1,
+      "samples": [
+        "domains/shipment/shipment.module.ts -> domains/fulfillment/fulfillment.module.ts"
+      ]
+    },
+    {
+      "from": "domains/shipment",
+      "to": "domains/treasury",
+      "count": 1,
+      "samples": [
+        "domains/shipment/shipment.module.ts -> domains/treasury/treasury.module.ts"
+      ]
+    },
+    {
+      "from": "domains/shipment",
+      "to": "domains/sales-orders",
+      "count": 1,
+      "samples": [
+        "domains/shipment/shipment.module.ts -> domains/sales-orders/sales-orders.module.ts"
+      ]
+    },
+    {
+      "from": "domains/shipment",
+      "to": "domains/crm",
+      "count": 1,
+      "samples": [
+        "domains/shipment/shipment.module.ts -> domains/crm/crm.module.ts"
+      ]
+    }
+  ],
+  "moduleCycles": [
+    [
+      "foundation/database-provisioning",
+      "domains/sales",
+      "domains/payroll",
+      "domains/commission",
+      "domains/attendance",
+      "domains/targets",
+      "domains/hr",
+      "domains/deposit-control",
+      "domains/delivery",
+      "domains/returns",
+      "domains/fulfillment",
+      "domains/shipment",
+      "foundation/module-role-templates",
+      "foundation/module-lifecycle",
+      "foundation/release-orchestration",
+      "foundation/release",
+      "domains/manufacturing",
+      "domains/procurement",
+      "domains/inventory-valuation",
+      "domains/inventory-warehouse",
+      "domains/commerce",
+      "domains/sales-orders",
+      "foundation/limit-engine",
+      "domains/crm",
+      "foundation/scope",
+      "domains/treasury",
+      "domains/customer-finance",
+      "foundation/configuration-engine",
+      "foundation/approval-engine",
+      "foundation/organization",
+      "foundation/events",
+      "domains/accounting",
+      "foundation/database-registry",
+      "foundation/audit",
+      "foundation/platform",
+      "foundation/entitlement",
+      "foundation/plans",
+      "foundation/navigation",
+      "foundation/permission",
+      "foundation/authorization",
+      "foundation/authentication",
+      "foundation/company",
+      "foundation/configuration",
+      "database"
+    ]
+  ],
+  "fileCycleCount": 2,
+  "fileCycleSizes": [
+    4,
+    2
+  ],
+  "fileCycleSamples": [
+    [
+      "foundation/configuration-engine/live-config-accessor.ts",
+      "foundation/configuration-engine/configuration-engine.service.ts"
+    ],
+    [
+      "foundation/database-provisioning/database-provisioning.module.ts",
+      "foundation/authentication/authentication.module.ts",
+      "foundation/company/company.module.ts",
+      "foundation/audit/audit.module.ts"
+    ]
+  ]
+}

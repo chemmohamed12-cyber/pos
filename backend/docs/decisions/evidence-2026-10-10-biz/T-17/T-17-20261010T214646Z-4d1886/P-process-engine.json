@@ -1,0 +1,49 @@
+{
+  "prounds": 15,
+  "pconc": 8,
+  "pstats": {
+    "plain": {
+      "multiWin": 15,
+      "wins": [
+        5,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "extraHistory": 0
+    },
+    "transaction": {
+      "multiWin": 0,
+      "wins": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "extraHistory": 0
+    }
+  },
+  "note": "serialised behaviour = at most 2 successes (a->b, b->c) and history rows = successes"
+}

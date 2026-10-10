@@ -1,0 +1,119 @@
+{
+  "rounds": 10,
+  "concurrent": 20,
+  "roundsWithDuplicateNumbers": {
+    "plain": 10,
+    "transaction": 0
+  },
+  "lastNumberAfter": {
+    "plain": 28,
+    "transaction": 200
+  },
+  "expected": 200,
+  "outcomes": {
+    "plain": [
+      {
+        "round": 0,
+        "issued": 20,
+        "distinct": 19
+      },
+      {
+        "round": 1,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 2,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 3,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 4,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 5,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 6,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 7,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 8,
+        "issued": 20,
+        "distinct": 1
+      },
+      {
+        "round": 9,
+        "issued": 20,
+        "distinct": 1
+      }
+    ],
+    "transaction": [
+      {
+        "round": 0,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 1,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 2,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 3,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 4,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 5,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 6,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 7,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 8,
+        "issued": 20,
+        "distinct": 20
+      },
+      {
+        "round": 9,
+        "issued": 20,
+        "distinct": 20
+      }
+    ]
+  }
+}

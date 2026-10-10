@@ -1,0 +1,13 @@
+
+=== T-18: src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts
+PASS src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts (85.673 s)
+  TEST-03 — entity metadata vs migrated Company schema
+    √ reports drift in both directions (20437 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        85.773 s
+Ran all test suites matching /src\\foundation\\testing\\test03-schema-drift.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

@@ -1,0 +1,22 @@
+{
+  "testId": "T-18",
+  "runId": "T-18-20261010T212310Z-619c4a",
+  "finishedAt": "2026-10-10T21:23:27.508Z",
+  "results": [
+    {
+      "id": "T-18-entity-to-schema",
+      "status": "FAIL-DEFECT",
+      "note": "739 statement(s) the schema builder would need; first: ALTER TABLE \"user_roles\" DROP CONSTRAINT \"user_roles_roleId_fkey\""
+    },
+    {
+      "id": "T-18-schema-to-entity-tables",
+      "status": "FAIL-DEFECT",
+      "note": "36 table(s) without an entity: _daii_bootstrap_check, backup_artifacts, backup_operations, backup_runs, companies, company_backup_settings, company_invitations, company_plan_assignments, config_keys, config_values, credentials, data_repair_runs"
+    },
+    {
+      "id": "T-18-schema-to-entity-columns",
+      "status": "PASS",
+      "note": "0 column(s) without an entity property: "
+    }
+  ]
+}

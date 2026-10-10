@@ -1,0 +1,783 @@
+{
+ "window": 80,
+ "summary": {
+  "processEngine.transition | NO opener nearby": 26,
+  "processEngine.transition | opener nearby": 46,
+  "limits.consume | opener nearby": 4,
+  "numbering.getNextNumber | NO opener nearby": 29,
+  "numbering.getNextNumber | opener nearby": 14
+ },
+ "noOpenerSites": [
+  "processEngine.transition domains/accounting/application/fiscal-period.service.ts:250",
+  "numbering.getNextNumber domains/accounting/application/journal-entry.service.ts:435",
+  "processEngine.transition domains/accounting/application/journal-entry.service.ts:447",
+  "numbering.getNextNumber domains/commerce/application/price-lists.service.ts:78",
+  "numbering.getNextNumber domains/commerce/application/price-lists.service.ts:177",
+  "processEngine.transition domains/commission/application/commission.service.ts:432",
+  "numbering.getNextNumber domains/crm/application/customers.service.ts:146",
+  "numbering.getNextNumber domains/customer-finance/application/customer-ledger.service.ts:70",
+  "numbering.getNextNumber domains/customer-finance/application/customer-ledger.service.ts:231",
+  "numbering.getNextNumber domains/customer-finance/application/invoices.service.ts:198",
+  "processEngine.transition domains/customer-finance/application/invoices.service.ts:288",
+  "numbering.getNextNumber domains/fulfillment/application/fulfillment.service.ts:68",
+  "processEngine.transition domains/fulfillment/application/fulfillment.service.ts:236",
+  "processEngine.transition domains/fulfillment/application/fulfillment.service.ts:436",
+  "numbering.getNextNumber domains/hr/application/hr.service.ts:132",
+  "numbering.getNextNumber domains/inventory-warehouse/application/warehouse-transactions.service.ts:105",
+  "processEngine.transition domains/inventory-warehouse/application/warehouse-transactions.service.ts:400",
+  "processEngine.transition domains/inventory-warehouse/application/warehouse-transactions.service.ts:403",
+  "processEngine.transition domains/inventory-warehouse/application/warehouse-transactions.service.ts:408",
+  "numbering.getNextNumber domains/inventory-warehouse/application/warehouse-transactions.service.ts:627",
+  "processEngine.transition domains/inventory-warehouse/application/warehouse-transactions.service.ts:632",
+  "numbering.getNextNumber domains/payroll/application/payroll.service.ts:255",
+  "processEngine.transition domains/payroll/application/payroll.service.ts:335",
+  "processEngine.transition domains/payroll/application/payroll.service.ts:356",
+  "numbering.getNextNumber domains/procurement/application/purchase-order.service.ts:81",
+  "numbering.getNextNumber domains/procurement/application/supplier-ledger.service.ts:52",
+  "numbering.getNextNumber domains/procurement/application/supplier-ledger.service.ts:145",
+  "numbering.getNextNumber domains/procurement/application/supplier.service.ts:133",
+  "numbering.getNextNumber domains/returns/application/returns.service.ts:94",
+  "numbering.getNextNumber domains/returns/application/returns.service.ts:201",
+  "processEngine.transition domains/returns/application/returns.service.ts:226",
+  "processEngine.transition domains/returns/application/returns.service.ts:245",
+  "processEngine.transition domains/returns/application/returns.service.ts:281",
+  "processEngine.transition domains/returns/application/returns.service.ts:287",
+  "processEngine.transition domains/returns/application/returns.service.ts:303",
+  "processEngine.transition domains/returns/application/returns.service.ts:322",
+  "numbering.getNextNumber domains/returns/application/returns.service.ts:332",
+  "numbering.getNextNumber domains/returns/application/sales-returns.service.ts:131",
+  "numbering.getNextNumber domains/returns/application/shipment-returns.service.ts:93",
+  "numbering.getNextNumber domains/sales/application/sales.service.ts:31",
+  "numbering.getNextNumber domains/sales-orders/application/sales-orders.service.ts:273",
+  "numbering.getNextNumber domains/sales-orders/application/sales-orders.service.ts:281",
+  "processEngine.transition domains/sales-orders/application/sales-orders.service.ts:1152",
+  "processEngine.transition domains/sales-orders/application/sales-orders.service.ts:1164",
+  "processEngine.transition domains/sales-orders/application/sales-orders.service.ts:1180",
+  "processEngine.transition domains/sales-orders/application/sales-orders.service.ts:1217",
+  "processEngine.transition domains/sales-orders/application/sales-orders.service.ts:1249",
+  "numbering.getNextNumber domains/shipment/application/shipment.service.ts:127",
+  "numbering.getNextNumber domains/shipment/application/shipment.service.ts:128",
+  "numbering.getNextNumber domains/shipment/application/shipment.service.ts:183",
+  "numbering.getNextNumber domains/shipment/application/shipment.service.ts:185",
+  "processEngine.transition domains/shipment/application/shipment.service.ts:284",
+  "processEngine.transition domains/shipment/application/shipment.service.ts:518",
+  "processEngine.transition domains/targets/application/target.service.ts:141",
+  "numbering.getNextNumber domains/treasury/application/treasury.service.ts:371"
+ ],
+ "all": [
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 250,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 311,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "line": 603,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset-disposal.service.ts",
+   "line": 238,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset-disposal.service.ts",
+   "line": 280,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/fixed-asset.service.ts",
+   "line": 344,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "limits.consume",
+   "file": "domains/accounting/application/gl-account.service.ts",
+   "line": 277,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "limits.consume",
+   "file": "domains/accounting/application/gl-account.service.ts",
+   "line": 687,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 261,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 313,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 435,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 447,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "line": 564,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/commerce/application/price-lists.service.ts",
+   "line": 78,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/commerce/application/price-lists.service.ts",
+   "line": 177,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 432,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 505,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/commission/application/commission.service.ts",
+   "line": 529,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/crm/application/customers.service.ts",
+   "line": 146,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "limits.consume",
+   "file": "domains/crm/application/customers.service.ts",
+   "line": 174,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/customer-ledger.service.ts",
+   "line": 70,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/customer-ledger.service.ts",
+   "line": 231,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 198,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 288,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 354,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 369,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 428,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "line": 430,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/payments.service.ts",
+   "line": 100,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/customer-finance/application/payments.service.ts",
+   "line": 205,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 68,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 236,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 282,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "line": 436,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/hr/application/hr.service.ts",
+   "line": 132,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/hr/application/hr.service.ts",
+   "line": 195,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "limits.consume",
+   "file": "domains/hr/application/hr.service.ts",
+   "line": 209,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/inventory.service.ts",
+   "line": 1632,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 105,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 166,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 400,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 403,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 408,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 599,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 627,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 632,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "line": 657,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 213,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 308,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 401,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 791,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 801,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 833,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "line": 865,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 255,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 335,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 356,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 459,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/payroll/application/payroll.service.ts",
+   "line": 460,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/goods-receipt.service.ts",
+   "line": 90,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/goods-receipt.service.ts",
+   "line": 169,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/new-item-request.service.ts",
+   "line": 120,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-order.service.ts",
+   "line": 81,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-order.service.ts",
+   "line": 148,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 90,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 137,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 175,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "line": 182,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 120,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 178,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 184,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/rfq.service.ts",
+   "line": 225,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 210,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 285,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 368,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 389,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 440,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "line": 442,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-ledger.service.ts",
+   "line": 52,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-ledger.service.ts",
+   "line": 145,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier-payment.service.ts",
+   "line": 82,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/procurement/application/supplier.service.ts",
+   "line": 133,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 94,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 201,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 226,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 245,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 281,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 287,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 303,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 322,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 332,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/returns.service.ts",
+   "line": 418,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/returns/application/sales-returns.service.ts",
+   "line": 131,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/sales-returns.service.ts",
+   "line": 240,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/returns/application/shipment-returns.service.ts",
+   "line": 93,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/returns/application/shipment-returns.service.ts",
+   "line": 226,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/sales/application/sales.service.ts",
+   "line": 31,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 273,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 281,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1152,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1164,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1180,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1217,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "line": 1249,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 127,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 128,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 183,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 185,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 284,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/shipment/application/shipment.service.ts",
+   "line": 518,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 141,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 178,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "domains/targets/application/target.service.ts",
+   "line": 205,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "numbering.getNextNumber",
+   "file": "domains/treasury/application/treasury.service.ts",
+   "line": 371,
+   "transactionOpenerInPrecedingWindow": false
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 341,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 358,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 406,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 420,
+   "transactionOpenerInPrecedingWindow": true
+  },
+  {
+   "prim": "processEngine.transition",
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "line": 462,
+   "transactionOpenerInPrecedingWindow": true
+  }
+ ]
+}

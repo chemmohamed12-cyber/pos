@@ -1,0 +1,771 @@
+
+=== REGRESSION: src/foundation/company/area6-company-isolation.acceptance.spec.ts
+PASS src/foundation/company/area6-company-isolation.acceptance.spec.ts (37.117 s)
+  Area 6 acceptance — Company authorization isolation (composed guard chain, not mocked in isolation)
+    √ 1+2+3. the same user sees DIFFERENT, correctly-isolated roles in Company A vs Company B — no bleed either direction (9 ms)
+    √ 4+5. a user NOT a member of Company B is rejected before Company B's database is ever selected (22 ms)
+    √ 6. revoking Membership blocks access on the very next request — nothing cached from the prior successful one (2 ms)
+    √ 7. RolesGuard never falls back to the ambient (platform) tables for a Company-scoped request — proven by a poisoned ambient AuthorizationService (2 ms)
+    √ 7b. a route with NO Company context still uses the ambient path by design (proves the ambient path itself is real, not dead code) (14 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        37.209 s, estimated 53 s
+Ran all test suites matching /src\\foundation\\company\\area6-company-isolation.acceptance.spec.ts/i.
+RESULT PASS src/foundation/company/area6-company-isolation.acceptance.spec.ts
+
+=== REGRESSION: src/foundation/company/permission-path-company-isolation.acceptance.spec.ts
+PASS src/foundation/company/permission-path-company-isolation.acceptance.spec.ts (51.103 s)
+  Permission-path composed isolation — CompanyContextGuard → PermissionGuard → PermissionService → Company DataSource
+    √ grants access when the Company-scoped role actually holds core.company.members.manage, and never touches the ambient (poisoned) platform tables (9 ms)
+    √ the SAME user's grant in Company A does NOT carry over to Company B — denied there despite being an "admin" in both (21 ms)
+    √ a user with no Membership in Company B is rejected at CompanyContextGuard — PermissionService/Company B's DataSource is never reached, regardless of any client-supplied companyId (5 ms)
+    √ a route with NO Company context still enforces via the ambient path (proves the ambient path is real, not dead code) (16 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        51.194 s
+Ran all test suites matching /src\\foundation\\company\\permission-path-company-isolation.acceptance.spec.ts/i.
+RESULT PASS src/foundation/company/permission-path-company-isolation.acceptance.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-connection-manager.sPASS src/foundaPASS src/foundation/database-registry/company-connection-manager.service.spec.ts (42.063 s)
+  CompanyConnectionManagerService — Multi-Company Area 9 (Background Jobs Gap Fix)
+    listActiveCompanyIds
+      √ returns the companyId of every ACTIVE registry, nothing else (6 ms)
+    getDataSource
+      √ refuses a Company with no DatabaseRegistry entry — never falls back to any other connection (20 ms)
+      √ refuses a Company whose database is not ACTIVE — never silently connects anyway (2 ms)
+      √ opens a real connection using the decrypted credential, scoped to that Company only (2 ms)
+      √ caches and reuses the same DataSource for a repeat call (never reopens per sweep tick) (1 ms)
+      √ reopens when the connection target changed underneath it (Area 4 retry path via updateConnection) (1 ms)
+      √ never returns a connection for one Company reused as another Company's connection (cache is keyed per Company, never shared) (2 ms)
+    onModuleDestroy
+      √ destroys every cached connection
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        42.155 s
+Ran all test suites matching /src\\foundation\\database-registry\\company-connection-manager.service.spec.ts/i.
+RESULT PASS src/foundation/database-registry/company-connection-manager.service.spec.ts
+
+=== REGRESSION: src/foundation/release/release-execution-environment-check.[31m[Ne[31m[Nest] 15876  - [39m١١‏/١٠‏/٢٠٢٦، ١:١٥:٤٢ ص [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31mStaged deploy failed for release "r1" (swapped=false)[39m
+PreSwapAbort: ENVIRONMENT_INVALID: release 1.1.5-test cannot start with this host's environment - fix the host configuration first (cPanel > Setup Node.js App > environment variables): "NEEDED_BY_NEW_RELEASE" is required
+    at ReleaseExecutionService.deployReleaseStaged (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\release-execution.service.ts:521:15)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at ReleaseExecutionService.deployRelease (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\release-execution.service.ts:389:14)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\release-execution-environment-check.spec.ts:149:20)
+[32m[Nest] 15876  - [39m١١‏/١٠‏/٢٠٢٦، ١:١٥:٤٢ ص [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32m[39m
+[33m[Nest] 15876  - [39m١١‏/١٠‏/٢٠٢٦، ١:١٥:٤٢ ص [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mRELEASE_READINESS_URL is not set: the engine cannot verify that the restarted application answers. The deploy is recorded DEPLOYED_UNVERIFIED.[39m
+PASS src/foundation/release/release-execution-environment-check.spec.ts (47.083 s)
+  ReleaseExecutionService — pre-swap environment check of the candidate
+    √ THE INCIDENT, with the real 1.1.x schema: a host configured for v1.1.2 lacks exactly DATABASE_CREDENTIAL_ENCRYPTION_KEY => invalid, naming it (480 ms)
+    √ the same host once the variable is set => valid (452 ms)
+    √ a key that is present but too short is refused too (the schema itself is the judge, not a hand-kept list) (451 ms)
+    √ development defaults still start: no production-only requirements are imposed outside production (447 ms)
+    √ a candidate without a schema file is `skipped` (reported, never silently passed) (4 ms)
+    √ a candidate whose schema cannot even be evaluated fails closed (not passed) (246 ms)
+    √ a genuine missing variable is NOT flagged as an evaluation failure (445 ms)
+    √ IN THE DEPLOY: an invalid candidate environment aborts PRE-SWAP — no migration, no swap, ACTIVE untouched — with the variable named; classified DEPLOYMENT_FAILED (360 ms)
+    √ IN THE DEPLOY: with the variable present the same candidate proceeds to the swap (272 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        47.241 s
+Ran all test suites matching /src\\foundation\\release\\release-execution-environment-check.spec.ts/i.
+RESULT PASS src/foundation/release/release-execution-environment-check.spec.ts
+
+=== REGRESSION: src/foundation/release/release-migration-registry.real-pg.sFAIL srFAIL src/foundation/release/release-migration-registry.real-pg.spec.ts (43.218 s)
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › accounting: selects exactly the closure, runs every migration of it, runs nothing unrelated
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › manufacturing: selects exactly the closure, runs every migration of it, runs nothing unrelated
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › sales (sales → finance → accounting chain): selects exactly the closure, runs every migration of it, runs nothing unrelated
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N provisions the Company; business data is written; a bystander Company exists
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N provisions the Company; business data is written; a bystander Company exists
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N+1 preflight: READY, pending == exactly the 4 new migrations, only in-scope tags
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N+1 preflight: READY, pending == exactly the 4 new migrations, only in-scope tags
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N+1 runs ONLY the pending migrations, exactly once; history and business data are preserved
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N+1 runs ONLY the pending migrations, exactly once; history and business data are preserved
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › re-running the same release is a no-op (idempotent)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › re-running the same release is a no-op (idempotent)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › a later release whose entitlement NARROWS (manufacturing dropped) removes nothing and runs nothing
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › a later release whose entitlement NARROWS (manufacturing dropped) removes nothing and runs nothing
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › the bystander Company's database was never touched
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › the bystander Company's database was never touched
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:300:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › RB-1 proof: appRoot = restored PREVIOUS tree (lacks N+1 classes) + migrationTreePath = FAILED slot → undo succeeds, exactly the 4 migrations reverted, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › RB-1 proof: appRoot = restored PREVIOUS tree (lacks N+1 classes) + migrationTreePath = FAILED slot → undo succeeds, exactly the 4 migrations reverted, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › safety fallback preserved: classes genuinely unavailable (failed-slot path lacks them) → undo rejects, backup restore is engaged, DB left exactly as migrated
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › safety fallback preserved: classes genuinely unavailable (failed-slot path lacks them) → undo rejects, backup restore is engaged, DB left exactly as migrated
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › legacy in-place path unchanged: no migrationTreePath → appRoot is used (appRoot = the tree holding the classes)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › legacy in-place path unchanged: no migrationTreePath → appRoot is used (appRoot = the tree holding the classes)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackAfterSwap: rollbackSwap() → failedPath → undo(failedPath) → classes resolved from the candidate slot → status rolled_back, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackAfterSwap: rollbackSwap() → failedPath → undo(failedPath) → classes resolved from the candidate slot → status rolled_back, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackReleaseStaged (operator rollback of a COMMITted release): same failedPath → undo → rolled_back, LKG popped, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackReleaseStaged (operator rollback of a COMMITted release): same failedPath → undo → rolled_back, LKG popped, no backup restore
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING fail-safe preserved: failed slot genuinely lacks the classes and the backup restore fails → FAILED-SAFE (explicit, recoverable), DB untouched
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING fail-safe preserved: failed slot genuinely lacks the classes and the backup restore fails → FAILED-SAFE (explicit, recoverable), DB untouched
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › no manifest on disk (production config): undo of an accounting+manufacturing run resolves through the fixed registry
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › no manifest on disk (production config): undo of an accounting+manufacturing run resolves through the fixed registry
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › NEGATIVE CONTROL — the pre-fix 6-tag registry makes the same undo fail (proves this test detects the H3 registry defect)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › NEGATIVE CONTROL — the pre-fix 6-tag registry makes the same undo fail (proves this test detects the H3 registry defect)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:434:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › a migration that throws mid-batch rolls the WHOLE batch back and is recorded as failed
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › a migration that throws mid-batch rolls the WHOLE batch back and is recorded as failed
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:554:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › a migration the manifest ships but whose class is missing from the artifact → preflight BLOCKED (tag/migration drift)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › a migration the manifest ships but whose class is missing from the artifact → preflight BLOCKED (tag/migration drift)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:554:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › PRE-FIX registry + a release shipping a manufacturing migration → preflight was already BLOCKED (loud, not silent)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › PRE-FIX registry + a release shipping a manufacturing migration → preflight was already BLOCKED (loud, not silent)
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:554:19)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › KNOWN GAP (characterization): an entitled tag whose directory is absent from the artifact and which ships no file is silently empty — not blocked
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: fail closed, recoverable, no partial migration › KNOWN GAP (characterization): an entitled tag whose directory is absent from the artifact and which ships no file is silently empty — not blocked
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+    [0m [90m 20 |[39m [36mexport[39m [36mfunction[39m assertIsolatedInstance()[33m:[39m [36mvoid[39m {
+     [90m 21 |[39m   [36mif[39m ([33mDB_HOST[39m [33m!==[39m [32m'127.0.0.1'[39m [33m||[39m [33mDB_PORT[39m [33m!==[39m [35m5544[39m [33m||[39m [33m![39m[33mDB_USER[39m [33m||[39m [33m![39m[33mDB_PASSWORD[39m) {
+    [31m[1m>[22m[39m[90m 22 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m'Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).'[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 23 |[39m   }
+     [90m 24 |[39m }
+     [90m 25 |[39m[0m
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:27:3)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:41:9)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:123:33)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:554:19)
+
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+    [0m [90m 402 |[39m
+     [90m 403 |[39m     afterAll([36masync[39m () [33m=>[39m {
+    [31m[1m>[22m[39m[90m 404 |[39m       [36mif[39m (env[33m.[39mds[33m.[39misInitialized) [36mawait[39m env[33m.[39mds[33m.[39mdestroy()[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 405 |[39m     })[33m;[39m
+     [90m 406 |[39m   })[33m;[39m
+     [90m 407 |[39m[0m
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:404:15)
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+    [0m [90m 444 |[39m
+     [90m 445 |[39m     afterAll([36masync[39m () [33m=>[39m {
+    [31m[1m>[22m[39m[90m 446 |[39m       [36mif[39m (env[33m.[39mds[33m.[39misInitialized) [36mawait[39m env[33m.[39mds[33m.[39mdestroy()[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 447 |[39m     })[33m;[39m
+     [90m 448 |[39m
+     [90m 449 |[39m     it([32m'RB-1 proof: appRoot = restored PREVIOUS tree (lacks N+1 classes) + migrationTreePath = FAILED slot → undo succeeds, exactly the 4 migrations reverted, no backup restore'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:446:15)
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+    [0m [90m 558 |[39m     })[33m;[39m
+     [90m 559 |[39m     afterAll([36masync[39m () [33m=>[39m {
+    [31m[1m>[22m[39m[90m 560 |[39m       [36mif[39m (env[33m.[39mds[33m.[39misInitialized) [36mawait[39m env[33m.[39mds[33m.[39mdestroy()[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 561 |[39m     })[33m;[39m
+     [90m 562 |[39m
+     [90m 563 |[39m     it([32m'a migration that throws mid-batch rolls the WHOLE batch back and is recorded as failed'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:560:15)
+
+Test Suites: 1 failed, 1 total
+Tests:       21 failed, 21 total
+Snapshots:   0 total
+Time:        43.319 s, estimated 82 s
+Ran all test suites matching /src\\foundation\\release\\release-migration-registry.real-pg.spec.ts/i.
+RESULT FAIL src/foundation/release/release-migration-registry.real-pg.spec.ts
+
+REGRESSION DONE: 4/5 passed

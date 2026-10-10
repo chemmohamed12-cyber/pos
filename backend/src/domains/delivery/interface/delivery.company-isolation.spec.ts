@@ -95,7 +95,7 @@ describe('DeliveryController Area 21 retrofit — real-Postgres Company isolatio
   }
 
   beforeAll(async () => {
-    h = await setUpTwoCompanyHarness({ namePrefix: 'delivery_isolation', extraCompanyTags: ['sales', 'inventory', 'finance', 'logistics'] });
+    h = await setUpTwoCompanyHarness({ namePrefix: 'courier_isolation', extraCompanyTags: ['sales', 'inventory', 'finance', 'logistics'] });
     await seedCompanyData(h.companyAId, 'A', 'A');
     await seedCompanyData(h.companyBId, 'B', 'B');
 

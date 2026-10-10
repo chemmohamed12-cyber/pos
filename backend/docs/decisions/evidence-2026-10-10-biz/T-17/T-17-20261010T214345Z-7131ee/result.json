@@ -1,0 +1,27 @@
+{
+  "testId": "T-17",
+  "runId": "T-17-20261010T214345Z-7131ee",
+  "finishedAt": "2026-10-10T21:43:58.911Z",
+  "results": [
+    {
+      "id": "N-A-plain-manager",
+      "status": "FAIL-DEFECT",
+      "note": "{\"roundsWithDuplicates\":10,\"lastNumber\":24,\"expected\":200}"
+    },
+    {
+      "id": "N-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"roundsWithDuplicates\":0,\"lastNumber\":200,\"expected\":200}"
+    },
+    {
+      "id": "P-A-plain-manager",
+      "status": "FAIL-DEFECT",
+      "note": "{\"roundsViolating\":15,\"wins\":[6,8,8,8,8,8,8,8,8,8,8,8,8,8,8]}"
+    },
+    {
+      "id": "P-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"roundsViolating\":0,\"wins\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]}"
+    }
+  ]
+}

@@ -1,0 +1,1221 @@
+{
+ "controllers": 75,
+ "routes": 616,
+ "requirePermissionDecorators": 378,
+ "controllersWithoutJwtAuthGuard": [
+  "foundation/integrations/interface/integration-order-intake.controller.ts (routes=1)",
+  "foundation/terminology/terminology.controller.ts (routes=1)",
+  "health/health.controller.ts (routes=3)"
+ ],
+ "controllersWithNoGuardAtAll": [
+  "foundation/terminology/terminology.controller.ts (routes=1)",
+  "health/health.controller.ts (routes=3)"
+ ],
+ "jwtButNoCompanyContextNorPlatformGuard": [
+  "foundation/company/company-invitations-public.controller.ts (routes=3)",
+  "foundation/integrations/interface/integrations.controller.ts (routes=15)",
+  "foundation/media/media.controller.ts (routes=2)",
+  "foundation/navigation/navigation.controller.ts (routes=1)"
+ ],
+ "rows": [
+  {
+   "file": "domains/accounting/interface/accounting-policy-config.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/accounting.controller.ts",
+   "routes": 46,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard",
+    "RequireFeatureGuard"
+   ],
+   "requirePermission": 46,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/ap.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/ar.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/cash-bank.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 8,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/fixed-asset.controller.ts",
+   "routes": 14,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard",
+    "RequireFeatureGuard"
+   ],
+   "requirePermission": 14,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/general-ledger.controller.ts",
+   "routes": 20,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 21,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/grni.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 4,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/inventory-accounting.controller.ts",
+   "routes": 6,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 6,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/accounting/interface/wip.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 4,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/attendance/interface/attendance.controller.ts",
+   "routes": 21,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 21,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/commerce/interface/bom.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/commerce/interface/price-lists.controller.ts",
+   "routes": 12,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/commerce/interface/products.controller.ts",
+   "routes": 11,
+   "classGuards": [],
+   "methodGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/commission/interface/commission.controller.ts",
+   "routes": 10,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 10,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/crm/interface/customers.controller.ts",
+   "routes": 13,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 6,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/customer-finance/interface/customer-ledger.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/customer-finance/interface/invoices.controller.ts",
+   "routes": 9,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/customer-finance/interface/payments.controller.ts",
+   "routes": 6,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/delivery/interface/delivery.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/deposit-control/interface/deposits.controller.ts",
+   "routes": 5,
+   "classGuards": [],
+   "methodGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "PermissionGuard"
+   ],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/fulfillment/interface/fulfillment.controller.ts",
+   "routes": 16,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/hr/interface/hr.controller.ts",
+   "routes": 16,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 16,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/inventory-valuation/interface/inventory-valuation.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 1,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/inventory-warehouse/interface/inventory.controller.ts",
+   "routes": 24,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 12,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/inventory-warehouse/interface/warehouse-transactions.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/manufacturing/interface/manufacturing-bom.controller.ts",
+   "routes": 6,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 6,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/manufacturing/interface/routing.controller.ts",
+   "routes": 6,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 6,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/manufacturing/interface/work-center.controller.ts",
+   "routes": 5,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 5,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/manufacturing/interface/work-order.controller.ts",
+   "routes": 13,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "RequireFeatureGuard",
+    "PermissionGuard"
+   ],
+   "requirePermission": 13,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/payroll/interface/payroll.controller.ts",
+   "routes": 16,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 16,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/goods-receipt.controller.ts",
+   "routes": 2,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/new-item-request.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/purchase-order.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/purchase-request.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 8,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/rfq.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 7,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/supplier-invoice.controller.ts",
+   "routes": 9,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 9,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/supplier-payment.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/procurement/interface/supplier.controller.ts",
+   "routes": 10,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 10,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/reports/interface/reports.controller.ts",
+   "routes": 12,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/returns/interface/returns.controller.ts",
+   "routes": 13,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 1,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/returns/interface/sales-returns.controller.ts",
+   "routes": 5,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 5,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/returns/interface/shipment-returns.controller.ts",
+   "routes": 5,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 5,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/sales/interface/sales.controller.ts",
+   "routes": 2,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 1,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/sales-orders/interface/sales-orders.controller.ts",
+   "routes": 9,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "WarehouseScopeGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/shipment/interface/shipment.controller.ts",
+   "routes": 24,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 9,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/targets/interface/target.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 4,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "domains/treasury/interface/treasury.controller.ts",
+   "routes": 11,
+   "classGuards": [],
+   "methodGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RequireModuleGuard",
+    "PermissionGuard"
+   ],
+   "requirePermission": 12,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/admin/admin.controller.ts",
+   "routes": 6,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/admin/sales-reps-directory.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/approval-engine/approval.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 8,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/audit/company-audit.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "PermissionGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 1,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/audit/installation-audit.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/authentication/auth.controller.ts",
+   "routes": 7,
+   "classGuards": [],
+   "methodGuards": [
+    "JwtAuthGuard"
+   ],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/company/company-access-scope.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "PermissionGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 2,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/company/company-invitations-public.controller.ts",
+   "routes": 3,
+   "classGuards": [],
+   "methodGuards": [
+    "JwtAuthGuard"
+   ],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/company/company-registry.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/company/company-roles.controller.ts",
+   "routes": 12,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "PermissionGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 8,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/company/company-users.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "PermissionGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 6,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/company/installation-membership.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/company/memberships-mine.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/configuration-engine/configuration.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [
+    "PlatformGuard"
+   ],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/entitlement/entitlement.controller.ts",
+   "routes": 3,
+   "classGuards": [
+    "JwtAuthGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [
+    "PlatformGuard"
+   ],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/integrations/interface/integration-order-intake.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "IntegrationAuthGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": false,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/integrations/interface/integrations.controller.ts",
+   "routes": 15,
+   "classGuards": [
+    "JwtAuthGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/limit-engine/limit.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "RolesGuard"
+   ],
+   "methodGuards": [
+    "PlatformGuard"
+   ],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/media/media.controller.ts",
+   "routes": 2,
+   "classGuards": [
+    "JwtAuthGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/navigation/navigation.controller.ts",
+   "routes": 1,
+   "classGuards": [
+    "JwtAuthGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/organization/organization.controller.ts",
+   "routes": 5,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard"
+   ],
+   "methodGuards": [
+    "PermissionGuard"
+   ],
+   "requirePermission": 3,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/plans/plans.controller.ts",
+   "routes": 7,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/platform/platform.controller.ts",
+   "routes": 8,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/release/company-backup.controller.ts",
+   "routes": 4,
+   "classGuards": [
+    "JwtAuthGuard",
+    "CompanyContextGuard",
+    "PermissionGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 1,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": true,
+   "platformGuard": false
+  },
+  {
+   "file": "foundation/release/release.controller.ts",
+   "routes": 31,
+   "classGuards": [
+    "JwtAuthGuard",
+    "PlatformGuard"
+   ],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": true,
+   "jwt": true,
+   "companyContext": false,
+   "platformGuard": true
+  },
+  {
+   "file": "foundation/terminology/terminology.controller.ts",
+   "routes": 1,
+   "classGuards": [],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": false,
+   "jwt": false,
+   "companyContext": false,
+   "platformGuard": false
+  },
+  {
+   "file": "health/health.controller.ts",
+   "routes": 3,
+   "classGuards": [],
+   "methodGuards": [],
+   "requirePermission": 0,
+   "authGuardReferenced": false,
+   "jwt": false,
+   "companyContext": false,
+   "platformGuard": false
+  }
+ ]
+}

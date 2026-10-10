@@ -1,0 +1,164 @@
+{
+ "backend": {
+  "total": 908,
+  "runtime": 369,
+  "productionLicenses": {
+   "MIT": 274,
+   "BSD-3-Clause": 11,
+   "ISC": 60,
+   "BSD-2-Clause": 4,
+   "Unlicense": 1,
+   "UNDECLARED": 3,
+   "MIT/X11": 2,
+   "Apache-2.0": 6,
+   "BlueOak-1.0.0": 4,
+   "(MIT OR GPL-3.0-or-later)": 1,
+   "(MIT AND Zlib)": 1,
+   "(MIT AND BSD-3-Clause)": 1,
+   "0BSD": 1
+  },
+  "allLicenses": {
+   "MIT": 708,
+   "Apache-2.0": 31,
+   "ISC": 98,
+   "BSD-3-Clause": 31,
+   "BSD-2-Clause": 18,
+   "Python-2.0": 1,
+   "Unlicense": 3,
+   "UNDECLARED": 4,
+   "CC-BY-4.0": 1,
+   "MIT/X11": 2,
+   "BlueOak-1.0.0": 5,
+   "(MIT OR GPL-3.0-or-later)": 1,
+   "(MIT AND Zlib)": 1,
+   "(MIT AND BSD-3-Clause)": 1,
+   "(MIT OR CC0-1.0)": 2,
+   "0BSD": 1
+  },
+  "flagged": [
+   {
+    "package": "buffers",
+    "version": "0.1.1",
+    "license": "UNDECLARED",
+    "scope": "runtime"
+   },
+   {
+    "package": "busboy",
+    "version": "1.6.0",
+    "license": "UNDECLARED",
+    "scope": "runtime"
+   },
+   {
+    "package": "exit",
+    "version": "0.1.2",
+    "license": "UNDECLARED",
+    "scope": "dev"
+   },
+   {
+    "package": "jszip",
+    "version": "3.10.1",
+    "license": "(MIT OR GPL-3.0-or-later)",
+    "scope": "runtime"
+   },
+   {
+    "package": "streamsearch",
+    "version": "1.1.0",
+    "license": "UNDECLARED",
+    "scope": "runtime"
+   }
+  ]
+ },
+ "frontend": {
+  "total": 73,
+  "runtime": 6,
+  "productionLicenses": {
+   "MIT": 6
+  },
+  "allLicenses": {
+   "MIT": 57,
+   "Apache-2.0": 2,
+   "MPL-2.0": 12,
+   "ISC": 1,
+   "BSD-3-Clause": 1
+  },
+  "flagged": [
+   {
+    "package": "lightningcss",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-android-arm64",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-darwin-arm64",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-darwin-x64",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-freebsd-x64",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-linux-arm-gnueabihf",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-linux-arm64-gnu",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-linux-arm64-musl",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-linux-x64-gnu",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-linux-x64-musl",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-win32-arm64-msvc",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   },
+   {
+    "package": "lightningcss-win32-x64-msvc",
+    "version": "1.33.0",
+    "license": "MPL-2.0",
+    "scope": "dev"
+   }
+  ]
+ },
+ "project": {
+  "packageJsonLicense": "UNLICENSED",
+  "private": true,
+  "licenseFilesFound": []
+ }
+}

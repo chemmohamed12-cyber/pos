@@ -37,7 +37,7 @@ describe('ProductsController Area 21 retrofit — real-Postgres Company isolatio
   }
 
   beforeAll(async () => {
-    h = await setUpTwoCompanyHarness({ namePrefix: 'products_isolation', extraCompanyTags: ['sales'] });
+    h = await setUpTwoCompanyHarness({ namePrefix: 'items_isolation', extraCompanyTags: ['sales'] });
     await seedProduct(h.companyAId, 'SKU-COMPANY-A', 'Company A Product', '10.00');
     await seedProduct(h.companyBId, 'SKU-COMPANY-B', 'Company B Product', '20.00');
 

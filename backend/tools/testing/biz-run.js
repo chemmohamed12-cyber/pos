@@ -33,6 +33,8 @@ const STEPS = [
   // local capacity baseline (informational; D-10 numbers unapproved => no threshold)
   ['T-15', 'src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts'],
   ['T-16', 'src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts'],
+  ['T-17', 'src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts'],
+  ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 
 const only = (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : '').split(',').filter(Boolean);

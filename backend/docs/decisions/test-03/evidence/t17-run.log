@@ -1,0 +1,13 @@
+
+=== T-17: src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts (81.674 s)
+  Plain-manager probes — numbering and process-engine
+    √ records the behaviour of both primitives under concurrency (19239 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        81.78 s
+Ran all test suites matching /src\\foundation\\testing\\f-plain-probes.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

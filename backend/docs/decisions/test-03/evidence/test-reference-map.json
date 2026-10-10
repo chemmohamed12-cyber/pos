@@ -1,0 +1,1581 @@
+{
+ "classes": 219,
+ "withNoSpecReference": 42,
+ "referencedOnlyByMockOrUnitSpecs": 11,
+ "withRealDatabaseSpec": 166,
+ "noSpecLargest": [
+  "foundation/release/release-execution.service.ts (1669 LOC)",
+  "foundation/integrations/application/integrations.service.ts (627 LOC)",
+  "foundation/release/staged-activation.service.ts (374 LOC)",
+  "domains/treasury/interface/treasury.controller.ts (287 LOC)",
+  "foundation/release/data-repair.service.ts (284 LOC)",
+  "domains/hr/interface/hr.controller.ts (265 LOC)",
+  "domains/attendance/interface/attendance.controller.ts (254 LOC)",
+  "foundation/authentication/auth.controller.ts (219 LOC)",
+  "domains/payroll/interface/payroll.controller.ts (207 LOC)",
+  "foundation/integrations/interface/integrations.controller.ts (198 LOC)",
+  "foundation/release/deploy-preflight.service.ts (196 LOC)",
+  "foundation/module-lifecycle/module-lifecycle.service.ts (194 LOC)",
+  "foundation/release/lkg-registry.service.ts (179 LOC)",
+  "domains/commission/interface/commission.controller.ts (165 LOC)",
+  "domains/accounting/interface/cash-bank.controller.ts (161 LOC)",
+  "foundation/approval-engine/approval.controller.ts (143 LOC)",
+  "domains/accounting/interface/ap.controller.ts (142 LOC)",
+  "domains/accounting/interface/ar.controller.ts (136 LOC)",
+  "domains/accounting/interface/inventory-accounting.controller.ts (131 LOC)",
+  "foundation/company/company-access-scope.controller.ts (122 LOC)",
+  "foundation/media/media.controller.ts (102 LOC)",
+  "domains/deposit-control/interface/deposits.controller.ts (93 LOC)",
+  "foundation/release/backup-scheduler.service.ts (92 LOC)",
+  "foundation/terminology/terminology.service.ts (76 LOC)",
+  "foundation/platform/integration-catalog.service.ts (75 LOC)"
+ ],
+ "mockOnlyLargest": [
+  "foundation/release/release-manager.service.ts (313 LOC, 1 spec)",
+  "foundation/release/package-validator.service.ts (261 LOC, 1 spec)",
+  "foundation/company/company-membership-provisioning.service.ts (250 LOC, 1 spec)",
+  "foundation/company/company-roles.controller.ts (112 LOC, 1 spec)",
+  "foundation/database-registry/company-connection-manager.service.ts (110 LOC, 1 spec)",
+  "domains/accounting/application/closing-snapshot-signing-key.service.ts (95 LOC, 1 spec)",
+  "foundation/navigation/navigation.service.ts (87 LOC, 2 spec)",
+  "foundation/release/backup-operation.service.ts (76 LOC, 1 spec)",
+  "foundation/release/company-backup.controller.ts (68 LOC, 1 spec)",
+  "foundation/company/company-registry.service.ts (58 LOC, 1 spec)",
+  "foundation/company/company-invitations-public.controller.ts (55 LOC, 1 spec)"
+ ],
+ "rows": [
+  {
+   "file": "domains/accounting/application/accounting-policy-config.service.ts",
+   "cls": "AccountingPolicyConfigService",
+   "loc": 186,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/ap-adjustment.service.ts",
+   "cls": "ApAdjustmentService",
+   "loc": 222,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/ap-reconciliation.service.ts",
+   "cls": "ApReconciliationService",
+   "loc": 230,
+   "specs": 4,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/ar-adjustment.service.ts",
+   "cls": "ArAdjustmentService",
+   "loc": 229,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/ar-reconciliation.service.ts",
+   "cls": "ArReconciliationService",
+   "loc": 161,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/cash-bank-adjustment.service.ts",
+   "cls": "CashBankAdjustmentService",
+   "loc": 294,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/cash-bank-reconciliation.service.ts",
+   "cls": "CashBankReconciliationService",
+   "loc": 251,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/closing-audit.service.ts",
+   "cls": "ClosingAuditService",
+   "loc": 359,
+   "specs": 6,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/closing-exception.service.ts",
+   "cls": "ClosingExceptionService",
+   "loc": 104,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/closing-snapshot-signing-key.service.ts",
+   "cls": "ClosingSnapshotSigningKeyService",
+   "loc": 95,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/application/closing-snapshot.service.ts",
+   "cls": "ClosingSnapshotService",
+   "loc": 363,
+   "specs": 7,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/currency.service.ts",
+   "cls": "CurrencyService",
+   "loc": 207,
+   "specs": 20,
+   "realDbSpecs": 20
+  },
+  {
+   "file": "domains/accounting/application/depreciation.service.ts",
+   "cls": "DepreciationService",
+   "loc": 221,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/accounting/application/financial-dimension.service.ts",
+   "cls": "FinancialDimensionService",
+   "loc": 158,
+   "specs": 20,
+   "realDbSpecs": 20
+  },
+  {
+   "file": "domains/accounting/application/financial-events/financial-event.service.ts",
+   "cls": "FinancialEventService",
+   "loc": 454,
+   "specs": 20,
+   "realDbSpecs": 18
+  },
+  {
+   "file": "domains/accounting/application/financial-events/inventory-costing-handler.service.ts",
+   "cls": "InventoryCostingHandlerService",
+   "loc": 193,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/accounting/application/financial-reporting.service.ts",
+   "cls": "FinancialReportingService",
+   "loc": 431,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/fiscal-period.service.ts",
+   "cls": "FiscalPeriodService",
+   "loc": 709,
+   "specs": 26,
+   "realDbSpecs": 20
+  },
+  {
+   "file": "domains/accounting/application/fixed-asset-acquisition.service.ts",
+   "cls": "FixedAssetAcquisitionService",
+   "loc": 99,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/fixed-asset-disposal.service.ts",
+   "cls": "FixedAssetDisposalService",
+   "loc": 312,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/accounting/application/fixed-asset-reconciliation.service.ts",
+   "cls": "FixedAssetReconciliationService",
+   "loc": 146,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/fixed-asset.service.ts",
+   "cls": "FixedAssetService",
+   "loc": 389,
+   "specs": 6,
+   "realDbSpecs": 6
+  },
+  {
+   "file": "domains/accounting/application/gl-account.service.ts",
+   "cls": "GLAccountService",
+   "loc": 892,
+   "specs": 20,
+   "realDbSpecs": 20
+  },
+  {
+   "file": "domains/accounting/application/grni-reconciliation.service.ts",
+   "cls": "GrniReconciliationService",
+   "loc": 240,
+   "specs": 4,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/inventory-adjustment.service.ts",
+   "cls": "InventoryAdjustmentService",
+   "loc": 209,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/inventory-posting-policy.service.ts",
+   "cls": "InventoryPostingPolicyService",
+   "loc": 159,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/accounting/application/inventory-reconciliation.service.ts",
+   "cls": "InventoryReconciliationService",
+   "loc": 221,
+   "specs": 4,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/journal-entry.service.ts",
+   "cls": "JournalEntryService",
+   "loc": 745,
+   "specs": 20,
+   "realDbSpecs": 19
+  },
+  {
+   "file": "domains/accounting/application/ledger.service.ts",
+   "cls": "LedgerService",
+   "loc": 205,
+   "specs": 9,
+   "realDbSpecs": 7
+  },
+  {
+   "file": "domains/accounting/application/processed-event.service.ts",
+   "cls": "ProcessedEventService",
+   "loc": 35,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/application/tax-code.service.ts",
+   "cls": "TaxCodeService",
+   "loc": 96,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/accounting/application/tax-engine.service.ts",
+   "cls": "TaxEngineService",
+   "loc": 80,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/tax-period.service.ts",
+   "cls": "TaxPeriodService",
+   "loc": 59,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/application/wip-reconciliation.service.ts",
+   "cls": "WipReconciliationService",
+   "loc": 239,
+   "specs": 5,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/accounting/interface/accounting-policy-config.controller.ts",
+   "cls": "AccountingPolicyConfigController",
+   "loc": 51,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/interface/accounting.controller.ts",
+   "cls": "AccountingController",
+   "loc": 817,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/interface/ap.controller.ts",
+   "cls": "ApController",
+   "loc": 142,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/interface/ar.controller.ts",
+   "cls": "ArController",
+   "loc": 136,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/interface/cash-bank.controller.ts",
+   "cls": "CashBankController",
+   "loc": 161,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/interface/fixed-asset.controller.ts",
+   "cls": "FixedAssetController",
+   "loc": 293,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/interface/general-ledger.controller.ts",
+   "cls": "GeneralLedgerController",
+   "loc": 441,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/interface/grni.controller.ts",
+   "cls": "GrniController",
+   "loc": 71,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/accounting/interface/inventory-accounting.controller.ts",
+   "cls": "InventoryAccountingController",
+   "loc": 131,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/accounting/interface/wip.controller.ts",
+   "cls": "WipController",
+   "loc": 67,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/attendance/application/attendance.service.ts",
+   "cls": "AttendanceService",
+   "loc": 907,
+   "specs": 6,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/attendance/interface/attendance.controller.ts",
+   "cls": "AttendanceController",
+   "loc": 254,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/commerce/application/bom.service.ts",
+   "cls": "BomService",
+   "loc": 255,
+   "specs": 6,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/commerce/application/price-lists.service.ts",
+   "cls": "PriceListsService",
+   "loc": 364,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/commerce/application/products.service.ts",
+   "cls": "ProductsService",
+   "loc": 339,
+   "specs": 14,
+   "realDbSpecs": 14
+  },
+  {
+   "file": "domains/commerce/interface/bom.controller.ts",
+   "cls": "BomController",
+   "loc": 87,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/commerce/interface/price-lists.controller.ts",
+   "cls": "PriceListsController",
+   "loc": 227,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/commerce/interface/products.controller.ts",
+   "cls": "ProductsController",
+   "loc": 248,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/commission/application/commission.service.ts",
+   "cls": "CommissionService",
+   "loc": 571,
+   "specs": 4,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/commission/interface/commission.controller.ts",
+   "cls": "CommissionController",
+   "loc": 165,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/crm/application/customers.service.ts",
+   "cls": "CustomersService",
+   "loc": 758,
+   "specs": 15,
+   "realDbSpecs": 13
+  },
+  {
+   "file": "domains/crm/interface/customers.controller.ts",
+   "cls": "CustomersController",
+   "loc": 467,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/customer-finance/application/customer-ledger.service.ts",
+   "cls": "CustomerLedgerService",
+   "loc": 345,
+   "specs": 12,
+   "realDbSpecs": 11
+  },
+  {
+   "file": "domains/customer-finance/application/invoices.service.ts",
+   "cls": "InvoiceService",
+   "loc": 553,
+   "specs": 7,
+   "realDbSpecs": 7
+  },
+  {
+   "file": "domains/customer-finance/application/payments.service.ts",
+   "cls": "PaymentsService",
+   "loc": 371,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/customer-finance/interface/customer-ledger.controller.ts",
+   "cls": "CustomerLedgerController",
+   "loc": 56,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/customer-finance/interface/invoices.controller.ts",
+   "cls": "InvoicesController",
+   "loc": 83,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/customer-finance/interface/payments.controller.ts",
+   "cls": "PaymentsController",
+   "loc": 173,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/delivery/application/delivery.service.ts",
+   "cls": "DeliveryService",
+   "loc": 484,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/delivery/interface/delivery.controller.ts",
+   "cls": "DeliveryController",
+   "loc": 112,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/deposit-control/application/deposits.service.ts",
+   "cls": "DepositsService",
+   "loc": 333,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/deposit-control/interface/deposits.controller.ts",
+   "cls": "ApproveDepositDto",
+   "loc": 93,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/fulfillment/application/fulfillment.service.ts",
+   "cls": "FulfillmentService",
+   "loc": 483,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/fulfillment/interface/fulfillment.controller.ts",
+   "cls": "FulfillmentController",
+   "loc": 149,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/hr/application/hr.service.ts",
+   "cls": "HrService",
+   "loc": 589,
+   "specs": 11,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/hr/interface/hr.controller.ts",
+   "cls": "HrController",
+   "loc": 265,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/inventory-valuation/application/inventory-valuation.service.ts",
+   "cls": "InventoryValuationService",
+   "loc": 66,
+   "specs": 11,
+   "realDbSpecs": 11
+  },
+  {
+   "file": "domains/inventory-valuation/application/moving-average-cost-engine.service.ts",
+   "cls": "MovingAverageCostEngine",
+   "loc": 420,
+   "specs": 11,
+   "realDbSpecs": 11
+  },
+  {
+   "file": "domains/inventory-valuation/interface/inventory-valuation.controller.ts",
+   "cls": "InventoryValuationController",
+   "loc": 43,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/inventory-warehouse/application/inventory.service.ts",
+   "cls": "InventoryService",
+   "loc": 1755,
+   "specs": 25,
+   "realDbSpecs": 21
+  },
+  {
+   "file": "domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+   "cls": "WarehouseTransactionsService",
+   "loc": 683,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/inventory-warehouse/interface/inventory.controller.ts",
+   "cls": "InventoryController",
+   "loc": 589,
+   "specs": 5,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/inventory-warehouse/interface/warehouse-transactions.controller.ts",
+   "cls": "WarehouseTransactionsController",
+   "loc": 229,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/manufacturing/application/manufacturing-wip-ledger.service.ts",
+   "cls": "ManufacturingWipLedgerService",
+   "loc": 49,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/manufacturing/application/routing.service.ts",
+   "cls": "RoutingService",
+   "loc": 224,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/manufacturing/application/work-center.service.ts",
+   "cls": "WorkCenterService",
+   "loc": 121,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/manufacturing/application/work-order.service.ts",
+   "cls": "WorkOrderService",
+   "loc": 876,
+   "specs": 8,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/manufacturing/interface/manufacturing-bom.controller.ts",
+   "cls": "ManufacturingBomController",
+   "loc": 105,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/manufacturing/interface/routing.controller.ts",
+   "cls": "RoutingController",
+   "loc": 109,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/manufacturing/interface/work-center.controller.ts",
+   "cls": "WorkCenterController",
+   "loc": 89,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/manufacturing/interface/work-order.controller.ts",
+   "cls": "WorkOrderController",
+   "loc": 191,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/payroll/application/payroll.service.ts",
+   "cls": "PayrollService",
+   "loc": 611,
+   "specs": 3,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/payroll/interface/payroll.controller.ts",
+   "cls": "PayrollController",
+   "loc": 207,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/procurement/application/goods-receipt.service.ts",
+   "cls": "GoodsReceiptService",
+   "loc": 204,
+   "specs": 5,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/procurement/application/grni-ledger.service.ts",
+   "cls": "GrniLedgerService",
+   "loc": 68,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/procurement/application/new-item-request.service.ts",
+   "cls": "NewItemRequestService",
+   "loc": 161,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/application/product-lifecycle-gate.service.ts",
+   "cls": "ProductLifecycleGate",
+   "loc": 42,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/procurement/application/purchase-order.service.ts",
+   "cls": "PurchaseOrderService",
+   "loc": 165,
+   "specs": 8,
+   "realDbSpecs": 6
+  },
+  {
+   "file": "domains/procurement/application/purchase-request.service.ts",
+   "cls": "PurchaseRequestService",
+   "loc": 194,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/procurement/application/rfq.service.ts",
+   "cls": "RfqService",
+   "loc": 302,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/procurement/application/supplier-invoice.service.ts",
+   "cls": "SupplierInvoiceService",
+   "loc": 526,
+   "specs": 7,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "domains/procurement/application/supplier-ledger.service.ts",
+   "cls": "SupplierLedgerService",
+   "loc": 199,
+   "specs": 8,
+   "realDbSpecs": 7
+  },
+  {
+   "file": "domains/procurement/application/supplier-payment.service.ts",
+   "cls": "SupplierPaymentService",
+   "loc": 183,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/procurement/application/supplier.service.ts",
+   "cls": "SupplierService",
+   "loc": 304,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/procurement/interface/goods-receipt.controller.ts",
+   "cls": "GoodsReceiptController",
+   "loc": 66,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/new-item-request.controller.ts",
+   "cls": "NewItemRequestController",
+   "loc": 62,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/procurement/interface/purchase-order.controller.ts",
+   "cls": "PurchaseOrderController",
+   "loc": 130,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/purchase-request.controller.ts",
+   "cls": "PurchaseRequestController",
+   "loc": 141,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/rfq.controller.ts",
+   "cls": "RfqController",
+   "loc": 98,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/supplier-invoice.controller.ts",
+   "cls": "SupplierInvoiceController",
+   "loc": 135,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/supplier-payment.controller.ts",
+   "cls": "SupplierPaymentController",
+   "loc": 72,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/procurement/interface/supplier.controller.ts",
+   "cls": "SupplierController",
+   "loc": 268,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/reports/application/customer-accounts.service.ts",
+   "cls": "CustomerAccountsService",
+   "loc": 260,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/reports/application/reports.service.ts",
+   "cls": "ReportsService",
+   "loc": 260,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/reports/interface/reports.controller.ts",
+   "cls": "ReportsController",
+   "loc": 209,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/returns/application/order-line-return-capacity.service.ts",
+   "cls": "OrderLineReturnCapacityService",
+   "loc": 103,
+   "specs": 4,
+   "realDbSpecs": 4
+  },
+  {
+   "file": "domains/returns/application/return-financials.service.ts",
+   "cls": "ReturnFinancialsService",
+   "loc": 289,
+   "specs": 4,
+   "realDbSpecs": 4
+  },
+  {
+   "file": "domains/returns/application/returns.service.ts",
+   "cls": "ReturnsService",
+   "loc": 773,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/returns/application/sales-returns.service.ts",
+   "cls": "SalesReturnsService",
+   "loc": 288,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/returns/application/shipment-returns.service.ts",
+   "cls": "ShipmentReturnsService",
+   "loc": 319,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "domains/returns/interface/returns.controller.ts",
+   "cls": "ReturnsController",
+   "loc": 155,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/returns/interface/sales-returns.controller.ts",
+   "cls": "SalesReturnsController",
+   "loc": 118,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/returns/interface/shipment-returns.controller.ts",
+   "cls": "ShipmentReturnsController",
+   "loc": 99,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/sales/application/sales.service.ts",
+   "cls": "SalesService",
+   "loc": 59,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/sales/interface/sales.controller.ts",
+   "cls": "SalesController",
+   "loc": 44,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/sales-orders/application/sales-orders.service.ts",
+   "cls": "SalesOrdersService",
+   "loc": 1267,
+   "specs": 11,
+   "realDbSpecs": 9
+  },
+  {
+   "file": "domains/sales-orders/interface/sales-orders.controller.ts",
+   "cls": "SalesOrdersController",
+   "loc": 298,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/shipment/application/shipment.service.ts",
+   "cls": "ShipmentService",
+   "loc": 1455,
+   "specs": 4,
+   "realDbSpecs": 4
+  },
+  {
+   "file": "domains/shipment/interface/shipment.controller.ts",
+   "cls": "ShipmentController",
+   "loc": 419,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "domains/targets/application/target.service.ts",
+   "cls": "TargetService",
+   "loc": 211,
+   "specs": 4,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "domains/targets/interface/target.controller.ts",
+   "cls": "TargetController",
+   "loc": 73,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "domains/treasury/application/treasury.service.ts",
+   "cls": "TreasuryService",
+   "loc": 1056,
+   "specs": 15,
+   "realDbSpecs": 12
+  },
+  {
+   "file": "domains/treasury/interface/treasury.controller.ts",
+   "cls": "CashMoveDto",
+   "loc": 287,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/admin/admin.controller.ts",
+   "cls": "AdminController",
+   "loc": 162,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/admin/sales-reps-directory.controller.ts",
+   "cls": "SalesRepsDirectoryController",
+   "loc": 34,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/approval-engine/approval-engine.service.ts",
+   "cls": "ApprovalEngineService",
+   "loc": 560,
+   "specs": 26,
+   "realDbSpecs": 15
+  },
+  {
+   "file": "foundation/approval-engine/approval.controller.ts",
+   "cls": "ApprovalController",
+   "loc": 143,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/audit/audit.service.ts",
+   "cls": "AuditService",
+   "loc": 161,
+   "specs": 76,
+   "realDbSpecs": 73
+  },
+  {
+   "file": "foundation/audit/company-audit.controller.ts",
+   "cls": "CompanyAuditController",
+   "loc": 51,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/audit/installation-audit.controller.ts",
+   "cls": "InstallationAuditController",
+   "loc": 65,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/authentication/auth-me.service.ts",
+   "cls": "AuthMeService",
+   "loc": 233,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/authentication/auth.controller.ts",
+   "cls": "AuthController",
+   "loc": 219,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/authentication/auth.service.ts",
+   "cls": "AuthService",
+   "loc": 293,
+   "specs": 6,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/authorization/authorization-context.service.ts",
+   "cls": "AuthorizationContextService",
+   "loc": 89,
+   "specs": 10,
+   "realDbSpecs": 9
+  },
+  {
+   "file": "foundation/authorization/authorization.service.ts",
+   "cls": "AuthorizationService",
+   "loc": 106,
+   "specs": 58,
+   "realDbSpecs": 50
+  },
+  {
+   "file": "foundation/company/company-access-scope.controller.ts",
+   "cls": "CompanyAccessScopeController",
+   "loc": 122,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/company/company-activation.service.ts",
+   "cls": "CompanyActivationService",
+   "loc": 45,
+   "specs": 6,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "foundation/company/company-invitation.service.ts",
+   "cls": "CompanyInvitationService",
+   "loc": 218,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/company/company-invitations-public.controller.ts",
+   "cls": "CompanyInvitationsPublicController",
+   "loc": 55,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/company/company-membership-provisioning.service.ts",
+   "cls": "LastAdminError",
+   "loc": 250,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/company/company-registry.controller.ts",
+   "cls": "CompanyRegistryController",
+   "loc": 327,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "foundation/company/company-registry.service.ts",
+   "cls": "InvalidCompanyTransitionError",
+   "loc": 58,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/company/company-role-management.service.ts",
+   "cls": "CompanyRoleManagementService",
+   "loc": 539,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/company/company-roles.controller.ts",
+   "cls": "CompanyRolesController",
+   "loc": 112,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/company/company-user-management.service.ts",
+   "cls": "CompanyUserManagementService",
+   "loc": 283,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "foundation/company/company-users.controller.ts",
+   "cls": "CompanyUsersController",
+   "loc": 122,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/company/company.service.ts",
+   "cls": "CompanyService",
+   "loc": 63,
+   "specs": 8,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "foundation/company/installation-membership.controller.ts",
+   "cls": "InstallationMembershipController",
+   "loc": 77,
+   "specs": 3,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/company/membership-operation.service.ts",
+   "cls": "MembershipOperationService",
+   "loc": 71,
+   "specs": 8,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "foundation/company/membership.service.ts",
+   "cls": "MembershipService",
+   "loc": 84,
+   "specs": 17,
+   "realDbSpecs": 12
+  },
+  {
+   "file": "foundation/company/memberships-mine.controller.ts",
+   "cls": "MembershipsMineController",
+   "loc": 64,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/configuration/app-config.service.ts",
+   "cls": "AppConfigService",
+   "loc": 292,
+   "specs": 16,
+   "realDbSpecs": 11
+  },
+  {
+   "file": "foundation/configuration-engine/configuration-engine.service.ts",
+   "cls": "ConfigurationEngineService",
+   "loc": 304,
+   "specs": 22,
+   "realDbSpecs": 21
+  },
+  {
+   "file": "foundation/configuration-engine/configuration.controller.ts",
+   "cls": "ConfigurationController",
+   "loc": 114,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/database-provisioning/database-provisioning.service.ts",
+   "cls": "ProvisioningFailedError",
+   "loc": 289,
+   "specs": 3,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/database-registry/company-connection-manager.service.ts",
+   "cls": "CompanyDatabaseNotProvisionedError",
+   "loc": 110,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/database-registry/database-credential-cipher.service.ts",
+   "cls": "DatabaseCredentialCipherService",
+   "loc": 43,
+   "specs": 12,
+   "realDbSpecs": 9
+  },
+  {
+   "file": "foundation/database-registry/database-registry.service.ts",
+   "cls": "DatabaseRegistryService",
+   "loc": 112,
+   "specs": 14,
+   "realDbSpecs": 10
+  },
+  {
+   "file": "foundation/entitlement/entitlement.controller.ts",
+   "cls": "EntitlementController",
+   "loc": 89,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/entitlement/entitlement.service.ts",
+   "cls": "EntitlementService",
+   "loc": 295,
+   "specs": 4,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "foundation/entitlement/installation-bootstrap.service.ts",
+   "cls": "InstallationBootstrapService",
+   "loc": 80,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/error-contract/idempotency.service.ts",
+   "cls": "IdempotencyService",
+   "loc": 119,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "foundation/events/event-bus.service.ts",
+   "cls": "EventBusService",
+   "loc": 256,
+   "specs": 54,
+   "realDbSpecs": 52
+  },
+  {
+   "file": "foundation/excel/excel.service.ts",
+   "cls": "ExcelService",
+   "loc": 116,
+   "specs": 4,
+   "realDbSpecs": 4
+  },
+  {
+   "file": "foundation/identity/users.service.ts",
+   "cls": "UsersService",
+   "loc": 104,
+   "specs": 16,
+   "realDbSpecs": 13
+  },
+  {
+   "file": "foundation/integrations/application/credential-cipher.service.ts",
+   "cls": "CredentialCipherService",
+   "loc": 47,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/integrations/application/integrations.service.ts",
+   "cls": "IntegrationsService",
+   "loc": 627,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/integrations/interface/integration-order-intake.controller.ts",
+   "cls": "IntegrationOrderIntakeController",
+   "loc": 70,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/integrations/interface/integrations.controller.ts",
+   "cls": "IntegrationsController",
+   "loc": 198,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/limit-engine/limit.controller.ts",
+   "cls": "LimitController",
+   "loc": 58,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/limit-engine/limit.service.ts",
+   "cls": "LimitService",
+   "loc": 277,
+   "specs": 9,
+   "realDbSpecs": 9
+  },
+  {
+   "file": "foundation/localization/localization.service.ts",
+   "cls": "LocalizationService",
+   "loc": 40,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/media/media.controller.ts",
+   "cls": "MediaController",
+   "loc": 102,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/media/media.service.ts",
+   "cls": "MediaService",
+   "loc": 54,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/module-lifecycle/module-lifecycle.service.ts",
+   "cls": "ModuleLifecycleService",
+   "loc": 194,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/navigation/navigation.controller.ts",
+   "cls": "NavigationController",
+   "loc": 26,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/navigation/navigation.service.ts",
+   "cls": "NavigationService",
+   "loc": 87,
+   "specs": 2,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/numbering/numbering.service.ts",
+   "cls": "NumberingService",
+   "loc": 97,
+   "specs": 56,
+   "realDbSpecs": 55
+  },
+  {
+   "file": "foundation/observability/daii-logger.service.ts",
+   "cls": "DaiiLoggerService",
+   "loc": 28,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/observability/health.service.ts",
+   "cls": "HealthService",
+   "loc": 57,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/observability/metrics.service.ts",
+   "cls": "MetricsService",
+   "loc": 37,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/organization/organization.controller.ts",
+   "cls": "OrganizationController",
+   "loc": 91,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/organization/organization.service.ts",
+   "cls": "OrganizationService",
+   "loc": 114,
+   "specs": 9,
+   "realDbSpecs": 8
+  },
+  {
+   "file": "foundation/permission/permission.service.ts",
+   "cls": "PermissionService",
+   "loc": 70,
+   "specs": 31,
+   "realDbSpecs": 24
+  },
+  {
+   "file": "foundation/plans/company-entitlement.service.ts",
+   "cls": "CompanyEntitlementService",
+   "loc": 103,
+   "specs": 3,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/plans/company-package.service.ts",
+   "cls": "CompanyPackageService",
+   "loc": 173,
+   "specs": 3,
+   "realDbSpecs": 3
+  },
+  {
+   "file": "foundation/plans/company-view-context.service.ts",
+   "cls": "CompanyViewContextService",
+   "loc": 43,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/plans/plan.service.ts",
+   "cls": "PlanService",
+   "loc": 209,
+   "specs": 3,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/plans/plans.controller.ts",
+   "cls": "PlansController",
+   "loc": 122,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/platform/integration-catalog.service.ts",
+   "cls": "IntegrationCatalogService",
+   "loc": 75,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/platform/platform.controller.ts",
+   "cls": "PlatformController",
+   "loc": 99,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/platform/support-access.service.ts",
+   "cls": "SupportAccessService",
+   "loc": 177,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/process-engine/process-engine.service.ts",
+   "cls": "ProcessEngineService",
+   "loc": 150,
+   "specs": 49,
+   "realDbSpecs": 48
+  },
+  {
+   "file": "foundation/release/backup-manager.service.ts",
+   "cls": "BackupManagerService",
+   "loc": 482,
+   "specs": 5,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/release/backup-operation.service.ts",
+   "cls": "BackupOperationService",
+   "loc": 76,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/backup-scheduler.service.ts",
+   "cls": "BackupSchedulerService",
+   "loc": 92,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/company-backup.controller.ts",
+   "cls": "CompanyBackupController",
+   "loc": 68,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/company-fanout.service.ts",
+   "cls": "CompanyFanoutBlockedError",
+   "loc": 371,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/release/data-repair.service.ts",
+   "cls": "DataRepairService",
+   "loc": 284,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/deploy-preflight.service.ts",
+   "cls": "DeployPreflightService",
+   "loc": 196,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/lkg-registry.service.ts",
+   "cls": "LkgRegistryService",
+   "loc": 179,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/package-validator.service.ts",
+   "cls": "PackageValidatorService",
+   "loc": 261,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/pg-dump-runner.service.ts",
+   "cls": "PgDumpRunnerService",
+   "loc": 243,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/release/release-execution.service.ts",
+   "cls": "PostSwapReadinessError",
+   "loc": 1669,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/release-health-check.service.ts",
+   "cls": "ReleaseHealthCheckService",
+   "loc": 164,
+   "specs": 2,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/release/release-manager.service.ts",
+   "cls": "ReleaseManagerService",
+   "loc": 313,
+   "specs": 1,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/release/release.controller.ts",
+   "cls": "ReleaseController",
+   "loc": 422,
+   "specs": 1,
+   "realDbSpecs": 1
+  },
+  {
+   "file": "foundation/release/restore-manager.service.ts",
+   "cls": "RestoreManagerService",
+   "loc": 269,
+   "specs": 3,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/release/staged-activation.service.ts",
+   "cls": "RollbackFailedSafeError",
+   "loc": 374,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/scope/access-scope.service.ts",
+   "cls": "AccessScopeService",
+   "loc": 345,
+   "specs": 5,
+   "realDbSpecs": 5
+  },
+  {
+   "file": "foundation/scope/scope-resolver.service.ts",
+   "cls": "ScopeResolver",
+   "loc": 90,
+   "specs": 2,
+   "realDbSpecs": 2
+  },
+  {
+   "file": "foundation/scope/scope.service.ts",
+   "cls": "ScopeService",
+   "loc": 80,
+   "specs": 4,
+   "realDbSpecs": 4
+  },
+  {
+   "file": "foundation/terminology/terminology.controller.ts",
+   "cls": "TerminologyController",
+   "loc": 15,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "foundation/terminology/terminology.service.ts",
+   "cls": "TerminologyService",
+   "loc": 76,
+   "specs": 0,
+   "realDbSpecs": 0
+  },
+  {
+   "file": "health/health.controller.ts",
+   "cls": "HealthController",
+   "loc": 46,
+   "specs": 0,
+   "realDbSpecs": 0
+  }
+ ]
+}
