@@ -10,6 +10,7 @@
     "start:dev": "nest start --watch",
     "lint": "eslint \"{src,tools,test}/**/*.ts\"",
     "test": "jest",
+    "test:biz": "node tools/testing/biz-run.js",
     "test:unit": "jest -c jest.unit.config.js --silent",
     "test:unit:probe": "jest -c tools/testing/unit-mode-probe/jest.probe.config.js",
     "test:unit:static": "node --test tools/testing/unit-mode.test.js",
