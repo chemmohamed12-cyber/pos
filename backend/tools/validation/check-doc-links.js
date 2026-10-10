@@ -10,10 +10,9 @@ const fs = require('fs'); const path = require('path');
 const REPO = path.resolve(__dirname, '..', '..', '..'); // release-new
 const ROOTS = ['README.md', 'MASTER_ARCHITECTURE.md', 'MASTER_HANDOVER.md', 'MASTER_PROJECT_STATUS.md', 'LOCAL_DEVELOPMENT.md', 'FINAL_RELEASE_REPORT.md', 'architecture', 'planning', 'docs', '_source-audits', 'backend/README.md', 'backend/docs/DAII_ENGINEERING_GOVERNANCE.md'];
 const KNOWN_EXTERNAL = [
-  { re: /(^|\/)(baseline|30|xnexus-website)(\/|$)/, why: 'XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README "Daii is NOT a clone of …")' },
-  { re: /^(\.\.\/)+(\.\.\/)?(1-hosting|hosting)\b/, why: 'workspace-level path outside the repository' },
-  { re: /LOCAL_DEV_CREDENTIALS\.md$/, why: 'credentials file — deliberately never placed under version control' },
-  { re: /^\.\/storage\/media$/, why: 'runtime upload directory created by the application, not a document' },
+  { re: /(^|\/)(baseline|30|xnexus-website)(\/|$)/, file: /^(README\.md|MASTER_HANDOVER\.md)$/, why: 'XNEXUS source systems referenced as read-only inspiration; outside this repository by design (see README "Daii is NOT a clone of …")' },
+  { re: /LOCAL_DEV_CREDENTIALS\.md$/, file: /^(LOCAL_DEVELOPMENT\.md|planning[\\/]v1-release[\\/]HANDOVER_)/, why: 'credentials file — deliberately never placed under version control' },
+  { re: /^\.\/storage\/media$/, file: /DEPLOYMENT_GUIDE\.md$/, why: 'runtime upload directory created by the application, not a document' },
   { re: /backend\/src\/(database\/migrations\/\d{13}-|domains\/.*\.spec\.ts)/, file: /HANDOVER_SALES_ORDER_TREASURY_WAREHOUSE\.md$/, why: 'historical handover written before migrations were split into per-tag folders; kept verbatim as the authoritative record of that date' },
 ];
 const files = [];

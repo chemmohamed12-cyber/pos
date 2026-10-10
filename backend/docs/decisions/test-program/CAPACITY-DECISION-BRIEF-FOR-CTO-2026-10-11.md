@@ -1,5 +1,7 @@
 # D-10 — Capacity decision brief (one decision requested)
 
+**Decision D-03 (2026-10-11):** the T-16 figures are accepted as a **local baseline only** (not production or hosting capacity); final workload targets and thresholds remain **gated** — nothing below is classified PASS/FAIL until the approver signs the targets in section D; staging/hosting load tests may not run until an authorised staging-like environment, a separate load-generator machine and a named load-test authoriser exist (no production, protected hosting or protected port is authorised). No target value in this brief has been approved or invented by the team.
+
 Status: **PROPOSAL FOR APPROVAL.** Nothing below is an approved requirement; T-16 is **not** labelled PASS or FAIL. Detail and rationale: `CAPACITY-WORKLOAD-ASSUMPTIONS-AND-PROPOSED-TARGETS-2026-10-10.md`; reproducible staging profile: `STAGING-CAPACITY-PROFILE-2026-10-11.md` + `tools/testing/capacity-loadgen.js`; event-outbox behaviour: `EVENT-OUTBOX-DISPATCH-BEHAVIOUR-2026-10-11.md`.
 
 ## A. Measured facts (local, 2-core laptop, app + load generator + PostgreSQL on one machine, fsync off)
