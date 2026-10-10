@@ -183,7 +183,9 @@ export class AppConfigService {
     const rawKeys = this.configService.get<string>('ENTITLEMENT_PUBLIC_KEYS') ?? '[]';
     let publicKeys: EntitlementPublicKeyConfig[] = [];
     try {
-      const parsed: unknown = JSON.parse(rawKeys);
+      // JSON objects cannot survive an environment editor that strips double quotes: `base64:<base64 of the JSON>` is accepted as well
+      const jsonText = rawKeys.startsWith('base64:') ? Buffer.from(rawKeys.slice('base64:'.length), 'base64').toString('utf8') : rawKeys;
+      const parsed: unknown = JSON.parse(jsonText);
       if (Array.isArray(parsed)) {
         publicKeys = parsed.filter(
           (k): k is EntitlementPublicKeyConfig =>
@@ -191,7 +193,7 @@ export class AppConfigService {
         );
       }
     } catch (err) {
-      throw new Error(`Config ENTITLEMENT_PUBLIC_KEYS is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`Config ENTITLEMENT_PUBLIC_KEYS is not valid JSON: ${err instanceof Error ? err.message : String(err)} (if the host's environment editor strips double quotes, set it as base64:<base64 of the JSON>)`);
     }
     return {
       mode: this.configService.get<'unlicensed-full' | 'enforced'>('ENTITLEMENT_MODE')!,
@@ -263,17 +265,27 @@ export class AppConfigService {
   }
 }
 
-/** Parses a JSON string array config value; a malformed value is a loud error, never a silent `[]`. */
-function parseJsonStringArray(raw: string | undefined, key: string): string[] {
-  if (raw === undefined || raw === null || raw === '') return [];
-  let parsed: unknown;
+/**
+ * Parses a list-of-strings config value: a JSON array (`["a","b"]`) OR a plain list (`a,b` / `[a,b]`), quotes optional. A malformed value is a loud error, never a silent `[]`.
+ * The shared host's environment-variable editor delivers `["a","b"]` WITHOUT its double quotes (release 1.1.7: `[a,b]`), which used to be a plain "not valid JSON" error.
+ */
+export function parseJsonStringArray(raw: string | undefined, key: string): string[] {
+  if (raw === undefined || raw === null || raw.trim() === '') return [];
+  let items: unknown[];
   try {
-    parsed = JSON.parse(raw);
+    const json = JSON.parse(raw);
+    if (!Array.isArray(json)) throw new Error(`Config ${key} must be a list of strings.`);
+    items = json;
   } catch (err) {
-    throw new Error(`Config ${key} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    if (err instanceof Error && err.message.startsWith(`Config ${key}`)) throw err;
+    items = raw
+      .trim()
+      .replace(/^\[/, '')
+      .replace(/\]$/, '')
+      .split(/[\s,;]+/)
+      .map((x) => x.replace(/^["'`]+|["'`]+$/g, ''))
+      .filter((x) => x.length > 0);
   }
-  if (!Array.isArray(parsed) || parsed.some((x) => typeof x !== 'string')) {
-    throw new Error(`Config ${key} must be a JSON array of strings.`);
-  }
-  return parsed as string[];
+  if (items.some((x) => typeof x !== 'string')) throw new Error(`Config ${key} must be a list of strings.`);
+  return items as string[];
 }
