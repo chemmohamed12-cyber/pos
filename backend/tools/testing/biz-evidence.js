@@ -61,9 +61,15 @@ function writeHeader(run, extra = {}) {
     testId: run.testId,
     runId: run.runId,
     startedAt: run.startedAt,
-    commit: git(['rev-parse', 'HEAD']),
-    branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
-    dirtyPaths: git(['status', '--porcelain', '--', 'backend/src', 'backend/tools']).split(/\r?\n/).filter(Boolean),
+    // A run executed from a CLEAN `git archive` snapshot (not a git checkout) pins the snapshot's own source commit through DAII_SOURCE_COMMIT (40 hex);
+    // reading the parent repository's moving HEAD would attribute the evidence to whatever was committed meanwhile.
+    ...(/^[0-9a-f]{40}$/.test(env.DAII_SOURCE_COMMIT || '')
+      ? { commit: env.DAII_SOURCE_COMMIT, branch: 'clean-snapshot', dirtyPaths: [], sourceKind: 'clean-git-archive-snapshot' }
+      : {
+        commit: git(['rev-parse', 'HEAD']),
+        branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
+        dirtyPaths: git(['status', '--porcelain', '--', 'backend/src', 'backend/tools']).split(/\r?\n/).filter(Boolean),
+      }),
     applicationVersion: pkg.version,
     node: process.version,
     environment: { DB_HOST: env.DB_HOST, DB_PORT: env.DB_PORT, DB_USER: env.DB_USER, DB_NAME: env.DB_NAME, COMPANY_DB_MODE: env.COMPANY_DB_MODE },
