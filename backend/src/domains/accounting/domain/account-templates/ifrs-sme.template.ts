@@ -52,6 +52,12 @@ export const IFRS_SME_TEMPLATE: AccountTemplate = {
     { code: '1120', nameEn: 'Inventory', nameAr: 'المخزون', accountType: 'asset', parentCode: '11', controlFunction: 'inventory' },
     { code: '1130', nameEn: 'Prepaid Expenses', nameAr: 'مصروفات مدفوعة مقدمًا', accountType: 'asset', parentCode: '11' },
     { code: '1140', nameEn: 'Input VAT / Recoverable Tax', nameAr: 'ضريبة القيمة المضافة — المشتريات', accountType: 'asset', parentCode: '11', controlFunction: 'tax_receivable' },
+    // ADR-061 (Manufacturing) — the account every Work Order Financial Event reclassifies Inventory into/out of
+    // (Dr WIP / Cr Inventory on issue; Dr Inventory / Cr WIP on return and finished-goods output). Always present,
+    // even for a Company with no Manufacturing entitlement: an unused zero-balance asset control account is inert
+    // (WIP reconciliation reports `no_subledger_source` with or without it), whereas omitting it makes the first
+    // Manufacturing event of an entitled Company REJECT until someone hand-assigns one (handoff H2).
+    { code: '1150', nameEn: 'Work in Process', nameAr: 'إنتاج تحت التشغيل', accountType: 'asset', parentCode: '11', controlFunction: 'wip' },
     { code: '12', nameEn: 'Non-Current Assets', nameAr: 'الأصول غير المتداولة', accountType: 'asset', isPostable: false, parentCode: '1' },
     { code: '1201', nameEn: 'Property, Plant & Equipment', nameAr: 'الممتلكات والآلات والمعدات', accountType: 'asset', parentCode: '12' },
     { code: '1202', nameEn: 'Accumulated Depreciation', nameAr: 'مجمع الإهلاك', accountType: 'asset', parentCode: '12', isContra: true },

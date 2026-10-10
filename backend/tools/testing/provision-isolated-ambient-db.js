@@ -22,8 +22,10 @@
  *      `admin` role and a credential (random password, never printed)
  *   5. import the standard IFRS-SME chart of accounts (the financial specs post to
  *      control accounts such as `ar`, `wages_payable`, `wip`); this is the same
- *      opt-in template the product offers, built from the compiled application code
- *   6. open fiscal years covering today, a `wip` control account, a GL-mapped treasury
+ *      opt-in template the product offers, built from the compiled application code.
+ *      The template itself carries the `wip` control account (1150) since handoff H2 —
+ *      it is not added by hand here
+ *   6. open fiscal years covering today, a `grni` control account, a GL-mapped treasury
  *      account, and one supplier / warehouse / product — the minimum base rows the
  *      financial and procurement suites select with `LIMIT 1`
  * Everything else (config keys, role templates, terminology) is seeded by the
@@ -117,12 +119,6 @@ async function main() {
   console.log(`imported chart of accounts "${templateKey}": ${template.accounts.length} accounts`);
 
   // 6. period, account-mapping and base-row fixtures
-  const wipParent = ids.get('11') ?? null;
-  await db.query(
-    `INSERT INTO accounting_gl_accounts ("code","name","nameAr","accountType","normalBalance","isContra","parentAccountId","isPostable","controlFunction","currencyMode","allowManualJournal","isActive")
-     VALUES ('1150','Work in Progress','أعمال تحت التنفيذ','asset','debit',false,$1,true,'wip','functional_only',false,true)`,
-    [wipParent],
-  );
   await db.query(`UPDATE treasury_accounts SET "glAccountCode" = '1101' WHERE code = 'MAIN-CASH'`);
   await db.query(
     `INSERT INTO accounting_gl_accounts ("code","name","nameAr","accountType","normalBalance","isContra","parentAccountId","isPostable","controlFunction","currencyMode","allowManualJournal","isActive")
@@ -132,7 +128,7 @@ async function main() {
   await db.query(`INSERT INTO warehouses ("code","name","status","kind") VALUES ('WH-MAIN','Main Warehouse','active','main')`);
   await db.query(`INSERT INTO products ("sku","name","unitPrice","status") VALUES ('FIX-PROD-1','Fixture Product',10,'active')`);
   await db.query(`INSERT INTO suppliers ("code","legalName","status") VALUES ('SUP-FIX-1','Fixture Supplier','active')`);
-  console.log('seeded wip + grni control accounts, GL-mapped treasury account, warehouse/product/supplier');
+  console.log('seeded grni control account, GL-mapped treasury account, warehouse/product/supplier');
   await db.end();
 
   // 7. the current fiscal year — created through the application's own service so its process instances
