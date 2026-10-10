@@ -33,18 +33,41 @@ export class CompanyDatabaseAllocationError extends Error {
 
 const SAFE_NAME = /^[A-Za-z0-9_]{1,63}$/;
 
+/** `COMPANY_DB_POOL` is not usable. Thrown as a classified error so the API answers with the real reason instead of "An unexpected error occurred". */
+export class CompanyDatabaseConfigError extends Error {
+  readonly code = 'COMPANY_DB_POOL_INVALID';
+}
+
+/**
+ * The pool of pre-created databases. Accepts a JSON array (`["a","b"]`) OR a plain list (`a,b` / `[a,b]` / `a b`), quotes optional.
+ * Why: the shared host's environment-variable editor delivers `["a","b","c"]` to the application WITHOUT its double quotes (`[a,b,c]`) — release 1.1.7 on the host failed with
+ * `COMPANY_DB_POOL is not valid JSON: Unexpected token 'x', "[xnexdrgr_d"...`. Every entry is still validated as a plain database identifier.
+ */
 export function parseCompanyDatabasePool(raw: string | undefined | null): string[] {
   if (raw === undefined || raw === null || raw.trim() === '') return [];
-  let parsed: unknown;
+  let items: unknown[];
   try {
-    parsed = JSON.parse(raw);
+    const json = JSON.parse(raw);
+    if (!Array.isArray(json)) throw new CompanyDatabaseConfigError('COMPANY_DB_POOL must be a list of database names.');
+    items = json;
   } catch (err) {
-    throw new Error(`Config COMPANY_DB_POOL is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    if (err instanceof CompanyDatabaseConfigError) throw err;
+    // not JSON: a plain list, optionally wrapped in [ ] and with quotes left in or stripped
+    items = raw
+      .trim()
+      .replace(/^\[/, '')
+      .replace(/\]$/, '')
+      .split(/[\s,;]+/)
+      .map((s) => s.replace(/^["'`]+|["'`]+$/g, ''))
+      .filter((s) => s.length > 0);
   }
-  if (!Array.isArray(parsed) || parsed.some((x) => typeof x !== 'string' || !SAFE_NAME.test(x))) {
-    throw new Error('Config COMPANY_DB_POOL must be a JSON array of database names (letters, digits, underscore; max 63 characters).');
+  const bad = items.filter((x) => typeof x !== 'string' || !SAFE_NAME.test(x));
+  if (bad.length > 0) {
+    throw new CompanyDatabaseConfigError(
+      `COMPANY_DB_POOL contains an entry that is not a database name (letters, digits, underscore; max 63 characters): ${bad.slice(0, 3).map((b) => JSON.stringify(b)).join(', ')}. Use a comma-separated list such as: xnexdrgr_daii_c01,xnexdrgr_daii_c02`,
+    );
   }
-  return [...new Set(parsed as string[])];
+  return [...new Set(items as string[])];
 }
 
 async function withConnection<T>(target: ConnectionTarget, database: string, fn: (ds: DataSource) => Promise<T>): Promise<T> {

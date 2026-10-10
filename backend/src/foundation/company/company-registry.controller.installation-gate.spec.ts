@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { CompanyRegistryController } from './company-registry.controller';
 import * as allocator from './company-database-allocator';
+import { parseCompanyDatabasePool as parsePool } from './company-database-allocator';
 import { DaiiException } from '../error-contract/daii-exception';
 
 /**
@@ -38,5 +39,17 @@ describe('CompanyRegistryController.create — installation gate', () => {
     jest.spyOn(allocator, 'allocateCompanyDatabase').mockResolvedValue({ databaseName: 'company_x', origin: 'created' });
     await expect(controller.create(dto)).rejects.toThrow('STOP-AFTER-PROVISION');
     expect(companyRegistry.provision).toHaveBeenCalledWith('installation', 'Acme');
+  });
+
+  it('a mis-set COMPANY_DB_POOL => 422 COMPANY_DB_POOL_INVALID naming the problem, before anything is allocated or created (was "An unexpected error occurred")', async () => {
+    const { controller, companyRegistry, databaseProvisioning } = build(true);
+    const config = (controller as unknown as { config: Record<string, unknown> }).config;
+    Object.defineProperty(config, 'companyDatabase', { get: () => parsePool('ok_one,db-name'), configurable: true });
+    const err = await controller.create(dto).catch((e) => e);
+    expect(err.getStatus()).toBe(422);
+    expect(err.getResponse()).toMatchObject({ code: 'COMPANY_DB_POOL_INVALID', stage: 'configuration' });
+    expect(err.getResponse().message).toContain('db-name');
+    expect(companyRegistry.provision).not.toHaveBeenCalled();
+    expect(databaseProvisioning.provision).not.toHaveBeenCalled();
   });
 });

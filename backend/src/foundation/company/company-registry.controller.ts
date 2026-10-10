@@ -3,7 +3,7 @@ import { BadRequestException, Body, Controller, Get, HttpStatus, NotFoundExcepti
 import { DaiiException } from '../error-contract/daii-exception';
 import { EntitlementService } from '../entitlement/entitlement.service';
 import { Logger } from '@nestjs/common';
-import { allocateCompanyDatabase, CompanyDatabaseAllocationError, CompanyDatabaseConfig, ConnectionTarget, serializeAllocation } from './company-database-allocator';
+import { allocateCompanyDatabase, CompanyDatabaseAllocationError, CompanyDatabaseConfig, CompanyDatabaseConfigError, ConnectionTarget, serializeAllocation } from './company-database-allocator';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
@@ -154,7 +154,17 @@ export class CompanyRegistryController {
     // shared PostgreSQL host), nothing has been created yet and the operator gets the real reason instead of "An unexpected error occurred".
     // The initial administrator must exist BEFORE anything is allocated or created: failing here later would leave a PROVISIONING Company and a consumed database.
     await this.assertInitialAdmin(dto.initialAdminUserId);
-    const cfg = this.config.companyDatabase;
+    let cfg: CompanyDatabaseConfig;
+    try {
+      cfg = this.config.companyDatabase;
+    } catch (err) {
+      // a mis-set COMPANY_DB_* variable is an operator-fixable configuration problem: say which one, before anything is allocated or created
+      if (err instanceof CompanyDatabaseConfigError) {
+        this.logger.error(`Company creation refused: ${err.message}`);
+        throw new UnprocessableEntityException({ message: err.message, code: err.code, stage: 'configuration' });
+      }
+      throw err;
+    }
     const app = { host: this.config.database.host, port: this.config.database.port, username: this.config.database.username, password: this.config.database.password };
     // Serialised so two concurrent creations cannot claim the same pooled database. The Company row follows the allocation, in the same critical section.
     return serializeAllocation(async () => {
