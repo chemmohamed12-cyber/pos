@@ -1,0 +1,3 @@
+Rerun of the one suite whose jest worker was SIGTERMed by the OS during the full run (machine under load):
+src/foundation/database-registry/database-registry.service.spec.ts -> PASS, 5/5 tests (unit mode, 2026-10-10)
+Full run: 58/59 suites passed, 425 tests passed, 0 test failures; 1 suite did not execute (worker terminated).
