@@ -1,0 +1,12 @@
+PASS src/foundation/release/expand-contract-guard.spec.ts
+PASS src/domains/accounting/domain/closing-exception-classification.spec.ts
+PASS src/foundation/release/dependency-classification.spec.ts
+PASS src/foundation/crypto/ed25519.spec.ts
+PASS src/foundation/crypto/canonical-json.spec.ts
+PASS src/domains/accounting/application/closing-snapshot.service.spec.ts (6.455 s)
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+
+Test Suites: 59 passed, 59 total
+Tests:       430 passed, 430 total
+Snapshots:   0 total
+Time:        140.798 s

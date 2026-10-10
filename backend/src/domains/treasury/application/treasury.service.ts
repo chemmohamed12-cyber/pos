@@ -453,7 +453,9 @@ export class TreasuryService implements FinanceTreasuryContract {
    * BEGIN/COMMIT); when omitted, behave exactly as before this method existed.
    */
   private run<T>(manager: EntityManager | undefined, fn: (m: EntityManager) => Promise<T>): Promise<T> {
-    return manager ? fn(manager) : this.dataSource.transaction(fn);
+    // F-TRS-001: a plain manager (no open transaction) must not run the per-account advisory lock + balance check outside one transaction; join only an ACTIVE caller transaction.
+    if (manager) return manager.queryRunner?.isTransactionActive ? fn(manager) : manager.transaction(fn);
+    return this.dataSource.transaction(fn);
   }
 
   private async cashInCore(

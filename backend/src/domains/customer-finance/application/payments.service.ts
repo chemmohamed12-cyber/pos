@@ -315,7 +315,9 @@ export class PaymentsService {
         invoiceRemaining: (remaining - Number(amount)).toFixed(2),
       };
     };
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // F-PAY-001: the two advisory locks + unapplied/remaining checks must share one transaction; join the caller's only when it is ACTIVE.
+    if (manager) return manager.queryRunner?.isTransactionActive ? run(manager) : manager.transaction(run);
+    return this.dataSource.transaction(run);
   }
 
   /** CUS-01 — "Customer Advance / Unapplied Receipt" list: the visible customers' payments that still carry an unapplied balance. */

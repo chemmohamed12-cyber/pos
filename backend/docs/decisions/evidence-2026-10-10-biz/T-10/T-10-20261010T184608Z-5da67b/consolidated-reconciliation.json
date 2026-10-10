@@ -1,0 +1,164 @@
+{
+  "commit": "a55ed87e8072cfea79e1f000c65d84ed9cca1951",
+  "runs": {
+    "T-01": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-01\\T-01-20261010T183839Z-2569ce",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-03": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-03\\T-03-20261010T183922Z-83c484",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-05": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-05\\T-05-20261010T184020Z-15b4a3",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-06": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-06\\T-06-20261010T184105Z-c82e5a",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-07": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-07\\T-07-20261010T184150Z-78ae4b",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-08": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-08\\T-08-20261010T184229Z-42df18",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-00": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-00\\T-00-20261010T183743Z-041cd1",
+      "checks": null
+    },
+    "T-09": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-09\\T-09-20261010T184317Z-a7dc59",
+      "checks": [
+        "R1:STOP",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-11": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-11\\T-11-20261010T184403Z-27448c",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-12": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-12\\T-12-20261010T184508Z-5eea4d",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    }
+  },
+  "problems": [],
+  "informational": [
+    "T-06/T-06x-INFO: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09: contains FAIL/STOP cases",
+    "T-09/E3: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E4: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E5: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E6-1: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E6-2: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E6-3: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E7-1: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E7-2: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E8-1: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E8-2: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E9-1: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E10-1: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E10-2: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/E13: FAIL-DEFECT (candidate defect, judged by its own case)",
+    "T-09/observation-negative-stock-after-run: FAIL-DEFECT (candidate defect, judged by its own case)"
+  ]
+}

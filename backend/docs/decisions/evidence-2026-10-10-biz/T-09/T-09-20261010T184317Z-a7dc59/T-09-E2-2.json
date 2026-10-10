@@ -1,0 +1,21 @@
+{
+  "request": {
+    "warehouseId": "dd2434db-85aa-4a02-bfff-85f2446fe18f",
+    "productId": "014c94e8-5f2c-4286-b61a-170fd7353c03",
+    "quantity": 3,
+    "movementType": "receipt",
+    "unitCostBase": "4.00"
+  },
+  "user": "eaa2b07f-4eeb-451c-95a4-7c075757578c",
+  "status": 400,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "A manual receipt requires a reason code"
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

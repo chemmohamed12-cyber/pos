@@ -104,7 +104,9 @@ export class AuditService {
       return repo.save(record);
     };
 
-    if (manager) return run(manager);
+    // F-AUD-002: a caller-supplied manager that has NO open transaction (e.g. `req.companyContext.dataSource.manager`) would run the advisory lock in its own implicit
+    // transaction, released at once, so concurrent writers fork the chain. Join the caller's transaction only when one is active; otherwise open one on that manager.
+    if (manager) return manager.queryRunner?.isTransactionActive ? run(manager) : manager.transaction(run);
     return this.dataSource.transaction(run);
   }
 
