@@ -126,6 +126,18 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return (manager ?? this.dataSource).getRepository(Warehouse).find();
   }
 
+  /**
+   * F-INV-001 — an HTTP movement request must name a warehouse and a product that exist in THIS Company: otherwise the insert dies on the foreign key (HTTP 500).
+   * Resolved before any write → 404 (same contract as the other warehouse-referencing writes). A malformed id is "not found", never a database error.
+   */
+  async assertMovementTargetsExist(warehouseId: string, productId: string, manager: EntityManager): Promise<void> {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID.test(warehouseId)) throw new NotFoundException(`Warehouse "${warehouseId}" not found.`);
+    await this.getWarehouse(warehouseId, manager);
+    const found: Array<{ id: string }> = UUID.test(productId) ? await manager.query(`SELECT id FROM "products" WHERE id = $1::uuid`, [productId]) : [];
+    if (found.length === 0) throw new NotFoundException(`Product "${productId}" not found.`);
+  }
+
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added. */
   async getWarehouse(warehouseId: string, manager?: EntityManager): Promise<Warehouse> {
     const warehouse = await (manager ?? this.dataSource).getRepository(Warehouse).findOne({ where: { id: warehouseId } });

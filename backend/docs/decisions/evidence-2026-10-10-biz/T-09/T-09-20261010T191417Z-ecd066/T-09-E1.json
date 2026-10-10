@@ -1,0 +1,14 @@
+{
+  "status": 201,
+  "body": {
+    "id": "ee8725bc-8174-4531-86c1-50eae7646ec9",
+    "warehouseId": "ddfb6b8a-bfed-42d6-9039-c771ddbbe941",
+    "productId": "25932a3c-6f40-4679-8806-cc1429aefa9c",
+    "quantity": 3,
+    "movementType": "receipt",
+    "referenceType": "manual_receipt",
+    "referenceId": null,
+    "createdByUserId": "2dbbc86a-d6ef-4fbd-939e-c2e172698413",
+    "createdAt": "2026-10-10T19:14:25.875Z"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "warehouseId": "ddfb6b8a-bfed-42d6-9039-c771ddbbe941",
+    "productId": "25932a3c-6f40-4679-8806-cc1429aefa9c",
+    "quantity": -9,
+    "movementType": "adjustment"
+  },
+  "user": "2dbbc86a-d6ef-4fbd-939e-c2e172698413",
+  "status": 410,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "REQUEST_ERROR",
+      "message": "Movement type \"adjustment\" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns)."
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

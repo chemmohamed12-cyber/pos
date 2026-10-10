@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { abortBiz, attempt, auditProbe, finishBiz, record, result, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 import { FinEnv, glLinesFor, seedPostedInvoice, setUpFinance } from './biz-finance-support';
+import { TreasuryController } from '../../domains/treasury/interface/treasury.controller';
 
 /**
  * T-06 (REQ-FIN-002) — FROZEN in docs/decisions/test-program/T-PLAN-FROZEN-2026-10-10.md.
@@ -82,6 +83,20 @@ describe('T-06 — a replayed collection request has exactly one financial effec
       const rows = (await e.dsA.query(`SELECT count(*)::int AS n FROM treasury_transactions WHERE reference = $1`, [kx]))[0].n;
       record(e, 'T-06x-treasury-cashin.json', { before, afterRows: rows, tally: tally(xs) });
       result(e, 'T-06x-INFO', rows === 1 ? 'PASS' : 'FAIL-DEFECT', `treasury cash-in with the SAME idempotency key sent 5x concurrently produced ${rows} treasury movement(s) (INFORMATIONAL — outside the frozen T-06 scope)`);
+
+      // ---- T-06y (informational, after remediation of T-06x): the REAL TreasuryController composition (withIdempotencyInTransaction) with a plain Company manager ----
+      const controller = new TreasuryController(e.treasury, e.idempotency, e.events);
+      const fakeReq = { user: { id: e.actor }, companyContext: { dataSource: wide } } as never;
+      const ky = `T06Y-${randomUUID()}`;
+      const ysRaw = await Promise.allSettled(Array.from({ length: 5 }, () => controller.cashIn(fakeReq, { accountId: e.bankAccountId, amount: '10.00', reference: ky, reason: 'T-06y' } as never, ky)));
+      const ys = ysRaw.map((r) => (r.status === 'fulfilled' ? { ok: true, kind: 'OK' } : { ok: false, kind: String((r.reason as Error)?.message).slice(0, 80) }));
+      const yRows = (await e.dsA.query(`SELECT count(*)::int AS n FROM treasury_transactions WHERE reference = $1`, [ky]))[0].n;
+      const ids = new Set(ysRaw.filter((r) => r.status === 'fulfilled').map((r) => (r as PromiseFulfilledResult<{ id: string }>).value.id));
+      const ky2 = `T06Y-${randomUUID()}`;
+      const y2 = await attempt(() => controller.cashIn(fakeReq, { accountId: e.bankAccountId, amount: '10.00', reference: ky2, reason: 'T-06y' } as never, ky2));
+      const yRows2 = (await e.dsA.query(`SELECT count(*)::int AS n FROM treasury_transactions WHERE reference = $1`, [ky2]))[0].n;
+      record(e, 'T-06y-controller-cashin.json', { sameKeyRows: yRows, outcomes: ys, distinctResultIds: ids.size, differentKeyOk: y2.ok, differentKeyRows: yRows2 });
+      result(e, 'T-06y-CONTROLLER', yRows === 1 && ids.size === 1 && y2.ok && yRows2 === 1 ? 'PASS' : 'FAIL-DEFECT', `TreasuryController.cashIn, same Idempotency-Key 5x concurrently: ${yRows} movement(s), ${ids.size} distinct result id(s); different key: ${yRows2} movement`);
 
       await auditProbe(e, 'final');
       await reconcileAndRecord(e, { nonGlTreasury: 5000, notes: ['5000.00 funding cash-in is deliberately non-emitting'] });

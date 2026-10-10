@@ -1,0 +1,13 @@
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+PASS src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (46.596 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    √ E1–E14 (11264 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        46.653 s, estimated 47 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

@@ -1,0 +1,146 @@
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+PASS src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (36.597 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    √ creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (8569 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.654 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+PASS src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (43.757 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    √ T-01 + T-02 (8910 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        43.824 s, estimated 54 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (67.233 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    √ T-03 + T-04 + T-04b (30812 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        67.303 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+PASS src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (44.856 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    √ 10 x 30.00 from 100.00 (9358 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        44.917 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (43.654 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    √ same key replayed: one effect; different key: a second effect (10728 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        43.723 s, estimated 53 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+PASS src/foundation/testing/t07-returns.biz.real-pg.spec.ts (49.087 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    √ two concurrent returns of 4 against 6 remaining (11331 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        49.182 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+=== T-08: src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts
+PASS src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts (50.559 s)
+  T-08 — concurrent applications of one payment never exceed its unapplied amount
+    √ 300 + 300 against 500 unapplied (10535 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        50.625 s
+Ran all test suites matching /src\\foundation\\testing\\t08-payment-apply.biz.real-pg.spec.ts/i.
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+PASS src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (46.377 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    √ E1–E14 (10815 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        46.453 s, estimated 47 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+=== T-11: src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts
+PASS src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts (51.468 s)
+  T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect
+    √ issue -> rejected event -> restore configuration -> re-drive (x3) (9461 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        51.543 s
+Ran all test suites matching /src\\foundation\\testing\\t11-failure-recovery.biz.real-pg.spec.ts/i.
+
+=== T-12: src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+PASS src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts (54.182 s)
+  T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once
+    √ kill the posting backend while it waits inside its transaction (10872 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        54.443 s, estimated 78 s
+Ran all test suites matching /src\\foundation\\testing\\t12-connection-loss.biz.real-pg.spec.ts/i.
+
+=== T-10: src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts
+PASS src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts (27.075 s)
+  T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run
+    √ every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained (174 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        27.143 s, estimated 34 s
+Ran all test suites matching /src\\foundation\\testing\\t10-reconciliation.biz.real-pg.spec.ts/i.
+
+=== F-AUD-002: src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts (48.653 s)
+  F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager
+    √ records the observed behaviour of both calling styles (11766 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        48.718 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-reproducer.biz.real-pg.spec.ts/i.
+
+=== F-TRS-001: src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts (49.164 s)
+  F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager
+    √ records overdraft occurrences for both calling styles (11302 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        49.242 s
+Ran all test suites matching /src\\foundation\\testing\\f-trs-reproducer.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED
+EXIT 0

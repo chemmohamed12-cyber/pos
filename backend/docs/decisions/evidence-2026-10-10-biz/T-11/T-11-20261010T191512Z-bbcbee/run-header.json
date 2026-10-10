@@ -1,0 +1,50 @@
+{
+  "testId": "T-11",
+  "runId": "T-11-20261010T191512Z-bbcbee",
+  "startedAt": "2026-10-10T19:15:12.617Z",
+  "commit": "6814643fee2c7065b580e2006f7cea89173668eb",
+  "branch": "master",
+  "dirtyPaths": [
+    "M backend/src/domains/inventory-warehouse/application/inventory.service.ts",
+    " M backend/src/domains/inventory-warehouse/interface/inventory.controller.ts",
+    " M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.spec.ts",
+    " M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts",
+    " M backend/src/domains/treasury/interface/treasury.controller.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.spec.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.ts",
+    " M backend/src/foundation/audit/company-audit-access.real-pg.spec.ts",
+    " M backend/src/foundation/audit/installation-audit.controller.ts",
+    " M backend/src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts",
+    "?? backend/src/foundation/company/company-lifecycle-admission.real-pg.spec.ts",
+    "?? backend/src/foundation/company/company-lifecycle-admission.ts"
+  ],
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new",
+  "systemIdentifier": "7695079006474257732",
+  "databases": [
+    "daii_test_biz_t11_control_plane",
+    "daii_test_biz_t11_company_a",
+    "daii_test_biz_t11_company_b"
+  ],
+  "prefix": "biz_t11",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (52.497 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    √ same key replayed: one effect; different key: a second effect (9768 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        52.605 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

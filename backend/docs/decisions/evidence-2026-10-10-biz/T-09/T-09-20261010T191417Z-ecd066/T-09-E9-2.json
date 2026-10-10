@@ -1,0 +1,22 @@
+{
+  "request": {
+    "warehouseId": "ddfb6b8a-bfed-42d6-9039-c771ddbbe941",
+    "productId": "25932a3c-6f40-4679-8806-cc1429aefa9c",
+    "quantity": 1.5,
+    "movementType": "dispatch"
+  },
+  "user": "2dbbc86a-d6ef-4fbd-939e-c2e172698413",
+  "status": 400,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": [
+        "quantity must be an integer number"
+      ]
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

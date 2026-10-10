@@ -7,6 +7,7 @@ import { RequireModuleGuard, RequireModule } from '../../../foundation/module-re
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
 import { IdempotencyService } from '../../../foundation/error-contract/idempotency.service';
+import { EventBusService } from '../../../foundation/events/event-bus.service';
 
 class CreateAccountTypeDto {
   @IsString()
@@ -127,6 +128,7 @@ export class TreasuryController {
   constructor(
     private readonly treasury: TreasuryService,
     private readonly idempotency: IdempotencyService,
+    private readonly events: EventBusService,
   ) {}
 
   @RequirePermission('finance', 'editable')
@@ -201,12 +203,15 @@ export class TreasuryController {
     // F06-H1: the Treasury-UI path uses `cashInDirect` — the emitting
     // variant. The `FinanceTreasuryContract.cashIn` other domains call
     // stays non-emitting (ADR-038 D4).
-    return this.idempotency.withIdempotency(
+    // T-06x: the dedup record and the cash movement commit together under a per-key lock (`withIdempotency` wrote the record after the operation, without a lock: concurrent same-key requests all executed).
+    const result = await this.idempotency.withIdempotencyInTransaction(
       'treasury.cash-in',
       idempotencyKey,
-      () => this.treasury.cashInDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      (tx) => this.treasury.cashInDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, tx),
       manager,
     );
+    await this.events.dispatchAfterCommit(manager);
+    return result;
   }
 
   /** Same finding/fix as `cashIn` above. */
@@ -215,12 +220,15 @@ export class TreasuryController {
   async cashOut(@Req() req: CompanyScopedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    return this.idempotency.withIdempotency(
+    // T-06x: the dedup record and the cash movement commit together under a per-key lock (`withIdempotency` wrote the record after the operation, without a lock: concurrent same-key requests all executed).
+    const result = await this.idempotency.withIdempotencyInTransaction(
       'treasury.cash-out',
       idempotencyKey,
-      () => this.treasury.cashOutDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      (tx) => this.treasury.cashOutDirect(dto.accountId, dto.amount, dto.customerId ?? null, dto.salesOrderId ?? null, dto.reference ?? null, dto.reason ?? null, req.user!.id, tx),
       manager,
     );
+    await this.events.dispatchAfterCommit(manager);
+    return result;
   }
 
   /** Same finding/fix as `cashIn` above — a retried transfer would otherwise post a second pair of legs. */
@@ -229,12 +237,15 @@ export class TreasuryController {
   async transfer(@Req() req: CompanyScopedRequest, @Body() dto: TransferDto, @Headers('idempotency-key') idempotencyKey?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    return this.idempotency.withIdempotency(
+    // T-06x: the dedup record and the cash movement commit together under a per-key lock (`withIdempotency` wrote the record after the operation, without a lock: concurrent same-key requests all executed).
+    const result = await this.idempotency.withIdempotencyInTransaction(
       'treasury.transfer',
       idempotencyKey,
-      () => this.treasury.transferDirect(dto.sourceAccountId, dto.destinationAccountId, dto.amount, dto.reference ?? null, dto.reason ?? null, req.user!.id, manager),
+      (tx) => this.treasury.transferDirect(dto.sourceAccountId, dto.destinationAccountId, dto.amount, dto.reference ?? null, dto.reason ?? null, req.user!.id, tx),
       manager,
     );
+    await this.events.dispatchAfterCommit(manager);
+    return result;
   }
 
   /** AUDIT-SEC-03 (F3) remediation: an `accountId` filter must pass ScopeResolver before the ledger query runs — was previously any `finance:editable` user, any account, no check. */

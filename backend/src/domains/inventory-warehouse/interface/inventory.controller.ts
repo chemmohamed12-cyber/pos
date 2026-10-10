@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Inject, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, GoneException, Inject, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -352,30 +352,15 @@ export class InventoryController {
   @Post('movements')
   async recordMovement(@Req() req: CompanyScopedRequest, @Body() dto: RecordMovementDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    // D3-B — a receipt through this endpoint IS a manual receipt: explicit cost + controlled reason, validated before any write.
-    if (dto.movementType === 'receipt') {
-      return this.inventory.recordManualReceipt(
-        dto.warehouseId,
-        dto.productId,
-        dto.quantity,
-        dto.unitCostBase,
-        dto.reasonCode,
-        null,
-        req.user.id,
-        req.companyContext.dataSource.manager,
-      );
+    // F-INV-001 — this endpoint accepts ONLY a manual receipt. The other types would post a raw ledger row (negative stock, no reservation/valuation/document control);
+    // they have governed paths (shipment/fulfilment, warehouse-transaction documents, returns). Refused before any read or write: no side effect of any kind.
+    if (dto.movementType !== 'receipt') {
+      throw new GoneException({ statusCode: 410, error: 'Gone', code: 'INVENTORY_MOVEMENT_TYPE_CLOSED', message: `Movement type "${dto.movementType}" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns).` });
     }
-    return this.inventory.recordMovement(
-      dto.warehouseId,
-      dto.productId,
-      dto.quantity,
-      dto.movementType,
-      null,
-      null,
-      req.user.id,
-      req.companyContext.dataSource.manager,
-      dto.unitCostBase,
-    );
+    // D3-B — a receipt through this endpoint IS a manual receipt: explicit cost + controlled reason, validated before any write.
+    const manager = req.companyContext.dataSource.manager;
+    await this.inventory.assertMovementTargetsExist(dto.warehouseId, dto.productId, manager);
+    return this.inventory.recordManualReceipt(dto.warehouseId, dto.productId, dto.quantity, dto.unitCostBase, dto.reasonCode, null, req.user.id, manager);
   }
 
   /**
