@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "rule": "Default DENY. An entry counts ONLY when it has id, host, port, approvedBy, approvedOn, identityEvidence and databases/databasePatterns. The hard denials in db-guard.js (daii_dev, port 5433, production-like names, non-loopback hosts) cannot be overridden here. Adding or changing an entry is a reviewed commit = the approval record.",
+  "approved": [],
+  "proposedNotApproved": [
+    {
+      "id": "isolated-5544",
+      "host": "127.0.0.1",
+      "port": 5544,
+      "proposedDatabases": ["postgres", "daii_test_ambient"],
+      "proposedDatabasePatterns": ["^daii_test_", "^iso_"],
+      "status": "PROPOSED — identity NOT proven (D-2). Needs an authorised read-only check: cluster data directory, system_identifier, database list, owner, and that it is not reachable from other hosts.",
+      "approvedBy": null
+    },
+    {
+      "id": "authz-verification-5656",
+      "host": "127.0.0.1",
+      "port": 5656,
+      "proposedDatabasePatterns": ["^bv_", "^d3verify"],
+      "status": "PROPOSED — identity NOT proven (D-2). Used by tools/testing/bv-*.ts and docs/decisions/authz-tools/*.js. The cluster lived in an earlier session's scratchpad; its existence and contents must be verified before approval.",
+      "approvedBy": null
+    }
+  ]
+}

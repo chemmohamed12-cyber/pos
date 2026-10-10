@@ -10,6 +10,7 @@
     "start:dev": "nest start --watch",
     "lint": "eslint \"{src,tools,test}/**/*.ts\"",
     "test": "jest",
+    "test:db-guard": "node --test tools/testing/db-guard.test.js",
     "generate:domain": "node tools/generators/generate-module.js",
     "validate:structure": "node tools/validation/validate-structure.js",
     "verify:deploy": "bash tools/deploy/verify-deploy.sh",

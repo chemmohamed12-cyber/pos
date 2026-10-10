@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // Scoped-user latency benchmark (CTO Phase 3): ADMINISTRATOR vs SCOPED USER on the same build, same environment, same endpoints, interleaved, plus the pre-F1 build
 // (port 3602) as the approved baseline. Per endpoint: N requests per session (default 100), P50 / P95 / P99, every non-200 counted (a run with any is discarded by the
 // aggregator), and EXACT DB statements per request, counted at the application's `pg` client on a separate measurement-only backend instance (3603, started with the

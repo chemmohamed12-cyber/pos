@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // Aggregate interleaved A/B runs, per endpoint using only runs where BOTH sides returned 200 (429-throttled samples are discarded, never averaged in).
 const fs = require('fs');
 const files = process.argv.slice(2);

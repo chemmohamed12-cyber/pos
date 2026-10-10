@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // F4 runtime verification over REAL HTTP against the booted backend (3601, isolated env). Test identities only (…@f4.example.test).
 const API = 'http://127.0.0.1:3601/api';
 const J = { 'Content-Type': 'application/json' };

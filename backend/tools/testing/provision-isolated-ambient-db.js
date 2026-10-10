@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./db-guard').install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 /**
  * Provisions a DISPOSABLE, SEEDED "ambient" test database for the suites that
  * boot the whole `AppModule` against the platform database and hard-wire the

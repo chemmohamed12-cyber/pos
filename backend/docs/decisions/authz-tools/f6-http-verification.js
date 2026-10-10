@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // F6 runtime verification over REAL HTTP against the booted backend (3601, isolated env). Test identities only (…@f6.example.test).
 // Controlled scope pilot: two branches, scoped users, warehouse-keyed enforcement on inventory / warehouse transactions / PR / PO / GR / sales orders, instant effect of a
 // grant, Effective Access Preview == the guards, containment, audit. Existing demo warehouses are linked to a test branch for the run and RESTORED at the end.

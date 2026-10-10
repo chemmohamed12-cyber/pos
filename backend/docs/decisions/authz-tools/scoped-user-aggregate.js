@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // Aggregates scoped-user-latency.js runs: per endpoint, only runs where NO session saw a non-200 count (a throttled/failed sample is never averaged in).
 // usage: node scoped-user-aggregate.js run1.json run2.json run3.json
 const fs = require('fs');

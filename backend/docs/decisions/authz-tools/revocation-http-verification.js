@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 // Immediate-revocation proof over real HTTP on the optimised build (3601, isolated env). A bearer token obtained BEFORE the change must be refused/filtered on the very next request.
 const API = (p) => `http://127.0.0.1:${p}/api`; const J = { 'Content-Type': 'application/json' }; const PORT = 3601;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

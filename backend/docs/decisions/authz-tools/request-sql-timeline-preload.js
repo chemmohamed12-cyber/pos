@@ -1,3 +1,4 @@
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
 const pg = require(process.env.TRACE_PG);
 let log = [];
 const orig = pg.Client.prototype.query;
