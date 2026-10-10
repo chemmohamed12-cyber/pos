@@ -1,0 +1,13 @@
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+PASS src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (42.737 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    √ T-01 + T-02 (8911 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        42.806 s, estimated 44 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

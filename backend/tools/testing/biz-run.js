@@ -30,6 +30,8 @@ const STEPS = [
   // informational reproducers of candidate defects (outside the frozen T-xx set; they never change a frozen verdict)
   ['F-AUD-002', 'src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts'],
   ['F-TRS-001', 'src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts'],
+  // local capacity baseline (informational; D-10 numbers unapproved => no threshold)
+  ['T-15', 'src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts'],
 ];
 
 const only = (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : '').split(',').filter(Boolean);

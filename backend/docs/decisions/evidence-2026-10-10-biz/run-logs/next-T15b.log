@@ -1,0 +1,13 @@
+
+=== T-15: src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts
+PASS src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts (67.176 s)
+  T-15 — local capacity baseline with correctness invariants under rising concurrency
+    √ 1/5/10/25/50 in-flight operations on four write paths (33466 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        67.24 s
+Ran all test suites matching /src\\foundation\\testing\\t15-capacity-baseline.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

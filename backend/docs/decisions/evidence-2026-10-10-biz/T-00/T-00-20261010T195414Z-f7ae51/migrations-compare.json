@@ -1,0 +1,14 @@
+{
+  "controlPlane": {
+    "applied": 120,
+    "expected": 120,
+    "latestApplied": 1790013000000,
+    "latestExpected": 1790013000000
+  },
+  "companyA": {
+    "applied": 217,
+    "expected": 217,
+    "latestApplied": 1790013000000,
+    "latestExpected": 1790013000000
+  }
+}

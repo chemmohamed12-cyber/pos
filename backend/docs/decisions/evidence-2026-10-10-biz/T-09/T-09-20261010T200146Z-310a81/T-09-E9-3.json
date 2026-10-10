@@ -1,0 +1,22 @@
+{
+  "request": {
+    "warehouseId": "fca261f7-5559-4dd8-9f48-d15b8f9cf2b8",
+    "productId": "6217ac86-444d-466e-a2e2-b920e649ed8b",
+    "quantity": "abc",
+    "movementType": "dispatch"
+  },
+  "user": "73d716be-e921-4a80-84ef-59a8e13bdf5e",
+  "status": 400,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": [
+        "quantity must be an integer number"
+      ]
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

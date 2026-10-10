@@ -48,6 +48,9 @@ export class IdempotencyService {
    * `operation()` from scratch instead of recovering — for `recordPayment`
    * specifically, that meant a second, independent Treasury cash-in leg
    * per retry (rows 33/34).
+   *
+   * @deprecated (2026-10-10, T-06x) — NOT concurrency-safe: no per-key lock and the dedup record is written after the operation, so concurrent same-key calls all execute
+   * (observed: 5 concurrent cash-ins → 5 movements). No production code calls it any more (TreasuryController moved to `withIdempotencyInTransaction`); do not use it for a mutating operation.
    */
   async withIdempotency<T>(scope: string, key: string | undefined, operation: () => Promise<T>, manager?: EntityManager): Promise<T> {
     if (!key) return operation();

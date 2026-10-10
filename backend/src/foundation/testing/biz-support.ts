@@ -5,6 +5,7 @@ import { setUpTwoCompanyHarness, TwoCompanyHarness } from './two-company-real-pg
 import { InventoryService } from '../../domains/inventory-warehouse/application/inventory.service';
 import { WarehouseTransactionsService } from '../../domains/inventory-warehouse/application/warehouse-transactions.service';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
+import { BomService } from '../../domains/commerce/application/bom.service';
 import { ProductsService } from '../../domains/commerce/application/products.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { AuditService } from '../audit/audit.service';
@@ -130,7 +131,7 @@ export async function setUpBiz(testId: string, prefix: string, opts: { tags?: st
     assertSupplierInvoicePostable: async () => undefined,
   });
   const eventsStub = { publish: async () => undefined } as never;
-  const inventory = new InventoryService(h.controlPlane, audit, inert, inert, numbering, eventsStub, undefined, policyRegistry);
+  const inventory = new InventoryService(h.controlPlane, audit, inert, new BomService(h.controlPlane, audit, products), numbering, eventsStub, undefined, policyRegistry);
   const whTx = new WarehouseTransactionsService(h.controlPlane, numbering, processEngine, authorization, audit, products, inventory, policyRegistry);
 
   ev.writeHeader(run, { systemIdentifier, databases, prefix, tags: { controlPlane: ['core'], company: ['core', ...(opts.tags ?? COMPANY_TAGS)] } });

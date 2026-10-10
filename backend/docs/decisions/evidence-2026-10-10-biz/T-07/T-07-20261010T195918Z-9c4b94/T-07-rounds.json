@@ -1,0 +1,72 @@
+[
+  {
+    "round": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "won": 1,
+    "lostMessages": [
+      "Cannot return 4 of order line \"a8adaf89-9bfd-402b-9521-3cf111a22dcc\" — only 2 remain returnable across ALL return types combined (shipped: 10, sold: 10, already returned via Sales Return: 8, via Shipm"
+    ],
+    "winnerCompleted": "completed",
+    "returnedQty": 8,
+    "creditGross": 91.2
+  },
+  {
+    "round": 2,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "won": 1,
+    "lostMessages": [
+      "Cannot return 4 of order line \"42384935-6e85-4e06-b4b2-a735208463c0\" — only 2 remain returnable across ALL return types combined (shipped: 10, sold: 10, already returned via Sales Return: 8, via Shipm"
+    ],
+    "winnerCompleted": "completed",
+    "returnedQty": 8,
+    "creditGross": 91.2
+  },
+  {
+    "round": 3,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "won": 1,
+    "lostMessages": [
+      "Cannot return 4 of order line \"6be2347e-ecf9-4463-b930-66dbeaa9f178\" — only 2 remain returnable across ALL return types combined (shipped: 10, sold: 10, already returned via Sales Return: 8, via Shipm"
+    ],
+    "winnerCompleted": "completed",
+    "returnedQty": 8,
+    "creditGross": 91.2
+  },
+  {
+    "round": 4,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "won": 1,
+    "lostMessages": [
+      "Cannot return 4 of order line \"dd4a145f-48ba-445f-861e-1a134ac72888\" — only 2 remain returnable across ALL return types combined (shipped: 10, sold: 10, already returned via Sales Return: 8, via Shipm"
+    ],
+    "winnerCompleted": "completed",
+    "returnedQty": 8,
+    "creditGross": 91.2
+  },
+  {
+    "round": 5,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "won": 1,
+    "lostMessages": [
+      "Cannot return 4 of order line \"fc949d1c-175e-4984-b8a6-55759557545d\" — only 2 remain returnable across ALL return types combined (shipped: 10, sold: 10, already returned via Sales Return: 8, via Shipm"
+    ],
+    "winnerCompleted": "completed",
+    "returnedQty": 8,
+    "creditGross": 91.2
+  }
+]

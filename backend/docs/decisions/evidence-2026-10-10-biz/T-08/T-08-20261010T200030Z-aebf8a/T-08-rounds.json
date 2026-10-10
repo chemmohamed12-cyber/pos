@@ -1,0 +1,262 @@
+[
+  {
+    "variant": "a-two-invoices",
+    "round": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000001\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 2,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000002\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 3,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000003\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 4,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000004\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 5,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000005\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 6,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000006\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 7,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000007\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 8,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000008\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 9,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000009\" is unapplied."
+    ]
+  },
+  {
+    "variant": "a-two-invoices",
+    "round": 10,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000010\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000011\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 2,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000012\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 3,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000013\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 4,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000014\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 5,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000015\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 6,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000016\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 7,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000017\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 8,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000018\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 9,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000019\" is unapplied."
+    ]
+  },
+  {
+    "variant": "b-same-invoice",
+    "round": 10,
+    "tally": {
+      "ConflictException:409": 1,
+      "OK": 1
+    },
+    "unapplied": "200.00",
+    "applicationRows": 2,
+    "refusedMessages": [
+      "Cannot apply 300.00 — only 200.00 of payment \"PAY-2026-000020\" is unapplied."
+    ]
+  }
+]

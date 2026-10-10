@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { BizEnv, abortBiz, approvedDoc, attempt, auditChainValid, auditProbe, finishBiz, fp, fpDiff, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, seedWarehouse, setUpBiz } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
+import { BomService } from '../../domains/commerce/application/bom.service';
+import { ProductsService } from '../../domains/commerce/application/products.service';
 
 /**
  * T-01 (REQ-INV-002) and T-02 (REQ-INV-002/005) — FROZEN in docs/decisions/test-program/T-PLAN-FROZEN-2026-10-10.md.
@@ -77,7 +79,21 @@ describe('T-01 / T-02 — over-issue, over-transfer and over-reservation are ref
       result(e, 'T-02c', okC2 ? 'PASS' : 'FAIL', JSON.stringify({ r1, r2 }));
 
       // ---------- T-02(d): assemble with a missing component ----------
-      result(e, 'T-02d', 'BLOCKED', 'the BOM contract is not wired in the two-company harness (InventoryService.assembleProduct needs SALES_BOM_CONTRACT); the over-consumption guard of component issue is exercised through Work Orders (work-order.spec) — recorded as not executed here, per the frozen plan\'s conditional "(if BOM is available in the tags)"');
+      // BOM contract now wired in the harness (real BomService): F = 2 x C1 + 3 x C2; stock C1 = 10, C2 = 5; assembling 2 units needs 6 of C2 (> 5).
+      const F = await seedProduct(e.dsA, 'T02-F');
+      const C1 = await seedProduct(e.dsA, 'T02-C1');
+      const C2 = await seedProduct(e.dsA, 'T02-C2');
+      await receive(e, W1, C1, 10);
+      await receive(e, W1, C2, 5);
+      const bomSvc = new BomService(e.h.controlPlane, e.audit, new ProductsService(e.h.controlPlane, e.audit, {} as never));
+      await bomSvc.defineBom(F, [{ componentProductId: C1, quantityPerUnit: 2 }, { componentProductId: C2, quantityPerUnit: 3 }], e.actor, e.manager);
+      const beforeD = await fp(e);
+      const outD = await attempt(() => e.inventory.assembleProduct(W1, F, 2, e.actor, e.manager));
+      const afterD = await fp(e);
+      const okD = !outD.ok && outD.kind.endsWith(':409') && fpDiff(beforeD, afterD).length === 0 && (await onHand(e, W1, C1)) === 10 && (await onHand(e, W1, C2)) === 5 && (await onHand(e, W1, F)) === 0;
+      record(e, 'T-02d.json', { outcome: outD, fingerprintDiff: fpDiff(beforeD, afterD), note: 'the assembly number is drawn before the transaction (numbering sequence is not in the fingerprint set): a refused assembly may leave a gap in the sequence, not a data effect' });
+      result(e, 'T-02d', okD ? 'PASS' : 'FAIL', JSON.stringify(outD));
+      // (a successful assembly is not exercised here: the harness event bus is a stub, so the positive path is covered by the Work Order/assembly specs, not by this refusal case)
 
       // ---------- global invariants ----------
       expect(await negativeStockPairs(e)).toBe(0);
