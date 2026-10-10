@@ -6,8 +6,6 @@ import { Logger } from '@nestjs/common';
 import { allocateCompanyDatabase, CompanyDatabaseAllocationError, CompanyDatabaseConfig, CompanyDatabaseConfigError, ConnectionTarget, serializeAllocation } from './company-database-allocator';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
-import { RolesGuard } from '../authorization/roles.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
 import { CompanyRegistryService, InvalidCompanyTransitionError } from './company-registry.service';
 import { CompanyActivationService } from './company-activation.service';
 import { DatabaseRegistryService } from '../database-registry/database-registry.service';

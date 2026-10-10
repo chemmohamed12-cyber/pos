@@ -2,8 +2,6 @@ import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
-import { RolesGuard } from '../authorization/roles.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
 import { CompanyMembershipProvisioningService } from './company-membership-provisioning.service';
 import { MembershipService } from './membership.service';
 

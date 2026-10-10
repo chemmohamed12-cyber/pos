@@ -27,10 +27,6 @@ import { readAppVersion } from './app-version';
 import { readBuildInfo } from './build-info';
 import { AppConfigService } from '../configuration/app-config.service';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
-import { RolesGuard } from '../authorization/roles.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
-import { PermissionGuard } from '../permission/permission.guard';
-import { RequirePermission } from '../permission/require-permission.decorator';
 
 /**
  * The manifest's own internal shape (`ReleaseManifest.files[]`

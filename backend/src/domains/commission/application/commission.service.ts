@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { DataSource, IsNull, Repository, EntityManager } from 'typeorm';
+import { DataSource, IsNull, EntityManager } from 'typeorm';
 import { CommissionPolicy } from '../infrastructure/commission-policy.entity';
 import { CommissionTier } from '../infrastructure/commission-tier.entity';
 import { CommissionApprovalBatch } from '../infrastructure/commission-approval-batch.entity';
@@ -250,7 +250,7 @@ export class CommissionService implements OnModuleInit {
   // (ADR-071 §12) distinguishing Invoice/Collection/Correction/Recalculation.
   // ---------------------------------------------------------------------------
 
-  private computeMarginalTierAmount(achievementPercent: number, eligibleAmount: number, tiers: CommissionTier[], manager?: EntityManager): { amount: number; appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> } {
+  private computeMarginalTierAmount(achievementPercent: number, eligibleAmount: number, tiers: CommissionTier[], _manager?: EntityManager): { amount: number; appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> } {
     let amount = 0;
     const appliedTiers: Array<{ tierOrder: number; rate: string; bandAmount: number }> = [];
     const sorted = [...tiers].sort((a, b) => a.tierOrder - b.tierOrder);

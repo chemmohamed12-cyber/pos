@@ -189,7 +189,7 @@ export class ApReconciliationService {
       status: ApReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    }, manager?: EntityManager): Promise<ApReconciliationRun> {
+    }, _manager?: EntityManager): Promise<ApReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({

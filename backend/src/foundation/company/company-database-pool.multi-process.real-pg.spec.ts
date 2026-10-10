@@ -42,7 +42,8 @@ describeIsolated('Company database pool — several OS processes at once (real P
       child.stderr.on('data', (d) => (err += d));
       child.on('close', () => {
         const line = out.split('\n').find((l) => l.startsWith('RESULT '));
-        line ? resolve(JSON.parse(line.slice(7))) : reject(new Error(`worker produced no result: ${err.slice(-800)}`));
+        if (line) resolve(JSON.parse(line.slice(7)));
+        else reject(new Error(`worker produced no result: ${err.slice(-800)}`));
       });
     });
 

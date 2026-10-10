@@ -53,7 +53,6 @@ describe('Accounting sub-ledger controllers (ap / ar / cash-bank / inventory) Ar
   let invRec: InventoryReconciliationService;
   let maker: string;
   let checker1: string;
-  let checker2: string;
   const customerId = randomUUID();
   const supplierId = randomUUID();
   const today = new Date().toISOString().slice(0, 10);
@@ -135,7 +134,7 @@ describe('Accounting sub-ledger controllers (ap / ar / cash-bank / inventory) Ar
 
     maker = (await h.createUserWithAdminRoleIn('Sub Maker', h.companyAId)).id;
     checker1 = (await h.createUserWithAdminRoleIn('Sub Checker 1', h.companyAId)).id;
-    checker2 = (await h.createUserWithAdminRoleIn('Sub Checker 2', h.companyAId)).id;
+    await h.createUserWithAdminRoleIn('Sub Checker 2', h.companyAId);
     const role = (await dsA.query(`SELECT id FROM roles WHERE key = 'admin'`))[0];
     for (const node of ['accounting.ap.approve', 'accounting.ar.approve', 'accounting.cash.approve', 'accounting.inventory.approve']) {
       await dsA.query(`INSERT INTO role_permissions ("roleId","nodeKey","access") VALUES ($1,$2,'editable') ON CONFLICT DO NOTHING`, [role.id, node]);

@@ -750,7 +750,7 @@ export class AccountingController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.account.view', 'read-only')
   @Get('chart/templates')
-  async listAccountTemplates(@Req() req: CompanyScopedRequest) {
+  async listAccountTemplates(@Req() _req: CompanyScopedRequest) {
     return this.glAccounts.listTemplates();
   }
 

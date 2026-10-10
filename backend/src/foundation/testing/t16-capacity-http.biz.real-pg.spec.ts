@@ -209,7 +209,6 @@ describe('T-16 — HTTP capacity benchmark (measurements + integrity oracle)', (
       let prevCpu = cpus().map((c) => ({ ...c.times }));
       let prevProc = process.cpuUsage();
       let prevT = Date.now();
-      let sampler: NodeJS.Timeout | undefined;
       let tick = 0;
       const sampleOnce = async () => {
         tick += 1;
@@ -227,7 +226,7 @@ describe('T-16 — HTTP capacity benchmark (measurements + integrity oracle)', (
         try { row.dbConnections = (await dsA.query('SELECT count(*)::int AS n FROM pg_stat_activity'))[0].n; } catch { /* ignore */ }
         samples.push(row);
       };
-      sampler = setInterval(() => { void sampleOnce(); }, 2000);
+      const sampler = setInterval(() => { void sampleOnce(); }, 2000);
 
       // ---------- phases ----------
       const phaseResults: Array<Record<string, unknown>> = [];

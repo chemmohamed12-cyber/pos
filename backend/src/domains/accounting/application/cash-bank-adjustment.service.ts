@@ -266,7 +266,7 @@ export class CashBankAdjustmentService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   /** `''` / non-numeric → null (fail-closed = always gated). */
-  private resolveThreshold(manager?: EntityManager): string | null {
+  private resolveThreshold(_manager?: EntityManager): string | null {
     const raw = (this.config.get<string>(THRESHOLD_KEY) ?? '').trim();
     if (!raw) return null;
     const n = Number(raw);

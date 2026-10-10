@@ -221,7 +221,7 @@ export class CashBankReconciliationService {
       status: CashBankReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    }, manager?: EntityManager): Promise<CashBankReconciliationRun> {
+    }, _manager?: EntityManager): Promise<CashBankReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({

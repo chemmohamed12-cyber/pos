@@ -36,7 +36,7 @@ export class SeedDefaultBaseCurrency1789701100000 implements MigrationInterface 
     `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Deliberately a no-op: reversing "which currency is base" is exactly the destructive,
     // history-invalidating action this migration exists to make safe to configure in the first
     // place — never undo it automatically. An operator who genuinely needs to change it uses

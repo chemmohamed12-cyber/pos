@@ -3,8 +3,6 @@ import { DataSource, In, MigrationExecutor } from 'typeorm';
 import { copyFile, cp, mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'fs/promises';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { runCapture } from './capture-process';
 import { dirname, join, resolve, sep } from 'path';
 import { randomUUID } from 'crypto';
@@ -60,7 +58,6 @@ class PreSwapAbort extends Error {
   }
 }
 
-const execFileAsync = promisify(execFile);
 
 /**
  * A POST-swap readiness failure, classified (post-incident review of release 1.1.4: "file deployment" success is not "application started" is not "initialised"):

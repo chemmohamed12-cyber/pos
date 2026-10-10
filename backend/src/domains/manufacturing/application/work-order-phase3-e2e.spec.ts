@@ -3,7 +3,6 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../../../app.module';
 import { WorkOrderService } from './work-order.service';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
-import { InventoryReconciliationService } from '../../accounting/application/inventory-reconciliation.service';
 import { WipReconciliationService } from '../../accounting/application/wip-reconciliation.service';
 import { ClosingAuditService } from '../../accounting/application/closing-audit.service';
 import { FiscalPeriodService } from '../../accounting/application/fiscal-period.service';
@@ -29,7 +28,6 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
   let moduleRef: TestingModule;
   let workOrders: WorkOrderService;
   let inventory: InventoryService;
-  let inventoryReconciliation: InventoryReconciliationService;
   let wipReconciliation: WipReconciliationService;
   let closingAudit: ClosingAuditService;
   let fiscalPeriods: FiscalPeriodService;
@@ -44,7 +42,6 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     await moduleRef.init();
     workOrders = moduleRef.get(WorkOrderService);
     inventory = moduleRef.get(InventoryService);
-    inventoryReconciliation = moduleRef.get(InventoryReconciliationService);
     wipReconciliation = moduleRef.get(WipReconciliationService);
     closingAudit = moduleRef.get(ClosingAuditService);
     fiscalPeriods = moduleRef.get(FiscalPeriodService);
@@ -177,7 +174,7 @@ describe('Manufacturing Phase 3 — Full E2E Verification (CTO directive)', () =
     // --- Material Issue #1: 12 @ $5.00 -------------------------------------------------------
     await workOrders.materialIssue(wo.id, componentProductId, 12, null, 'p3-issue-1');
     expect(await workOrders.getWorkOrderState(wo.id)).toBe('in_progress'); // auto-transition on first issue
-    let wip = await workOrders.computeWipValue(wo.id);
+    const wip = await workOrders.computeWipValue(wo.id);
     expect(wip).toBeCloseTo(60.0, 4);
     let onHandWip = await inventory.getOnHandQuantityInTransaction(dataSource.manager, wipWarehouseId, componentProductId);
     expect(onHandWip).toBe(12); // Item 3 — physical transfer into the dedicated WIP warehouse, not just a value bump

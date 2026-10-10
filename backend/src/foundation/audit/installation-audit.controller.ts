@@ -1,8 +1,6 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Controller, Get, Param, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
-import { RolesGuard } from '../authorization/roles.guard';
-import { RequireRole } from '../authorization/require-role.decorator';
 import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
 import { AuditService } from './audit.service';
 import { AuditRecord } from './audit-record.entity';

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
-import { BizEnv, abortBiz, approvedDoc, auditProbe, attempt, auditChainValid, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
+import { BizEnv, abortBiz, approvedDoc, auditProbe, attempt, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
 import { reconcileAndRecord } from './biz-reconcile';
 
 /**

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type -- this spec inspects NestJS controller classes and handler functions generically through reflection metadata */
 import 'reflect-metadata';
 import { Reflector } from '@nestjs/core';
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';

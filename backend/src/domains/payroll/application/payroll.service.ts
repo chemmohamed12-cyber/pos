@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { DataSource, IsNull, Repository, EntityManager } from 'typeorm';
+import { DataSource, IsNull, EntityManager } from 'typeorm';
 import { FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { PayrollPeriod } from '../infrastructure/payroll-period.entity';
 import { PayrollCompensation } from '../infrastructure/payroll-compensation.entity';

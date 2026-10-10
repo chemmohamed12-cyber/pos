@@ -5,8 +5,6 @@ import { ConfigurationEngineService } from './configuration-engine.service';
 import { ConfigScopeLevel } from './config-key.entity';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
-import { PermissionGuard } from '../permission/permission.guard';
-import { RequirePermission } from '../permission/require-permission.decorator';
 
 const CUSTOMER_SCOPES = ['installation', 'user', 'org'] as const;
 

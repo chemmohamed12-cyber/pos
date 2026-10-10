@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { Between, DataSource, In, IsNull, Repository, EntityManager } from 'typeorm';
+import { Between, DataSource, In, IsNull, EntityManager } from 'typeorm';
 import { createHash } from 'crypto';
 import { AttendanceConnector } from '../infrastructure/attendance-connector.entity';
 import { AttendanceEmployeeMapping } from '../infrastructure/attendance-employee-mapping.entity';
@@ -9,7 +9,7 @@ import { AttendanceBiometricDailyFact } from '../infrastructure/attendance-biome
 import { AttendanceDay } from '../infrastructure/attendance-day.entity';
 import { AttendanceApprovalBatch } from '../infrastructure/attendance-approval-batch.entity';
 import { AttendanceCorrectionRequest } from '../infrastructure/attendance-correction-request.entity';
-import { AttendanceDayStatus, AttendancePunchType, AttendanceSourceType } from '../domain/attendance-day-status';
+import { AttendanceDayStatus, AttendancePunchType } from '../domain/attendance-day-status';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
@@ -331,7 +331,7 @@ export class AttendanceService implements OnModuleInit {
     return saved;
   }
 
-  buildImportTemplate(manager?: EntityManager): Promise<Buffer> {
+  buildImportTemplate(_manager?: EntityManager): Promise<Buffer> {
     return this.excel.buildTemplate('Attendance', IMPORT_COLUMNS);
   }
 
@@ -342,7 +342,7 @@ export class AttendanceService implements OnModuleInit {
     return this.validateRows(rows as unknown as AttendanceImportRow[], manager);
   }
 
-  private validateRows(rows: AttendanceImportRow[], manager?: EntityManager): ImportSummary<AttendanceImportRow> {
+  private validateRows(rows: AttendanceImportRow[], _manager?: EntityManager): ImportSummary<AttendanceImportRow> {
     const succeeded: AttendanceImportRow[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     for (let i = 0; i < rows.length; i++) {
@@ -447,7 +447,7 @@ export class AttendanceService implements OnModuleInit {
   // payroll deduction (that boundary is Payroll's own, per ADR-067 §C).
   // ---------------------------------------------------------------------------
 
-  buildBiometricDailyImportTemplate(manager?: EntityManager): Promise<Buffer> {
+  buildBiometricDailyImportTemplate(_manager?: EntityManager): Promise<Buffer> {
     return this.excel.buildTemplate('Biometric Daily Attendance', BIOMETRIC_DAILY_COLUMNS);
   }
 
@@ -458,7 +458,7 @@ export class AttendanceService implements OnModuleInit {
     return this.validateBiometricDailyRows(rows as unknown as BiometricDailyImportRow[], manager);
   }
 
-  private validateBiometricDailyRows(rows: BiometricDailyImportRow[], manager?: EntityManager): ImportSummary<BiometricDailyImportRow> {
+  private validateBiometricDailyRows(rows: BiometricDailyImportRow[], _manager?: EntityManager): ImportSummary<BiometricDailyImportRow> {
     const succeeded: BiometricDailyImportRow[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     for (let i = 0; i < rows.length; i++) {

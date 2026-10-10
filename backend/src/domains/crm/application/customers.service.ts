@@ -39,6 +39,7 @@ import { LimitService } from '../../../foundation/limit-engine/limit.service';
  * needs the same "qualified role, not per-resource assignment" treatment
  * `sales_supervisor`/`sales_manager` already get.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- documentation of the legacy leg; the legacy-admin register (foundation/authorization/legacy-admin-dependency.register.spec.ts) counts this reference
 const REVIEWER_ROLES = ['admin', 'sales_supervisor', 'sales_manager', 'finance']; // F5: documentation of the legacy leg; the decision is the rule `sales.customer.read_any`
 
 /**

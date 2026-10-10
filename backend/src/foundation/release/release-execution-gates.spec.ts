@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- jest.spyOn on private methods of the service under test */
 import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';

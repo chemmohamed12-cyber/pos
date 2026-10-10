@@ -19,5 +19,6 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true
-  }
+  },
+  "exclude": ["node_modules", "dist", "_deploy", "archive", "storage", "tmp", "public.pre-v1.0.3"]
 }

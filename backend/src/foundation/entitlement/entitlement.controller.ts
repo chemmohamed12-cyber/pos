@@ -5,8 +5,6 @@ import { EntitlementService } from './entitlement.service';
 import { EntitlementManifest } from './manifest.type';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
-import { PermissionGuard } from '../permission/permission.guard';
-import { RequirePermission } from '../permission/require-permission.decorator';
 import { CompanyEntitlementService } from '../plans/company-entitlement.service';
 import { CompanyViewContextService } from '../plans/company-view-context.service';
 

@@ -184,6 +184,7 @@ describe('DatabaseProvisioningService — mocked sequencing logic (supplementary
   });
 
   it('defaults roleModuleCodes to empty (does not guess entitlement) when not supplied', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit the property from the rest object
     const { roleModuleCodes: _omit, ...paramsWithoutRoleModules } = params;
     await service.provision(paramsWithoutRoleModules);
     expect(seedCompanyRoleTemplatesMock).toHaveBeenCalledWith(expect.anything(), []);

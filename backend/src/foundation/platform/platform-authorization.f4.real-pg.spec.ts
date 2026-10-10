@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type -- this spec inspects NestJS controller classes and handler functions generically through reflection metadata */
 import { randomUUID } from 'crypto';
 import { ConflictException, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -20,7 +21,6 @@ import { Role } from '../authorization/role.entity';
 import { UserRole } from '../authorization/user-role.entity';
 import { CompanyContextGuard } from '../company/company-context.guard';
 import { CompanyUserManagementService } from '../company/company-user-management.service';
-import { CompanyUserError } from '../company/company-user-roles';
 import { CompanyRegistryController } from '../company/company-registry.controller';
 import { InstallationMembershipController } from '../company/installation-membership.controller';
 import { InstallationAuditController } from '../audit/installation-audit.controller';

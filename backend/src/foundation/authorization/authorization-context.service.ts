@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { PermissionAccess } from '../permission/role-permission.entity';
 import { AuthorizationContext } from './authorization-context';
 import { loadAuthorizationContext } from './authorization-context.loader';
 

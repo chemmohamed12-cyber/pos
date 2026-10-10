@@ -4,8 +4,6 @@ import { IsInt, Min } from 'class-validator';
 import { LimitService } from './limit.service';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
 import { RolesGuard } from '../authorization/roles.guard';
-import { PermissionGuard } from '../permission/permission.guard';
-import { RequirePermission } from '../permission/require-permission.decorator';
 
 class SetLimitDto {
   @IsInt()

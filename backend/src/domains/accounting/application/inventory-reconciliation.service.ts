@@ -180,7 +180,7 @@ export class InventoryReconciliationService {
       status: InventoryReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
       actorUserId: string;
-    }, manager?: EntityManager): Promise<InventoryReconciliationRun> {
+    }, _manager?: EntityManager): Promise<InventoryReconciliationRun> {
     try {
       return (await repo.save(
         repo.create({
