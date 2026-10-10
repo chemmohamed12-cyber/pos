@@ -88,9 +88,15 @@ async function dropDatabase(name: string): Promise<void> {
 }
 
 export async function setUpTwoCompanyHarness(config: TwoCompanyHarnessConfig): Promise<TwoCompanyHarness> {
-  const controlPlaneDb = `daii_test_${config.namePrefix}_control_plane`;
-  const companyADbName = `daii_test_${config.namePrefix}_company_a`;
-  const companyBDbName = `daii_test_${config.namePrefix}_company_b`;
+  // Optional, fail-closed database-name namespace (Workstream C, 2026-10-10): the regression runner (tools/testing/biz-run.js --regression) sets DAII_TEST_DB_NS to
+  // exactly `biz_tNN_` so these historical specs create `daii_test_biz_tNN_<prefix>_*` — a name the existing guard entry already approves. Any other value is refused here.
+  // Unset => names unchanged (and the guard will simply refuse them on the dedicated cluster, as before).
+  const ns = process.env.DAII_TEST_DB_NS ?? '';
+  if (ns && !/^biz_t[0-9]{2}_$/.test(ns)) throw new Error(`DAII_TEST_DB_NS must look like biz_tNN_ (got an invalid value)`);
+  const controlPlaneDb = `daii_test_${ns}${config.namePrefix}_control_plane`;
+  const companyADbName = `daii_test_${ns}${config.namePrefix}_company_a`;
+  const companyBDbName = `daii_test_${ns}${config.namePrefix}_company_b`;
+  for (const n of [controlPlaneDb, companyADbName, companyBDbName]) if (n.length > 63) throw new Error(`disposable database name exceeds the PostgreSQL 63-character limit: ${n}`);
   const companyTags = ['core', ...(config.extraCompanyTags ?? [])];
   const roleModuleCodes = config.roleModuleCodes ?? ['sales'];
 

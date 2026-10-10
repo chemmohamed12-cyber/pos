@@ -1,0 +1,1072 @@
+[
+  {
+    "tSec": 2,
+    "systemCpuPct": 74.2,
+    "nodeCpuPctOfOneCore": 138.4,
+    "nodeRssMB": 2490,
+    "dbConnections": 19
+  },
+  {
+    "tSec": 4,
+    "systemCpuPct": 61.4,
+    "nodeCpuPctOfOneCore": 130.4,
+    "nodeRssMB": 2496,
+    "dbConnections": 20
+  },
+  {
+    "tSec": 6,
+    "systemCpuPct": 58.7,
+    "nodeCpuPctOfOneCore": 111.7,
+    "nodeRssMB": 2505,
+    "postgresRssMB": 535,
+    "dbConnections": 20
+  },
+  {
+    "tSec": 8,
+    "systemCpuPct": 53.7,
+    "nodeCpuPctOfOneCore": 71.1,
+    "nodeRssMB": 2510,
+    "dbConnections": 20
+  },
+  {
+    "tSec": 10,
+    "systemCpuPct": 56.8,
+    "nodeCpuPctOfOneCore": 108.7,
+    "nodeRssMB": 2518,
+    "dbConnections": 19
+  },
+  {
+    "tSec": 12,
+    "systemCpuPct": 53.4,
+    "nodeCpuPctOfOneCore": 114.8,
+    "nodeRssMB": 2526,
+    "postgresRssMB": 511,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 14,
+    "systemCpuPct": 51.3,
+    "nodeCpuPctOfOneCore": 77.3,
+    "nodeRssMB": 2534,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 16,
+    "systemCpuPct": 66.2,
+    "nodeCpuPctOfOneCore": 114,
+    "nodeRssMB": 2544,
+    "dbConnections": 21
+  },
+  {
+    "tSec": 18,
+    "systemCpuPct": 93.8,
+    "nodeCpuPctOfOneCore": 101.5,
+    "nodeRssMB": 2550,
+    "postgresRssMB": 703,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 20,
+    "systemCpuPct": 77.3,
+    "nodeCpuPctOfOneCore": 66.4,
+    "nodeRssMB": 2556,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 22,
+    "systemCpuPct": 73.2,
+    "nodeCpuPctOfOneCore": 107.8,
+    "nodeRssMB": 2561,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 24,
+    "systemCpuPct": 70.1,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2570,
+    "postgresRssMB": 755,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 26,
+    "systemCpuPct": 87.3,
+    "nodeCpuPctOfOneCore": 213.5,
+    "nodeRssMB": 2574,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 28,
+    "systemCpuPct": 89,
+    "nodeCpuPctOfOneCore": 165.3,
+    "nodeRssMB": 2569,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 30,
+    "systemCpuPct": 64.8,
+    "nodeCpuPctOfOneCore": 115.6,
+    "nodeRssMB": 2567,
+    "postgresRssMB": 814,
+    "dbConnections": 25
+  },
+  {
+    "tSec": 32,
+    "systemCpuPct": 56.1,
+    "nodeCpuPctOfOneCore": 86,
+    "nodeRssMB": 2570,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 34,
+    "systemCpuPct": 47.6,
+    "nodeCpuPctOfOneCore": 107.1,
+    "nodeRssMB": 2570,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 36,
+    "systemCpuPct": 57.4,
+    "nodeCpuPctOfOneCore": 107.8,
+    "nodeRssMB": 2570,
+    "postgresRssMB": 794,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 38,
+    "systemCpuPct": 51,
+    "nodeCpuPctOfOneCore": 84.3,
+    "nodeRssMB": 2570,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 40,
+    "systemCpuPct": 51.7,
+    "nodeCpuPctOfOneCore": 104.7,
+    "nodeRssMB": 2570,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 42,
+    "systemCpuPct": 57.8,
+    "nodeCpuPctOfOneCore": 102.3,
+    "nodeRssMB": 2570,
+    "postgresRssMB": 813,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 44,
+    "systemCpuPct": 58.2,
+    "nodeCpuPctOfOneCore": 77.2,
+    "nodeRssMB": 2571,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 46,
+    "systemCpuPct": 62.7,
+    "nodeCpuPctOfOneCore": 100.1,
+    "nodeRssMB": 2571,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 48,
+    "systemCpuPct": 63.9,
+    "nodeCpuPctOfOneCore": 104.3,
+    "nodeRssMB": 2571,
+    "postgresRssMB": 826,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 50,
+    "systemCpuPct": 56.1,
+    "nodeCpuPctOfOneCore": 81.2,
+    "nodeRssMB": 2571,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 52,
+    "systemCpuPct": 54.4,
+    "nodeCpuPctOfOneCore": 105.5,
+    "nodeRssMB": 2572,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 54,
+    "systemCpuPct": 54.4,
+    "nodeCpuPctOfOneCore": 101.5,
+    "nodeRssMB": 2572,
+    "postgresRssMB": 840,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 56,
+    "systemCpuPct": 60.5,
+    "nodeCpuPctOfOneCore": 75.5,
+    "nodeRssMB": 2572,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 58,
+    "systemCpuPct": 53,
+    "nodeCpuPctOfOneCore": 104.7,
+    "nodeRssMB": 2574,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 60,
+    "systemCpuPct": 50.7,
+    "nodeCpuPctOfOneCore": 101.5,
+    "nodeRssMB": 2579,
+    "postgresRssMB": 944,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 62,
+    "systemCpuPct": 44,
+    "nodeCpuPctOfOneCore": 81.5,
+    "nodeRssMB": 2588,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 64,
+    "systemCpuPct": 35.5,
+    "nodeCpuPctOfOneCore": 80.5,
+    "nodeRssMB": 2596,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 66,
+    "systemCpuPct": 40.2,
+    "nodeCpuPctOfOneCore": 93.8,
+    "nodeRssMB": 2607,
+    "postgresRssMB": 862,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 68,
+    "systemCpuPct": 42.2,
+    "nodeCpuPctOfOneCore": 64.1,
+    "nodeRssMB": 2614,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 70,
+    "systemCpuPct": 41.6,
+    "nodeCpuPctOfOneCore": 80.5,
+    "nodeRssMB": 2623,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 72,
+    "systemCpuPct": 46.1,
+    "nodeCpuPctOfOneCore": 82,
+    "nodeRssMB": 2632,
+    "postgresRssMB": 740,
+    "dbConnections": 23
+  },
+  {
+    "tSec": 74,
+    "systemCpuPct": 77.2,
+    "nodeCpuPctOfOneCore": 230.3,
+    "nodeRssMB": 2636,
+    "dbConnections": 13
+  },
+  {
+    "tSec": 76,
+    "systemCpuPct": 58.9,
+    "nodeCpuPctOfOneCore": 139.8,
+    "nodeRssMB": 2627,
+    "dbConnections": 13
+  },
+  {
+    "tSec": 78,
+    "systemCpuPct": 51.8,
+    "nodeCpuPctOfOneCore": 87.4,
+    "nodeRssMB": 2628,
+    "postgresRssMB": 506,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 80,
+    "systemCpuPct": 41.8,
+    "nodeCpuPctOfOneCore": 57,
+    "nodeRssMB": 2628,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 82,
+    "systemCpuPct": 40.8,
+    "nodeCpuPctOfOneCore": 82.8,
+    "nodeRssMB": 2628,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 84,
+    "systemCpuPct": 41.5,
+    "nodeCpuPctOfOneCore": 87.5,
+    "nodeRssMB": 2629,
+    "postgresRssMB": 565,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 86,
+    "systemCpuPct": 45,
+    "nodeCpuPctOfOneCore": 71.1,
+    "nodeRssMB": 2628,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 88,
+    "systemCpuPct": 41.7,
+    "nodeCpuPctOfOneCore": 82,
+    "nodeRssMB": 2628,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 90,
+    "systemCpuPct": 39.3,
+    "nodeCpuPctOfOneCore": 75,
+    "nodeRssMB": 2629,
+    "postgresRssMB": 652,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 92,
+    "systemCpuPct": 35.1,
+    "nodeCpuPctOfOneCore": 64,
+    "nodeRssMB": 2629,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 94,
+    "systemCpuPct": 35.7,
+    "nodeCpuPctOfOneCore": 78.9,
+    "nodeRssMB": 2630,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 96,
+    "systemCpuPct": 32.8,
+    "nodeCpuPctOfOneCore": 86.7,
+    "nodeRssMB": 2632,
+    "postgresRssMB": 571,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 98,
+    "systemCpuPct": 75.6,
+    "nodeCpuPctOfOneCore": 54.8,
+    "nodeRssMB": 2632,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 100,
+    "systemCpuPct": 38.9,
+    "nodeCpuPctOfOneCore": 85.2,
+    "nodeRssMB": 2633,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 102,
+    "systemCpuPct": 38.1,
+    "nodeCpuPctOfOneCore": 89.8,
+    "nodeRssMB": 2633,
+    "postgresRssMB": 582,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 104,
+    "systemCpuPct": 35.7,
+    "nodeCpuPctOfOneCore": 64,
+    "nodeRssMB": 2634,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 106,
+    "systemCpuPct": 36.2,
+    "nodeCpuPctOfOneCore": 79,
+    "nodeRssMB": 2636,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 108,
+    "systemCpuPct": 40.2,
+    "nodeCpuPctOfOneCore": 88.3,
+    "nodeRssMB": 2638,
+    "postgresRssMB": 592,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 110,
+    "systemCpuPct": 37.3,
+    "nodeCpuPctOfOneCore": 68.7,
+    "nodeRssMB": 2639,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 112,
+    "systemCpuPct": 69.2,
+    "nodeCpuPctOfOneCore": 96.9,
+    "nodeRssMB": 2638,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 114,
+    "systemCpuPct": 46.5,
+    "nodeCpuPctOfOneCore": 106.3,
+    "nodeRssMB": 2639,
+    "postgresRssMB": 867,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 116,
+    "systemCpuPct": 50.8,
+    "nodeCpuPctOfOneCore": 85.9,
+    "nodeRssMB": 2639,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 118,
+    "systemCpuPct": 47.3,
+    "nodeCpuPctOfOneCore": 101.6,
+    "nodeRssMB": 2642,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 120,
+    "systemCpuPct": 45.5,
+    "nodeCpuPctOfOneCore": 98.5,
+    "nodeRssMB": 2653,
+    "postgresRssMB": 982,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 122,
+    "systemCpuPct": 48.6,
+    "nodeCpuPctOfOneCore": 84.1,
+    "nodeRssMB": 2663,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 124,
+    "systemCpuPct": 50.4,
+    "nodeCpuPctOfOneCore": 103.2,
+    "nodeRssMB": 2676,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 126,
+    "systemCpuPct": 47.3,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2688,
+    "postgresRssMB": 908,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 128,
+    "systemCpuPct": 47.1,
+    "nodeCpuPctOfOneCore": 87.5,
+    "nodeRssMB": 2699,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 130,
+    "systemCpuPct": 63.7,
+    "nodeCpuPctOfOneCore": 102.2,
+    "nodeRssMB": 2709,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 132,
+    "systemCpuPct": 48.5,
+    "nodeCpuPctOfOneCore": 104.8,
+    "nodeRssMB": 2723,
+    "postgresRssMB": 922,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 134,
+    "systemCpuPct": 48.4,
+    "nodeCpuPctOfOneCore": 78.1,
+    "nodeRssMB": 2732,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 136,
+    "systemCpuPct": 46.5,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2745,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 138,
+    "systemCpuPct": 80.9,
+    "nodeCpuPctOfOneCore": 281.8,
+    "nodeRssMB": 2739,
+    "postgresRssMB": 934,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 140,
+    "systemCpuPct": 49.2,
+    "nodeCpuPctOfOneCore": 101,
+    "nodeRssMB": 2730,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 142,
+    "systemCpuPct": 47.3,
+    "nodeCpuPctOfOneCore": 98.4,
+    "nodeRssMB": 2731,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 144,
+    "systemCpuPct": 46.5,
+    "nodeCpuPctOfOneCore": 105.4,
+    "nodeRssMB": 2731,
+    "postgresRssMB": 965,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 146,
+    "systemCpuPct": 47.7,
+    "nodeCpuPctOfOneCore": 80.5,
+    "nodeRssMB": 2732,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 148,
+    "systemCpuPct": 44.3,
+    "nodeCpuPctOfOneCore": 98.3,
+    "nodeRssMB": 2732,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 150,
+    "systemCpuPct": 44.1,
+    "nodeCpuPctOfOneCore": 96.1,
+    "nodeRssMB": 2734,
+    "postgresRssMB": 1052,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 152,
+    "systemCpuPct": 45.8,
+    "nodeCpuPctOfOneCore": 86,
+    "nodeRssMB": 2734,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 154,
+    "systemCpuPct": 50.2,
+    "nodeCpuPctOfOneCore": 105.5,
+    "nodeRssMB": 2734,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 156,
+    "systemCpuPct": 48,
+    "nodeCpuPctOfOneCore": 101.3,
+    "nodeRssMB": 2734,
+    "postgresRssMB": 972,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 158,
+    "systemCpuPct": 61.7,
+    "nodeCpuPctOfOneCore": 77.3,
+    "nodeRssMB": 2734,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 160,
+    "systemCpuPct": 46.7,
+    "nodeCpuPctOfOneCore": 104,
+    "nodeRssMB": 2734,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 162,
+    "systemCpuPct": 55.6,
+    "nodeCpuPctOfOneCore": 93.8,
+    "nodeRssMB": 2734,
+    "postgresRssMB": 968,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 164,
+    "systemCpuPct": 47,
+    "nodeCpuPctOfOneCore": 78.2,
+    "nodeRssMB": 2734,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 166,
+    "systemCpuPct": 56,
+    "nodeCpuPctOfOneCore": 97.6,
+    "nodeRssMB": 2735,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 168,
+    "systemCpuPct": 47.7,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2735,
+    "postgresRssMB": 982,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 170,
+    "systemCpuPct": 44.3,
+    "nodeCpuPctOfOneCore": 84.3,
+    "nodeRssMB": 2735,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 172,
+    "systemCpuPct": 44.7,
+    "nodeCpuPctOfOneCore": 102.4,
+    "nodeRssMB": 2735,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 174,
+    "systemCpuPct": 49.8,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2735,
+    "postgresRssMB": 995,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 176,
+    "systemCpuPct": 53.4,
+    "nodeCpuPctOfOneCore": 75.8,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 178,
+    "systemCpuPct": 46.3,
+    "nodeCpuPctOfOneCore": 99.7,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 180,
+    "systemCpuPct": 46.1,
+    "nodeCpuPctOfOneCore": 106.2,
+    "nodeRssMB": 2736,
+    "postgresRssMB": 1098,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 182,
+    "systemCpuPct": 43.7,
+    "nodeCpuPctOfOneCore": 75.2,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 184,
+    "systemCpuPct": 54.3,
+    "nodeCpuPctOfOneCore": 103.9,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 186,
+    "systemCpuPct": 46.3,
+    "nodeCpuPctOfOneCore": 99.2,
+    "nodeRssMB": 2736,
+    "postgresRssMB": 1017,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 188,
+    "systemCpuPct": 44,
+    "nodeCpuPctOfOneCore": 81.3,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 190,
+    "systemCpuPct": 48.4,
+    "nodeCpuPctOfOneCore": 102.3,
+    "nodeRssMB": 2736,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 192,
+    "systemCpuPct": 45.1,
+    "nodeCpuPctOfOneCore": 98.4,
+    "nodeRssMB": 2740,
+    "postgresRssMB": 1028,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 194,
+    "systemCpuPct": 51.1,
+    "nodeCpuPctOfOneCore": 79.8,
+    "nodeRssMB": 2751,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 196,
+    "systemCpuPct": 53.4,
+    "nodeCpuPctOfOneCore": 100.8,
+    "nodeRssMB": 2765,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 198,
+    "systemCpuPct": 53.1,
+    "nodeCpuPctOfOneCore": 109.3,
+    "nodeRssMB": 2778,
+    "postgresRssMB": 1177,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 200,
+    "systemCpuPct": 47.3,
+    "nodeCpuPctOfOneCore": 85.8,
+    "nodeRssMB": 2789,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 202,
+    "systemCpuPct": 46,
+    "nodeCpuPctOfOneCore": 96.9,
+    "nodeRssMB": 2816,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 204,
+    "systemCpuPct": 45.7,
+    "nodeCpuPctOfOneCore": 99.2,
+    "nodeRssMB": 2835,
+    "postgresRssMB": 1219,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 206,
+    "systemCpuPct": 46.3,
+    "nodeCpuPctOfOneCore": 78.9,
+    "nodeRssMB": 2848,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 208,
+    "systemCpuPct": 52,
+    "nodeCpuPctOfOneCore": 103.2,
+    "nodeRssMB": 2866,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 210,
+    "systemCpuPct": 50.7,
+    "nodeCpuPctOfOneCore": 100,
+    "nodeRssMB": 2879,
+    "postgresRssMB": 1144,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 212,
+    "systemCpuPct": 43.8,
+    "nodeCpuPctOfOneCore": 79.7,
+    "nodeRssMB": 2894,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 214,
+    "systemCpuPct": 49.9,
+    "nodeCpuPctOfOneCore": 103.8,
+    "nodeRssMB": 2910,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 216,
+    "systemCpuPct": 50.4,
+    "nodeCpuPctOfOneCore": 104,
+    "nodeRssMB": 2926,
+    "postgresRssMB": 1063,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 218,
+    "systemCpuPct": 46.1,
+    "nodeCpuPctOfOneCore": 85.1,
+    "nodeRssMB": 2942,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 220,
+    "systemCpuPct": 47.3,
+    "nodeCpuPctOfOneCore": 96.8,
+    "nodeRssMB": 2960,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 222,
+    "systemCpuPct": 43.2,
+    "nodeCpuPctOfOneCore": 100,
+    "nodeRssMB": 2976,
+    "postgresRssMB": 1074,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 224,
+    "systemCpuPct": 44.5,
+    "nodeCpuPctOfOneCore": 83.6,
+    "nodeRssMB": 2989,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 226,
+    "systemCpuPct": 44.1,
+    "nodeCpuPctOfOneCore": 103.1,
+    "nodeRssMB": 3004,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 228,
+    "systemCpuPct": 50.7,
+    "nodeCpuPctOfOneCore": 99.3,
+    "nodeRssMB": 3021,
+    "postgresRssMB": 1086,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 230,
+    "systemCpuPct": 49.2,
+    "nodeCpuPctOfOneCore": 85.9,
+    "nodeRssMB": 3034,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 232,
+    "systemCpuPct": 49.1,
+    "nodeCpuPctOfOneCore": 96.8,
+    "nodeRssMB": 3051,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 234,
+    "systemCpuPct": 43.9,
+    "nodeCpuPctOfOneCore": 104,
+    "nodeRssMB": 3075,
+    "postgresRssMB": 1097,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 236,
+    "systemCpuPct": 50.1,
+    "nodeCpuPctOfOneCore": 75.8,
+    "nodeRssMB": 3085,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 238,
+    "systemCpuPct": 45.7,
+    "nodeCpuPctOfOneCore": 98.4,
+    "nodeRssMB": 3102,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 240,
+    "systemCpuPct": 50,
+    "nodeCpuPctOfOneCore": 102.3,
+    "nodeRssMB": 3120,
+    "postgresRssMB": 1199,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 242,
+    "systemCpuPct": 46.6,
+    "nodeCpuPctOfOneCore": 72.6,
+    "nodeRssMB": 3134,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 244,
+    "systemCpuPct": 64.1,
+    "nodeCpuPctOfOneCore": 181.8,
+    "nodeRssMB": 3148,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 246,
+    "systemCpuPct": 94,
+    "nodeCpuPctOfOneCore": 292.7,
+    "nodeRssMB": 2539,
+    "postgresRssMB": 1113,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 248,
+    "systemCpuPct": 50.4,
+    "nodeCpuPctOfOneCore": 71.9,
+    "nodeRssMB": 2544,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 250,
+    "systemCpuPct": 50,
+    "nodeCpuPctOfOneCore": 115.6,
+    "nodeRssMB": 2565,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 252,
+    "systemCpuPct": 52.9,
+    "nodeCpuPctOfOneCore": 100.9,
+    "nodeRssMB": 2573,
+    "postgresRssMB": 1119,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 254,
+    "systemCpuPct": 47.5,
+    "nodeCpuPctOfOneCore": 80.5,
+    "nodeRssMB": 2578,
+    "dbConnections": 27
+  },
+  {
+    "tSec": 256,
+    "systemCpuPct": 45.4,
+    "nodeCpuPctOfOneCore": 98.5,
+    "nodeRssMB": 2584,
+    "dbConnections": 26
+  },
+  {
+    "tSec": 258,
+    "systemCpuPct": 48.4,
+    "nodeCpuPctOfOneCore": 111,
+    "nodeRssMB": 2594,
+    "postgresRssMB": 671,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 260,
+    "systemCpuPct": 44.6,
+    "nodeCpuPctOfOneCore": 81.3,
+    "nodeRssMB": 2600,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 262,
+    "systemCpuPct": 46.8,
+    "nodeCpuPctOfOneCore": 94.4,
+    "nodeRssMB": 2605,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 264,
+    "systemCpuPct": 44.2,
+    "nodeCpuPctOfOneCore": 98.5,
+    "nodeRssMB": 2613,
+    "postgresRssMB": 694,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 266,
+    "systemCpuPct": 52.6,
+    "nodeCpuPctOfOneCore": 82.8,
+    "nodeRssMB": 2620,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 268,
+    "systemCpuPct": 45.3,
+    "nodeCpuPctOfOneCore": 99.2,
+    "nodeRssMB": 2627,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 270,
+    "systemCpuPct": 48.2,
+    "nodeCpuPctOfOneCore": 98.4,
+    "nodeRssMB": 2635,
+    "postgresRssMB": 805,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 272,
+    "systemCpuPct": 56.3,
+    "nodeCpuPctOfOneCore": 68,
+    "nodeRssMB": 2639,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 274,
+    "systemCpuPct": 47.5,
+    "nodeCpuPctOfOneCore": 94.5,
+    "nodeRssMB": 2648,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 276,
+    "systemCpuPct": 53.8,
+    "nodeCpuPctOfOneCore": 93,
+    "nodeRssMB": 2655,
+    "postgresRssMB": 670,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 278,
+    "systemCpuPct": 48.5,
+    "nodeCpuPctOfOneCore": 79.7,
+    "nodeRssMB": 2663,
+    "dbConnections": 17
+  },
+  {
+    "tSec": 280,
+    "systemCpuPct": 45,
+    "nodeCpuPctOfOneCore": 96,
+    "nodeRssMB": 2671,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 282,
+    "systemCpuPct": 58.9,
+    "nodeCpuPctOfOneCore": 91.4,
+    "nodeRssMB": 2679,
+    "postgresRssMB": 696,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 284,
+    "systemCpuPct": 45.7,
+    "nodeCpuPctOfOneCore": 71.8,
+    "nodeRssMB": 2686,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 286,
+    "systemCpuPct": 70.1,
+    "nodeCpuPctOfOneCore": 210.3,
+    "nodeRssMB": 2693,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 288,
+    "systemCpuPct": 78.8,
+    "nodeCpuPctOfOneCore": 187.7,
+    "nodeRssMB": 2645,
+    "postgresRssMB": 700,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 290,
+    "systemCpuPct": 40.7,
+    "nodeCpuPctOfOneCore": 74.8,
+    "nodeRssMB": 2647,
+    "dbConnections": 18
+  },
+  {
+    "tSec": 292,
+    "systemCpuPct": 45.4,
+    "nodeCpuPctOfOneCore": 104,
+    "nodeRssMB": 2647,
+    "dbConnections": 17
+  }
+]

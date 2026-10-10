@@ -1,0 +1,13 @@
+
+=== T-16: src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts
+PASS src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts (346.483 s)
+  T-16 — HTTP capacity benchmark (measurements + integrity oracle)
+    √ ramp, hot-spot, sustained, peak, recovery over HTTP (307135 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        346.567 s, estimated 360 s
+Ran all test suites matching /src\\foundation\\testing\\t16-capacity-http.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

@@ -1,0 +1,38 @@
+harness-based, namespaceable: 72
+refused by protected-name rule (2):
+domains/commerce/interface/products.company-isolation.spec.ts [products_isolation]
+domains/delivery/interface/delivery.company-isolation.spec.ts [delivery_isolation]
+other DB-touching specs with own connection logic (33):
+domains/accounting/application/closing-snapshot.service.spec.ts
+foundation/audit/area14-company-audit.real-pg.spec.ts
+foundation/audit/audit-chain-concurrency.real-pg.spec.ts
+foundation/audit/company-audit-access.real-pg.spec.ts
+foundation/authorization/authorization-context.spec.ts
+foundation/company/area6-company-isolation.acceptance.spec.ts
+foundation/company/company-database-allocation.http.real-pg.spec.ts
+foundation/company/company-database-pool.full-flow.real-pg.spec.ts
+foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+foundation/company/company-membership-provisioning.real-pg.spec.ts
+foundation/company/company-registry.controller.database-creation.real-pg.spec.ts
+foundation/company/membership-role-provisioning.spec.ts
+foundation/company/memberships-mine.real-pg.spec.ts
+foundation/company/permission-path-company-isolation.acceptance.spec.ts
+foundation/database-provisioning/database-provisioning.service.spec.ts
+foundation/database-provisioning/module-add-existing-company.characterization.spec.ts
+foundation/database-provisioning/new-company-default-administrator.verification.spec.ts
+foundation/database-provisioning/provisioning-lifecycle.characterization.spec.ts
+foundation/database-provisioning/ui-created-company-admin.characterization.spec.ts
+foundation/database-registry/company-connection-manager.service.spec.ts
+foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+foundation/database-registry/company-datasource-registry-isolation.spec.ts
+foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+foundation/limit-engine/limits-scope.characterization.spec.ts
+foundation/release/company-fanout.real-pg.spec.ts
+foundation/release/release-execution-environment-check.spec.ts
+foundation/release/release-migration-registry.real-pg.spec.ts
+foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+foundation/release-orchestration/company-migration-runner.spec.ts
+foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+foundation/testing/t16-capacity-http.biz.real-pg.spec.ts

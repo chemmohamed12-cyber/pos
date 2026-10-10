@@ -130,9 +130,40 @@ test('the existing provisioning harness issues ONLY statements this policy allow
   const adminSql = [...src.matchAll(/admin\.query\(`([^`]*)`\)/g)].map((m) => m[1]);
   assert.deepEqual(adminSql.sort(), ['CREATE DATABASE "${name}"', 'DROP DATABASE IF EXISTS "${name}"', 'DROP DATABASE IF EXISTS "${name}" WITH (FORCE)'].sort(), 'the harness admin statements changed — re-review the policy');
   assert.match(src, /database: 'postgres'/, 'admin connection database');
-  assert.match(src, /daii_test_\$\{config\.namePrefix\}_control_plane/);
-  assert.match(src, /daii_test_\$\{config\.namePrefix\}_company_a/);
-  assert.match(src, /daii_test_\$\{config\.namePrefix\}_company_b/);
+  // Workstream C (2026-10-10): names are daii_test_${ns}${prefix}_*; ns comes ONLY from DAII_TEST_DB_NS and must be exactly biz_tNN_ (validated in the harness, fail-closed)
+  assert.match(src, /daii_test_\$\{ns\}\$\{config\.namePrefix\}_control_plane/);
+  assert.match(src, /daii_test_\$\{ns\}\$\{config\.namePrefix\}_company_a/);
+  assert.match(src, /daii_test_\$\{ns\}\$\{config\.namePrefix\}_company_b/);
+  assert.match(src, /process\.env\.DAII_TEST_DB_NS/);
+  assert.match(src, /\^biz_t\[0-9\]\{2\}_\$/, 'the namespace validation');
+  assert.match(src, /exceeds the PostgreSQL 63-character limit/);
+  // every historical spec prefix, under the regression namespace, yields an approved business name within 63 characters, and the admin statements allow exactly those
+  const prefixes = new Set();
+  (function walk(d) {
+    for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const fp = path.join(d, f.name);
+      if (f.isDirectory()) walk(fp);
+      else if (f.name.endsWith('.ts')) for (const m of fs.readFileSync(fp, 'utf8').matchAll(/namePrefix: '([a-z0-9_]+)'/g)) prefixes.add(m[1]);
+    }
+  })(path.join(BACKEND, 'src'));
+  assert.ok(prefixes.size > 50, 'found the spec prefixes');
+  // a prefix containing prod|production|live|staging|ambient is refused by the guard's protected-name rule BY DESIGN (never weakened): those specs are NOT runnable under the guard
+  const lookalike = /(prod|production|live|staging|daii_dev|ambient|^restore_)/i;
+  const refusedByDesign = [];
+  for (const pre of prefixes) {
+    for (const suffix of ['control_plane', 'company_a', 'company_b']) {
+      const name = `daii_test_biz_t90_${pre}_${suffix}`;
+      assert.ok(name.length <= 63, `${name} too long`);
+      if (lookalike.test(name)) {
+        refusedByDesign.push(pre);
+        assert.equal(guard.evaluate(T(name), policy).role, null, `${name} must stay refused`);
+        continue;
+      }
+      assert.equal(guard.evaluate(T(name), policy).role, 'business', name);
+      assert.equal(admin(adminSql[0].replace('${name}', name)), null, name);
+    }
+  }
+  assert.ok(new Set(refusedByDesign).size < prefixes.size / 4, 'only a minority of prefixes are look-alikes');
   for (let i = 1; i <= 12; i += 1) {
     const prefix = `biz_t${String(i).padStart(2, '0')}`;
     for (const suffix of ['control_plane', 'company_a', 'company_b']) {

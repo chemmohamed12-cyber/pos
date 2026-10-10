@@ -32,6 +32,7 @@ const STEPS = [
   ['F-TRS-001', 'src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts'],
   // local capacity baseline (informational; D-10 numbers unapproved => no threshold)
   ['T-15', 'src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts'],
+  ['T-16', 'src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts'],
 ];
 
 const only = (process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : '').split(',').filter(Boolean);
@@ -53,6 +54,23 @@ try {
 } catch (e) {
   console.error(e.message);
   process.exit(2);
+}
+
+// Workstream C: --regression <list> runs the listed real-Postgres specs (one jest process each) with DAII_TEST_DB_NS=biz_t90_ so their disposable databases are
+// named daii_test_biz_t90_* (already approved by the unchanged guard entry). Logs only; evidence = the per-spec result lines.
+if (process.argv.includes('--regression')) {
+  const list = fs.readFileSync(path.resolve(BACKEND, process.argv[process.argv.indexOf('--regression') + 1]), 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#'));
+  const renv = { ...env, DAII_TEST_DB_NS: 'biz_t90_' };
+  let bad = 0;
+  for (const spec of list) {
+    if (!fs.existsSync(path.join(BACKEND, spec))) { console.log(`NOT-FOUND ${spec}`); bad += 1; continue; }
+    console.log(`\n=== REGRESSION: ${spec}`);
+    const r = spawnSync(process.execPath, [path.join(BACKEND, 'node_modules', 'jest', 'bin', 'jest.js'), '--runInBand', '--testTimeout=600000', spec], { cwd: BACKEND, env: renv, stdio: 'inherit' });
+    console.log(`RESULT ${r.status === 0 ? 'PASS' : 'FAIL'} ${spec}`);
+    if (r.status !== 0) bad += 1;
+  }
+  console.log(`\nREGRESSION DONE: ${list.length - bad}/${list.length} passed`);
+  process.exit(bad ? 1 : 0);
 }
 
 const keepGoing = process.argv.includes('--continue-after-failure'); // only for steps already triaged as independent; failures are still reported and the exit code stays non-zero

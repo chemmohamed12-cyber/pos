@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "status": "PROPOSED — not approved (see docs/decisions/test-program/CAPACITY-WORKLOAD-ASSUMPTIONS-AND-PROPOSED-TARGETS-2026-10-10.md). Thresholds are NOT applied to any verdict until the CTO approves them.",
+  "usage": "Local: node tools/testing/biz-run.js --only T-16 (optionally CAPACITY_SCALE=0.2 to shorten every phase). Hosting-like: same spec against an authorised cluster after adding its approved-databases entry; the profile below is the reproducible workload.",
+  "companies": 2,
+  "perCompany": { "treasuryAccounts": 8, "products": 40, "warehouses": 1, "customers": 1 },
+  "funding": "1000000.00 per treasury account (non-emitting opening cash-in)",
+  "mix": [
+    { "op": "payment.on-account", "weight": 35 },
+    { "op": "inventory.receipt", "weight": 20 },
+    { "op": "treasury.cash-in", "weight": 12.5 },
+    { "op": "treasury.cash-out", "weight": 12.5 },
+    { "op": "read.treasury-accounts", "weight": 10 },
+    { "op": "read.movements-report", "weight": 10 }
+  ],
+  "phases": [
+    { "name": "ramp-distributed", "kind": "distributed", "virtualUsers": [5, 10, 25, 50], "secondsEach": 15 },
+    { "name": "ramp-hot", "kind": "hot", "virtualUsers": [5, 25, 50], "secondsEach": 15 },
+    { "name": "sustained", "kind": "distributed", "virtualUsers": [20], "secondsEach": 90 },
+    { "name": "peak", "kind": "distributed", "virtualUsers": [60], "secondsEach": 45 },
+    { "name": "recovery", "kind": "distributed", "virtualUsers": [5], "secondsEach": 45, "windowSeconds": 5 }
+  ],
+  "proposedTargets": {
+    "writeLatencyMs": { "p50": 300, "p95": 1000, "p99": 2000 },
+    "readLatencyMsP95": 500,
+    "errorRate": "0 at target rate; <= 0.1% transient at 3x peak",
+    "resourceCeilings": { "cpuPct": 70, "memoryGrowthPct": 10, "dbConnectionsPctOfMax": 60 },
+    "recoveryMinutes": 2,
+    "integrity": "0 duplicate financial effects, 0 unexplained reconciliation differences, audit chain valid, no negative stock"
+  }
+}

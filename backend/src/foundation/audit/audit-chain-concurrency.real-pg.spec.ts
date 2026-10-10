@@ -15,7 +15,7 @@ const describeIsolated = PORT && PORT !== 5433 && USER ? describe : describe.ski
 
 describeIsolated('AuditService.record — concurrent writers keep one linear chain (real Postgres, isolated instance only)', () => {
   jest.setTimeout(120_000);
-  const dbName = `daii_test_auditchain_${randomUUID().slice(0, 8)}`;
+  const dbName = `daii_test_${process.env.DAII_TEST_DB_NS ?? ''}auditchain_${randomUUID().slice(0, 8)}`;
   let admin: DataSource;
   let ds: DataSource;
 
