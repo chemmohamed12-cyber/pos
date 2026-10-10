@@ -10,6 +10,7 @@ import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { TreasuryService } from '../../treasury/application/treasury.service';
 import { SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { AR_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ar-events.contract';
+import { runInTransaction } from '../../../foundation/transaction/run-in-transaction';
 
 const PAYMENT_DOCUMENT_TYPE = 'customer_payment';
 const PAYMENT_PREFIX = 'PAY';
@@ -316,8 +317,7 @@ export class PaymentsService {
       };
     };
     // F-PAY-001: the two advisory locks + unapplied/remaining checks must share one transaction; join the caller's only when it is ACTIVE.
-    if (manager) return manager.queryRunner?.isTransactionActive ? run(manager) : manager.transaction(run);
-    return this.dataSource.transaction(run);
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /** CUS-01 — "Customer Advance / Unapplied Receipt" list: the visible customers' payments that still carry an unapplied balance. */

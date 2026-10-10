@@ -16,6 +16,7 @@ import {
   TREASURY_EVENT_TOPICS,
 } from '../../../foundation/module-registry/contracts/treasury-events.contract';
 import { ScopeResolver } from '../../../foundation/scope/scope-resolver.service';
+import { runInTransaction } from '../../../foundation/transaction/run-in-transaction';
 
 const NUMBERING_SERIES: Record<TreasuryTransactionType, string> = {
   cash_in: 'treasury_cash_in',
@@ -454,8 +455,7 @@ export class TreasuryService implements FinanceTreasuryContract {
    */
   private run<T>(manager: EntityManager | undefined, fn: (m: EntityManager) => Promise<T>): Promise<T> {
     // F-TRS-001: a plain manager (no open transaction) must not run the per-account advisory lock + balance check outside one transaction; join only an ACTIVE caller transaction.
-    if (manager) return manager.queryRunner?.isTransactionActive ? fn(manager) : manager.transaction(fn);
-    return this.dataSource.transaction(fn);
+    return runInTransaction(this.dataSource, manager, fn);
   }
 
   private async cashInCore(

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { NumberingSequence } from './numbering-sequence.entity';
+import { runInTransaction } from '../transaction/run-in-transaction';
 
 interface SequenceRow {
   documentType: string;
@@ -74,7 +75,8 @@ export class NumberingService {
       const padded = String(nextNumber).padStart(6, '0');
       return seq.includeYear ? `${seq.prefix}-${yearToUse}-${padded}` : `${seq.prefix}-${padded}`;
     };
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-01: the FOR UPDATE row lock must outlive the read-modify-write — join an active caller transaction, otherwise open one (a plain manager would release the lock at once)
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**

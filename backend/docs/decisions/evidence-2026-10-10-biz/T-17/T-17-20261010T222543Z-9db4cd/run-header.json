@@ -1,0 +1,59 @@
+{
+  "testId": "T-17",
+  "runId": "T-17-20261010T222543Z-9db4cd",
+  "startedAt": "2026-10-10T22:25:43.842Z",
+  "commit": "74920fc55762f5589f243663b9665a77356e4113",
+  "branch": "master",
+  "dirtyPaths": [
+    "M backend/src/domains/customer-finance/application/payments.service.ts",
+    " M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.spec.ts",
+    " M backend/src/domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts",
+    " M backend/src/domains/treasury/application/treasury.service.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.spec.ts",
+    " M backend/src/foundation/approval-engine/approval-expiry.scheduler.ts",
+    " M backend/src/foundation/audit/audit.service.ts",
+    " M backend/src/foundation/audit/company-audit-access.real-pg.spec.ts",
+    " M backend/src/foundation/audit/installation-audit.controller.ts",
+    " M backend/src/foundation/company/company-membership-provisioning.real-pg.spec.ts",
+    " M backend/src/foundation/company/memberships-mine.real-pg.spec.ts",
+    " M backend/src/foundation/database-provisioning/database-provisioning.service.spec.ts",
+    " M backend/src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts",
+    " M backend/src/foundation/database-registry/company-datasource-registry-isolation.spec.ts",
+    " M backend/src/foundation/numbering/numbering.service.ts",
+    " M backend/src/foundation/process-engine/process-engine.service.ts",
+    " M backend/src/foundation/release-orchestration/company-migration-runner.spec.ts",
+    " M backend/src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts",
+    "?? backend/src/foundation/company/company-lifecycle-admission.real-pg.spec.ts",
+    "?? backend/src/foundation/company/company-lifecycle-admission.ts",
+    "?? backend/src/foundation/transaction/"
+  ],
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new",
+  "systemIdentifier": "7695079006474257732",
+  "databases": [
+    "daii_test_biz_t17_control_plane",
+    "daii_test_biz_t17_company_a",
+    "daii_test_biz_t17_company_b"
+  ],
+  "prefix": "biz_t17",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

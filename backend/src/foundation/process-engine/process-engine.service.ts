@@ -3,6 +3,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ProcessDefinition } from './process-definition';
 import { ProcessInstance } from './process-instance.entity';
 import { ProcessTransitionRecord } from './process-transition-record.entity';
+import { runInTransaction } from '../transaction/run-in-transaction';
 
 /**
  * Process Engine — Stage 2 build-order item 18.
@@ -138,7 +139,8 @@ export class ProcessEngineService {
       return instanceRepo.findOneOrFail({ where: { id } });
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-01: the FOR UPDATE lock on the process instance must be held until the state change and its history row are written (a plain manager would release it at once)
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   async getHistory(processInstanceId: string): Promise<ProcessTransitionRecord[]> {

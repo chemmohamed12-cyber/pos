@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditRecord, AuditResult } from './audit-record.entity';
 import { computeAuditHash, GENESIS_HASH } from './audit-hash';
+import { runInTransaction } from '../transaction/run-in-transaction';
 
 export interface RecordAuditInput {
   actorUserId: string | null;
@@ -106,8 +107,7 @@ export class AuditService {
 
     // F-AUD-002: a caller-supplied manager that has NO open transaction (e.g. `req.companyContext.dataSource.manager`) would run the advisory lock in its own implicit
     // transaction, released at once, so concurrent writers fork the chain. Join the caller's transaction only when one is active; otherwise open one on that manager.
-    if (manager) return manager.queryRunner?.isTransactionActive ? run(manager) : manager.transaction(run);
-    return this.dataSource.transaction(run);
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /** Walks the whole chain and verifies every record's hash — the backup/restore integrity check (ADR-020 §3). */
