@@ -1,4 +1,4 @@
-require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard-register')); // DB guard (M-R2 §11): default deny, all layers — no connection to an unapproved database
 // READ-ONLY capability snapshot (before/after a migration) of EVERY user in EVERY isolated bv Company database (5656 only).
 // Effective level per catalog node, computed with the product's own AuthorizationContext (ancestor-walk, most specific per role, most permissive across roles).
 // usage: node bv-cap-snapshot.js <out.json>

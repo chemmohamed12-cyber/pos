@@ -1,4 +1,4 @@
-require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard-register')); // DB guard (M-R2 §11): default deny, all layers — no connection to an unapproved database
 // Authorization Foundation closure — Step B: security / NO-MUTATION verification over REAL HTTP (bv backend 3601, isolated env) with DATABASE proof.
 // Every denied call is bracketed by fingerprints (md5 of the full ordered row set) of the tables it could have touched, in Company A's DB, Company B's DB and the
 // control plane; a denial passes only if the HTTP status is the refusal AND every fingerprint is unchanged. Positive controls (an allowed call) prove the

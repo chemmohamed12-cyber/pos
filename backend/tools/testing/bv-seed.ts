@@ -3,6 +3,7 @@
  * chart, an open fiscal period, two warehouses, products, a customer with an order + posted invoices + a shipment, mapped treasury accounts.
  * Everything else (suppliers, item requests, PR/RFQ/PO, payments, edits) is created through the real UI/API during the verification itself.
  */
+require('./db-guard-register'); // DB guard (M-R2 §11): default deny, all layers — must run before any database import
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 

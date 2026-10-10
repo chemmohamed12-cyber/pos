@@ -9,6 +9,7 @@
  * Usage (from backend/):  DB_HOST=127.0.0.1 DB_PORT=5656 DB_USER=d3verify DB_PASSWORD=x \
  *   DATABASE_CREDENTIAL_ENCRYPTION_KEY=<same as the backend's> npx ts-node --transpile-only tools/testing/bv-bootstrap.ts
  */
+require('./db-guard-register'); // DB guard (M-R2 §11): default deny, all layers — must run before any database import
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';

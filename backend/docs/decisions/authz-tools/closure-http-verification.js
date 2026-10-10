@@ -1,4 +1,4 @@
-require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard-register')); // DB guard (M-R2 §11): default deny, all layers — no connection to an unapproved database
 // CTO decisions of 2026-10-07 — runtime verification over REAL HTTP against the booted backend (3601, isolated env). Test identities only (…@closure.example.test).
 //  Decision 4-C: support self-grant prohibited (grant / extend), support membership never receives a scope, support cannot manage anything.
 //  Decision 3 / non-self-elevation: a `company_admin` administers users, organization and scopes of OTHER people, holds no ERP operational power, and can never add to or

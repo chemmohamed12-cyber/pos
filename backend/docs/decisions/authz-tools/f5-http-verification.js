@@ -1,4 +1,4 @@
-require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard-register')); // DB guard (M-R2 §11): default deny, all layers — no connection to an unapproved database
 // F5 runtime verification over REAL HTTP against the booted backend (3601, isolated env). Test identities only (…@f5.example.test).
 // Legacy authorization migration: the capability decisions equal the legacy role decisions; /admin/sales-reps is Company-aware; Organization writes, nav, scope and
 // customer-reviewer rules are served by workflow capabilities; the divergence monitor shows no user losing power.

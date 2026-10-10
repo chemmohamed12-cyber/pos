@@ -1,4 +1,5 @@
 /** Adds a second admin user to the isolated browser-verification environment (maker/checker needs two distinct users). */
+require('./db-guard-register'); // DB guard (M-R2 §11): default deny, all layers — must run before any database import
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';

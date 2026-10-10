@@ -1,4 +1,4 @@
-require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard')).install(); // DB guard (M-R2 §11): default deny — no connection to an unapproved database
+require(require('path').join(__dirname, '..', '..', '..', 'tools', 'testing', 'db-guard-register')); // DB guard (M-R2 §11): default deny, all layers — no connection to an unapproved database
 // Interleaved A/B latency comparison: pre-F1 build (3602) vs current build (3601), same isolated DBs, one client, alternating requests. GET only.
 const CO = '8a60c675-42c5-4747-91cf-3f1f12250c15';
 const J = { 'Content-Type': 'application/json' };
