@@ -49,14 +49,15 @@ import { ApprovalDecision } from '../approval-engine/approval-decision.entity';
  * here — never promoted to PROVEN WORKING just because it shares the
  * same (now-fixed) `DataSource`/registry as an already-proven row.
  */
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
 const HOST = process.env.DB_HOST ?? 'localhost';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 5433;
 const USERNAME = process.env.DB_USER ?? 'daii';
 const PASSWORD = process.env.DB_PASSWORD ?? 'daii_dev_only';
 const APP_ROOT = process.cwd();
 
-const CONTROL_PLANE_DB = 'daii_test_adr074_control_plane';
-const COMPANY_DB = 'daii_test_adr074_company';
+const CONTROL_PLANE_DB = `daii_test_${NS}adr074_control_plane`;
+const COMPANY_DB = `daii_test_${NS}adr074_company`;
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
   const admin = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'postgres', synchronize: false, logging: false });

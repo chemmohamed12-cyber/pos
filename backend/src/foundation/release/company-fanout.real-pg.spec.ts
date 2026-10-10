@@ -1,5 +1,4 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
@@ -28,7 +27,14 @@ const HOST = process.env.DB_HOST ?? '127.0.0.1';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 0;
 const USERNAME = process.env.DB_USER ?? '';
 const PASSWORD = process.env.DB_PASSWORD ?? '';
-const PREFIX = `daii_test_fo_${randomUUID().slice(0, 8)}`;
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
+const PREFIX = `daii_test_${NS}fo_${randomUUID().slice(0, 8)}`;
+// fixtures are written INSIDE the project root (never the OS temp directory)
+const tmpdir = (): string => {
+  const d = join(process.cwd(), '.test-tmp');
+  mkdirSync(d, { recursive: true });
+  return d;
+};
 const ACTOR = '00000000-0000-4000-8000-0000000000aa';
 
 type Mig = { ts: string; name: string; up: string; down?: string };

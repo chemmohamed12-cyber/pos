@@ -1,0 +1,124 @@
+
+=== REGRESSION: src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+[33m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [33m   WARN[39m [38;5;3m[InstallationBootstrapService] [39m[33mENTITLEMENT_MODE=enforced and no installation row: NOT creating one — apply a signed entitlement manifest (POST /api/admin/entitlement/apply).[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[EntitlementService] [39m[32mNo entitlement manifest — running the implicit DAII_STANDARD edition (ENTITLEMENT_MODE=unlicensed-full).[39m
+[32m[Nest] 15064  - [39m١١‏/١٠‏/٢٠٢٦، ١:٤٣:٢١ ص [32m    LOG[39m [38;5;3m[InstallationBootstrapService] [39m[32mInitialised the implicit unlicensed installation row (implicit-05ff224bd91fc4faca6ce909391a17b4); required by companies.installationId.[39m
+PASS src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts (33.018 s)
+  Installation bootstrap — real Postgres (isolated instance only)
+    √ REPRODUCES THE INCIDENT: a migrated platform with no installation row cannot create a Company (companies_installationId_fkey) (105 ms)
+    √ unlicensed-full: creates the implicit UNSIGNED DAII_STANDARD row — no manifest, no signature, no kid, state `unlicensed` — audited once; Company creation then works (511 ms)
+    √ idempotent: a second ensure() (an application restart) changes nothing and audits nothing more (88 ms)
+    √ race-safe: eight concurrent application starts produce exactly ONE row and ONE audit record (422 ms)
+    √ NEVER overwrites an existing row — a licensed-looking row is returned untouched (95 ms)
+    √ enforced: NEVER invents a row (no licence is fabricated) — absent stays absent, the foreign key still refuses a Company (7 ms)
+    √ enforced with an existing row: reported present, untouched (41 ms)
+    √ entitlement semantics are UNCHANGED: with or without the implicit row the application resolves the same implicit unlicensed DAII_STANDARD edition (47 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        33.119 s, estimated 62 s
+Ran all test suites matching /src\\foundation\\entitlement\\installation-bootstrap.real-pg.spec.ts/i.
+RESULT PASS src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-old-UcaQDx\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-old-UcaQDx\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-old-UcaQDx\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\core\1790900001001-CoreNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\hr\1790900001003-HrNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\manufacturing\1790900001004-MfgFirst.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\sales\1790900001002-SalesNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-new-QzOSBl\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\core\1790900001001-CoreNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\hr\1790900001003-HrNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\manufacturing\1790900001004-MfgFirst.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\sales\1790900001002-SalesNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.test-tmp\fo-fail-JvC3Du\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+  console.log
+    Migration "SalesNew1790900001002" failed, error: injected failure in SalesNew
+
+      at Function.log (platform/PlatformTools.ts:274:17)
+
+PASS src/foundation/release/company-fanout.real-pg.spec.ts (48.407 s)
+  Company fan-out — real Postgres (isolated instance only)
+    √ NAME CONVENTION: the file-name -> migration-name mapping that tag derivation relies on matches TypeORM exactly for EVERY migration in the real compiled set (664 ms)
+    √ tagsReceivedByCompany: core always; another tag only if the Company has at least one executed migration of it (1 ms)
+    plan (read-only)
+      √ discovers READY Companies only, derives each one's tags from ITS OWN history, never invents a tag, and writes nothing (6199 ms)
+      √ a READY Company that cannot be evaluated is a BLOCKER (never silently skipped) (1169 ms)
+    restore points
+      √ policy `create`: one verified pre_update backup per Company that has something pending — none for a Company with nothing to do (3184 ms)
+      √ policy `create`: a backup that does not verify BLOCKS (nothing is migrated by this call, by construction) (1334 ms)
+      √ policy `require-recent`: no verified backup => BLOCKED; a verified recent one is accepted (basis `recent`); an OLD one is not (1164 ms)
+    migrate
+      √ HAPPY PATH: every applicable READY Company is migrated READY -> MIGRATING -> READY; the SUSPENDED one and the never-had tag are untouched; verify is clean; a re-run is a no-op; evidence is in the audit chain (7807 ms)
+      √ STOPS AT THE FIRST FAILURE: the earlier Company stays migrated (forward-only), the failing one is rolled back by its own transaction and provably unchanged -> READY, the later one is NOT TOUCHED (5832 ms)
+      √ a Company that is no longer READY at its turn is NOT migrated and the sweep stops (LA-1 re-check at execution time) (2674 ms)
+      √ verify() reports a Company that still has pending migrations (the independent post-condition) (1319 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        48.539 s, estimated 57 s
+Ran all test suites matching /src\\foundation\\release\\company-fanout.real-pg.spec.ts/i.
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+PASS src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts (58.684 s)
+  Company database pool — several OS processes at once (real Postgres, isolated instance only)
+    √ the migration created the unique index, and the database itself refuses a second registration of a database name (304 ms)
+    √ the migration refuses (and changes nothing) when duplicates already exist, naming them (168 ms)
+    √ 6 separate processes, 3 pooled databases: exactly 3 Companies are created, every database has ONE owner, and the losers leave no Company behind (34373 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        59.061 s
+Ran all test suites matching /src\\foundation\\company\\company-database-pool.multi-process.real-pg.spec.ts/i.
+RESULT PASS src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+
+REGRESSION DONE: 3/3 passed

@@ -28,16 +28,17 @@ import { User } from '../identity/user.entity';
  * logic-only coverage that ran throughout the blocked period as
  * supplementary (not equivalent) evidence.
  */
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
 const HOST = process.env.DB_HOST ?? 'localhost';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 5433;
 const USERNAME = process.env.DB_USER ?? 'daii';
 const PASSWORD = process.env.DB_PASSWORD ?? 'daii_dev_only';
 const APP_ROOT = process.cwd();
 
-const CONTROL_PLANE_DB = 'daii_test_area4_control_plane';
-const COMPANY_DB = 'daii_test_area4_company';
+const CONTROL_PLANE_DB = `daii_test_${NS}area4_control_plane`;
+const COMPANY_DB = `daii_test_${NS}area4_company`;
 // One physical database belongs to exactly ONE Company (unique index on database_registries.databaseName), so each test that provisions its own Company gets its own database.
-const EXTRA_DBS = ['daii_test_area4_company_unknown_admin', 'daii_test_area4_company_retry'];
+const EXTRA_DBS = [`daii_test_${NS}area4_company_unknown_admin`, `daii_test_${NS}area4_company_retry`];
 const INSTALLATION_ID = 'installation';
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
@@ -214,7 +215,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
         companyId: company.id,
         host: HOST,
         port: PORT,
-        databaseName: 'daii_test_area4_company_unknown_admin',
+        databaseName: `daii_test_${NS}area4_company_unknown_admin`,
         username: USERNAME,
         password: PASSWORD,
         appRoot: APP_ROOT,
@@ -227,7 +228,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
     // Never reached the Company-DB UserRole write for this identity — the
     // Platform-level UsersService.findById check fails first, exactly the
     // invariant ADR-073 §7 requires now that no local FK exists to catch it.
-    const companyDs = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'daii_test_area4_company_unknown_admin', synchronize: false, logging: false });
+    const companyDs = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: `daii_test_${NS}area4_company_unknown_admin`, synchronize: false, logging: false });
     await companyDs.initialize();
     try {
       const rows: Array<{ count: string }> = await companyDs.query(`SELECT count(*)::text AS count FROM "user_roles" WHERE "userId" = $1`, [unknownUserId]);
@@ -274,7 +275,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
         companyId: company.id,
         host: HOST,
         port: 1, // unreachable, first attempt fails
-        databaseName: 'daii_test_area4_company_retry',
+        databaseName: `daii_test_${NS}area4_company_retry`,
         username: USERNAME,
         password: PASSWORD,
         appRoot: APP_ROOT,
@@ -288,7 +289,7 @@ describe('DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposa
       companyId: company.id,
       host: HOST,
       port: PORT, // corrected
-      databaseName: 'daii_test_area4_company_retry',
+      databaseName: `daii_test_${NS}area4_company_retry`,
       username: USERNAME,
       password: PASSWORD,
       appRoot: APP_ROOT,

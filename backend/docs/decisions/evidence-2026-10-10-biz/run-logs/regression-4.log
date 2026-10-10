@@ -1,0 +1,133 @@
+
+=== REGRESSION: src/foundation/company/memberships-mine.real-pg.spec.ts
+PASS src/foundation/company/memberships-mine.real-pg.spec.ts (63.621 s)
+  GET /memberships/mine — real Postgres (2026-09-25, CTO-authorized)
+    √ Positive: returns only the caller's own memberships (59 ms)
+    √ Multiple Companies: a user with memberships in both A and B gets both back (18 ms)
+    √ No membership: returns an empty array, not an error (8 ms)
+    √ Cross-user protection: there is no parameter through which User A can request User B's memberships (22 ms)
+    √ No Company Context: the request succeeds with only req.user set — no companyContext anywhere (21 ms)
+    √ DB boundary: the controller has no Company-DataSource-capable dependency at all (structural), and only the Platform DB is ever queried (empirical) (1 ms)
+    √ Authentication: the controller is gated by JwtAuthGuard only (no CompanyContextGuard, no PermissionGuard) (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        63.691 s
+Ran all test suites matching /src\\foundation\\company\\memberships-mine.real-pg.spec.ts/i.
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-membership-provisioning.real-pg.spec.ts
+PASS src/foundation/company/company-membership-provisioning.real-pg.spec.ts (76.681 s)
+  Track A live grant paths — ADR-073 §6 targeted re-verification, real disposable Postgres
+    √ grantMembership: Platform User validation -> Company Membership -> real Company-DB UserRole write (905 ms)
+    √ grantMembership rejects an unknown Platform User BEFORE any Company-DB write (negative integrity proof) (140 ms)
+    √ changeMembershipRole: real Company-DB transaction (deprovision old + provision new) succeeds (286 ms)
+    √ MembershipReconciliationScheduler replays a stale FAILED "grant" operation and completes it against the real Company DB (139 ms)
+    √ MembershipReconciliationScheduler replays a stale FAILED "role_change" operation and completes it against the real Company DB (160 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        76.763 s
+Ran all test suites matching /src\\foundation\\company\\company-membership-provisioning.real-pg.spec.ts/i.
+RESULT PASS src/foundation/company/company-membership-provisioning.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/database-provisioning/database-provisioning.service.spec.ts
+PASS src/foundation/database-provisioning/database-provisioning.service.spec.ts (93.945 s)
+  DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposable Postgres)
+    √ provisions a Company end-to-end: registers the database, migrates it, health-checks it, marks READY (proof points 1, 2, 7) (3099 ms)
+    √ ADR-073 negative integrity proof — an unknown Platform User is rejected BEFORE any Company-DB write, even with no local FK to catch it (2041 ms)
+    √ a provisioning failure (unreachable database) leaves a recoverable FAILED state, does not mark the Company READY (proof point 5) (118 ms)
+    √ retrying with a corrected connection reuses the same registry row and succeeds (proof point 6) (2794 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        94.154 s
+Ran all test suites matching /src\\foundation\\database-provisioning\\database-provisioning.service.spec.ts/i.
+RESULT PASS src/foundation/database-provisioning/database-provisioning.service.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+  console.log
+    ADR-074 Authorization chain characterization: RETURNED: ["admin"]
+
+      at Object.<anonymous> (foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts:170:13)
+
+  console.log
+    ADR-074 Closing Snapshot chain characterization: RAN OK
+
+      at Object.<anonymous> (foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts:193:13)
+
+PASS src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts (102.377 s)
+  ADR-074 §6 — Company DataSource factory real-PG characterization (2026-09-25)
+    √ Authorization chain: CompanyConnectionManagerService.getDataSource() -> AuthorizationService.getRoleKeysForUser(manager) — real production call shape (673 ms)
+    √ Closing Snapshot chain: CompanyConnectionManagerService.getDataSource() -> manager.getRepository(ClosingSnapshotRun) — real production call shape (11 ms)
+    √ Gate B — Closing Snapshot deep chain (assembleAndFinalize): real production factory resolves .getRepository() for its own entities (21 ms)
+    √ Gate B — Journal (accounting posting): real production factory resolves .getRepository() for its own entities (19 ms)
+    √ Gate B — Ledger: real production factory resolves .getRepository() for its own entities (9 ms)
+    √ Gate B — Customer Finance (via ClosingSnapshotService FINANCE_CUSTOMER_LEDGER_CONTRACT): real production factory resolves .getRepository() for its own entities (8 ms)
+    √ Gate B — Treasury (via ClosingSnapshotService FINANCE_TREASURY_CONTRACT): real production factory resolves .getRepository() for its own entities (26 ms)
+    √ Gate B — Audit (called with manager throughout every chain above): real production factory resolves .getRepository() for its own entities (7 ms)
+    √ Gate B — Sales Orders (via PreliminaryHoldExpiryScheduler.expireHoldForOrder): real production factory resolves .getRepository() for its own entities (13 ms)
+    √ Gate B — Process Engine (via SalesOrdersService.expireHoldForOrder -> transition): real production factory resolves .getRepository() for its own entities (10 ms)
+    √ Gate B — Approval Engine (via ApprovalExpiryScheduler.expire): real production factory resolves .getRepository() for its own entities (17 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        102.52 s
+Ran all test suites matching /src\\foundation\\database-registry\\company-datasource-factory-impact.characterization.spec.ts/i.
+RESULT PASS src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+PASS src/foundation/database-registry/company-datasource-registry-isolation.spec.ts (72.784 s)
+  ADR-074 Gate D — Area 21 cross-company isolation, unaffected by COMPANY_ENTITY_REGISTRY (2026-09-25)
+    √ Company A connection resolves Company A grant, and does NOT see Company B's user at all (689 ms)
+    √ Company B connection resolves Company B grant, and does NOT see Company A's user at all (411 ms)
+    √ CompanyConnectionManagerService returns genuinely distinct, separately-cached DataSource objects for A and B (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        72.956 s
+Ran all test suites matching /src\\foundation\\database-registry\\company-datasource-registry-isolation.spec.ts/i.
+RESULT PASS src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+
+=== REGRESSION: src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+[31m[Nest] 21944  - [39m١١‏/١٠‏/٢٠٢٦، ١:٣٤:٤٦ ص [31m  ERROR[39m [38;5;3m[RestoreManagerService] [39m[31mRestore failed for operation "86a3e6e4-0820-49fd-91b8-92c0fcd0104a"[39m
+Error: Restored Company audit chain is broken at seq 2 — restore rejected.
+    at RestoreManagerService.confirmAndRestore (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\restore-manager.service.ts:223:21)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\restore-manager-audit-chain.real-pg.spec.ts:180:5)
+PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts (69.275 s)
+  Area 14 — RestoreManagerService audit-chain branch, real Postgres (2026-09-25)
+    √ zero audit rows (pre-Area-14 backup) — restore succeeds, chain never checked (177 ms)
+    √ audit rows present + valid chain — restore succeeds (186 ms)
+    √ audit rows present + broken chain — restore rejected (218 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        69.393 s
+Ran all test suites matching /src\\foundation\\release\\restore-manager-audit-chain.real-pg.spec.ts/i.
+RESULT PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release-orchestration/company-migration-runner.spec.ts
+PASS src/foundation/release-orchestration/company-migration-runner.spec.ts (70.883 s)
+  runMigrationsForDatabase (Area 16, real disposable Postgres databases)
+    √ runs the existing core migration pipeline, unmodified, against a fresh disposable database (2194 ms)
+    √ the migrated database actually has the expected tables (not a no-op success) (91 ms)
+    √ migrating Company B never touches Company A — no cross-company selection (proof point 4) (1384 ms)
+    √ re-running against an already-migrated database is a safe no-op (retry semantics) (97 ms)
+    √ reports failure (not a thrown crash escaping the function) for an unreachable database (71 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        70.979 s
+Ran all test suites matching /src\\foundation\\release-orchestration\\company-migration-runner.spec.ts/i.
+RESULT PASS src/foundation/release-orchestration/company-migration-runner.spec.ts
+
+REGRESSION DONE: 7/7 passed
+EXIT 0

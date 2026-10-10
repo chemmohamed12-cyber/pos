@@ -17,7 +17,8 @@ const ADMIN = process.env.DB_USER ?? '';
 const ADMIN_PW = process.env.DB_PASSWORD ?? '';
 const describeIsolated = PORT && PORT !== 5433 && ADMIN ? describe : describe.skip;
 const tag = randomUUID().slice(0, 6);
-const CP = `daii_test_mp_cp_${tag}`;
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
+const CP = `daii_test_${NS}mp_cp_${tag}`;
 
 describeIsolated('Company database pool — several OS processes at once (real Postgres, isolated instance only)', () => {
   jest.setTimeout(900_000);
@@ -88,7 +89,7 @@ describeIsolated('Company database pool — several OS processes at once (real P
   });
 
   it('6 separate processes, 3 pooled databases: exactly 3 Companies are created, every database has ONE owner, and the losers leave no Company behind', async () => {
-    const pool = ['mp_a', 'mp_b', 'mp_c'].map((n) => `${n}_${tag}`);
+    const pool = ['mp_a', 'mp_b', 'mp_c'].map((n) => `daii_test_${NS}${n}_${tag}`);
     for (const d of pool) { toDrop.push(d); await withAdmin((ds) => ds.query(`CREATE DATABASE "${d}"`)); }
     const before = (await cp.query(`SELECT count(*)::int n FROM companies`))[0].n;
 

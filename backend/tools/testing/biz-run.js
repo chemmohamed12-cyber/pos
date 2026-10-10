@@ -34,6 +34,7 @@ const STEPS = [
   ['T-15', 'src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts'],
   ['T-16', 'src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts'],
   ['T-17', 'src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts'],
+  ['T-19', 'src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts'],
   ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 
@@ -62,7 +63,9 @@ try {
 // named daii_test_biz_t90_* (already approved by the unchanged guard entry). Logs only; evidence = the per-spec result lines.
 if (process.argv.includes('--regression')) {
   const list = fs.readFileSync(path.resolve(BACKEND, process.argv[process.argv.indexOf('--regression') + 1]), 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#'));
-  const renv = { ...env, DAII_TEST_DB_NS: 'biz_t90_' };
+  const nsArg = process.env.REGRESSION_NS || 'biz_t90_'; // allows two runners on the shared cluster not to collide; must stay within the approved pattern
+  if (!/^biz_t[0-9]{2}_$/.test(nsArg)) { console.error('REFUSED: REGRESSION_NS must look like biz_tNN_'); process.exit(2); }
+  const renv = { ...env, DAII_TEST_DB_NS: nsArg };
   let bad = 0;
   for (const spec of list) {
     if (!fs.existsSync(path.join(BACKEND, spec))) { console.log(`NOT-FOUND ${spec}`); bad += 1; continue; }

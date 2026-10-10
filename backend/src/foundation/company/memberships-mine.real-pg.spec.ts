@@ -19,13 +19,14 @@ import { AuthenticatedRequest } from '../authentication/jwt-auth.guard';
  * — grep-verifiable, not just asserted) and empirically (queries only hit
  * the one Platform database this test provisions).
  */
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
 const HOST = process.env.DB_HOST ?? 'localhost';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 5433;
 const USERNAME = process.env.DB_USER ?? 'daii';
 const PASSWORD = process.env.DB_PASSWORD ?? 'daii_dev_only';
 const APP_ROOT = process.cwd();
 
-const CONTROL_PLANE_DB = 'daii_test_memberships_mine_control_plane';
+const CONTROL_PLANE_DB = `daii_test_${NS}memberships_mine_control_plane`;
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
   const admin = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'postgres', synchronize: false, logging: false });

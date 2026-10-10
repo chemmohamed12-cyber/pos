@@ -1,0 +1,246 @@
+{
+  "generatedFrom": {
+    "package": "daii-backend@1.1.9",
+    "license": "UNLICENSED",
+    "lockfileVersion": 3,
+    "nodeEngines": {
+      "node": ">=20.0.0"
+    }
+  },
+  "directCounts": {
+    "dependencies": 19,
+    "devDependencies": 23
+  },
+  "totalPackagesInLock": 908,
+  "scope": {
+    "productionTransitive": 387,
+    "devOnlyTransitive": 521,
+    "optional": 5
+  },
+  "licenseCountsTop": [
+    [
+      "MIT",
+      708
+    ],
+    [
+      "ISC",
+      98
+    ],
+    [
+      "Apache-2.0",
+      31
+    ],
+    [
+      "BSD-3-Clause",
+      31
+    ],
+    [
+      "BSD-2-Clause",
+      18
+    ],
+    [
+      "BlueOak-1.0.0",
+      5
+    ],
+    [
+      "Unlicense",
+      3
+    ],
+    [
+      "MIT/X11",
+      2
+    ],
+    [
+      "(MIT OR CC0-1.0)",
+      2
+    ],
+    [
+      "Python-2.0",
+      1
+    ],
+    [
+      "[{\"type\":\"MIT\",\"url\":\"http://github.com/mscdex/busboy/raw/master/LICENSE\"}]",
+      1
+    ],
+    [
+      "CC-BY-4.0",
+      1
+    ],
+    [
+      "[{\"type\":\"MIT\",\"url\":\"https://github.com/cowboy/node-exit/blob/master/LICENSE-MIT\"}]",
+      1
+    ],
+    [
+      "(MIT OR GPL-3.0-or-later)",
+      1
+    ],
+    [
+      "(MIT AND Zlib)",
+      1
+    ],
+    [
+      "(MIT AND BSD-3-Clause)",
+      1
+    ],
+    [
+      "[{\"type\":\"MIT\",\"url\":\"http://github.com/mscdex/streamsearch/raw/master/LICENSE\"}]",
+      1
+    ],
+    [
+      "0BSD",
+      1
+    ]
+  ],
+  "packagesWithoutDeclaredLicense": [
+    {
+      "name": "buffers",
+      "version": "0.1.1",
+      "scope": "prod"
+    }
+  ],
+  "licenseNeedingLegalInterpretation": {
+    "copyleftFamily": [
+      {
+        "name": "jszip",
+        "version": "3.10.1",
+        "license": "(MIT OR GPL-3.0-or-later)",
+        "scope": "prod"
+      }
+    ],
+    "nonStandardOrUnlicensed": []
+  },
+  "deprecatedPackages": [
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "dev",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "prod",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "are-we-there-yet",
+      "version": "2.0.0",
+      "scope": "prod",
+      "message": "This package is no longer supported."
+    },
+    {
+      "name": "eslint",
+      "version": "9.39.5",
+      "scope": "dev",
+      "message": "This version is no longer supported. Please see https://eslint.org/version-support for other options."
+    },
+    {
+      "name": "uuid",
+      "version": "8.3.2",
+      "scope": "prod",
+      "message": "uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely"
+    },
+    {
+      "name": "fstream",
+      "version": "1.0.12",
+      "scope": "prod",
+      "message": "This package is no longer supported."
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "prod",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "rimraf",
+      "version": "2.7.1",
+      "scope": "prod",
+      "message": "Rimraf versions prior to v4 are no longer supported"
+    },
+    {
+      "name": "gauge",
+      "version": "3.0.2",
+      "scope": "prod",
+      "message": "This package is no longer supported."
+    },
+    {
+      "name": "glob",
+      "version": "10.4.5",
+      "scope": "dev",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "inflight",
+      "version": "1.0.6",
+      "scope": "prod",
+      "message": "This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, "
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "dev",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "dev",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "lodash.isequal",
+      "version": "4.5.0",
+      "scope": "prod",
+      "message": "This package is deprecated. Use require('node:util').isDeepStrictEqual instead."
+    },
+    {
+      "name": "npmlog",
+      "version": "5.0.1",
+      "scope": "prod",
+      "message": "This package is no longer supported."
+    },
+    {
+      "name": "rimraf",
+      "version": "3.0.2",
+      "scope": "prod",
+      "message": "Rimraf versions prior to v4 are no longer supported"
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "prod",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "tar",
+      "version": "6.2.1",
+      "scope": "prod",
+      "message": "Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Supp"
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "dev",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "glob",
+      "version": "10.5.0",
+      "scope": "prod",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    },
+    {
+      "name": "uuid",
+      "version": "9.0.1",
+      "scope": "prod",
+      "message": "uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely"
+    },
+    {
+      "name": "glob",
+      "version": "7.2.3",
+      "scope": "prod",
+      "message": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Sup"
+    }
+  ]
+}

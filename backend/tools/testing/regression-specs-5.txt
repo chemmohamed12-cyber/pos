@@ -1,0 +1,4 @@
+# N-01 round (2026-10-11): further specs whose database names derive from a fixed prefix (test-only namespace); company-fanout also writes its fixtures inside the project root (.test-tmp) instead of the OS temp directory.
+src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+src/foundation/release/company-fanout.real-pg.spec.ts
+src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts

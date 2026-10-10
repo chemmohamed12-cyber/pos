@@ -21,15 +21,16 @@ import { seedCompanyRoleTemplates, seedCompanyAdminRole } from '../company/compa
  *   Company A request -> Company A DataSource -> Company A entity metadata -> authorization
  *   Company B must never be selected/touched by a Company A request.
  */
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
 const HOST = process.env.DB_HOST ?? 'localhost';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 5433;
 const USERNAME = process.env.DB_USER ?? 'daii';
 const PASSWORD = process.env.DB_PASSWORD ?? 'daii_dev_only';
 const APP_ROOT = process.cwd();
 
-const CONTROL_PLANE_DB = 'daii_test_adr074_gated_control_plane';
-const COMPANY_A_DB = 'daii_test_adr074_gated_company_a';
-const COMPANY_B_DB = 'daii_test_adr074_gated_company_b';
+const CONTROL_PLANE_DB = `daii_test_${NS}adr074_gated_control_plane`;
+const COMPANY_A_DB = `daii_test_${NS}adr074_gated_company_a`;
+const COMPANY_B_DB = `daii_test_${NS}adr074_gated_company_b`;
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
   const admin = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'postgres', synchronize: false, logging: false });

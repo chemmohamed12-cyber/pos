@@ -25,14 +25,15 @@ import { applyCompanyAuthorizationSchemaAdjustment } from '../company/company-au
  * - rows present + valid chain -> restore succeeds
  * - rows present + broken chain -> restore rejected
  */
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
 const HOST = process.env.DB_HOST ?? 'localhost';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 5433;
 const USERNAME = process.env.DB_USER ?? 'daii';
 const PASSWORD = process.env.DB_PASSWORD ?? 'daii_dev_only';
 const APP_ROOT = process.cwd();
 
-const CONTROL_PLANE_DB = 'daii_test_area14_restore_control_plane';
-const COMPANY_DB = 'daii_test_area14_restore_company';
+const CONTROL_PLANE_DB = `daii_test_${NS}area14_restore_control_plane`;
+const COMPANY_DB = `daii_test_${NS}area14_restore_company`;
 
 async function withAdminConnection<T>(fn: (admin: DataSource) => Promise<T>): Promise<T> {
   const admin = new DataSource({ type: 'postgres', host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database: 'postgres', synchronize: false, logging: false });

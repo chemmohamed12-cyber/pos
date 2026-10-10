@@ -19,7 +19,8 @@ const HOST = process.env.DB_HOST ?? '127.0.0.1';
 const PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 0;
 const USERNAME = process.env.DB_USER ?? '';
 const PASSWORD = process.env.DB_PASSWORD ?? '';
-const DB = `daii_test_ib_${randomUUID().slice(0, 8)}`;
+const NS = process.env.DAII_TEST_DB_NS ?? ''; // regression runner namespace (biz_tNN_), see two-company-real-pg-harness.ts
+const DB = `daii_test_${NS}ib_${randomUUID().slice(0, 8)}`;
 const describeIsolated = PORT && PORT !== 5433 && USERNAME ? describe : describe.skip;
 
 describeIsolated('Installation bootstrap — real Postgres (isolated instance only)', () => {

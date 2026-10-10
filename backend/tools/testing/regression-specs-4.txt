@@ -1,0 +1,8 @@
+# N-01 round (2026-10-11): the seven fixed-name specs adapted with the test-only namespace (no guard change); admin statements are only exact CREATE/DROP DATABASE.
+src/foundation/company/memberships-mine.real-pg.spec.ts
+src/foundation/company/company-membership-provisioning.real-pg.spec.ts
+src/foundation/database-provisioning/database-provisioning.service.spec.ts
+src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+src/foundation/release-orchestration/company-migration-runner.spec.ts
