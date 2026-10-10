@@ -1,0 +1,189 @@
+PASS src/foundation/navigation/navigation.service.spec.ts (250.234 s)
+PASS src/foundation/release/release-manager.service.spec.ts (250.244 s)
+PASS src/foundation/release/upgrade-resolver.spec.ts
+PASS src/foundation/company/company-users.controller.spec.ts (10.515 s)
+PASS src/database/migrations/extension-dependencies.spec.ts (8.372 s)
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٢ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mTopic "commerce.product.created" has only ambient-scope subscribers — its Company-outbox events are marked 'skipped' (ADR-075 §5).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٢ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mEvent handler for "finance.x" failed in Company company-a: boom[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٢ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mEvent handler for "finance.x" failed in Company company-a: boom[39m
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٢ م [31m  ERROR[39m [38;5;3m[EventBusService] [39m[31mEvent 11 (finance.x) exhausted retries and was marked failed.[39m
+PASS src/foundation/events/event-bus.service.spec.ts (6.084 s)
+PASS src/foundation/release/manifest-validation.spec.ts
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٥ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mFU-1: stamped C:\Users\chem_\AppData\Local\Temp\reupload-test-WY2Xe9\active.next-release-x\package.json version 1.1.1 → 1.1.2[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٥ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release release-x: C:\Users\chem_\AppData\Local\Temp\reupload-test-WY2Xe9\active.next-release-x (1 delta file(s))[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٦ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mFU-1: stamped C:\Users\chem_\AppData\Local\Temp\reupload-test-3KWDBW\active.next-release-x\package.json version 1.1.1 → 1.1.2[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٦ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release release-x: C:\Users\chem_\AppData\Local\Temp\reupload-test-3KWDBW\active.next-release-x (1 delta file(s))[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٦ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mFU-1: stamped C:\Users\chem_\AppData\Local\Temp\reupload-test-3KWDBW\active.next-release-x\package.json version 1.1.1 → 1.1.2[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٦ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release release-x: C:\Users\chem_\AppData\Local\Temp\reupload-test-3KWDBW\active.next-release-x (1 delta file(s))[39m
+PASS src/foundation/scope/warehouse-scope.coverage.spec.ts (30.23 s)
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٧ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mFU-1: stamped C:\Users\chem_\AppData\Local\Temp\reupload-test-W9dLul\active.next-release-x\package.json version 1.1.1 → 1.1.2[39m
+[32m[Nest] 15408  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٢:٠٧ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release release-x: C:\Users\chem_\AppData\Local\Temp\reupload-test-W9dLul\active.next-release-x (1 delta file(s))[39m
+PASS src/foundation/release/artifact-integrity.spec.ts (281.882 s)
+PASS src/foundation/company/company-registry.service.spec.ts (9.22 s)
+
+<--- Last few GCs --->
+
+[15408:0000021A172187E0]   392573 ms: Scavenge (reduce) 2215.5 (2254.7) -> 2215.1 (2255.0) MB, 435.22 / 0.01 ms  (average mu = 0.997, current mu = 0.998) allocation failure; 
+[15408:0000021A172187E0]   396242 ms: Scavenge (reduce) 2215.8 (2255.0) -> 2215.3 (2255.2) MB, 542.38 / 0.01 ms  (average mu = 0.997, current mu = 0.998) allocation failure; 
+
+
+<--- JS stacktrace --->
+
+FATAL ERROR: Committing semi space failed. Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+FAIL src/foundation/database-registry/database-registry.service.spec.ts
+  ● Test suite failed to run
+
+    A jest worker process (pid=15408) was terminated by another process: signal=SIGTERM, exitCode=null. Operating system logs may contain more information on why this occurred.
+
+      at ChildProcessWorker._onExit (../node_modules/jest-worker/build/workers/ChildProcessWorker.js:370:23)
+
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-a" (v1.1.2) reconciled from "health_checking" to "succeeded".[39m
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-a" (v1.1.2) reconciled from "health_checking" to "succeeded".[39m
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-migrating" (v1.1.2) reconciled from "migrating" to "succeeded".[39m
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-deploying" (v1.1.2) reconciled from "deploying" to "succeeded".[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "release-other-version" (v1.1.1) is stuck at "health_checking" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "release-unhealthy" matches this process's version but health check failed right now — leaving status as-is for manual review.[39m
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٨ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-already-committed" (v1.1.2) reconciled from "health_checking" to "succeeded".[39m
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31mreconcileInterruptedDeploys: failed for release "release-b1" — left untouched for manual review.[39m
+Error: transient failure
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\reconcile-interrupted-deploys.spec.ts:215:30)
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:397:39
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:404:13)
+    at Object.mockConstructor [as check] (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:148:19)
+    at ReleaseExecutionService.reconcileInterruptedDeploys (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\release-execution.service.ts:286:47)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\reconcile-interrupted-deploys.spec.ts:219:5)
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [32m    LOG[39m [38;5;3m[ReleaseExecutionService] [39m[32mreconcileInterruptedDeploys: release "release-b2" (v1.1.2) reconciled from "health_checking" to "succeeded".[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "cut-off" (v1.1.6) was interrupted before the swap with no change made anywhere — recorded as failed (this process runs v1.1.2). A stale candidate slot may remain on disk: C:/fake-deploy-root/backend.next-cut-off.[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "had-migration" (v1.1.6) is stuck at "deploying" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "mig" (v1.1.6) is stuck at "migrating" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "hc" (v1.1.6) is stuck at "health_checking" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "is-lkg" (v1.1.6) is stuck at "deploying" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: could not prove release "fanout" changed nothing (RELEASE_COMPANY_MIGRATIONS=dry-run but no CompanyFanoutService is wired — refusing to deploy.) — leaving it for manual review.[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "fanout" (v1.1.6) is stuck at "deploying" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: could not prove release "unprovable" changed nothing (lkg file unreadable) — leaving it for manual review.[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٤:٤٩ م [33m   WARN[39m [38;5;3m[ReleaseExecutionService] [39m[33mreconcileInterruptedDeploys: release "unprovable" (v1.1.6) is stuck at "deploying" but this process is running v1.1.2 — not reconciling (version mismatch, needs manual review).[39m
+PASS src/foundation/release/reconcile-interrupted-deploys.spec.ts (165.303 s)
+[32m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٥:٠٧ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release rel-1: C:\Users\chem_\AppData\Local\Temp\staged-activation-test-GnlKrM\active.next-rel-1 (1 delta file(s))[39m
+[32m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٥:٠٨ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mFU-1: stamped C:\Users\chem_\AppData\Local\Temp\staged-activation-test-ojDXzl\active.next-rel-2\package.json version 1.0.10 → 1.1.2[39m
+[32m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٥:٠٨ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release rel-2: C:\Users\chem_\AppData\Local\Temp\staged-activation-test-ojDXzl\active.next-rel-2 (1 delta file(s))[39m
+PASS src/foundation/release/staged-activation.service.spec.ts (181.571 s)
+[32m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٥:٠٨ م [32m    LOG[39m [38;5;3m[StagedActivationService] [39m[32mCANDIDATE built for release rel-3: C:\Users\chem_\AppData\Local\Temp\staged-activation-test-87gXVv\active.next-rel-3 (1 delta file(s))[39m
+[31m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٥:١٠ م [31m  ERROR[39m [38;5;3m[CompanyFanoutService] [39m[31mCompany a migrated but could not return to READY: db hiccup[39m
+PASS src/foundation/release/company-fanout.unit.spec.ts
+PASS src/foundation/navigation/navigation-authorization-context.spec.ts (12.793 s)
+PASS src/foundation/authorization/legacy-admin-dependency.register.spec.ts (25.977 s)
+PASS src/foundation/company/membership-role-provisioning.spec.ts (80.13 s)
+PASS src/foundation/plans/company-entitlement.service.spec.ts (6.338 s)
+PASS src/foundation/company/company-entitlement-provisioning.unit.spec.ts (35.786 s)
+PASS src/foundation/module-registry/company-aware-guards.spec.ts (17.344 s)
+PASS src/foundation/authentication/auth.service.spec.ts (15.809 s)
+PASS src/foundation/permission/permission.guard.spec.ts
+PASS src/foundation/company/company.service.spec.ts
+PASS src/foundation/release/company-backup.controller.spec.ts (22.277 s)
+PASS src/foundation/plans/plan.service.spec.ts (12.916 s)
+PASS src/domains/accounting/application/closing-snapshot.service.spec.ts (12.674 s)
+PASS src/foundation/authorization/authorization.service.spec.ts (33.417 s)
+PASS src/foundation/company/company-status.spec.ts (47.196 s)
+PASS src/foundation/company/company-admin-role-seeding.spec.ts
+PASS src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts (28.321 s)
+PASS src/foundation/localization/business-date.spec.ts
+PASS src/foundation/company/company-role-seeding.unit.spec.ts (8.326 s)
+PASS src/foundation/configuration/app-config-list-values.spec.ts (13.836 s)
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٨:٣٠ م [32m    LOG[39m [38;5;3m[CompanyBaselineBackupScheduler] [39m[32mBaseline backup created for Company company-2.[39m
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٨:٣٠ م [31m  ERROR[39m [38;5;3m[CompanyBaselineBackupScheduler] [39m[31mBaseline backup failed for Company company-a[39m
+Error: registry not provisioned yet
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\company-baseline-backup.scheduler.spec.ts:46:44)
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:397:39
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:404:13)
+    at Object.mockConstructor [as createBackup] (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-mock\build\index.js:148:19)
+    at CompanyBaselineBackupScheduler.runOnce (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\company-baseline-backup.scheduler.ts:63:34)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\company-baseline-backup.scheduler.spec.ts:50:5)
+PASS src/foundation/release/company-baseline-backup.scheduler.spec.ts (6.906 s)
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٨:٣٠ م [32m    LOG[39m [38;5;3m[CompanyBaselineBackupScheduler] [39m[32mBaseline backup created for Company company-b.[39m
+[33m[Nest] 9820  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٨:٤٥ م [33m   WARN[39m [38;5;3m[WorkflowAccess] [39m[33mworkflow rule sales.order.supervisor_approve: legacy=false capability=true (user u) — role lists and capabilities disagree[39m
+PASS src/foundation/authorization/workflow-rules.spec.ts (37.152 s)
+PASS src/foundation/release/backup-manager.retention.spec.ts (271.979 s)
+PASS src/foundation/company/installation-membership.controller.spec.ts (21.47 s)
+PASS src/foundation/database-registry/database-credential-cipher.service.spec.ts (20.335 s)
+PASS src/foundation/release/restore-manager.company-isolation.spec.ts (14.41 s)
+PASS src/foundation/release/backup-operation.service.spec.ts (15.611 s)
+PASS src/foundation/database-registry/database-registry.service.getConnectionConfigForCompany.spec.ts (16.183 s)
+PASS src/foundation/navigation/nav-closure.spec.ts (15.093 s)
+PASS src/foundation/authorization/roles.guard.spec.ts (15.03 s)
+PASS src/foundation/company/membership-operation.service.spec.ts (12.858 s)
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٩:٥١ م [31m  ERROR[39m [38;5;3m[AllExceptionsFilter] [39m[31mUnhandled exception[39m
+Error: relation "secret_table" does not exist
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\error-contract\all-exceptions.filter.spec.ts:37:34)
+    at Promise.then.completed (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\run.js:121:9)
+    at run (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-runner\build\runTest.js:444:34)
+    at Object.worker (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\node_modules\jest-runner\build\testWorker.js:106:12)
+PASS src/foundation/error-contract/all-exceptions.filter.spec.ts (14.632 s)
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٣٩:٥١ م [33m   WARN[39m [38;5;3m[AllExceptionsFilter] [39m[33mEntity not found (mapped to 404): Could not find any entity of type "Customer" matching: {[39m
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\tools\validation\module-enforcement-coverage.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+PASS src/foundation/plans/module-enforcement-coverage.spec.ts (13.402 s)
+PASS src/foundation/permission/permission.service.spec.ts (8.591 s)
+PASS src/foundation/company/company-activation.service.spec.ts (84.476 s)
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [33m   WARN[39m [38;5;3m[BackupManagerService] [39m[33mCould not write backup manifest for run "run-1": Cannot read properties of undefined (reading 'appRoot')[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [33m   WARN[39m [38;5;3m[BackupManagerService] [39m[33mCould not write backup manifest for run "run-1": Cannot read properties of undefined (reading 'appRoot')[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [33m   WARN[39m [38;5;3m[BackupManagerService] [39m[33mCould not write backup manifest for run "run-1": Cannot read properties of undefined (reading 'appRoot')[39m
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [33m   WARN[39m [38;5;3m[BackupManagerService] [39m[33mCould not write backup manifest for run "run-1": Cannot read properties of undefined (reading 'appRoot')[39m
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [31m  ERROR[39m [38;5;3m[BackupManagerService] [39m[31mMedia backup failed for run "run-1"[39m
+UnitModeError: DAII unit mode (database-free): starting a child process (execFile) is not allowed. This spec needs a database or the network and must run under the DB guard (npm test) with an approved database — remove it from tools/testing/unit-specs.txt.
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\tools\testing\unit-mode-setup.js:25:9
+    at node:internal/util:441:7
+    at new Promise (<anonymous>)
+    at node:internal/util:427:12
+    at BackupManagerService.runMediaArtifact (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\backup-manager.service.ts:313:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at BackupManagerService.createBackup (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\backup-manager.service.ts:102:50)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\src\foundation\release\backup-manager.company-scoped.spec.ts:127:17)
+PASS src/foundation/release/backup-manager.company-scoped.spec.ts (28.03 s)
+[33m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:١٩ م [33m   WARN[39m [38;5;3m[BackupManagerService] [39m[33mCould not write backup manifest for run "run-1": Cannot read properties of undefined (reading 'appRoot')[39m
+PASS src/foundation/release/expand-contract-guard.spec.ts (8.217 s)
+PASS src/foundation/release/dependency-classification.spec.ts (8.901 s)
+PASS src/foundation/authorization/authorization-context.spec.ts (12.295 s)
+PASS src/foundation/company/membership.service.spec.ts (9.812 s)
+[31m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:٤٠ م [31m  ERROR[39m [38;5;3m[BackupReconciliationScheduler] [39m[31mBackup reconciliation failed for operation op-1 (run run-1)[39m
+pg_dump still failing
+PASS src/foundation/release/backup-reconciliation.scheduler.spec.ts (11.384 s)
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:٤٠ م [32m    LOG[39m [38;5;3m[BackupReconciliationScheduler] [39m[32mBackup reconciliation: operation op-1 (run run-1) completed for Company company-1.[39m
+[32m[Nest] 22616  - [39m١٠‏/١٠‏/٢٠٢٦، ٥:٤٠:٤٠ م [32m    LOG[39m [38;5;3m[BackupReconciliationScheduler] [39m[32mBackup reconciliation: operation op-2 (run run-2) completed (platform).[39m
+PASS src/foundation/crypto/ed25519.spec.ts (12.572 s)
+PASS src/foundation/company/company-database-pool-parse.spec.ts (18.925 s)
+PASS src/foundation/release-orchestration/company-migration-runner.unit.spec.ts (13.339 s)
+PASS src/domains/accounting/domain/closing-exception-classification.spec.ts (48.587 s)
+PASS src/foundation/crypto/canonical-json.spec.ts (12.306 s)
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+
+Summary of all failing tests
+FAIL foundation/database-registry/database-registry.service.spec.ts
+  ● Test suite failed to run
+
+    A jest worker process (pid=15408) was terminated by another process: signal=SIGTERM, exitCode=null. Operating system logs may contain more information on why this occurred.
+
+      at ChildProcessWorker._onExit (../node_modules/jest-worker/build/workers/ChildProcessWorker.js:370:23)
+
+
+Test Suites: 1 failed, 58 passed, 59 total
+Tests:       425 passed, 425 total
+Snapshots:   0 total
+Time:        829.984 s
+EXIT 1
+EXIT 1
