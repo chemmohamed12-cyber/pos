@@ -57,3 +57,33 @@ Candidate cleanup (nothing deleted; each needs the explicit approval the directi
 
 ## 7. Recommendation on 1.1.9
 Justified: item 1 is a data-integrity guard and item 2 removes a time-dependent false-drift defect, both proven by tests; item 3 only affects NEW Companies. Proposed content: items 1–2 (+3 if accepted); excluded: LA-1. Pre-conditions still to do: approval, package build, SHA-256, deploy once from the DAII panel, check readiness, one acceptance action. **No package was built.**
+
+---
+# Addendum — execution results (2026-10-10, unified source and cleanup)
+
+## A. Source of truth
+`release-new` branch **`master` = `334db31`** (fast-forward of `recovery/unreleased-work`; deployed 1.1.8 + the three recovered fixes + this report). Uncommitted LA-1 Layer 2 work (3 new + 7 modified files) is intact in the working tree and preserved in `1-hosting\_recovery-snapshots\2026-10-10\main-checkout-LA1`. Branches kept: `master`, `recovery/unreleased-work`, `release-1.1.6`, `release-company-fanout`, `claude/*` (no commit lost). Only worktree left: `release-new` (plus the session scratch worktree outside the project).
+Verification after unification (isolated PostgreSQL 5544, SERIAL): **194 suites passed, 0 failed, 1 skipped (195) · 1358 tests passed, 0 failed, 1 skipped (1359)**; `nest build` OK; frontend typecheck clean. `tsc -p tsconfig.json` still reports one error inside the tracked junk folder `backend/_deploy/staging/bootstrap-v1.0.3/...` (pre-existing; the build config excludes it).
+
+## B. Deleted, archived, kept (full list with sizes: `_recovery-snapshots\2026-10-10\DELETION-MANIFEST.tsv`)
+| Item | Action | Proof / reason |
+|---|---|---|
+| `D:\CLAUDE-CODE - Copy` (355 736 files, 18.2 GiB) | **deleted** | 70 737 files byte-identical (SHA-256) to files under `D:\CLAUDE-CODE`; 284 867 regenerable (`node_modules`/`dist`); **28 unique files (620 KB) archived** to `_archive-readonly\copy-unique-2026-10-10` and SHA-256 verified; 0 junctions inside |
+| `XNEXUS-WORKSPACE\old` (81 481 files, 2.1 GiB) | **deleted** | 10 913 files identical to `archive`; 70 389 regenerable; **173 unique files (338 MB: XNEXUS-QR standalone release zip, release zips, consolidation reports) archived** to `_archive-readonly\workspace-old-unique-2026-10-10`, SHA-256 verified |
+| `XNEXUS-WORKSPACE\archive` (17 GB: historical server snapshots 25–31 Aug 2026, quarantine) | **moved** (not deleted) | now `1-hosting\_archive-readonly\workspace-archive`; the only copy of the historical server/release evidence; the only document referencing the old path was this report |
+| 6 temporary git worktrees (`.claude/worktrees/*`) and `merge-116` | removed (`merge-116` partly, see D) | their content verified identical to what is committed on `master` (only line endings differ); node_modules junctions removed FIRST (link only; the real `node_modules` re-checked after each: 582 / 32 entries) |
+| `daii.xnexustech.com\base-f6` (temp worktree leftover) | deleted | 0 reparse points |
+| `release-new\backend`: `node_modules.incident-backup-2026-09-15` (119 MB), `stderr.log*`, `_restart2–6 *.log` | deleted | untracked; no references (git grep) |
+| `D:\PROG` (77 GB), `D:\DAII-ISOLATED-PG`, `D:\DAII-LOCAL-DEPLOY`, `daii.xnexustech.com\{backend,frontend,_deploy,_la1,_wp41,_execution-baselines,…}`, `1-hosting\{1-xnexus-website,2-xnexus-platform,3-xnexus-qr-mobile,4-daii-erp,…}` | **untouched** | out of scope / running / referenced evidence (pinned baseline `EB-WP04-20261005-155534` lives in `_execution-baselines`) |
+**Space:** file-size sum removed ≈ 20.8 GiB (Copy 18.2 + old 2.1 + junk 0.1 + base-f6); measured free space on `D:` rose from 149.8 GiB to 164.1 GiB (+14.3 GiB net; other writes — builds, test databases, archive copies, scans — ran during the work).
+**Two mistakes made and corrected during the work (both recorded in the manifest):** (1) the first delete of `Copy` stopped on a read-only file but a "deleted" line was written; corrected, then completed after clearing read-only attributes. (2) `backend\public.pre-v1.0.3` (5 files, 568 KB) was deleted although it is TRACKED in git (my pre-check output was truncated); restored with `git checkout`, nothing lost.
+Earlier in the session a `git worktree remove` followed a junction and emptied the main `node_modules`; restored with `npm ci` (907 packages, lock unchanged) — recorded in memory as a rule.
+
+## C. Remaining problems only
+1. `daii.xnexustech.com\merge-116` (68 MB leftover, deregistered worktree) is **locked by the desktop app's preview servers** (backend on :3500 and Vite on :5173, started 04:44 with that folder as working directory). Not mine to stop; remove after they are restarted from `release-new`.
+2. Tracked junk in the repository itself (host mirror): `backend.prev-b73290c0…`, `_frontend-backup-2026-09-17…`, `_release-output`, `backend/_deploy/…`, `backend/public.pre-v1.0.3` — a history-changing cleanup, needs an explicit decision.
+3. Old DAII repositories inside `_archive-readonly` carry dev credentials in their git history (`LOCAL_DEV_CREDENTIALS.md`, 97 lines, deleted only in the working copy) — keep them read-only and out of any package.
+4. Open items unchanged from §6 (host evidence for audit chain `seq 1`; secrets rotation; four bare `PROVISIONING` Companies; LA-1 Layer 2 HOLD; staging lifecycle; async deploy; test isolation).
+
+## D. Release 1.1.9 recommendation
+**Ready to build on request, not built.** Content: `92426fe` (unknown warehouse → 404), `3ef67f4` (UTC business date), and `352f0df` (WIP account 1150, new Companies only; exclude if not wanted). Evidence: 193/194 suites green on the branch, 194/195 on the unified tree (serial), pinned-clock spec for the Cairo window. Excluded: LA-1. Before deploy: build with `tools/build/build-release.sh`, verify SHA-256, deploy once from the DAII panel, check readiness, create one acceptance action. The deploy path on the host is now the fixed engine (1.1.8) with `RELEASE_READINESS_URL` set.
