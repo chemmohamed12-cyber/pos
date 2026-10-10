@@ -1,3 +1,6 @@
 Rerun of the one suite whose jest worker was SIGTERMed by the OS during the full run (machine under load):
 src/foundation/database-registry/database-registry.service.spec.ts -> PASS, 5/5 tests (unit mode, 2026-10-10)
 Full run: 58/59 suites passed, 425 tests passed, 0 test failures; 1 suite did not execute (worker terminated).
+COMPLETE FULL RUN (supersedes the interrupted aggregate in unit-mode-run-final.log):
+59/59 suites passed, 430/430 tests, exit 0, no worker interruption, 2026-10-10T14:54:04Z-14:55:57Z, jest -c jest.unit.config.js --maxWorkers=3.
+The earlier run (unit-mode-run-final.log) remains recorded as INCOMPLETE: 58/59 suites ran, 1 worker was SIGTERMed by the OS; that suite passed on rerun.
