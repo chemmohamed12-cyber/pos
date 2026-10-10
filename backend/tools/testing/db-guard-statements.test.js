@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const guard = require('./db-guard');
 
 const entry = {
-  id: 'e', host: '127.0.0.1', port: 6001, databases: ['postgres', 'daii_test_ambient'], databasePatterns: ['^daii_test_biz_[a-z0-9_]+$'],
+  id: 'e', host: '127.0.0.1', port: 6001, adminDatabases: ['postgres'], databases: [], databasePatterns: ['^daii_test_biz_[a-z0-9_]+$'],
   rolePatterns: ['^daii_test_role_'], approvedBy: 'cto', approvedOn: 'x', identityEvidence: 'fixture',
 };
 const policy = { approved: [entry], incomplete: 0 };

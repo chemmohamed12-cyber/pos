@@ -19,7 +19,7 @@ const proc = require('./db-guard-process');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..'); // .../release-new
 const ALLOWED_PORT = 5544;
-const ALLOWED_DBS = new Set(['postgres', 'daii_test_ambient']); // widening this list is a reviewed code change
+const ALLOWED_DBS = new Set(['postgres']); // maintenance database only (administrative, read-only). daii_test_ambient is hard-denied by the guard since 2026-10-10; its inspection evidence is already recorded.
 const USER = 'isolated_admin';
 const PASSWORD = process.env.ISOLATED_PG_PASSWORD || 'isolated_only_pw'; // the project's own isolated-test credential (provision-isolated-ambient-db.js)
 
@@ -38,7 +38,7 @@ if (!(outDir + path.sep).startsWith(ROOT + path.sep)) die(`output directory must
 
 const scoped = {
   approved: [{
-    id: 'inspection-scope-only', host: '127.0.0.1', port: ALLOWED_PORT, databases: dbs,
+    id: 'inspection-scope-only', host: '127.0.0.1', port: ALLOWED_PORT, adminDatabases: dbs,
     approvedBy: 'CTO D-2 conditional approval 2026-10-10 (READ-ONLY identity/cleanliness inspection; NOT a test-database approval)',
     approvedOn: '2026-10-10', identityEvidence: 'inspection tool scope',
   }],
