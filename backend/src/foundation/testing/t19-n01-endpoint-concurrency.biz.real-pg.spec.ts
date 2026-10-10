@@ -37,7 +37,7 @@ describe('T-19 — concurrent creates through the numbering-based endpoints (pla
       const numbering = new NumberingService(e.h.controlPlane);
       const authz = new AuthorizationService(e.dsA.getRepository(Role), e.dsA.getRepository(UserRole));
       const limitsStub = { check: async () => ({ allowed: true, max: null }), consume: async () => ({ allowed: true, max: null }) } as never;
-      const customers = new CustomersService(e.h.controlPlane, numbering, inert, audit, inert, authz, inert, limitsStub);
+      const customers = new CustomersService(e.h.controlPlane, numbering, inert, audit, { publish: async () => undefined } as never, authz, inert, limitsStub);
       const suppliers = new SupplierService(e.h.controlPlane, audit, inert, numbering);
       const products = new ProductsService(e.h.controlPlane, audit, inert);
       const priceLists = new PriceListsService(e.h.controlPlane, numbering, audit, products, { publish: async () => undefined } as never);
@@ -75,7 +75,7 @@ describe('T-19 — concurrent creates through the numbering-based endpoints (pla
             }));
             for (const s of settled) {
               if (s.status === 'fulfilled') ok += 1;
-              else { const k = String((s.reason as { code?: string; name?: string })?.code ?? (s.reason as Error)?.name ?? 'error'); errors[k] = (errors[k] ?? 0) + 1; }
+              else { const rr = s.reason as { code?: string; name?: string; message?: string }; const k = String(rr?.code ?? rr?.name ?? 'error') + (rr?.code ? '' : ':' + String(rr?.message ?? '').slice(0, 70)); errors[k] = (errors[k] ?? 0) + 1; }
             }
           }
           const expected = rounds * conc;
