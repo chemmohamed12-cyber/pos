@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { utcDayEndExclusiveSql } from '../../../foundation/localization/business-date';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, ILike, In } from 'typeorm';
 import { TreasuryAccount } from '../infrastructure/treasury-account.entity';
@@ -257,13 +258,15 @@ export class TreasuryService implements FinanceTreasuryContract {
     // to 'posted' would drop the reversed row but keep the reversal leg,
     // double-counting the correction.
     //
-    // The as-of comparison casts the `timestamptz` movementDate to a DATE
-    // (session TZ) and compares dates — symmetric with the GL side's
-    // `businessDate` (a DATE column) `<= to`. A bare `movementDate <
-    // ($1::date + INTERVAL '1 day')` silently drops late-in-the-day UTC
-    // movements when the session TZ is ahead of UTC (the F04 lesson).
+    // The as-of comparison is an exclusive UTC-day-end bound on the `timestamptz`
+    // movementDate — symmetric with the GL side's `businessDate` (a DATE column,
+    // stamped with the UTC date) `<= to`. Neither a session-TZ `::date` cast nor a
+    // bare `($1::date + INTERVAL '1 day')` is safe: with the session TZ ahead of UTC
+    // (Africa/Cairo) a movement at 00:00-03:00 local falls on the NEXT local day but
+    // the GL journal carries the previous UTC date -> phantom drift
+    // (see foundation/localization/business-date.ts).
     const runner = manager ?? this.dataSource;
-    const dateClause = asOfDate ? `AND t."movementDate"::date <= $1::date` : '';
+    const dateClause = asOfDate ? `AND t."movementDate" < ${utcDayEndExclusiveSql('$1')}` : '';
     const params: string[] = asOfDate ? [asOfDate] : [];
     const rows = (await runner.query(
       `SELECT a."id" AS "treasuryAccountId", a."code", a."name", a."glAccountCode",

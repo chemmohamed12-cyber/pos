@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { GrniReconciliationRun } from '../infrastructure/grni-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -74,7 +75,7 @@ export class GrniReconciliationService {
    * five reconciliation types' already-verified results.
    */
   async reconcile(input: GrniReconcileInput, actorUserId: string, manager?: EntityManager): Promise<GrniReconciliationRun> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const grni = await this.grniAccount(manager);
     const repo = (manager ?? this.dataSource).getRepository(GrniReconciliationRun);
 

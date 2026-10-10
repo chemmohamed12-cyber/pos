@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { utcBusinessDate } from '../../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { GLAccount } from '../../infrastructure/gl-account.entity';
@@ -149,7 +150,7 @@ export class FinancialEventService implements OnModuleInit {
     const sourceEntityId =
       str(payload.sourceEntityId) ?? str(payload.entityId) ?? str(payload.id) ?? str(payload.invoiceId) ?? str(payload.paymentId) ?? 'unknown';
     const idempotencyKey = str(payload.idempotencyKey) ?? `${sourceDomain}:${sourceEntityType}:${sourceEntityId}:${eventType}`;
-    const businessDate = str(payload.businessDate) ?? new Date().toISOString().slice(0, 10);
+    const businessDate = str(payload.businessDate) ?? utcBusinessDate();
 
     // 1. idempotency-guarded landing (ADR-035 D6)
     let event: FinancialEvent;

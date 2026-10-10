@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApReconciliationRun } from '../infrastructure/ap-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -61,7 +62,7 @@ export class ApReconciliationService {
   }
 
   async reconcile(input: ApReconcileInput, actorUserId: string, manager?: EntityManager): Promise<ApReconciliationRun> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const ap = await this.apAccount(manager);
 
     // GL side — always computed

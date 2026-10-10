@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { WipReconciliationRun } from '../infrastructure/wip-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -78,7 +79,7 @@ export class WipReconciliationService {
    * a fresh chart otherwise has none).
    */
   async reconcile(input: WipReconcileInput, actorUserId: string, manager?: EntityManager): Promise<WipReconciliationRun> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const wip = await this.wipAccount(manager);
     const repo = (manager ?? this.dataSource).getRepository(WipReconciliationRun);
 

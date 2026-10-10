@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { utcDayEndExclusiveSql } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { SupplierLedgerEntry } from '../infrastructure/supplier-ledger-entry.entity';
 import { SupplierLedgerDirection, SupplierLedgerEntryType } from '../domain/supplier-ledger-entry-type';
@@ -107,7 +108,9 @@ export class SupplierLedgerService implements SupplierLedgerContract {
     let dateClause = '';
     if (asOfDate) {
       params.push(asOfDate);
-      dateClause = `WHERE "entryDate" < ($1::date + INTERVAL '1 day')`;
+      // UTC calendar day, independent of the DB session timezone — symmetric with the GL side's
+      // UTC-stamped `businessDate` (see foundation/localization/business-date.ts).
+      dateClause = `WHERE "entryDate" < ${utcDayEndExclusiveSql('$1')}`;
     }
     const rows = await runner.query(
       `SELECT "supplierId",

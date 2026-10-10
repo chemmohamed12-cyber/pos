@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { ArReconciliationRun } from '../infrastructure/ar-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -59,7 +60,7 @@ export class ArReconciliationService {
   }
 
   async reconcile(input: ReconcileInput, actorUserId: string, manager?: EntityManager): Promise<ArReconciliationRun> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const ar = await this.arAccount(manager);
 
     // subledger side (read contract, no raw table access — ADR-036 D11)

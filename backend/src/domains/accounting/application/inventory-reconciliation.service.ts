@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { InventoryReconciliationRun } from '../infrastructure/inventory-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -72,7 +73,7 @@ export class InventoryReconciliationService {
   }
 
   async reconcile(input: InventoryReconcileInput, actorUserId: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const inv = await this.inventoryAccount(manager);
 
     // GL side — always computed

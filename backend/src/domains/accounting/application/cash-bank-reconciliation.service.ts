@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { utcBusinessDate } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { CashBankReconciliationRun } from '../infrastructure/cash-bank-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
@@ -69,7 +70,7 @@ export class CashBankReconciliationService {
    * `treasuryAccountId` is omitted). Returns the run(s) it created.
    */
   async reconcile(input: CashBankReconcileInput, actorUserId: string, manager?: EntityManager): Promise<CashBankReconciliationRun[]> {
-    const asOfDate = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
     const { balances } = await this.treasury.getAllTreasuryBalances(asOfDate, manager);
 
     let targets = balances.filter((b) => b.glAccountCode && b.glAccountCode.trim() !== '');

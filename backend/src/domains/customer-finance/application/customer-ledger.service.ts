@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { utcDayEndExclusiveSql } from '../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { CustomerLedgerEntry } from '../infrastructure/customer-ledger-entry.entity';
 import { CustomerLedgerEntryType, LedgerDirection } from '../domain/customer-ledger-entry-type';
@@ -150,8 +151,10 @@ export class CustomerLedgerService implements FinanceCustomerLedgerContract {
       // `businessDate <= :date` (a DATE column). Comparing a `timestamptz`
       // `entryDate` with `<= '<date>'` would silently drop every same-day entry
       // (they sort after midnight) and manufacture phantom drift for any
-      // reconciliation run on the current day. Compare on the date part.
-      dateClause = `WHERE "entryDate" < ($1::date + INTERVAL '1 day')`;
+      // reconciliation run on the current day. Compare on the UTC date part (independent of the
+      // DB session timezone — symmetric with the GL's UTC-stamped `businessDate`; see
+      // foundation/localization/business-date.ts).
+      dateClause = `WHERE "entryDate" < ${utcDayEndExclusiveSql('$1')}`;
     }
     const rows = await runner.query(
       `SELECT "customerId",
