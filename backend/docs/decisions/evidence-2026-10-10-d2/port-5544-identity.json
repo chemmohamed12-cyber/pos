@@ -1,0 +1,437 @@
+{
+  "inspectedAt": "2026-10-10T13:59:43.391Z",
+  "target": {
+    "host": "127.0.0.1",
+    "port": 5544,
+    "database": "postgres"
+  },
+  "notes": [
+    "read-only transaction; SELECT/SHOW only; credentials not recorded"
+  ],
+  "identity": [
+    {
+      "version": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit",
+      "database": "postgres",
+      "user": "isolated_admin",
+      "session_user": "isolated_admin",
+      "server_addr": "127.0.0.1/32",
+      "server_port": 5544,
+      "postmaster_start": "2026-10-09T23:01:11.623Z",
+      "in_recovery": false
+    }
+  ],
+  "control": [
+    {
+      "system_identifier": "7692905965783805068",
+      "pg_control_version": 1800,
+      "catalog_version_no": 202506291,
+      "timeline": "1"
+    }
+  ],
+  "settings": [
+    {
+      "name": "archive_mode",
+      "setting": "off"
+    },
+    {
+      "name": "config_file",
+      "setting": "D:/DAII-ISOLATED-PG/data/postgresql.conf"
+    },
+    {
+      "name": "data_directory",
+      "setting": "D:/DAII-ISOLATED-PG/data"
+    },
+    {
+      "name": "default_transaction_read_only",
+      "setting": "on"
+    },
+    {
+      "name": "fsync",
+      "setting": "off"
+    },
+    {
+      "name": "full_page_writes",
+      "setting": "on"
+    },
+    {
+      "name": "hba_file",
+      "setting": "D:/DAII-ISOLATED-PG/data/pg_hba.conf"
+    },
+    {
+      "name": "listen_addresses",
+      "setting": "127.0.0.1"
+    },
+    {
+      "name": "log_connections",
+      "setting": ""
+    },
+    {
+      "name": "max_connections",
+      "setting": "300"
+    },
+    {
+      "name": "port",
+      "setting": "5544"
+    },
+    {
+      "name": "shared_buffers",
+      "setting": "16384"
+    },
+    {
+      "name": "ssl",
+      "setting": "off"
+    },
+    {
+      "name": "synchronous_commit",
+      "setting": "on"
+    },
+    {
+      "name": "unix_socket_directories",
+      "setting": ""
+    },
+    {
+      "name": "wal_level",
+      "setting": "replica"
+    }
+  ],
+  "databases": [
+    {
+      "datname": "company_dabcc38172364032a8ed31a537c29027",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "daii_test_ambient",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "daii_test_fanout_ambient",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "119899",
+      "xact_rollback": "343",
+      "stats_reset": null
+    },
+    {
+      "datname": "daii_test_h3_ambient",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "pool_b_663466",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "pool_dirty_663466",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "pool_one_663466",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "pool_r1_663466",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "postgres",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 1,
+      "xact_commit": "15585",
+      "xact_rollback": "13",
+      "stats_reset": null
+    },
+    {
+      "datname": "rehearsal_fresh",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_company_08cf24873de0411abf7938a9f39a6aa3",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_company_0b2acb6a995d4cb091dd90e6c79cbae3",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_company_1621a97219f14fbf8c28255dc27e5a5a",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_company_69b8b1cdf60d43ad9b8127431dac3b26",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_company_bd8eed0c298a45eb86842e7f867a3e45",
+      "owner": "isolated_admin",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_old_daii_dev",
+      "owner": "daii",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "restore_quiet_daii_dev",
+      "owner": "daii",
+      "datistemplate": false,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "template0",
+      "owner": "isolated_admin",
+      "datistemplate": true,
+      "datallowconn": false,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "0",
+      "xact_rollback": "0",
+      "stats_reset": null
+    },
+    {
+      "datname": "template1",
+      "owner": "isolated_admin",
+      "datistemplate": true,
+      "datallowconn": true,
+      "datconnlimit": -1,
+      "numbackends": 0,
+      "xact_commit": "1635",
+      "xact_rollback": "1",
+      "stats_reset": null
+    }
+  ],
+  "database_count": [
+    {
+      "databases": 19,
+      "test_named": 3
+    }
+  ],
+  "data_dir_size_note": [
+    {
+      "note": "sizes skipped: pg_database_size over every database exceeded the time budget"
+    }
+  ],
+  "roles": [
+    {
+      "rolname": "daii",
+      "rolsuper": false,
+      "rolcreatedb": true,
+      "rolcanlogin": true,
+      "rolreplication": false,
+      "rolconnlimit": -1
+    },
+    {
+      "rolname": "daii_nocreate_663466",
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcanlogin": true,
+      "rolreplication": false,
+      "rolconnlimit": -1
+    },
+    {
+      "rolname": "isolated_admin",
+      "rolsuper": true,
+      "rolcreatedb": true,
+      "rolcanlogin": true,
+      "rolreplication": true,
+      "rolconnlimit": -1
+    }
+  ],
+  "sessions": [],
+  "hba": [
+    {
+      "line_number": 113,
+      "type": "local",
+      "database": [
+        "all"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": null,
+      "netmask": null,
+      "auth_method": "scram-sha-256",
+      "error": null
+    },
+    {
+      "line_number": 115,
+      "type": "host",
+      "database": [
+        "all"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "127.0.0.1",
+      "netmask": "255.255.255.255",
+      "auth_method": "scram-sha-256",
+      "error": null
+    },
+    {
+      "line_number": 117,
+      "type": "host",
+      "database": [
+        "all"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "::1",
+      "netmask": "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+      "auth_method": "scram-sha-256",
+      "error": null
+    },
+    {
+      "line_number": 120,
+      "type": "local",
+      "database": [
+        "replication"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": null,
+      "netmask": null,
+      "auth_method": "scram-sha-256",
+      "error": null
+    },
+    {
+      "line_number": 121,
+      "type": "host",
+      "database": [
+        "replication"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "127.0.0.1",
+      "netmask": "255.255.255.255",
+      "auth_method": "scram-sha-256",
+      "error": null
+    },
+    {
+      "line_number": 122,
+      "type": "host",
+      "database": [
+        "replication"
+      ],
+      "user_name": [
+        "all"
+      ],
+      "address": "::1",
+      "netmask": "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+      "auth_method": "scram-sha-256",
+      "error": null
+    }
+  ],
+  "disk": [
+    {
+      "total_databases": "1077 MB"
+    }
+  ]
+}

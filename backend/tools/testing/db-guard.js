@@ -139,7 +139,63 @@ function install(opts = {}) {
     }
     return original.apply(this, arguments);
   };
+  // Statement-level guard: server-wide / cross-database DDL is checked against the approved entry for the connection's server.
+  const originalQuery = Client.prototype.query;
+  Client.prototype.query = function guardedQuery(config) {
+    const text = typeof config === 'string' ? config : config && typeof config.text === 'string' ? config.text : null;
+    if (text !== null) {
+      const p = this.connectionParameters || this._connectionOptions || {};
+      const violation = checkStatement(text, { host: p.host, port: p.port, database: p.database }, policy);
+      if (violation) {
+        const err = new DbGuardError(`DB guard REFUSED statement on ${p.host}:${p.port}/${p.database} — ${violation}. Nothing was executed.`);
+        const cb = arguments[arguments.length - 1];
+        if (typeof cb === 'function') {
+          process.nextTick(cb, err);
+          return undefined;
+        }
+        return Promise.reject(err);
+      }
+    }
+    return originalQuery.apply(this, arguments);
+  };
   Client.prototype.__daiiGuarded = true;
+}
+
+const DB_DDL = /\b(CREATE|DROP|ALTER)\s+DATABASE\s+(?:IF\s+EXISTS\s+)?("(?:[^"]|"")+"|[A-Za-z0-9_$]+)/gi;
+const ROLE_DDL = /\b(CREATE|DROP|ALTER)\s+(?:ROLE|USER)\s+(?:IF\s+EXISTS\s+)?("(?:[^"]|"")+"|[A-Za-z0-9_$]+)/gi;
+const unquote = (s) => (s.startsWith('"') ? s.slice(1, -1).replace(/""/g, '"') : s);
+
+/**
+ * Returns a violation message, or null. Rules (all fail-closed):
+ *  - CREATE/DROP/ALTER DATABASE only for a name matching `databasePatterns` of the approved entry for that server (a name listed
+ *    only in `databases` — e.g. the maintenance database, or an ambient database — can never be created/dropped/altered by tests);
+ *  - role DDL only for names matching the entry's `rolePatterns` (absent ⇒ refused);
+ *  - ALTER SYSTEM, tablespace DDL, DROP OWNED, CREATE/ALTER EXTENSION on other servers: refused;
+ *  - pg_terminate_backend / pg_cancel_backend only when the statement filters on datname AND application_name AND excludes its own pid.
+ */
+function checkStatement(text, conn, policy) {
+  const sql = String(text).replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const hasDdl = /\b(CREATE|DROP|ALTER)\b/i.test(sql) || /pg_terminate_backend|pg_cancel_backend/i.test(sql);
+  if (!hasDdl) return null;
+  const host = normaliseHost(conn.host);
+  const entry = (policy.approved || []).find((e) => normaliseHost(e.host) === host && e.port === Number(conn.port));
+  if (!entry) return null; // connection itself is checked by connect(); statements on unknown servers never get this far
+  if (/\bALTER\s+SYSTEM\b/i.test(sql)) return 'ALTER SYSTEM is never allowed from a guarded process';
+  if (/\b(CREATE|DROP|ALTER)\s+TABLESPACE\b/i.test(sql) || /\bDROP\s+OWNED\b/i.test(sql)) return 'tablespace / DROP OWNED statements are never allowed from a guarded process';
+  for (const m of sql.matchAll(DB_DDL)) {
+    const name = unquote(m[2]);
+    const ok = (entry.databasePatterns || []).some((p) => new RegExp(p).test(name)) && !DENIED_DATABASE_NAMES.has(name.toLowerCase()) && !DENIED_DATABASE_PATTERN.test(name);
+    if (!ok) return `${m[1].toUpperCase()} DATABASE "${name}" is not allowed (only names matching the approved disposable-database patterns)`;
+  }
+  for (const m of sql.matchAll(ROLE_DDL)) {
+    const name = unquote(m[2]);
+    const ok = (entry.rolePatterns || []).some((p) => new RegExp(p).test(name));
+    if (!ok) return `${m[1].toUpperCase()} ROLE "${name}" is not allowed (no matching rolePatterns in the approved entry)`;
+  }
+  if (/pg_terminate_backend|pg_cancel_backend/i.test(sql) && !(/datname\s*=/i.test(sql) && /application_name\s*=/i.test(sql) && /pg_backend_pid\s*\(\s*\)/i.test(sql))) {
+    return 'pg_terminate_backend/pg_cancel_backend must filter on datname AND application_name and exclude pg_backend_pid()';
+  }
+  return null;
 }
 
 /** For manual HTTP scripts: only a loopback API base is a legal target. */
@@ -155,7 +211,7 @@ function assertLoopbackApi(url) {
   }
 }
 
-module.exports = { evaluate, loadPolicy, preflight, install, effectiveAmbient, parseDotenv, assertLoopbackApi, DbGuardError, POLICY_PATH };
+module.exports = { checkStatement, evaluate, loadPolicy, preflight, install, effectiveAmbient, parseDotenv, assertLoopbackApi, DbGuardError, POLICY_PATH };
 
 if (require.main === module) {
   // CLI: `node tools/testing/db-guard.js --check`  → prints the decision for the ambient configuration; opens no connection.

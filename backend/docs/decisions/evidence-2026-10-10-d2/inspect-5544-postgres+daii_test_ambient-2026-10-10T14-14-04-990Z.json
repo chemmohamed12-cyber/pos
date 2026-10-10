@@ -1,0 +1,641 @@
+{
+  "inspectedAt": "2026-10-10T14:14:03.336Z",
+  "target": {
+    "host": "127.0.0.1",
+    "port": 5544
+  },
+  "mode": "READ ONLY (BEGIN READ ONLY; default_transaction_read_only=on); aggregates only; credentials not recorded",
+  "databases": {
+    "postgres": {
+      "database": "postgres",
+      "identity": [
+        {
+          "database": "postgres",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "size_bytes": "8197823"
+        }
+      ],
+      "control": [
+        {
+          "system_identifier": "7692905965783805068"
+        }
+      ],
+      "settings": [
+        {
+          "name": "data_directory",
+          "setting": "D:/DAII-ISOLATED-PG/data"
+        },
+        {
+          "name": "fsync",
+          "setting": "off"
+        },
+        {
+          "name": "listen_addresses",
+          "setting": "127.0.0.1"
+        },
+        {
+          "name": "max_connections",
+          "setting": "300"
+        },
+        {
+          "name": "port",
+          "setting": "5544"
+        },
+        {
+          "name": "ssl",
+          "setting": "off"
+        },
+        {
+          "name": "wal_level",
+          "setting": "replica"
+        }
+      ],
+      "sessions": [],
+      "databases": [
+        {
+          "datname": "company_dabcc38172364032a8ed31a537c29027",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "daii_test_ambient",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "daii_test_fanout_ambient",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "daii_test_h3_ambient",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "pool_b_663466",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "pool_dirty_663466",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "pool_one_663466",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "pool_r1_663466",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "postgres",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 1,
+          "stats_reset": null
+        },
+        {
+          "datname": "rehearsal_fresh",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_company_08cf24873de0411abf7938a9f39a6aa3",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_company_0b2acb6a995d4cb091dd90e6c79cbae3",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_company_1621a97219f14fbf8c28255dc27e5a5a",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_company_69b8b1cdf60d43ad9b8127431dac3b26",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_company_bd8eed0c298a45eb86842e7f867a3e45",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_old_daii_dev",
+          "owner": "daii",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "restore_quiet_daii_dev",
+          "owner": "daii",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "template0",
+          "owner": "isolated_admin",
+          "datistemplate": true,
+          "datallowconn": false,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        },
+        {
+          "datname": "template1",
+          "owner": "isolated_admin",
+          "datistemplate": true,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "numbackends": 0,
+          "stats_reset": null
+        }
+      ],
+      "roles": [
+        {
+          "rolname": "daii",
+          "rolsuper": false,
+          "rolcreatedb": true,
+          "rolcanlogin": true,
+          "rolreplication": false
+        },
+        {
+          "rolname": "daii_nocreate_663466",
+          "rolsuper": false,
+          "rolcreatedb": false,
+          "rolcanlogin": true,
+          "rolreplication": false
+        },
+        {
+          "rolname": "isolated_admin",
+          "rolsuper": true,
+          "rolcreatedb": true,
+          "rolcanlogin": true,
+          "rolreplication": true
+        }
+      ],
+      "hba": [
+        {
+          "line_number": 113,
+          "type": "local",
+          "database": [
+            "all"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": null,
+          "auth_method": "scram-sha-256"
+        },
+        {
+          "line_number": 115,
+          "type": "host",
+          "database": [
+            "all"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": "127.0.0.1",
+          "auth_method": "scram-sha-256"
+        },
+        {
+          "line_number": 117,
+          "type": "host",
+          "database": [
+            "all"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": "::1",
+          "auth_method": "scram-sha-256"
+        },
+        {
+          "line_number": 120,
+          "type": "local",
+          "database": [
+            "replication"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": null,
+          "auth_method": "scram-sha-256"
+        },
+        {
+          "line_number": 121,
+          "type": "host",
+          "database": [
+            "replication"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": "127.0.0.1",
+          "auth_method": "scram-sha-256"
+        },
+        {
+          "line_number": 122,
+          "type": "host",
+          "database": [
+            "replication"
+          ],
+          "user_name": [
+            "all"
+          ],
+          "address": "::1",
+          "auth_method": "scram-sha-256"
+        }
+      ],
+      "stats": [
+        {
+          "numbackends": 1,
+          "xact_commit": "15614",
+          "xact_rollback": "23",
+          "stats_reset": null,
+          "tup_inserted": "0",
+          "tup_updated": "108",
+          "tup_deleted": "0"
+        }
+      ],
+      "extensions": [
+        {
+          "extname": "plpgsql",
+          "extversion": "1.0"
+        },
+        {
+          "extname": "uuid-ossp",
+          "extversion": "1.1"
+        }
+      ],
+      "schemas": [
+        {
+          "nspname": "public"
+        }
+      ],
+      "table_count": [
+        {
+          "tables": 0
+        }
+      ],
+      "migrations": [
+        {
+          "has_table": false
+        }
+      ]
+    },
+    "daii_test_ambient": {
+      "database": "daii_test_ambient",
+      "identity": [
+        {
+          "database": "daii_test_ambient",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "size_bytes": "18953919"
+        }
+      ],
+      "stats": [
+        {
+          "numbackends": 1,
+          "xact_commit": "1",
+          "xact_rollback": "0",
+          "stats_reset": null,
+          "tup_inserted": "0",
+          "tup_updated": "0",
+          "tup_deleted": "0"
+        }
+      ],
+      "extensions": [
+        {
+          "extname": "plpgsql",
+          "extversion": "1.0"
+        },
+        {
+          "extname": "uuid-ossp",
+          "extversion": "1.1"
+        }
+      ],
+      "schemas": [
+        {
+          "nspname": "public"
+        }
+      ],
+      "table_count": [
+        {
+          "tables": 181
+        }
+      ],
+      "migrations": [
+        {
+          "has_table": true
+        }
+      ],
+      "row_counts": {
+        "_daii_bootstrap_check": 1,
+        "access_scopes": 0,
+        "accounting_ap_reconciliation_runs": 1,
+        "accounting_ar_reconciliation_runs": 0,
+        "accounting_cash_bank_reconciliation_runs": 0,
+        "accounting_closing_audit_runs": 0,
+        "accounting_closing_exceptions": 0,
+        "accounting_closing_snapshot_runs": 0,
+        "accounting_closing_snapshot_signing_keys": 0,
+        "accounting_closing_workflow_runs": 0,
+        "accounting_currencies": 1,
+        "accounting_depreciation_run_lines": 0,
+        "accounting_depreciation_runs": 0,
+        "accounting_exchange_rates": 0,
+        "accounting_financial_dimension_types": 0,
+        "accounting_financial_dimension_values": 0,
+        "accounting_financial_events": 2,
+        "accounting_fiscal_periods": 12,
+        "accounting_fiscal_years": 1,
+        "accounting_fixed_asset_category_account_mappings": 0,
+        "accounting_fixed_asset_disposals": 0,
+        "accounting_fixed_assets": 0,
+        "accounting_gl_account_dimension_rules": 0,
+        "accounting_gl_accounts": 51,
+        "accounting_grni_reconciliation_runs": 1,
+        "accounting_inventory_reconciliation_runs": 0,
+        "accounting_journal_entries": 2,
+        "accounting_journal_line_dimensions": 0,
+        "accounting_journal_lines": 4,
+        "accounting_processed_events": 0,
+        "accounting_tax_codes": 0,
+        "accounting_tax_periods": 0,
+        "accounting_wip_reconciliation_runs": 0,
+        "approval_decisions": 0,
+        "approval_matrix_rules": 29,
+        "approval_request_types": 30,
+        "approval_requests": 0,
+        "attendance_approval_batches": 0,
+        "attendance_biometric_daily_facts": 0,
+        "attendance_connectors": 0,
+        "attendance_correction_requests": 0,
+        "attendance_days": 0,
+        "attendance_employee_mappings": 0,
+        "attendance_import_batches": 0,
+        "attendance_raw_records": 0,
+        "audit_records": 79,
+        "backup_artifacts": 0,
+        "backup_operations": 0,
+        "backup_runs": 0,
+        "bill_of_materials": 0,
+        "bom_components": 0,
+        "collections": 0,
+        "commission_adjustments": 0,
+        "commission_approval_batches": 0,
+        "commission_policies": 0,
+        "commission_results": 0,
+        "commission_tiers": 0,
+        "companies": 0,
+        "company_backup_settings": 0,
+        "company_invitations": 0,
+        "company_plan_assignments": 0,
+        "config_keys": 56,
+        "config_values": 0,
+        "credentials": 3,
+        "customer_assignments": 0,
+        "customer_ledger_entries": 0,
+        "customer_payments": 0,
+        "customers": 0,
+        "data_repair_runs": 0,
+        "database_credentials": 0,
+        "database_registries": 0,
+        "delivery_outcomes": 0,
+        "deposits": 0,
+        "edition_features": 0,
+        "edition_limits": 0,
+        "edition_modules": 5,
+        "editions": 1,
+        "event_outbox": 4,
+        "fulfillment_orders": 0,
+        "goods_receipt_lines": 1,
+        "goods_receipts": 1,
+        "hr_employee_status_history": 0,
+        "hr_employees": 0,
+        "hr_leave_requests": 0,
+        "idempotency_records": 0,
+        "installation": 1,
+        "integration_connectors": 0,
+        "integration_credentials": 0,
+        "integration_product_mappings": 0,
+        "integration_providers": 1,
+        "integration_sync_logs": 0,
+        "inventory_valuation_movements": 1,
+        "inventory_valuation_state": 1,
+        "limit_profiles": 1,
+        "limit_usage_counters": 0,
+        "media_assets": 0,
+        "membership_operations": 0,
+        "migrations": 285,
+        "numbering_sequences": 32,
+        "org_memberships": 0,
+        "org_units": 0,
+        "pack_tasks": 0,
+        "payroll_adjustments": 0,
+        "payroll_attendance_day_classifications": 0,
+        "payroll_compensations": 0,
+        "payroll_deduction_lines": 0,
+        "payroll_earning_lines": 0,
+        "payroll_periods": 0,
+        "payroll_run_lines": 0,
+        "payroll_runs": 0,
+        "pick_task_lines": 0,
+        "pick_tasks": 0,
+        "plan_modules": 0,
+        "plans": 0,
+        "price_list_items": 0,
+        "price_lists": 1,
+        "process_instances": 17,
+        "process_transition_records": 7,
+        "product_item_requests": 0,
+        "products": 1,
+        "purchase_order_lines": 1,
+        "purchase_orders": 1,
+        "purchase_request_lines": 0,
+        "purchase_requests": 0,
+        "refresh_tokens": 0,
+        "release_migration_runs": 0,
+        "releases": 0,
+        "restore_operations": 0,
+        "return_credits": 0,
+        "return_dispositions": 0,
+        "return_requests": 0,
+        "rfq_supplier_invites": 0,
+        "rfqs": 0,
+        "role_permissions": 317,
+        "roles": 45,
+        "routing_operations": 0,
+        "routings": 0,
+        "sales_invoice_lines": 0,
+        "sales_invoices": 0,
+        "sales_order_lines": 0,
+        "sales_orders": 0,
+        "sales_rep_profiles": 0,
+        "sales_return_lines": 0,
+        "sales_returns": 0,
+        "scope_assignments": 0,
+        "shipment_lines": 0,
+        "shipment_return_lines": 0,
+        "shipment_returns": 0,
+        "shipments": 0,
+        "shipping_companies": 0,
+        "stock_movements": 1,
+        "stock_reservations": 0,
+        "supplier_addresses": 0,
+        "supplier_bank_accounts": 0,
+        "supplier_contacts": 0,
+        "supplier_invoice_lines": 1,
+        "supplier_invoices": 1,
+        "supplier_ledger_entries": 1,
+        "supplier_payments": 0,
+        "supplier_quotation_lines": 0,
+        "supplier_quotations": 0,
+        "suppliers": 1,
+        "targets": 0,
+        "terminology_entries": 1851,
+        "tracking_events": 0,
+        "treasury_account_types": 4,
+        "treasury_accounts": 1,
+        "treasury_transactions": 0,
+        "user_company_memberships": 0,
+        "user_locale_preferences": 0,
+        "user_roles": 3,
+        "users": 3,
+        "vehicles": 0,
+        "warehouse_items": 0,
+        "warehouse_transaction_lines": 0,
+        "warehouse_transactions": 0,
+        "warehouses": 1,
+        "work_centers": 0,
+        "work_order_components": 0,
+        "work_order_operations": 0,
+        "work_orders": 0
+      },
+      "migrations_applied": [
+        {
+          "applied": 285,
+          "latest_timestamp": "1790011000000",
+          "latest_name": "AddWarehouseOrgUnit1790011000000"
+        }
+      ],
+      "audit_range": [
+        {
+          "records": 79,
+          "first": "2026-10-08T20:05:12.397Z",
+          "last": "2026-10-08T20:07:02.669Z"
+        }
+      ],
+      "user_email_domains": [
+        {
+          "domain": "daii.example",
+          "users": 3
+        }
+      ],
+      "companies": [
+        {
+          "companies": 0,
+          "not_ready": 0
+        }
+      ],
+      "movement_signals": [
+        {
+          "stock_movements": 1,
+          "reference_types": 1,
+          "first": "2026-10-08T20:07:01.951Z",
+          "last": "2026-10-08T20:07:01.951Z"
+        }
+      ],
+      "negative_onhand": [
+        {
+          "pairs_negative": 0
+        }
+      ],
+      "journal_balance": [
+        {
+          "unbalanced_entries": 0
+        }
+      ]
+    }
+  }
+}

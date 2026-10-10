@@ -11,7 +11,7 @@
     "lint": "eslint \"{src,tools,test}/**/*.ts\"",
     "test": "jest",
     "test:db-guard:jest-probe": "jest -c tools/testing/guard-probe/jest.probe.config.js",
-    "test:db-guard": "node --test tools/testing/db-guard.test.js tools/testing/db-guard-process.test.js tools/testing/db-guard.coverage.test.js",
+    "test:db-guard": "node --test tools/testing/db-guard.test.js tools/testing/db-guard-statements.test.js tools/testing/db-guard-process.test.js tools/testing/db-guard.coverage.test.js",
     "generate:domain": "node tools/generators/generate-module.js",
     "validate:structure": "node tools/validation/validate-structure.js",
     "verify:deploy": "bash tools/deploy/verify-deploy.sh",

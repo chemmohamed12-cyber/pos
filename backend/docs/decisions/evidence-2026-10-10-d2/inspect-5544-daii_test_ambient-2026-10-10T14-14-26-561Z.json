@@ -1,0 +1,1428 @@
+{
+  "inspectedAt": "2026-10-10T14:14:25.738Z",
+  "target": {
+    "host": "127.0.0.1",
+    "port": 5544
+  },
+  "mode": "READ ONLY (BEGIN READ ONLY; default_transaction_read_only=on); aggregates only; credentials not recorded",
+  "databases": {
+    "daii_test_ambient": {
+      "database": "daii_test_ambient",
+      "identity": [
+        {
+          "database": "daii_test_ambient",
+          "owner": "isolated_admin",
+          "datistemplate": false,
+          "datallowconn": true,
+          "datconnlimit": -1,
+          "size_bytes": "18953919"
+        }
+      ],
+      "stats": [
+        {
+          "numbackends": 1,
+          "xact_commit": "4",
+          "xact_rollback": "14",
+          "stats_reset": null,
+          "tup_inserted": "0",
+          "tup_updated": "0",
+          "tup_deleted": "0"
+        }
+      ],
+      "extensions": [
+        {
+          "extname": "plpgsql",
+          "extversion": "1.0"
+        },
+        {
+          "extname": "uuid-ossp",
+          "extversion": "1.1"
+        }
+      ],
+      "schemas": [
+        {
+          "nspname": "public"
+        }
+      ],
+      "table_count": [
+        {
+          "tables": 181
+        }
+      ],
+      "migrations": [
+        {
+          "has_table": true
+        }
+      ],
+      "row_counts": {
+        "_daii_bootstrap_check": 1,
+        "access_scopes": 0,
+        "accounting_ap_reconciliation_runs": 1,
+        "accounting_ar_reconciliation_runs": 0,
+        "accounting_cash_bank_reconciliation_runs": 0,
+        "accounting_closing_audit_runs": 0,
+        "accounting_closing_exceptions": 0,
+        "accounting_closing_snapshot_runs": 0,
+        "accounting_closing_snapshot_signing_keys": 0,
+        "accounting_closing_workflow_runs": 0,
+        "accounting_currencies": 1,
+        "accounting_depreciation_run_lines": 0,
+        "accounting_depreciation_runs": 0,
+        "accounting_exchange_rates": 0,
+        "accounting_financial_dimension_types": 0,
+        "accounting_financial_dimension_values": 0,
+        "accounting_financial_events": 2,
+        "accounting_fiscal_periods": 12,
+        "accounting_fiscal_years": 1,
+        "accounting_fixed_asset_category_account_mappings": 0,
+        "accounting_fixed_asset_disposals": 0,
+        "accounting_fixed_assets": 0,
+        "accounting_gl_account_dimension_rules": 0,
+        "accounting_gl_accounts": 51,
+        "accounting_grni_reconciliation_runs": 1,
+        "accounting_inventory_reconciliation_runs": 0,
+        "accounting_journal_entries": 2,
+        "accounting_journal_line_dimensions": 0,
+        "accounting_journal_lines": 4,
+        "accounting_processed_events": 0,
+        "accounting_tax_codes": 0,
+        "accounting_tax_periods": 0,
+        "accounting_wip_reconciliation_runs": 0,
+        "approval_decisions": 0,
+        "approval_matrix_rules": 29,
+        "approval_request_types": 30,
+        "approval_requests": 0,
+        "attendance_approval_batches": 0,
+        "attendance_biometric_daily_facts": 0,
+        "attendance_connectors": 0,
+        "attendance_correction_requests": 0,
+        "attendance_days": 0,
+        "attendance_employee_mappings": 0,
+        "attendance_import_batches": 0,
+        "attendance_raw_records": 0,
+        "audit_records": 79,
+        "backup_artifacts": 0,
+        "backup_operations": 0,
+        "backup_runs": 0,
+        "bill_of_materials": 0,
+        "bom_components": 0,
+        "collections": 0,
+        "commission_adjustments": 0,
+        "commission_approval_batches": 0,
+        "commission_policies": 0,
+        "commission_results": 0,
+        "commission_tiers": 0,
+        "companies": 0,
+        "company_backup_settings": 0,
+        "company_invitations": 0,
+        "company_plan_assignments": 0,
+        "config_keys": 56,
+        "config_values": 0,
+        "credentials": 3,
+        "customer_assignments": 0,
+        "customer_ledger_entries": 0,
+        "customer_payments": 0,
+        "customers": 0,
+        "data_repair_runs": 0,
+        "database_credentials": 0,
+        "database_registries": 0,
+        "delivery_outcomes": 0,
+        "deposits": 0,
+        "edition_features": 0,
+        "edition_limits": 0,
+        "edition_modules": 5,
+        "editions": 1,
+        "event_outbox": 4,
+        "fulfillment_orders": 0,
+        "goods_receipt_lines": 1,
+        "goods_receipts": 1,
+        "hr_employee_status_history": 0,
+        "hr_employees": 0,
+        "hr_leave_requests": 0,
+        "idempotency_records": 0,
+        "installation": 1,
+        "integration_connectors": 0,
+        "integration_credentials": 0,
+        "integration_product_mappings": 0,
+        "integration_providers": 1,
+        "integration_sync_logs": 0,
+        "inventory_valuation_movements": 1,
+        "inventory_valuation_state": 1,
+        "limit_profiles": 1,
+        "limit_usage_counters": 0,
+        "media_assets": 0,
+        "membership_operations": 0,
+        "migrations": 285,
+        "numbering_sequences": 32,
+        "org_memberships": 0,
+        "org_units": 0,
+        "pack_tasks": 0,
+        "payroll_adjustments": 0,
+        "payroll_attendance_day_classifications": 0,
+        "payroll_compensations": 0,
+        "payroll_deduction_lines": 0,
+        "payroll_earning_lines": 0,
+        "payroll_periods": 0,
+        "payroll_run_lines": 0,
+        "payroll_runs": 0,
+        "pick_task_lines": 0,
+        "pick_tasks": 0,
+        "plan_modules": 0,
+        "plans": 0,
+        "price_list_items": 0,
+        "price_lists": 1,
+        "process_instances": 17,
+        "process_transition_records": 7,
+        "product_item_requests": 0,
+        "products": 1,
+        "purchase_order_lines": 1,
+        "purchase_orders": 1,
+        "purchase_request_lines": 0,
+        "purchase_requests": 0,
+        "refresh_tokens": 0,
+        "release_migration_runs": 0,
+        "releases": 0,
+        "restore_operations": 0,
+        "return_credits": 0,
+        "return_dispositions": 0,
+        "return_requests": 0,
+        "rfq_supplier_invites": 0,
+        "rfqs": 0,
+        "role_permissions": 317,
+        "roles": 45,
+        "routing_operations": 0,
+        "routings": 0,
+        "sales_invoice_lines": 0,
+        "sales_invoices": 0,
+        "sales_order_lines": 0,
+        "sales_orders": 0,
+        "sales_rep_profiles": 0,
+        "sales_return_lines": 0,
+        "sales_returns": 0,
+        "scope_assignments": 0,
+        "shipment_lines": 0,
+        "shipment_return_lines": 0,
+        "shipment_returns": 0,
+        "shipments": 0,
+        "shipping_companies": 0,
+        "stock_movements": 1,
+        "stock_reservations": 0,
+        "supplier_addresses": 0,
+        "supplier_bank_accounts": 0,
+        "supplier_contacts": 0,
+        "supplier_invoice_lines": 1,
+        "supplier_invoices": 1,
+        "supplier_ledger_entries": 1,
+        "supplier_payments": 0,
+        "supplier_quotation_lines": 0,
+        "supplier_quotations": 0,
+        "suppliers": 1,
+        "targets": 0,
+        "terminology_entries": 1851,
+        "tracking_events": 0,
+        "treasury_account_types": 4,
+        "treasury_accounts": 1,
+        "treasury_transactions": 0,
+        "user_company_memberships": 0,
+        "user_locale_preferences": 0,
+        "user_roles": 3,
+        "users": 3,
+        "vehicles": 0,
+        "warehouse_items": 0,
+        "warehouse_transaction_lines": 0,
+        "warehouse_transactions": 0,
+        "warehouses": 1,
+        "work_centers": 0,
+        "work_order_components": 0,
+        "work_order_operations": 0,
+        "work_orders": 0
+      },
+      "migrations_applied": [
+        {
+          "applied": 285,
+          "latest_timestamp": "1790011000000",
+          "latest_name": "AddWarehouseOrgUnit1790011000000"
+        }
+      ],
+      "migration_timestamps": [
+        {
+          "ts": "1755840000000",
+          "name": "BootstrapCheck1755840000000"
+        },
+        {
+          "ts": "1755840100000",
+          "name": "CreateUsers1755840100000"
+        },
+        {
+          "ts": "1755840150000",
+          "name": "UuidGenerateV4Compatibility1755840150000"
+        },
+        {
+          "ts": "1755840200000",
+          "name": "CreateAuthTables1755840200000"
+        },
+        {
+          "ts": "1755840300000",
+          "name": "CreateAuthorizationTables1755840300000"
+        },
+        {
+          "ts": "1755840400000",
+          "name": "CreateRolePermissions1755840400000"
+        },
+        {
+          "ts": "1755840500000",
+          "name": "CreateScopeAssignments1755840500000"
+        },
+        {
+          "ts": "1755840600000",
+          "name": "CreateOrganizationTables1755840600000"
+        },
+        {
+          "ts": "1755840700000",
+          "name": "CreateAuditRecords1755840700000"
+        },
+        {
+          "ts": "1755840800000",
+          "name": "CreateEventOutbox1755840800000"
+        },
+        {
+          "ts": "1755840900000",
+          "name": "CreateIdempotencyRecords1755840900000"
+        },
+        {
+          "ts": "1755841000000",
+          "name": "CreateTerminologyEntries1755841000000"
+        },
+        {
+          "ts": "1755841100000",
+          "name": "CreateUserLocalePreferences1755841100000"
+        },
+        {
+          "ts": "1755841200000",
+          "name": "CreateNumberingSequences1755841200000"
+        },
+        {
+          "ts": "1755841300000",
+          "name": "CreateProcessEngineTables1755841300000"
+        },
+        {
+          "ts": "1755841400000",
+          "name": "CreateMediaAssets1755841400000"
+        },
+        {
+          "ts": "1755841500000",
+          "name": "CreateCrmTables1755841500000"
+        },
+        {
+          "ts": "1755841600000",
+          "name": "CreateCommerceTables1755841600000"
+        },
+        {
+          "ts": "1755841700000",
+          "name": "CreateSalesTables1755841700000"
+        },
+        {
+          "ts": "1755841800000",
+          "name": "CreateSalesOrderTables1755841800000"
+        },
+        {
+          "ts": "1755841900000",
+          "name": "CreateDeposits1755841900000"
+        },
+        {
+          "ts": "1755842000000",
+          "name": "CreateInventoryTables1755842000000"
+        },
+        {
+          "ts": "1755842100000",
+          "name": "CreateFulfillmentTables1755842100000"
+        },
+        {
+          "ts": "1755842200000",
+          "name": "CreateShipmentTables1755842200000"
+        },
+        {
+          "ts": "1755842300000",
+          "name": "CreateDeliveryTables1755842300000"
+        },
+        {
+          "ts": "1755842400000",
+          "name": "CreateReturnsTables1755842400000"
+        },
+        {
+          "ts": "1755842500000",
+          "name": "SeedOperationalTerminology1755842500000"
+        },
+        {
+          "ts": "1755843000000",
+          "name": "DropFulfillmentOrderReservationId1755843000000"
+        },
+        {
+          "ts": "1755843100000",
+          "name": "SeedUiPanelTerminology1755843100000"
+        },
+        {
+          "ts": "1755843200000",
+          "name": "SeedRemainingUiTerminology1755843200000"
+        },
+        {
+          "ts": "1755843300000",
+          "name": "SeedProductInventoryTerminology1755843300000"
+        },
+        {
+          "ts": "1755844000000",
+          "name": "AddDepositRejectionReason1755844000000"
+        },
+        {
+          "ts": "1755844100000",
+          "name": "SeedOrgDepositTerminology1755844100000"
+        },
+        {
+          "ts": "1755844200000",
+          "name": "SeedPrintDocumentTerminology1755844200000"
+        },
+        {
+          "ts": "1755844300000",
+          "name": "SeedExcelTerminology1755844300000"
+        },
+        {
+          "ts": "1755845000000",
+          "name": "AddCustomerOrderWorkflowPolicy1755845000000"
+        },
+        {
+          "ts": "1755845100000",
+          "name": "AddSalesOrderWorkflowPolicy1755845100000"
+        },
+        {
+          "ts": "1755845200000",
+          "name": "SeedWorkflowPolicyTerminology1755845200000"
+        },
+        {
+          "ts": "1755845300000",
+          "name": "AddSalesOrderLineDiscount1755845300000"
+        },
+        {
+          "ts": "1755845400000",
+          "name": "SeedDiscountTerminology1755845400000"
+        },
+        {
+          "ts": "1755845500000",
+          "name": "CreatePriceListTables1755845500000"
+        },
+        {
+          "ts": "1755845600000",
+          "name": "AddCustomerPriceList1755845600000"
+        },
+        {
+          "ts": "1755845700000",
+          "name": "AddSalesOrderLinePricing1755845700000"
+        },
+        {
+          "ts": "1755845800000",
+          "name": "SeedPriceListTerminology1755845800000"
+        },
+        {
+          "ts": "1755845900000",
+          "name": "CreateBomTables1755845900000"
+        },
+        {
+          "ts": "1755846000000",
+          "name": "SeedBomTerminology1755846000000"
+        },
+        {
+          "ts": "1755846100000",
+          "name": "WidenStockMovementType1755846100000"
+        },
+        {
+          "ts": "1755846200000",
+          "name": "SeedReportsTerminology1755846200000"
+        },
+        {
+          "ts": "1755846200000",
+          "name": "CreateIntegrationTables1755846200000"
+        },
+        {
+          "ts": "1755846300000",
+          "name": "SeedIntegrationsTerminology1755846300000"
+        },
+        {
+          "ts": "1755846400000",
+          "name": "SeedDashboardTerminology1755846400000"
+        },
+        {
+          "ts": "1755846400000",
+          "name": "AddCustomerCrmFields1755846400000"
+        },
+        {
+          "ts": "1755846500000",
+          "name": "SeedWarehouseRoles1755846500000"
+        },
+        {
+          "ts": "1755846500000",
+          "name": "SeedCustomerCrmTerminology1755846500000"
+        },
+        {
+          "ts": "1755846600000",
+          "name": "AddSalesOrderRepManagerPricing1755846600000"
+        },
+        {
+          "ts": "1755846600000",
+          "name": "CreateWarehouseTransactionTables1755846600000"
+        },
+        {
+          "ts": "1755846700000",
+          "name": "SeedWarehouseTransactionTerminology1755846700000"
+        },
+        {
+          "ts": "1755846700000",
+          "name": "SeedSalesOrderPricingTerminology1755846700000"
+        },
+        {
+          "ts": "1755846800000",
+          "name": "SeedNavGroupTerminology1755846800000"
+        },
+        {
+          "ts": "1755846800000",
+          "name": "AddSalesOrderCreatedBy1755846800000"
+        },
+        {
+          "ts": "1755846900000",
+          "name": "SeedWarehouseTxnPostTerminology1755846900000"
+        },
+        {
+          "ts": "1755846900000",
+          "name": "SeedSalesOrderDetailTerminology1755846900000"
+        },
+        {
+          "ts": "1755847000000",
+          "name": "SeedCustomerCompletionTerminology1755847000000"
+        },
+        {
+          "ts": "1755847100000",
+          "name": "SeedWarehouseOverviewFixTerminology1755847100000"
+        },
+        {
+          "ts": "1755847200000",
+          "name": "SeedInventoryGridTerminology1755847200000"
+        },
+        {
+          "ts": "1755847300000",
+          "name": "AddSalesOrderWarehouseAndPriceListPrice1755847300000"
+        },
+        {
+          "ts": "1755847300000",
+          "name": "AddWarehouseMasterFields1755847300000"
+        },
+        {
+          "ts": "1755847400000",
+          "name": "SeedSalesOrderStockPricingTerminology1755847400000"
+        },
+        {
+          "ts": "1755847400000",
+          "name": "AddWarehouseTransactionMovementDate1755847400000"
+        },
+        {
+          "ts": "1755847500000",
+          "name": "AddProductUnit1755847500000"
+        },
+        {
+          "ts": "1755847600000",
+          "name": "SeedWarehouseMasterTerminology1755847600000"
+        },
+        {
+          "ts": "1755848000000",
+          "name": "CreateTreasuryTables1755848000000"
+        },
+        {
+          "ts": "1755848100000",
+          "name": "SeedFinanceRole1755848100000"
+        },
+        {
+          "ts": "1755848200000",
+          "name": "SeedDefaultTreasuryAccount1755848200000"
+        },
+        {
+          "ts": "1755848300000",
+          "name": "SeedTreasuryNumbering1755848300000"
+        },
+        {
+          "ts": "1755848400000",
+          "name": "SeedTreasuryTerminology1755848400000"
+        },
+        {
+          "ts": "1755848500000",
+          "name": "AddShippingCompanyAndShipmentCod1755848500000"
+        },
+        {
+          "ts": "1755848600000",
+          "name": "AddCollectionRemittanceStatus1755848600000"
+        },
+        {
+          "ts": "1755848700000",
+          "name": "SeedFulfillmentShippingTerminology1755848700000"
+        },
+        {
+          "ts": "1755848800000",
+          "name": "AddTreasuryAccountTypeHierarchy1755848800000"
+        },
+        {
+          "ts": "1755848900000",
+          "name": "SeedTreasuryAccountTypeTerminology1755848900000"
+        },
+        {
+          "ts": "1755849000000",
+          "name": "AddWarehouseSubLocationFields1755849000000"
+        },
+        {
+          "ts": "1755849100000",
+          "name": "CreateVehicleTable1755849100000"
+        },
+        {
+          "ts": "1755849200000",
+          "name": "AddShippingCompanyCustodyFields1755849200000"
+        },
+        {
+          "ts": "1755849300000",
+          "name": "AddShipmentVehicleId1755849300000"
+        },
+        {
+          "ts": "1755849400000",
+          "name": "AddCollectionCustodyFields1755849400000"
+        },
+        {
+          "ts": "1755849500000",
+          "name": "SeedTreasuryCustodyAccountType1755849500000"
+        },
+        {
+          "ts": "1755849600000",
+          "name": "SeedShippingCustodyTerminology1755849600000"
+        },
+        {
+          "ts": "1755849600000",
+          "name": "SeedOrderEditTerminology1755849600000"
+        },
+        {
+          "ts": "1755849700000",
+          "name": "CreatePickTaskLineTable1755849700000"
+        },
+        {
+          "ts": "1755849800000",
+          "name": "SeedPreparationTerminology1755849800000"
+        },
+        {
+          "ts": "1755850000000",
+          "name": "SeedAdminUserManagementTerminology1755850000000"
+        },
+        {
+          "ts": "1755850100000",
+          "name": "SeedCustomerAccountTerminology1755850100000"
+        },
+        {
+          "ts": "1755850200000",
+          "name": "SeedDraftEditAndDepositPreviewTerminology1755850200000"
+        },
+        {
+          "ts": "1755850300000",
+          "name": "AddFulfillmentOrderNumber1755850300000"
+        },
+        {
+          "ts": "1755850400000",
+          "name": "SeedOrderEditHistoryTerminology1755850400000"
+        },
+        {
+          "ts": "1755850500000",
+          "name": "AddSalesOrderShippingMethod1755850500000"
+        },
+        {
+          "ts": "1755850600000",
+          "name": "AddReturnsEngineCustomerReturns1755850600000"
+        },
+        {
+          "ts": "1755850700000",
+          "name": "AddShipmentRshNumberAndSalesOrderLink1755850700000"
+        },
+        {
+          "ts": "1755850800000",
+          "name": "AddShipmentCarrierWaybillFields1755850800000"
+        },
+        {
+          "ts": "1755850900000",
+          "name": "AddCustodyReturns1755850900000"
+        },
+        {
+          "ts": "1755851000000",
+          "name": "SeedSectionCoverTerminology1755851000000"
+        },
+        {
+          "ts": "1755851000000",
+          "name": "AddCustomerFinancialCore1755851000000"
+        },
+        {
+          "ts": "1755851100000",
+          "name": "SeedCustodyStatementTerminology1755851100000"
+        },
+        {
+          "ts": "1755851200000",
+          "name": "SeedPhase5CustodyVisibilityTerminology1755851200000"
+        },
+        {
+          "ts": "1755851300000",
+          "name": "SeedCustomersAccountsUiTerminology1755851300000"
+        },
+        {
+          "ts": "1755851400000",
+          "name": "SeedShippingMethodsAndFulfillmentCoverTerminology1755851400000"
+        },
+        {
+          "ts": "1755851500000",
+          "name": "AddShipmentSalesRepTraceability1755851500000"
+        },
+        {
+          "ts": "1755851600000",
+          "name": "SeedVehicleClosingTerminology1755851600000"
+        },
+        {
+          "ts": "1755851700000",
+          "name": "AddShipmentCarrierContactPhone1755851700000"
+        },
+        {
+          "ts": "1755851800000",
+          "name": "SeedShippingDashboardTerminology1755851800000"
+        },
+        {
+          "ts": "1755851900000",
+          "name": "SeedCollectionReceiptTerminology1755851900000"
+        },
+        {
+          "ts": "1755852000000",
+          "name": "AddCredentialLoginLockout1755852000000"
+        },
+        {
+          "ts": "1755852100000",
+          "name": "AddCreatedAtIndexesForPaginatedLists1755852100000"
+        },
+        {
+          "ts": "1755852200000",
+          "name": "SeedAddUserTerminology1755852200000"
+        },
+        {
+          "ts": "1755852300000",
+          "name": "AddSalesOrderSkipDeposit1755852300000"
+        },
+        {
+          "ts": "1755852400000",
+          "name": "AddPriceListRoleAndGeneralList1755852400000"
+        },
+        {
+          "ts": "1755852500000",
+          "name": "FixGenRandomUuidRfc4122Compliance1755852500000"
+        },
+        {
+          "ts": "1755852800000",
+          "name": "AddReleaseBackupTables1755852800000"
+        },
+        {
+          "ts": "1755852900000",
+          "name": "AddReleaseRestoreTable1755852900000"
+        },
+        {
+          "ts": "1755853000000",
+          "name": "AddReleasesTable1755853000000"
+        },
+        {
+          "ts": "1755853100000",
+          "name": "AddReleaseExecutionTables1755853100000"
+        },
+        {
+          "ts": "1755853200000",
+          "name": "AddDataRepairRunTable1755853200000"
+        },
+        {
+          "ts": "1755853300000",
+          "name": "CreateConfigurationEngine1755853300000"
+        },
+        {
+          "ts": "1755853400000",
+          "name": "CreateEntitlement1755853400000"
+        },
+        {
+          "ts": "1755853500000",
+          "name": "BackfillLegacyRolePermissions1755853500000"
+        },
+        {
+          "ts": "1755853600000",
+          "name": "CreateLimitEngine1755853600000"
+        },
+        {
+          "ts": "1755853700000",
+          "name": "SeedNavStatusTerminology1755853700000"
+        },
+        {
+          "ts": "1755854000000",
+          "name": "CreateHrTables1755854000000"
+        },
+        {
+          "ts": "1755854100000",
+          "name": "SeedHrTerminology1755854100000"
+        },
+        {
+          "ts": "1755854200000",
+          "name": "AddTreasuryAccountOrgUnit1755854200000"
+        },
+        {
+          "ts": "1755854300000",
+          "name": "SeedNavGroupHrTerminology1755854300000"
+        },
+        {
+          "ts": "1755854400000",
+          "name": "CreateAccountingTables1755854400000"
+        },
+        {
+          "ts": "1755854500000",
+          "name": "SeedAccountingTerminology1755854500000"
+        },
+        {
+          "ts": "1755854600000",
+          "name": "CreateChartOfAccountsTables1755854600000"
+        },
+        {
+          "ts": "1755854700000",
+          "name": "SeedChartOfAccountsTerminology1755854700000"
+        },
+        {
+          "ts": "1755854800000",
+          "name": "CreateGeneralLedgerTables1755854800000"
+        },
+        {
+          "ts": "1755854900000",
+          "name": "SeedGeneralLedgerTerminology1755854900000"
+        },
+        {
+          "ts": "1755855000000",
+          "name": "AddSalesInvoiceExternalDocumentRef1755855000000"
+        },
+        {
+          "ts": "1755855100000",
+          "name": "CreateArReconciliationTables1755855100000"
+        },
+        {
+          "ts": "1755855200000",
+          "name": "SeedArTerminology1755855200000"
+        },
+        {
+          "ts": "1755855300000",
+          "name": "SeedArTerminologyExtras1755855300000"
+        },
+        {
+          "ts": "1755855400000",
+          "name": "CreateApReconciliationTables1755855400000"
+        },
+        {
+          "ts": "1755855410000",
+          "name": "SeedApTerminology1755855410000"
+        },
+        {
+          "ts": "1755855500000",
+          "name": "CreateApprovalEngine1755855500000"
+        },
+        {
+          "ts": "1755855600000",
+          "name": "AddTreasuryAccountGlMapping1755855600000"
+        },
+        {
+          "ts": "1755855700000",
+          "name": "CreateCashBankReconciliationTables1755855700000"
+        },
+        {
+          "ts": "1755855710000",
+          "name": "SeedCashBankTerminology1755855710000"
+        },
+        {
+          "ts": "1755858000000",
+          "name": "SeedAdminModulePermissionsForHrAndAccounting1755858000000"
+        },
+        {
+          "ts": "1755859000000",
+          "name": "CreateInventoryReconciliationTable1755859000000"
+        },
+        {
+          "ts": "1755859100000",
+          "name": "ExtendTaxCodeForF101755859100000"
+        },
+        {
+          "ts": "1755859200000",
+          "name": "AddSalesInvoiceTaxCode1755859200000"
+        },
+        {
+          "ts": "1755859300000",
+          "name": "CreateTaxPeriodTable1755859300000"
+        },
+        {
+          "ts": "1755859400000",
+          "name": "SeedControlFunctionTerminology1755859400000"
+        },
+        {
+          "ts": "1755859500000",
+          "name": "SeedHrCoverTerminology1755859500000"
+        },
+        {
+          "ts": "1755860000000",
+          "name": "CreateInventoryValuationTables1755860000000"
+        },
+        {
+          "ts": "1755860100000",
+          "name": "SeedSmartLookupTerminology1755860100000"
+        },
+        {
+          "ts": "1755860200000",
+          "name": "AddGlAccountNameAr1755860200000"
+        },
+        {
+          "ts": "1755860300000",
+          "name": "SeedGlAccountNameArTerminology1755860300000"
+        },
+        {
+          "ts": "1755861000000",
+          "name": "CreateFixedAssetTables1755861000000"
+        },
+        {
+          "ts": "1755861100000",
+          "name": "SeedFixedAssetControlFunctionTerminology1755861100000"
+        },
+        {
+          "ts": "1755861200000",
+          "name": "SeedFinancialReportingTerminology1755861200000"
+        },
+        {
+          "ts": "1755862000000",
+          "name": "SeedPasswordVisibilityTerminology1755862000000"
+        },
+        {
+          "ts": "1755862100000",
+          "name": "RemediateGlAccountNameAr1755862100000"
+        },
+        {
+          "ts": "1755863000000",
+          "name": "SeedUpgradePathTerminology1755863000000"
+        },
+        {
+          "ts": "1755863100000",
+          "name": "CreateShipmentLines1755863100000"
+        },
+        {
+          "ts": "1755863200000",
+          "name": "CreateShipmentAndSalesReturns1755863200000"
+        },
+        {
+          "ts": "1755863300000",
+          "name": "SeedShipmentAndSalesReturnsTerminology1755863300000"
+        },
+        {
+          "ts": "1755863400000",
+          "name": "SeedUpgradePathPanelTerminology1755863400000"
+        },
+        {
+          "ts": "1789600700000",
+          "name": "SeedHrEmployeeStatusTerminology1789600700000"
+        },
+        {
+          "ts": "1789600700001",
+          "name": "SeedFixedAssetInventoryDimensionSettingsTerminology1789600700001"
+        },
+        {
+          "ts": "1789621007496",
+          "name": "SeedSalesRepProfileTerminology1789621007496"
+        },
+        {
+          "ts": "1789621100000",
+          "name": "SeedInventoryValuationTerminology1789621100000"
+        },
+        {
+          "ts": "1789622214177",
+          "name": "SeedFiscalClosingTerminology1789622214177"
+        },
+        {
+          "ts": "1789622332654",
+          "name": "SeedFiscalClosingPanelTerminology1789622332654"
+        },
+        {
+          "ts": "1789623445210",
+          "name": "SeedApprovalsAdminPanelTerminology1789623445210"
+        },
+        {
+          "ts": "1789623729706",
+          "name": "SeedArAndFiscalClosingRequestTypeTitles1789623729706"
+        },
+        {
+          "ts": "1789623849097",
+          "name": "SeedFixedAssetAndInventoryRequestTypeTitles1789623849097"
+        },
+        {
+          "ts": "1789623911628",
+          "name": "SeedFixedAssetInventoryRequestTypeTitles1789623911628"
+        },
+        {
+          "ts": "1789654616058",
+          "name": "SeedShipmentReturnCapacityTerminology1789654616058"
+        },
+        {
+          "ts": "1789656033351",
+          "name": "SeedSalesReturnOriginalPriceTerminology1789656033351"
+        },
+        {
+          "ts": "1789656229165",
+          "name": "FixCustodyReturnsArabicLabel1789656229165"
+        },
+        {
+          "ts": "1789658077538",
+          "name": "SeedShipmentBoardFilterTerminology1789658077538"
+        },
+        {
+          "ts": "1789660000000",
+          "name": "SeedProductComboboxTerminology1789660000000"
+        },
+        {
+          "ts": "1789700000000",
+          "name": "CreateSupplierTables1789700000000"
+        },
+        {
+          "ts": "1789700100000",
+          "name": "SeedSupplierTerminology1789700100000"
+        },
+        {
+          "ts": "1789700200000",
+          "name": "SeedAdminPermissionsForProcurement1789700200000"
+        },
+        {
+          "ts": "1789700300000",
+          "name": "SeedSupplierStatusTerminology1789700300000"
+        },
+        {
+          "ts": "1789700400000",
+          "name": "CreatePurchaseOrderAndGoodsReceiptTables1789700400000"
+        },
+        {
+          "ts": "1789700500000",
+          "name": "SeedPurchaseOrderTerminology1789700500000"
+        },
+        {
+          "ts": "1789700600000",
+          "name": "CreateSupplierInvoiceAndLedgerTables1789700600000"
+        },
+        {
+          "ts": "1789700700000",
+          "name": "SeedSupplierInvoiceTerminology1789700700000"
+        },
+        {
+          "ts": "1789700800000",
+          "name": "SeedSupplierStatementTerminology1789700800000"
+        },
+        {
+          "ts": "1789700900000",
+          "name": "CreatePurchaseRequestAndRfqTables1789700900000"
+        },
+        {
+          "ts": "1789701000000",
+          "name": "SeedPurchaseRequestRfqTerminology1789701000000"
+        },
+        {
+          "ts": "1789701100000",
+          "name": "SeedDefaultBaseCurrency1789701100000"
+        },
+        {
+          "ts": "1789701200000",
+          "name": "CreateClosingAuditRunTable1789701200000"
+        },
+        {
+          "ts": "1789701300000",
+          "name": "CreateClosingSnapshotSigningKeyTable1789701300000"
+        },
+        {
+          "ts": "1789701400000",
+          "name": "CreateClosingExceptionTable1789701400000"
+        },
+        {
+          "ts": "1789701500000",
+          "name": "CreateClosingWorkflowRunTable1789701500000"
+        },
+        {
+          "ts": "1789701600000",
+          "name": "CreateClosingSnapshotRunTable1789701600000"
+        },
+        {
+          "ts": "1789701610000",
+          "name": "AddManifestHashToClosingSnapshotRun1789701610000"
+        },
+        {
+          "ts": "1789701700000",
+          "name": "CreateGrniReconciliationTable1789701700000"
+        },
+        {
+          "ts": "1789702000000",
+          "name": "AddTreasuryTransactionSupplierColumns1789702000000"
+        },
+        {
+          "ts": "1789702100000",
+          "name": "SeedWave1FrontendCompletionTerminology1789702100000"
+        },
+        {
+          "ts": "1789704000000",
+          "name": "SeedFiscalPeriodsNavTerminology1789704000000"
+        },
+        {
+          "ts": "1789710000000",
+          "name": "RetireHrDepartmentsIntoOrgUnits1789710000000"
+        },
+        {
+          "ts": "1789710100000",
+          "name": "ExpandHrEmployeeAggregate1789710100000"
+        },
+        {
+          "ts": "1789710200000",
+          "name": "CreateHrLeaveRequests1789710200000"
+        },
+        {
+          "ts": "1789710300000",
+          "name": "SeedHrPhase1Terminology1789710300000"
+        },
+        {
+          "ts": "1789710400000",
+          "name": "SeedHrPhase1StageGapsTerminology1789710400000"
+        },
+        {
+          "ts": "1789720000000",
+          "name": "AddGenericReferenceToStockReservations1789720000000"
+        },
+        {
+          "ts": "1789730000000",
+          "name": "CreateWorkOrderTables1789730000000"
+        },
+        {
+          "ts": "1789730000000",
+          "name": "CreateAttendanceCore1789730000000"
+        },
+        {
+          "ts": "1789730100000",
+          "name": "SeedAttendancePhase1Terminology1789730100000"
+        },
+        {
+          "ts": "1789730200000",
+          "name": "SeedAdminPermissionsForAttendance1789730200000"
+        },
+        {
+          "ts": "1789730300000",
+          "name": "AddBiometricDailySummaryImport1789730300000"
+        },
+        {
+          "ts": "1789730400000",
+          "name": "SeedBiometricDailySummaryTerminology1789730400000"
+        },
+        {
+          "ts": "1789730500000",
+          "name": "SeedNavGroupAttendanceTerminology1789730500000"
+        },
+        {
+          "ts": "1789731000000",
+          "name": "SeedManufacturingTerminology1789731000000"
+        },
+        {
+          "ts": "1789732000000",
+          "name": "SeedAdminPermissionsForManufacturing1789732000000"
+        },
+        {
+          "ts": "1789733000000",
+          "name": "CreateWipReconciliationTable1789733000000"
+        },
+        {
+          "ts": "1789734000000",
+          "name": "SeedManufacturingPhase2UiTerminology1789734000000"
+        },
+        {
+          "ts": "1789734100000",
+          "name": "SeedNavGroupManufacturingTerminology1789734100000"
+        },
+        {
+          "ts": "1789740000000",
+          "name": "CreatePayrollCore1789740000000"
+        },
+        {
+          "ts": "1789740100000",
+          "name": "SeedAdminPermissionsForPayroll1789740100000"
+        },
+        {
+          "ts": "1789740200000",
+          "name": "SeedPayrollPhase1Terminology1789740200000"
+        },
+        {
+          "ts": "1789740300000",
+          "name": "SeedNavGroupPayrollTerminology1789740300000"
+        },
+        {
+          "ts": "1789741000000",
+          "name": "AddTreasuryTransactionPayrollColumns1789741000000"
+        },
+        {
+          "ts": "1789750000000",
+          "name": "CreateTargetsCore1789750000000"
+        },
+        {
+          "ts": "1789750100000",
+          "name": "SeedAdminPermissionsForTargets1789750100000"
+        },
+        {
+          "ts": "1789750200000",
+          "name": "SeedTargetsPhase1Terminology1789750200000"
+        },
+        {
+          "ts": "1789750300000",
+          "name": "SeedNavGroupTargetsTerminology1789750300000"
+        },
+        {
+          "ts": "1789751000000",
+          "name": "CreateCommissionCore1789751000000"
+        },
+        {
+          "ts": "1789751100000",
+          "name": "SeedAdminPermissionsForCommission1789751100000"
+        },
+        {
+          "ts": "1789751300000",
+          "name": "SeedCommissionPhase1Terminology1789751300000"
+        },
+        {
+          "ts": "1789751400000",
+          "name": "CorrectPayrollCommissionPendingNotice1789751400000"
+        },
+        {
+          "ts": "1789751500000",
+          "name": "SeedNavGroupCommissionTerminology1789751500000"
+        },
+        {
+          "ts": "1789760000000",
+          "name": "AddTransientDatabaseErrorClosingExceptionCategory1789760000000"
+        },
+        {
+          "ts": "1789770000000",
+          "name": "CorrectStaleTerminologyValues1789770000000"
+        },
+        {
+          "ts": "1789780000000",
+          "name": "CreateCompanies1789780000000"
+        },
+        {
+          "ts": "1789790000000",
+          "name": "CreateDatabaseRegistry1789790000000"
+        },
+        {
+          "ts": "1789800000000",
+          "name": "CreateUserCompanyMemberships1789800000000"
+        },
+        {
+          "ts": "1789810000000",
+          "name": "AddCompanyIdToRefreshTokens1789810000000"
+        },
+        {
+          "ts": "1789820000000",
+          "name": "CreateMembershipOperations1789820000000"
+        },
+        {
+          "ts": "1789830000000",
+          "name": "AddCompanyBackupSupport1789830000000"
+        },
+        {
+          "ts": "1789840000000",
+          "name": "SeedControlPlaneTerminology1789840000000"
+        },
+        {
+          "ts": "1789850000000",
+          "name": "SeedTreasuryGlMappingTerminology1789850000000"
+        },
+        {
+          "ts": "1789860000000",
+          "name": "AddManualReceiptCostAndReasonCode1789860000000"
+        },
+        {
+          "ts": "1789870000000",
+          "name": "SeedManualReceiptTerminology1789870000000"
+        },
+        {
+          "ts": "1789890000000",
+          "name": "CreatePlansAndCompanyAssignments1789890000000"
+        },
+        {
+          "ts": "1789900000000",
+          "name": "AddReturnFinancialSnapshot1789900000000"
+        },
+        {
+          "ts": "1789910000000",
+          "name": "AddSupplierInvoiceTaxAndVariance1789910000000"
+        },
+        {
+          "ts": "1789920000000",
+          "name": "SeedSupplierInvoiceVatTerminology1789920000000"
+        },
+        {
+          "ts": "1789930000000",
+          "name": "SeedRfqAwardVisibilityTerminology1789930000000"
+        },
+        {
+          "ts": "1789940000000",
+          "name": "CreateWarehouseItems1789940000000"
+        },
+        {
+          "ts": "1789950000000",
+          "name": "SeedWarehouseItemAssignmentTerminology1789950000000"
+        },
+        {
+          "ts": "1789960000000",
+          "name": "SeedFixedAssetAcquisitionLinkTerminology1789960000000"
+        },
+        {
+          "ts": "1789970000000",
+          "name": "SeedSupplierEditTerminology1789970000000"
+        },
+        {
+          "ts": "1789980000000",
+          "name": "CreateProductItemRequests1789980000000"
+        },
+        {
+          "ts": "1789990000000",
+          "name": "SeedNewItemRequestTerminology1789990000000"
+        },
+        {
+          "ts": "1789991000000",
+          "name": "AllowOnAccountCustomerPayments1789991000000"
+        },
+        {
+          "ts": "1789992000000",
+          "name": "SeedOnAccountPaymentTerminology1789992000000"
+        },
+        {
+          "ts": "1789993000000",
+          "name": "SeedRfqAwardApprovalTitleTerminology1789993000000"
+        },
+        {
+          "ts": "1789994000000",
+          "name": "SeedAcquisitionJournalHelperTerminology1789994000000"
+        },
+        {
+          "ts": "1789995000000",
+          "name": "SeedAccountingPolicyTerminology1789995000000"
+        },
+        {
+          "ts": "1789996000000",
+          "name": "SeedPendingWorkTerminology1789996000000"
+        },
+        {
+          "ts": "1789997000000",
+          "name": "SeedSetupGuideTerminology1789997000000"
+        },
+        {
+          "ts": "1789998000000",
+          "name": "SeedCommonTasksTerminology1789998000000"
+        },
+        {
+          "ts": "1789999000000",
+          "name": "SeedFinancialTraceTerminology1789999000000"
+        },
+        {
+          "ts": "1790000000000",
+          "name": "SeedNavClosureTerminology1790000000000"
+        },
+        {
+          "ts": "1790000000000",
+          "name": "AddBomStatus1790000000000"
+        },
+        {
+          "ts": "1790000100000",
+          "name": "CreateRoutingAndWorkCenterTables1790000100000"
+        },
+        {
+          "ts": "1790000200000",
+          "name": "SeedManufacturingMasterDataTerminology1790000200000"
+        },
+        {
+          "ts": "1790001000000",
+          "name": "RefineCommonTasksHints1790001000000"
+        },
+        {
+          "ts": "1790002000000",
+          "name": "EnsureOrgUnitCode1790002000000"
+        },
+        {
+          "ts": "1790003000000",
+          "name": "MembershipLifecycleAndInvitations1790003000000"
+        },
+        {
+          "ts": "1790004000000",
+          "name": "SeedCompanyUsersTerminology1790004000000"
+        },
+        {
+          "ts": "1790005000000",
+          "name": "RoleMetadataAndRolesManageNode1790005000000"
+        },
+        {
+          "ts": "1790006000000",
+          "name": "SeedRolesTerminology1790006000000"
+        },
+        {
+          "ts": "1790007000000",
+          "name": "SupportAccessMemberships1790007000000"
+        },
+        {
+          "ts": "1790008000000",
+          "name": "IntegrationProviderCatalog1790008000000"
+        },
+        {
+          "ts": "1790009000000",
+          "name": "WorkflowCapabilityGrants1790009000000"
+        },
+        {
+          "ts": "1790010000000",
+          "name": "AccessScopes1790010000000"
+        },
+        {
+          "ts": "1790011000000",
+          "name": "AddWarehouseOrgUnit1790011000000"
+        }
+      ],
+      "audit_range": [
+        {
+          "records": 79,
+          "first": "2026-10-08T20:05:12.397Z",
+          "last": "2026-10-08T20:07:02.669Z"
+        }
+      ],
+      "user_email_domains": [
+        {
+          "domain": "daii.example",
+          "users": 3
+        }
+      ],
+      "companies": [
+        {
+          "companies": 0,
+          "not_ready": 0
+        }
+      ],
+      "movement_signals": [
+        {
+          "stock_movements": 1,
+          "reference_types": 1,
+          "first": "2026-10-08T20:07:01.951Z",
+          "last": "2026-10-08T20:07:01.951Z"
+        }
+      ],
+      "negative_onhand": [
+        {
+          "pairs_negative": 0
+        }
+      ],
+      "journal_balance": [
+        {
+          "unbalanced_entries": 0
+        }
+      ]
+    }
+  }
+}
