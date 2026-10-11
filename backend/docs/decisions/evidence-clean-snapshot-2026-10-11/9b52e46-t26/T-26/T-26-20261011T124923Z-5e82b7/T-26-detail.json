@@ -1,0 +1,95 @@
+{
+  "healthy": {
+    "rows": [
+      {
+        "seq": 1,
+        "prev10": "0000000000",
+        "hash10": "178e419908"
+      },
+      {
+        "seq": 2,
+        "prev10": "178e419908",
+        "hash10": "04931f7e9b"
+      },
+      {
+        "seq": 3,
+        "prev10": "04931f7e9b",
+        "hash10": "bc14c20d2e"
+      }
+    ],
+    "chainValid": true,
+    "brokenAtSeq": null,
+    "sequenceLastValue": 3
+  },
+  "L1": {
+    "append": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "duplicate key value violates unique constraint \"audit_records_pkey\"",
+      "pgCode": "23505",
+      "detail": "Key (seq)=(2) already exists."
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "178e419908"
+        },
+        {
+          "seq": 2,
+          "prev10": "178e419908",
+          "hash10": "04931f7e9b"
+        },
+        {
+          "seq": 3,
+          "prev10": "04931f7e9b",
+          "hash10": "bc14c20d2e"
+        }
+      ],
+      "chainValid": true,
+      "brokenAtSeq": null,
+      "sequenceLastValue": 2
+    }
+  },
+  "L2": {
+    "importedSeq": 103,
+    "chainValidBeforeAppend": true,
+    "append": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "178e419908"
+        },
+        {
+          "seq": 2,
+          "prev10": "178e419908",
+          "hash10": "04931f7e9b"
+        },
+        {
+          "seq": 3,
+          "prev10": "04931f7e9b",
+          "hash10": "bc14c20d2e"
+        },
+        {
+          "seq": 4,
+          "prev10": "23bd7e5ab2",
+          "hash10": "ac6ba139cc"
+        },
+        {
+          "seq": 103,
+          "prev10": "bc14c20d2e",
+          "hash10": "23bd7e5ab2"
+        }
+      ],
+      "chainValid": false,
+      "brokenAtSeq": 4,
+      "sequenceLastValue": 4
+    }
+  }
+}
