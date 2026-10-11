@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditRecord, AuditResult } from './audit-record.entity';
 import { computeAuditHash, GENESIS_HASH } from './audit-hash';
@@ -50,8 +50,18 @@ export interface RecordAuditInput {
 /** Arbitrary constant, unique to the audit chain; the lock is released automatically at the end of the writer's transaction. */
 const AUDIT_CHAIN_LOCK_KEY = 7_419_203_511;
 
+/** WP-AUD-08: raised (and the writer's transaction aborted) when the audit sequence cannot be brought ahead of the stored tail; no record is written. */
+export class AuditSequenceLagError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuditSequenceLagError';
+  }
+}
+
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async record(input: RecordAuditInput, manager?: EntityManager): Promise<AuditRecord> {
@@ -60,8 +70,9 @@ export class AuditService {
       // waited on the head row is handed that SAME (now stale) row once the first commits, so both chain onto one prevHash and the chain forks. Observed on daii_dev: seq 13
       // and seq 14 share a prevHash, so verifyChain reports the chain broken at 14 although nothing was tampered with.
       await m.query('SELECT pg_advisory_xact_lock($1)', [AUDIT_CHAIN_LOCK_KEY]);
-      const rows = await m.query('SELECT hash FROM audit_records ORDER BY seq DESC LIMIT 1');
+      const rows = await m.query('SELECT seq, hash FROM audit_records ORDER BY seq DESC LIMIT 1');
       const prevHash: string = rows[0]?.hash ?? GENESIS_HASH;
+      const tailSeq: number | null = rows[0] ? Number(rows[0].seq) : null;
 
       // F-AUD-003: the hash must commit to the seq that is actually STORED. `audit_records.seq` is SERIAL and TypeORM's save() ignores an explicit seq (proved by T-22 case X),
       // so the previous `MAX(seq)+1` was only a prediction of the next sequence value — wrong after any rolled-back insert (a rolled-back transaction still consumes a sequence
@@ -69,7 +80,16 @@ export class AuditService {
       // insert it explicitly. Gaps in seq are legitimate (verification checks hashes and prevHash links, not contiguity). Hash format and existing records are untouched.
       const seqName: string | null = (await m.query(`SELECT pg_get_serial_sequence('audit_records', 'seq') AS name`))[0]?.name ?? null;
       if (!seqName) throw new Error('audit_records.seq has no serial sequence; refusing to write an audit record whose hash input cannot be tied to the stored seq');
-      const seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
+      let seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
+      // WP-AUD-08 (DEC-01b, option A): the new row must sit strictly after the stored tail whose hash is `prevHash`, otherwise seq order and chain order disagree (sequence behind
+      // the data after a reset/restore/import: a duplicate-key outage or a silently broken chain). Realign the SEQUENCE (never the data) to the tail, under this same lock, then draw again.
+      // `setval(.., true)` is monotone here (only used when nextval <= tail), non-transactional (it survives a rollback, which is intended) and needs UPDATE on the sequence; any failure aborts the transaction.
+      if (tailSeq !== null && seq <= tailSeq) {
+        await m.query('SELECT setval($1::regclass, $2::bigint, true)', [seqName, tailSeq]);
+        seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
+        if (!(seq > tailSeq)) throw new AuditSequenceLagError(`audit sequence could not be brought ahead of the stored tail (tail ${tailSeq}, drawn ${seq}); no audit record written`);
+        this.logger.warn(`audit sequence was behind the stored tail and was realigned (tail ${tailSeq} -> next ${seq})`);
+      }
       const timestamp = new Date();
 
       const hash = computeAuditHash({

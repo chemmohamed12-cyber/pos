@@ -42,6 +42,7 @@ const STEPS = [
   ['T-24', 'src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts'],
   ['T-25', 'src/foundation/testing/t25-h5-shipment-transitions.biz.real-pg.spec.ts'],
   ['T-26', 'src/foundation/testing/t26-audit-seq-lag-baseline.biz.real-pg.spec.ts'],
+  ['T-27', 'src/foundation/testing/t27-audit-seq-lag-guard.biz.real-pg.spec.ts'],
   ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 
