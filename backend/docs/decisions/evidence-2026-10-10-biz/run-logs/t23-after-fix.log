@@ -1,0 +1,28 @@
+
+=== T-23: src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts (87.488 s)
+  T-23 — audit hash commits to the stored seq (F-AUD-003)
+    × chain stays verifiable after rollbacks and concurrency; history is never rewritten (38883 ms)
+
+  ● T-23 — audit hash commits to the stored seq (F-AUD-003) › chain stays verifiable after rollbacks and concurrency; history is never rewritten
+
+    STOP: cleanup did not leave the instance as found
+
+    [0m [90m 214 |[39m   ev[33m.[39mwriteJson(env[33m.[39mrun[33m,[39m [32m'post-cleanup.json'[39m[33m,[39m { removed[33m:[39m env[33m.[39mdatabases[33m,[39m allRemoved[33m:[39m gone[33m,[39m otherDatabasesUnchanged[33m:[39m othersUnchanged[33m,[39m databasesAfter[33m:[39m after })[33m;[39m
+     [90m 215 |[39m   ev[33m.[39mfinalize(env[33m.[39mrun)[33m;[39m
+    [31m[1m>[22m[39m[90m 216 |[39m   [36mif[39m ([33m![39mgone [33m||[39m [33m![39mothersUnchanged) [36mthrow[39m [36mnew[39m [33mError[39m([32m'STOP: cleanup did not leave the instance as found'[39m)[33m;[39m
+     [90m     |[39m                                        [31m[1m^[22m[39m
+     [90m 217 |[39m   [36mconst[39m bad [33m=[39m env[33m.[39mresults[33m.[39mfilter((r) [33m=>[39m r[33m.[39mstatus [33m===[39m [32m'FAIL'[39m [33m||[39m r[33m.[39mstatus [33m===[39m [32m'STOP'[39m)[33m;[39m
+     [90m 218 |[39m   [36mif[39m (bad[33m.[39mlength) [36mthrow[39m [36mnew[39m [33mError[39m([32m`cases failed: ${bad.map((b) => `${b.id}=${b.status}`).join(', ')}`[39m)[33m;[39m
+     [90m 219 |[39m }[0m
+
+      at finishBiz (foundation/testing/biz-support.ts:216:40)
+      at Object.<anonymous> (foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts:113:7)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        87.632 s
+Ran all test suites matching /src\\foundation\\testing\\t23-audit-seq-hash.biz.real-pg.spec.ts/i.
+
+STOP: T-23 did not pass (exit 1). Later steps were not run.

@@ -1,0 +1,13 @@
+
+=== T-22: src/foundation/testing/f-aud-rollback-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-aud-rollback-reproducer.biz.real-pg.spec.ts (47.842 s)
+  F-AUD-003 reproducer — audit chain after a rolled-back transaction that wrote an audit record
+    √ records the behaviour (18132 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        47.927 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-rollback-reproducer.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

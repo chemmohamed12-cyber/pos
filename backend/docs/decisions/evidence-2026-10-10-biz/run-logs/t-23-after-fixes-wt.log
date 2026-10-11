@@ -1,0 +1,13 @@
+
+=== T-23: src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts
+PASS src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts (36.461 s)
+  T-23 — audit hash commits to the stored seq (F-AUD-003)
+    √ chain stays verifiable after rollbacks and concurrency; history is never rewritten (16160 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.54 s, estimated 88 s
+Ran all test suites matching /src\\foundation\\testing\\t23-audit-seq-hash.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

@@ -1,0 +1,26 @@
+[
+  {
+    "datname": "daii_test_biz_t03_company_a",
+    "oid": "1812185"
+  },
+  {
+    "datname": "daii_test_biz_t03_company_b",
+    "oid": "1812186"
+  },
+  {
+    "datname": "daii_test_biz_t03_control_plane",
+    "oid": "1812184"
+  },
+  {
+    "datname": "postgres",
+    "oid": "5"
+  },
+  {
+    "datname": "template0",
+    "oid": "4"
+  },
+  {
+    "datname": "template1",
+    "oid": "1"
+  }
+]

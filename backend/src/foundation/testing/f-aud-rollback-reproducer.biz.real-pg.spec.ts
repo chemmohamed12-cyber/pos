@@ -1,3 +1,4 @@
+import { AuditRecord } from '../audit/audit-record.entity';
 import { BizEnv, abortBiz, finishBiz, record, result, setUpBiz } from './biz-support';
 
 /**
@@ -47,6 +48,12 @@ describe('F-AUD-003 reproducer — audit chain after a rolled-back transaction t
       const v1 = await e.audit.verifyCompanyChain(e.manager);
       const s1 = await state();
 
+      // X) exact persistence behaviour: does TypeORM store an EXPLICIT seq given to save() on the SERIAL primary key, or take the sequence default? (determines how the fix must insert)
+      const probeRepo = e.dsA.getRepository(AuditRecord);
+      const probe = probeRepo.create({ seq: 9000, timestamp: new Date(), actorUserId: null, organizationId: null, action: 'repro.explicit-seq', resource: 'x', resourceId: 'x', result: 'success', correlationId: null, before: null, after: null, prevHash: 'p', hash: 'h' });
+      const saved = await probeRepo.save(probe);
+      const explicitSeq = { requested: 9000, storedSeq: Number(saved.seq) };
+      result(e, 'F-AUD-003-X-explicit-seq-honoured-by-save', explicitSeq.storedSeq === 9000 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(explicitSeq));
       record(e, 'F-AUD-003.json', { control: { chainValid: v0.valid, ...s0 }, rolledBack, afterRollback: sAfterRollback, afterNextCommittedRecord: { chainValid: v1.valid, brokenAtSeq: v1.brokenAtSeq, ...s1 } });
       result(e, 'F-AUD-003-S-control', v0.valid ? 'PASS' : 'FAIL-DEFECT', JSON.stringify({ chainValid: v0.valid, ...s0 }));
       result(e, 'F-AUD-003-R-after-rollback', rolledBack && v1.valid ? 'PASS' : 'FAIL-DEFECT', JSON.stringify({ rolledBack, chainValid: v1.valid, brokenAtSeq: v1.brokenAtSeq, ...s1 }));

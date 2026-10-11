@@ -63,12 +63,13 @@ export class AuditService {
       const rows = await m.query('SELECT hash FROM audit_records ORDER BY seq DESC LIMIT 1');
       const prevHash: string = rows[0]?.hash ?? GENESIS_HASH;
 
-      // seq is DB-assigned on insert; we need it for the hash, so insert
-      // first with a placeholder, then update the hash — OR select the
-      // next sequence value up front. Simpler and still correct: use the
-      // table's own auto-increment via a dry insert-then-hash-update pass.
-      const nextSeqRows = await m.query(`SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM audit_records`);
-      const seq: number = Number(nextSeqRows[0].next);
+      // F-AUD-003: the hash must commit to the seq that is actually STORED. `audit_records.seq` is SERIAL and TypeORM's save() ignores an explicit seq (proved by T-22 case X),
+      // so the previous `MAX(seq)+1` was only a prediction of the next sequence value — wrong after any rolled-back insert (a rolled-back transaction still consumes a sequence
+      // value). Draw the sequence value here, under the same advisory lock that serialises every writer and is held until this transaction ends, hash with THAT value and
+      // insert it explicitly. Gaps in seq are legitimate (verification checks hashes and prevHash links, not contiguity). Hash format and existing records are untouched.
+      const seqName: string | null = (await m.query(`SELECT pg_get_serial_sequence('audit_records', 'seq') AS name`))[0]?.name ?? null;
+      if (!seqName) throw new Error('audit_records.seq has no serial sequence; refusing to write an audit record whose hash input cannot be tied to the stored seq');
+      const seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
       const timestamp = new Date();
 
       const hash = computeAuditHash({
@@ -86,8 +87,26 @@ export class AuditService {
         prevHash,
       });
 
-      const repo = m.getRepository(AuditRecord);
-      const record = repo.create({
+      await m.query(
+        `INSERT INTO "audit_records" ("seq","timestamp","actorUserId","organizationId","action","resource","resourceId","result","correlationId","before","after","prevHash","hash")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13)`,
+        [
+          seq,
+          timestamp,
+          input.actorUserId,
+          input.organizationId,
+          input.action,
+          input.resource,
+          input.resourceId,
+          input.result,
+          input.correlationId,
+          input.before == null ? null : JSON.stringify(input.before),
+          input.after == null ? null : JSON.stringify(input.after),
+          prevHash,
+          hash,
+        ],
+      );
+      return m.getRepository(AuditRecord).create({
         seq,
         timestamp,
         actorUserId: input.actorUserId,
@@ -102,7 +121,6 @@ export class AuditService {
         prevHash,
         hash,
       });
-      return repo.save(record);
     };
 
     // F-AUD-002: a caller-supplied manager that has NO open transaction (e.g. `req.companyContext.dataSource.manager`) would run the advisory lock in its own implicit
