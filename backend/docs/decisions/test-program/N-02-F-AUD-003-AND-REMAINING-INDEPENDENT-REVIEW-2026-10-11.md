@@ -57,3 +57,37 @@ No sign-off is given here: this review will be completed (or revised) when the p
 - Behaviour change of §3 item 2 is now asserted by T-21 case E2 (order-level repeat = idempotent no-op; direct re-fulfilment stays 409, case B).
 - **Scope of the withdrawal (per the CTO's update):** the deadlock concern is withdrawn **for the examined `fulfillReservation` / `fulfillReservationsForOrder` path only**; it is not a claim that the system is deadlock-free. The one path that might acquire a valuation lock before its first audit write in the same transaction is recorded as an **explicit evidence gap** — not a confirmed defect and not a universal deadlock claim.
 - **Statuses kept separate:** implementation = done by the verification session (patches `a798d9d`, `c764fc5`, `5c5b791`, `71e5f5e`); independent review = **in progress** (code reviewed; clean-snapshot evidence of `71e5f5e` not yet read); overall N-02 = **OPEN** (shipment probe H5 BLOCKED; F-AUD-003 seq-lag guard undecided). The audit-chain boundary (PA-33: no rewriting, rehashing, deleting or normalising of existing broken chains) is outside N-02 and untouched here.
+
+## 7. Final addendum (reviewer) — evidence of the `71e5f5e` pipeline read and independently re-run
+**Tested commits.** The verification session's pipeline ran on a clean `git archive` of `71e5f5ecbff0fd4a51b0f862d722950e22006a91` (`evidence-clean-snapshot-2026-10-11/71e5f5e-final/`, `SOURCE_COMMIT.txt`). This reviewer re-read it with `tools/assessment/review-snapshot-evidence.js`: all 23 run headers carry that commit with `dirtyPaths: []`. This reviewer then ran CI and T-03/T-20…T-24 on a clean `git archive` of `f881e53aecf9461edd1d9e583224b315fd6450f2` (`71e5f5e-reviewer-rerun/`). `git diff --name-only 71e5f5e HEAD -- backend/src backend/tools` is empty, so product and tool code are identical to `71e5f5e`; only documents and evidence differ. The six re-run directories are HEADER-OK (commit `f881e53`, `dirtyPaths: []`). Historical runs from earlier commits were deliberately removed from the copy.
+
+**Results (clean snapshots).**
+| Item | Result |
+|---|---|
+| T-03 (alone, quiet cluster) | 20 PASS (resolves the earlier collision artifact) |
+| T-20 | 8 PASS, 1 BLOCKED (H5 shipment transition) |
+| T-21 (A–J, E2) | 13 PASS, including I and J (overlapping orders, no deadlock) |
+| T-22 | 2 PASS; `F-AUD-003-X-explicit-seq-honoured-by-save` FAIL-DEFECT = intentional characterisation (`repo.save` ignores an explicit seq; the production path no longer uses it). Not a regression |
+| T-23 | 7 PASS (rollback-then-append, concurrency, golden vector, broken chain preserved) |
+| T-24 | 10 PASS, 1 BLOCKED (H5) |
+| 91 isolation specs (peer's run, reconciled with the list) | 89 executed-pass, 1 skipped (`t0-clean-company-baseline`, opt-in; the runner printed PASS), 1 failed (`release-migration-registry`, the known 5544-pinned BLOCKED spec). Not "91 passed" |
+| Unit / guard | 59 suites, 430 tests PASS / guard 50/50 PASS |
+| Build / typecheck | PASS |
+| Lint | FAIL: 3 errors, all in LA-1-track files (`installation-audit.controller.ts`, `company-lifecycle-admission.real-pg.spec.ts`), plus 5 redundant-disable warnings; none from N-02 work |
+
+T-18 (3 FAIL-DEFECT) and T-06x-INFO are not N-02 items.
+
+**Independence and limits.** I wrote `runInTransaction` (a dependency of every patch) and raised the deadlock concern that the sorted-key change answers; the peer authored all patches and specs; the committer of `a798d9d` cannot be established (shared git identity). Both sessions are Claude; this is evidence for the CTO's decision, not an acceptance. Not covered: more than 8-way concurrency, multi-instance, hosting, shipment end-to-end (H5).
+
+**Per-finding N-02 status (implementation / independent review).**
+| Finding | Status |
+|---|---|
+| H3 `fulfillReservation` + `fulfillReservationsForOrder` | Fixed; clean-snapshot VERIFIED (T-21 A–J, E2); review: code and evidence read, no defect found |
+| H1 limit consume/release | Fixed; T-24 clean-snapshot PASS |
+| H2 `releaseReservedQuantity` | Fixed; T-24 clean-snapshot PASS |
+| H4 process start | Fixed (`ON CONFLICT DO NOTHING`, unique index confirmed); T-24 PASS |
+| H5 shipment transitions | **BLOCKED / not run**, visible and unresolved |
+| F-AUD-003 | Fixed for new writes (T-22/T-23); seq-lag guard undecided (proposal only); historical broken chains untouched — PA-33, separate, nothing rewritten, rehashed, deleted or normalised |
+| Valuation-lock-before-audit path | **Evidence gap** (no such path found in fulfilment, not probed); not a defect, not a deadlock-freedom claim |
+
+**Overall N-02: OPEN. Release: NOT APPROVED.** CI is not green (LA-1 lint at HEAD). No new defects, guard failures or scope deviations found by this reviewer; the earlier T-03 collision was this session's and is closed by the alone-run.

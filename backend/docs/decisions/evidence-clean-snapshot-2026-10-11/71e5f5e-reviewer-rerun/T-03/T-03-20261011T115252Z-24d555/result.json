@@ -1,0 +1,104 @@
+{
+  "testId": "T-03",
+  "runId": "T-03-20261011T115252Z-24d555",
+  "finishedAt": "2026-10-11T11:53:35.955Z",
+  "results": [
+    {
+      "id": "T-03-N10",
+      "status": "PASS",
+      "note": "20 rounds: exactly 5 reserved, the rest refused with 409, no other error kind, available = 0, movements unchanged"
+    },
+    {
+      "id": "T-03-N25",
+      "status": "PASS",
+      "note": "20 rounds: exactly 5 reserved, the rest refused with 409, no other error kind, available = 0, movements unchanged"
+    },
+    {
+      "id": "T-03-N50",
+      "status": "PASS",
+      "note": "20 rounds: exactly 5 reserved, the rest refused with 409, no other error kind, available = 0, movements unchanged"
+    },
+    {
+      "id": "audit-chain-after-T-03",
+      "status": "PASS"
+    },
+    {
+      "id": "T-04-N10",
+      "status": "PASS",
+      "note": "20 rounds: exactly 5 posted, the rest refused with 409, SUM(quantity)=0, 5 dispatch movements, no half-posted document"
+    },
+    {
+      "id": "T-04-N25",
+      "status": "PASS",
+      "note": "20 rounds: exactly 5 posted, the rest refused with 409, SUM(quantity)=0, 5 dispatch movements, no half-posted document"
+    },
+    {
+      "id": "audit-chain-after-T-04",
+      "status": "PASS"
+    },
+    {
+      "id": "T-04b",
+      "status": "PASS",
+      "note": "20 rounds: successes = 5 exactly, on-hand >= 0, available >= 0, no other error kind"
+    },
+    {
+      "id": "invariant-no-negative-stock",
+      "status": "PASS",
+      "note": "pairs with negative on-hand: 0"
+    },
+    {
+      "id": "audit-chain-after-T-04b",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-03/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":120,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-03/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-03/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-03/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-03/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":0,\"declaredNonGlTreasury\":0,\"expectedGl\":0,\"glNet\":0}"
+    },
+    {
+      "id": "T-10/T-03/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-03/R7",
+      "status": "PASS",
+      "note": "{\"events\":0,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-03/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-03/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: none declared"
+    },
+    {
+      "id": "T-10/T-03/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}
