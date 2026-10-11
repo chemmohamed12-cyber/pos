@@ -1,0 +1,39 @@
+{
+  "testId": "T-25",
+  "runId": "T-25-20261011T124427Z-30179f",
+  "startedAt": "2026-10-11T12:44:27.945Z",
+  "commit": "06ef615e5f6dfde80c52455a62b297c9cdabb16a",
+  "branch": "clean-snapshot",
+  "dirtyPaths": [],
+  "sourceKind": "clean-git-archive-snapshot",
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\_v8",
+  "systemIdentifier": "7695079006474257732",
+  "databases": [
+    "daii_test_biz_t25_control_plane",
+    "daii_test_biz_t25_company_a",
+    "daii_test_biz_t25_company_b"
+  ],
+  "prefix": "biz_t25",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting",
+      "logistics"
+    ]
+  }
+}
