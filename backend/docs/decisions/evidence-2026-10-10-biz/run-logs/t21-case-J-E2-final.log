@@ -1,0 +1,22 @@
+
+=== T-21: src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts (21.734 s)
+  T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservation)
+    × duplicate, retried, partially failed and rolled-back fulfilments never create a second movement (8209 ms)
+
+  ● T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservation) › duplicate, retried, partially failed and rolled-back fulfilments never create a second movement
+
+    QueryFailedError: duplicate key value violates unique constraint "IDX_products_sku"
+
+      at PostgresQueryRunner.query (driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (data-source/DataSource.ts:541:20)
+      at seedProduct (foundation/testing/biz-support.ts:94:3)
+      at Object.<anonymous> (foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts:121:19)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        21.795 s, estimated 27 s
+Ran all test suites matching /src\\foundation\\testing\\t21-n02-fulfil-reservation.biz.real-pg.spec.ts/i.
+
+STOP: T-21 did not pass (exit 1). Later steps were not run.

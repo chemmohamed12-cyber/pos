@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BizEnv, abortBiz, attempt, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, setUpBiz, tally, widePool } from './biz-support';
+import { BizEnv, abortBiz, attempt, finishBiz, negativeStockPairs, onHand, receive, record, reserved, result, seedProduct, seedWarehouse, setUpBiz, tally, widePool } from './biz-support';
 
 /**
  * T-21 — N-02 `InventoryService.fulfillReservation` integrity (regression test for the reservation-fulfilment race; outside the frozen T-xx set).
@@ -114,6 +114,21 @@ describe('T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservat
         await chainAfter('after-E'); result(e, 'E-order-level-concurrent-fulfilment', good ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.E));
       }
 
+      // ---- E2) order-level repeat is IDEMPOTENT (independent-review finding 3): once an order has no active reservation, fulfillReservationsForOrder is a successful no-op that writes nothing,
+      // whereas fulfilling an already-fulfilled reservation DIRECTLY is refused with 409 (case B). Documented behaviour, asserted so that it cannot change silently. ----
+      {
+        const so = randomUUID();
+        const p = await seedProduct(e.dsA, 'T21-E2-repeat');
+        await receive(e, W, p, 20);
+        await e.inventory.reserveStock(W, p, 2, so, e.actor, 'active', e.manager);
+        const first = await attempt(() => e.inventory.fulfillReservationsForOrder(so, W, e.actor, e.manager));
+        const afterFirst = { movements: await dispatches(p), onHand: await onHand(e, W, p) };
+        const repeat = await attempt(() => e.inventory.fulfillReservationsForOrder(so, W, e.actor, e.manager));
+        const afterRepeat = { movements: await dispatches(p), onHand: await onHand(e, W, p) };
+        detail.E2 = { first: first.ok, repeat: repeat.ok, afterFirst, afterRepeat };
+        result(e, 'E2-order-level-repeat-is-an-idempotent-noop', first.ok && repeat.ok && afterFirst.movements === 1 && afterRepeat.movements === 1 && afterRepeat.onHand === afterFirst.onHand ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.E2));
+      }
+
       // ---- F) positive control: different reservations fulfilled concurrently all succeed ----
       {
         const ps: string[] = [];
@@ -154,6 +169,36 @@ describe('T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservat
         const unexpected = Object.entries(stats.errors).filter(([k]) => k !== 'ConflictException:409').reduce((a, [, v]) => a + v, 0);
         detail.I = { ...stats, dispatchMovements: moved, expectedMovements: rounds * 4, deadlocks, unexpectedErrors: unexpected };
         result(e, 'I-overlapping-orders-no-deadlock', deadlocks === 0 && unexpected === 0 && stats.bothOk === rounds && moved === rounds * 4 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.I));
+      }
+
+      // ---- J) override-warehouse case (second independent-review finding): the reservations sit in DIFFERENT warehouses (distinct reservation keys), but both orders are dispatched from the
+      // SAME custody warehouse, so their valuation keys (override warehouse + product) overlap in opposite line order. ----
+      {
+        const rounds = 6;
+        const wCustody = W;
+        const wA = await seedWarehouse(e.dsA, 'T21J-A');
+        const wB = await seedWarehouse(e.dsA, 'T21J-B');
+        const pa = await seedProduct(e.dsA, 'T21-J1');
+        const pb = await seedProduct(e.dsA, 'T21-J2');
+        for (const wh of [wCustody, wA, wB]) { await receive(e, wh, pa, 200); await receive(e, wh, pb, 200); }
+        const stats = { rounds, bothOk: 0, errors: {} as Record<string, number> };
+        const countDispatch = async () => Number((await e.dsA.query('SELECT count(*)::int AS n FROM stock_movements WHERE "movementType" = \'dispatch\' AND "warehouseId" = $1', [wCustody]))[0].n);
+        const before = await countDispatch();
+        for (let r = 0; r < rounds; r += 1) {
+          const o1 = randomUUID(); const o2 = randomUUID();
+          await e.inventory.reserveStock(wA, pa, 1, o1, e.actor, 'active', e.manager);
+          await e.inventory.reserveStock(wA, pb, 1, o1, e.actor, 'active', e.manager);
+          await e.inventory.reserveStock(wB, pb, 1, o2, e.actor, 'active', e.manager); // opposite line order, other reservation warehouse
+          await e.inventory.reserveStock(wB, pa, 1, o2, e.actor, 'active', e.manager);
+          const outs = await Promise.all([o1, o2, o1, o2].map((o) => attempt(() => e.inventory.fulfillReservationsForOrder(o, wCustody, e.actor, wide.manager))));
+          for (const o of outs.filter((x) => !x.ok)) { const k = (o as { pgCode?: string }).pgCode ?? o.kind; stats.errors[k] = (stats.errors[k] ?? 0) + 1; }
+          if (outs.filter((x) => x.ok).length >= 2) stats.bothOk += 1;
+        }
+        const moved = (await countDispatch()) - before;
+        const deadlocks = stats.errors['40P01'] ?? 0;
+        const unexpected = Object.entries(stats.errors).filter(([k]) => k !== 'ConflictException:409').reduce((a, [, v]) => a + v, 0);
+        detail.J = { ...stats, dispatchMovementsAtCustodyWarehouse: moved, expectedMovements: rounds * 4, deadlocks, unexpectedErrors: unexpected };
+        result(e, 'J-override-warehouse-overlapping-orders-no-deadlock', deadlocks === 0 && unexpected === 0 && stats.bothOk === rounds && moved === rounds * 4 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.J));
       }
 
       // ---- G) global consistency ----
