@@ -1,0 +1,426 @@
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\23e5ec1\backend\tools\testing\biz-evidence.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\23e5ec1\backend\tools\testing\blocked-db-driver.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+FAIL src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (36.181 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    × creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (2230 ms)
+
+  ● T-00 harness smoke — fresh disposable databases from the current migration set › creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at Object.<anonymous> (foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts:74:11)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        36.287 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-00 exit 1
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (30.423 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    × T-01 + T-02 (2729 ms)
+
+  ● T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect › T-01 + T-02
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts:22:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        30.536 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-01+T-02 exit 1
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (62.006 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    × T-03 + T-04 + T-04b (3037 ms)
+
+  ● T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock › T-03 + T-04 + T-04b
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts:22:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        62.178 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-03+T-04 exit 1
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (36.662 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    × 10 x 30.00 from 100.00 (3119 ms)
+
+  ● T-05 — concurrent treasury withdrawals never exceed the balance › 10 x 30.00 from 100.00
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t05-treasury.biz.real-pg.spec.ts:23:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        36.817 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-05 exit 1
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (37.852 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    × same key replayed: one effect; different key: a second effect (3175 ms)
+
+  ● T-06 — a replayed collection request has exactly one financial effect › same key replayed: one effect; different key: a second effect
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts:45:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        38.01 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-06 exit 1
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t07-returns.biz.real-pg.spec.ts (32.896 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    × two concurrent returns of 4 against 6 remaining (2727 ms)
+
+  ● T-07 — concurrent sales returns never exceed the returnable quantity › two concurrent returns of 4 against 6 remaining
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/t07-returns.biz.real-pg.spec.ts:55:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        33.03 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-07 exit 1
+
+=== T-08: src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts (29.98 s)
+  T-08 — concurrent applications of one payment never exceed its unapplied amount
+    × 300 + 300 against 500 unapplied (2986 ms)
+
+  ● T-08 — concurrent applications of one payment never exceed its unapplied amount › 300 + 300 against 500 unapplied
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t08-payment-apply.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        30.079 s
+Ran all test suites matching /src\\foundation\\testing\\t08-payment-apply.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-08 exit 1
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (37.22 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    × E1–E14 (4030 ms)
+
+  ● T-09 — POST /api/inventory/movements: frozen contract (F-INV-001) › E1–E14
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts:46:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        37.374 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-09 exit 1
+
+=== T-11: src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts (54.491 s)
+  T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect
+    × issue -> rejected event -> restore configuration -> re-drive (x3) (4061 ms)
+
+  ● T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect › issue -> rejected event -> restore configuration -> re-drive (x3)
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpInventoryGl (foundation/testing/biz-inventory-gl-support.ts:43:16)
+      at Object.<anonymous> (foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts:25:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        54.69 s
+Ran all test suites matching /src\\foundation\\testing\\t11-failure-recovery.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-11 exit 1
+
+=== T-12: src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts (48.75 s)
+  T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once
+    × kill the posting backend while it waits inside its transaction (11312 ms)
+
+  ● T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once › kill the posting backend while it waits inside its transaction
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/t12-connection-loss.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        48.895 s
+Ran all test suites matching /src\\foundation\\testing\\t12-connection-loss.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-12 exit 1
+
+=== T-10: src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts (53.795 s)
+  T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run
+    × every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained (22 ms)
+
+  ● T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run › every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained
+
+    ENOENT: no such file or directory, open 'D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\23e5ec1\backend\docs\decisions\evidence-2026-10-10-biz\T-01\T-01-20261010T224717Z-6bd877\run-header.json'
+
+    [0m [90m 33 |[39m       [36mconst[39m dir [33m=[39m runs[33m.[39mlength [33m?[39m join(base[33m,[39m runs[runs[33m.[39mlength [33m-[39m [35m1[39m]) [33m:[39m [36mnull[39m[33m;[39m
+     [90m 34 |[39m       [36mif[39m ([33m![39mdir) { latest[id] [33m=[39m [36mnull[39m[33m;[39m [36mif[39m ([33mFROZEN_RUNS[39m[33m.[39mincludes(id)) problems[33m.[39mpush([32m`${id}: no evidence run found`[39m)[33m;[39m [36melse[39m informational[33m.[39mpush([32m`${id}: no evidence run found`[39m)[33m;[39m [36mcontinue[39m[33m;[39m }
+    [31m[1m>[22m[39m[90m 35 |[39m       [36mconst[39m header [33m=[39m [33mJSON[39m[33m.[39mparse(readFileSync(join(dir[33m,[39m [32m'run-header.json'[39m)[33m,[39m [32m'utf8'[39m))[33m;[39m
+     [90m    |[39m                                             [31m[1m^[22m[39m
+     [90m 36 |[39m       [36mconst[39m reconFile [33m=[39m join(dir[33m,[39m [32m'reconciliation-R1-R10.json'[39m)[33m;[39m
+     [90m 37 |[39m       [36mconst[39m recon [33m=[39m existsSync(reconFile) [33m?[39m [33mJSON[39m[33m.[39mparse(readFileSync(reconFile[33m,[39m [32m'utf8'[39m)) [33m:[39m [36mnull[39m[33m;[39m
+     [90m 38 |[39m       [36mconst[39m result [33m=[39m existsSync(join(dir[33m,[39m [32m'result.json'[39m)) [33m?[39m [33mJSON[39m[33m.[39mparse(readFileSync(join(dir[33m,[39m [32m'result.json'[39m)[33m,[39m [32m'utf8'[39m)) [33m:[39m [36mnull[39m[33m;[39m[0m
+
+      at Object.<anonymous> (foundation/testing/t10-reconciliation.biz.real-pg.spec.ts:35:45)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        54.087 s
+Ran all test suites matching /src\\foundation\\testing\\t10-reconciliation.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-10 exit 1
+
+=== F-AUD-002: src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts (58.811 s)
+  F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager
+    × records the observed behaviour of both calling styles (3412 ms)
+
+  ● F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager › records the observed behaviour of both calling styles
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        59.027 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-reproducer.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): F-AUD-002 exit 1
+
+=== F-TRS-001: src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts (37.918 s)
+  F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager
+    × records overdraft occurrences for both calling styles (2758 ms)
+
+  ● F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager › records overdraft occurrences for both calling styles
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts:25:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        38.047 s
+Ran all test suites matching /src\\foundation\\testing\\f-trs-reproducer.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): F-TRS-001 exit 1
+
+=== T-15: src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts (29.024 s)
+  T-15 — local capacity baseline with correctness invariants under rising concurrency
+    × 1/5/10/25/50 in-flight operations on four write paths (2709 ms)
+
+  ● T-15 — local capacity baseline with correctness invariants under rising concurrency › 1/5/10/25/50 in-flight operations on four write paths
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts:50:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        29.171 s
+Ran all test suites matching /src\\foundation\\testing\\t15-capacity-baseline.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-15 exit 1
+
+=== T-16: src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts (32.943 s)
+  T-16 — HTTP capacity benchmark (measurements + integrity oracle)
+    × ramp, hot-spot, sustained, peak, recovery over HTTP (2490 ms)
+
+  ● T-16 — HTTP capacity benchmark (measurements + integrity oracle) › ramp, hot-spot, sustained, peak, recovery over HTTP
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t16-capacity-http.biz.real-pg.spec.ts:68:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        33.081 s
+Ran all test suites matching /src\\foundation\\testing\\t16-capacity-http.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-16 exit 1
+
+=== T-17: src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts (28.921 s)
+  Plain-manager probes — numbering and process-engine
+    × records the behaviour of both primitives under concurrency (2776 ms)
+
+  ● Plain-manager probes — numbering and process-engine › records the behaviour of both primitives under concurrency
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/f-plain-probes.biz.real-pg.spec.ts:31:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        29.086 s
+Ran all test suites matching /src\\foundation\\testing\\f-plain-probes.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-17 exit 1
+
+=== T-18: src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts
+FAIL src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts (28.892 s)
+  TEST-03 — entity metadata vs migrated Company schema
+    × reports drift in both directions (2973 ms)
+
+  ● TEST-03 — entity metadata vs migrated Company schema › reports drift in both directions
+
+    QueryFailedError: relation "user_roles" does not exist
+
+      at PostgresQueryRunner.query (../../../../src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../../src/data-source/DataSource.ts:541:20)
+      at applyCompanyAuthorizationSchemaAdjustment (foundation/company/company-authorization-schema-adjustment.ts:51:5)
+      at setUpTwoCompanyHarness (foundation/testing/two-company-real-pg-harness.ts:121:5)
+      at setUpBiz (foundation/testing/biz-support.ts:115:13)
+      at Object.<anonymous> (foundation/testing/test03-schema-drift.biz.real-pg.spec.ts:23:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        29.053 s
+Ran all test suites matching /src\\foundation\\testing\\test03-schema-drift.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-18 exit 1
+
+17 step(s) failed.
+EXIT 1

@@ -1,0 +1,13 @@
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+PASS src/foundation/testing/t07-returns.biz.real-pg.spec.ts (26.324 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    √ two concurrent returns of 4 against 6 remaining (14590 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        26.394 s, estimated 99 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

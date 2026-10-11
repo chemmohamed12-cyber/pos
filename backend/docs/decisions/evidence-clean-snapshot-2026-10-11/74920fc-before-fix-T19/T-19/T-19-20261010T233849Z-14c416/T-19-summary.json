@@ -1,0 +1,70 @@
+{
+  "rounds": 8,
+  "conc": 10,
+  "summary": {
+    "customer.create/plain": {
+      "expected": 80,
+      "succeeded": 18,
+      "errors": {
+        "23505": 62
+      },
+      "storedRows": 18,
+      "distinctCodes": 18
+    },
+    "customer.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 98,
+      "distinctCodes": 98
+    },
+    "supplier.create/plain": {
+      "expected": 80,
+      "succeeded": 9,
+      "errors": {
+        "23505": 71
+      },
+      "storedRows": 9,
+      "distinctCodes": 9
+    },
+    "supplier.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 89,
+      "distinctCodes": 89
+    },
+    "priceList.create/plain": {
+      "expected": 80,
+      "succeeded": 8,
+      "errors": {
+        "23505": 72
+      },
+      "storedRows": 9,
+      "distinctCodes": 9
+    },
+    "priceList.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 89,
+      "distinctCodes": 89
+    },
+    "salesRep.create/plain": {
+      "expected": 80,
+      "succeeded": 25,
+      "errors": {
+        "23505": 55
+      },
+      "storedRows": 25,
+      "distinctCodes": 25
+    },
+    "salesRep.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 105,
+      "distinctCodes": 105
+    }
+  }
+}

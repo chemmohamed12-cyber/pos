@@ -1,0 +1,27 @@
+{
+  "removed": [
+    "daii_test_biz_t07_control_plane",
+    "daii_test_biz_t07_company_a",
+    "daii_test_biz_t07_company_b"
+  ],
+  "allRemoved": true,
+  "otherDatabasesUnchanged": false,
+  "databasesAfter": [
+    {
+      "datname": "daii_test_biz_t20_company_b",
+      "oid": "1182367"
+    },
+    {
+      "datname": "postgres",
+      "oid": "5"
+    },
+    {
+      "datname": "template0",
+      "oid": "4"
+    },
+    {
+      "datname": "template1",
+      "oid": "1"
+    }
+  ]
+}

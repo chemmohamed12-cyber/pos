@@ -1,0 +1,374 @@
+
+=== REGRESSION: src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+[31m[Nest] 15944  - [39m١١‏/١٠‏/٢٠٢٦، ٦:٣٥:٤٧ ص [31m  ERROR[39m [38;5;3m[CompanyEventDispatcherScheduler] [39m[31mEvent dispatch sweep failed for Company 9fcbe57f-1deb-4980-8484-23ef2dbcc1f5[39m
+Error: simulated Company A connection failure
+    at Object.getDataSource (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\final2\backend\src\domains\accounting\interface\event-engine.company-isolation.spec.ts:207:40)
+    at CompanyEventDispatcherScheduler.runOnce (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\final2\backend\src\foundation\events\company-event-dispatcher.scheduler.ts:56:53)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\final2\backend\src\domains\accounting\interface\event-engine.company-isolation.spec.ts:212:26)
+[33m[Nest] 15944  - [39m١١‏/١٠‏/٢٠٢٦، ٦:٣٥:٤٧ ص [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mTopic "d10.ambient.only" has only ambient-scope subscribers — its Company-outbox events are marked 'skipped' (ADR-075 §5).[39m
+[33m[Nest] 15944  - [39m١١‏/١٠‏/٢٠٢٦، ٦:٣٥:٤٧ ص [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mEvent handler for "d10.fails" failed in Company 9fcbe57f-1deb-4980-8484-23ef2dbcc1f5: boom[39m
+PASS src/domains/accounting/interface/event-engine.company-isolation.spec.ts (22.426 s)
+  Event Engine — Company context (D10) — real-Postgres
+    √ A/B isolation with IDENTICAL event type, idempotency key, source entity and account codes: each event posts ONLY in its own Company (and B's DataSource is never requested while A dispatches) (193 ms)
+    √ dispatchAfterCommit: a no-op inside an ACTIVE transaction (rows not committed); Company dispatch after commit with the root manager (60 ms)
+    √ per-Company scheduler sweep: each Company's outbox is processed with that Company's manager; a Company whose connection fails does not stop the other (248 ms)
+    √ subscriber classification: an ambient-only subscriber is NEVER run on a Company event (row → skipped); a Company-scope subscriber runs with {manager, companyId}; ambient sibling on the same topic does not (12 ms)
+    √ concurrent claims (FOR UPDATE SKIP LOCKED): three simultaneous dispatchers process every row exactly once (186 ms)
+    √ lease recovery: a row stuck "processing" past the lease (crashed dispatcher) is reclaimed; a freshly leased row is not (15 ms)
+    √ a failing Company handler leaves the row retryable in THAT Company only (attempts incremented, back to pending) (14 ms)
+    √ type sanity: a transaction manager is accepted by dispatchAfterCommit (compile-time contract) (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        22.489 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\event-engine.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts (23.076 s)
+  D8 acquisition-journal helper — Dr cost / Cr Acquisition Clearing, fail-closed — real-Postgres, A/B
+    √ 1. FAIL CLOSED before any mutation: clearing account unset / unknown / header / inactive / control (AP) → rejected naming the config key; no journal, no event, the asset stays pending (81 ms)
+    √ 2. HAPPY PATH (Option C): Dr asset cost 12000 / Cr Acquisition Clearing 12000, balanced, posted + linked → the asset is ACTIVE; neither AP nor Bank is touched; the GL reads back exactly (108 ms)
+    √ 3. NOT REPEATABLE: a second call is refused (asset no longer pending) and creates nothing; the asset is a normal active asset — a depreciation run charges it (69 ms)
+    √ 4. POSTING FAILURE rolls everything back: an asset acquired in a date with no open fiscal period is rejected with the engine's reason — no journal, no event row, the asset stays pending (57 ms)
+    √ 5. ISOLATION: Company B's helper posts only in B against B's own chart; A is untouched by B; B's DataSource is never requested for A's calls; the Platform DB holds no accounting tables (232 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        23.141 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-acquisition-helper.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts (23.231 s)
+  D8 — fixed-asset acquisition-journal candidates (manual JE + link) — real-Postgres, A/B
+    √ 1. CANDIDATES = POSTED entries with a debit on the asset's cost account for EXACTLY its cost; drafts, other amounts and other accounts are excluded; nothing is created (211 ms)
+    √ 2. LINK activates the asset (rules re-validated at link time); the linked entry is then no longer a candidate for another asset, and linking it again is rejected (152 ms)
+    √ 3. ISOLATION: Company B sees only its own entries/assets; A's asset id is unknown to B; the other Company's DataSource is never requested (90 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        23.293 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-acquisition-link.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts (22.617 s)
+  FA-02 — disposal gain/loss accounts (separate, configured, fail-closed) — real-Postgres, A/B
+    √ 1. LOSS needs the LOSS account: unset / unknown / header / inactive / control-function accounts are rejected BEFORE any mutation; a usable one lets it through (247 ms)
+    √ 2. GAIN needs the GAIN account (and NOT the loss account): unset is rejected before mutation; configured → Cr gain, balanced, no loss line (122 ms)
+    √ 3. BREAK-EVEN (proceeds = cost): no gain/loss line and neither account needs to be configured (98 ms)
+    √ 4. APPROVAL re-checks: if the configured account becomes unusable after submission, the decision is refused BEFORE it is recorded (still pending), and succeeds once fixed (93 ms)
+    √ 5. ISOLATION: the disposal posts into the Company that owns it; B is untouched by A's disposals; B's DataSource is never requested for A's calls; B resolves its OWN accounts (91 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        22.679 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-disposal-gain-loss.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts (22.763 s)
+  FA-02 — disposal reconciliation with real depreciation (NBV, gain, loss) — real-Postgres, A/B
+    √ 1. DEPRECIATION first: the run charges 1000 / 500 (12 months) and the GL accumulated depreciation holds exactly that (298 ms)
+    √ 2. GAIN: NBV 11000, proceeds 12500 → gain 1500 credited to the GAIN account; Dr accum 1000 + Dr cash 12500 = Cr cost 12000 + Cr gain 1500; cost and accumulated depreciation are fully removed from the GL; no decoy / loss account touched (136 ms)
+    √ 3. LOSS: NBV 5500, proceeds 4000 → loss 1500 debited to the LOSS account; Dr accum 500 + Dr cash 4000 + Dr loss 1500 = Cr cost 6000; GL is clean afterwards (105 ms)
+    √ 4. MISSING config with real depreciation: a gain disposal with the gain account unset and a loss disposal with the loss account unset are each rejected before any mutation (89 ms)
+    √ 5. ISOLATION: Company B has its own chart and is untouched by A's disposals; B posts its own gain in B only; A's DataSource-only calls never request B; the Platform DB holds no accounting rows (199 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        22.83 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-disposal-reconciliation.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts (22.024 s)
+  FixedAssetController Area 21 retrofit — real-Postgres Company isolation
+    √ assets are registered in their own Company; an account of another Company is not a valid reference (82 ms)
+    √ a depreciation run charges and posts only the Company's own active assets, and its GL journal lands in that Company (122 ms)
+    √ a disposal is submitted and decided inside the Company; the other Company can neither see nor decide it; reconciliation runs are local (141 ms)
+    √ Test F — nothing leaked into the other Company's fixed-asset tables (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        22.092 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+PASS src/domains/accounting/interface/general-ledger.company-isolation.spec.ts (22.652 s)
+  GeneralLedgerController Area 21 retrofit — real-Postgres Company isolation (2026-10-04)
+    √ create → submit → post for Company A lands entirely in Company A's database (numbered, POSTED) — Company B sees nothing (120 ms)
+    √ Company B posts its own, different journal (250.00) independently — Company A's list is unchanged (80 ms)
+    √ getEntry / updateEntry / submitEntry / postEntry / reverseEntry of Company A's journal id through Company B's manager are all rejected (A→B DENY) (71 ms)
+    √ B→A DENY — Company B's journal id through Company A's manager is rejected (12 ms)
+    √ trial balance / account ledger are per-Company — A totals 100.00, B totals 250.00, never the sum; a foreign account id is rejected (20 ms)
+    √ balance sheet / P&L / cash-flow are per-Company (A 100.00 vs B 250.00) and a foreign tax period id is not found (84 ms)
+    √ financial event ingest for Company A posts a journal in Company A only; list/get/redrive are per-Company (93 ms)
+    √ reversing Company A's journal nets A's trial balance accordingly and leaves Company B untouched (68 ms)
+    √ Test F — resolving Company A's general-ledger data never even requests Company B's DataSource (146 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        22.717 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\general-ledger.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts (22.183 s)
+  D3 — inventory movement posting (Model A) — real-Postgres, A/B
+    √ 1. OPENING STOCK → GL: Dr Inventory / Cr the CONFIGURED opening-balance account for qty × supplied cost; valuation bootstrapped (122 ms)
+    √ 2. PURCHASE RECEIPT (GR) is NOT re-published by D3 — its own GRNI event posts it (Dr Inventory / Cr GRNI), valuation +60 (68 ms)
+    √ 3. ADJUSTMENT INCREASE → GL at the warehouse moving-average cost: Dr Inventory / Cr configured Gain; valuation increased at that cost (71 ms)
+    √ 4. ADJUSTMENT DECREASE → GL: Dr configured Loss / Cr Inventory at the consumed average cost; valuation decreased (69 ms)
+    √ 5. TRANSFER A→B → NO GL; valuation carried at the source average; TOTAL valuation unchanged (27 ms)
+    √ 6. RETURN-IN → a financial event EXISTS and is REJECTED with the explicit D4 reason (no invented account, no journal, valuation untouched) (25 ms)
+    √ 7. RECONCILIATION: Σ inventory valuation = GL Inventory control account, and every journal balances (8 ms)
+    √ 8. FAIL-CLOSED: unset adjustment-gain config ⇒ REJECTED with the config reason, NO fallback account, valuation NOT mutated; after configuring, redrive posts it and the reconciliation still holds (71 ms)
+    √ 9. ISOLATION: Company B is untouched (no stock, valuation, events or journals) and the Platform/control-plane DB was never used (16 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        22.246 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-posting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+PASS src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts (22.692 s)
+  D3-B — manual receipt policy (explicit cost + controlled reason → configured offset) — real-Postgres, A/B
+    √ 1. VALID cost + VALID reason → posted: stock +10, valuation 10 @ 3.50, GL Dr 1120 35.00 / Cr the reason-configured account (4201) (165 ms)
+    √ 1b. a DIFFERENT valid reason selects ITS OWN offset account (DONATION → 3105) — no shared/generic account; the movement endpoint path behaves the same (72 ms)
+    √ 2. MISSING / non-positive cost → rejected BEFORE mutation (no stock, document, valuation, outbox or journal change) — both entry paths (202 ms)
+    √ 3. MISSING reason code → rejected BEFORE mutation — both entry paths (free-text `reason` alone is not accepted) (50 ms)
+    √ 4. reason WITHOUT a configured GL account → rejected BEFORE mutation, no fallback account is ever used (28 ms)
+    √ 5. WRONG GL mapping → rejected BEFORE mutation: account not in the chart (GHOST→9999) and a control account (CTRL→1120) (45 ms)
+    √ 5b. config changes AFTER the draft was created → the post re-validates inside its transaction: rejected, document NOT posted, NOTHING mutated (38 ms)
+    √ 5c. EVENT-TIME fail-closed: mapping removed between movement and GL event → REJECTED (reason + config key named), no journal, no fallback; restored → redrive POSTS (62 ms)
+    √ 5d. a posted cost-bearing manual receipt is NOT reversible as a document (rejected before mutation) — Adjustment decrease is the approved route (82 ms)
+    √ 6/9/10. RECONCILIATION: Σ inventory valuation = GL Inventory 1120 after the whole scenario, and every journal is balanced (14 ms)
+    √ 7/8. ISOLATION: everything stayed in Company A; Company B is untouched; the Platform/control-plane DB holds no outbox/stock/journal rows (21 ms)
+    √ 7b. Company B can run its OWN manual receipt (its own chart/valuation) and it posts only in B — A stays unchanged (98 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        22.759 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\manual-receipt.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
+PASS src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts (23.598 s)
+  Accounting sub-ledger controllers (ap / ar / cash-bank / inventory) Area 21 retrofit — real-Postgres Company isolation
+    √ AP: an adjustment is submitted and approved inside Company A; the GL journal lands in A only; the reconciliation run is A's (241 ms)
+    √ AR: an adjustment moves the Customer Ledger and the GL inside Company A only (approved by the checker if the matrix gates it) (239 ms)
+    √ Cash/Bank: an opening-balance adjustment posts to Company A's bank account only; its runs list is Company-local (153 ms)
+    √ Inventory: a count-variance adjustment posts to Company A's inventory account only; the reconciliation run is A's (105 ms)
+    √ Test F — nothing leaked into Company B (no journals, ledger movements, runs or financial events) (11 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        23.663 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\subledger-controllers.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/t0-clean-company-baseline.spec.ts
+Test Suites: 1 skipped, 0 of 1 total
+Tests:       1 skipped, 1 total
+Snapshots:   0 total
+Time:        13.861 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\t0-clean-company-baseline.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/t0-clean-company-baseline.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts
+PASS src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts (22.99 s)
+  WIP control account in the ifrs-sme template (H2) — static template contract
+    √ carries exactly one wip control account: 1150, asset, postable, under the Current Assets header, never contra (5 ms)
+    √ is ordered parents-before-children, has no duplicate code, and 1150 does not collide with another account (9 ms)
+  WIP control account (H2) — real-Postgres, template import → Work Order GL posting
+    √ A — a fresh Company imports the ifrs-sme template: ONE active postable wip control account (1150) appears, shaped like every other control account (158 ms)
+    √ A — Work Order: material issue → return → finished-goods output all POST the exact ADR-061 §13 entry with the template-only chart (no hand-seeded WIP account) (319 ms)
+    √ A — the GL wip control account equals the Manufacturing WIP subledger (WIP reconciliation → matched, drift 0.0000) (17 ms)
+    √ B — a chart that PRE-DATES the fix (template imported without 1150) still fails closed with the explicit reason: REJECTED, nothing posted (209 ms)
+    √ B — documented recovery: create a wip control account in that chart, re-drive the REJECTED event → POSTED Dr WIP / Cr Inventory (57 ms)
+    √ Isolation — each Company owns its own wip account; A's postings never appear in B and vice-versa (14 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        23.055 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\wip-control-account.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts
+PASS src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts (22.892 s)
+  CUS-01 — on-account / advance customer payment (Cr existing AR control, unapplied → applied) — real-Postgres, A/B
+    √ 1. RECEIVE before any invoice: Dr mapped bank (1102) / Cr the EXISTING ar control (1110) — no new account; unapplied credit in the Customer Ledger; the invoice is untouched (170 ms)
+    √ 2. FAIL CLOSED before any mutation: amount ≤ 0, unmapped Treasury account, a sales order of another customer, an unknown customer — zero treasury / payment / ledger / event / journal / outbox rows (68 ms)
+    √ 3. EXPLICIT PARTIAL APPLY (append-only): 200 of the 500 goes to invoice 1 — two new application rows, the original row untouched, invoice partially_paid, customer balance and GL unchanged (70 ms)
+    √ 4. APPLY REJECTIONS before any mutation: > unapplied, > invoice outstanding, ≤ 0, another customer's invoice, a paid invoice, an unknown payment (183 ms)
+    √ 5. AUTOMATIC settlement (existing sweep): a payment earmarked to a sales order is settled when that order's invoice is posted; a PARTIALLY applied receipt is never swept (no double application) (144 ms)
+    √ 6. RECONCILIATION — AR: the Customer Ledger total equals the GL `ar` control balance (applications change neither); TREASURY: the account balance movement equals the GL bank-leg debits (4 ms)
+    √ 7. ISOLATION: B's on-account flow posts only in B; A's payment/invoice ids are unknown to B; A is unchanged by B; the Platform DB was never used (116 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        22.958 s
+Ran all test suites matching /src\\domains\\customer-finance\\interface\\on-account-payment.company-isolation.spec.ts/i.
+RESULT PASS src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/payments.company-isolation.spec.ts
+PASS src/domains/customer-finance/interface/payments.company-isolation.spec.ts (24.527 s)
+  PaymentsController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ recordPayment for Company A posts against Company A's own invoice/account inside Company A's own database (76 ms)
+    √ recordPayment for Company B posts independently in Company B's own database — no leakage of Company A's invoice/account (76 ms)
+    √ listPaymentsForCustomer via Company A resolves only Company A's own payment (6 ms)
+    √ listAllPayments via Company B resolves only Company B's own payment — no leakage of Company A's data (8 ms)
+    √ Test F — resolving Company A's payments never even requests Company B's DataSource (9 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        24.591 s
+Ran all test suites matching /src\\domains\\customer-finance\\interface\\payments.company-isolation.spec.ts/i.
+RESULT PASS src/domains/customer-finance/interface/payments.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+PASS src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts (28.55 s)
+  GoodsReceiptController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ post for Company A receives against Company A's own PO and writes the stock movement into Company A's ledger only (55 ms)
+    √ post for Company B receives independently in Company B's own database — Company B's ledger and PO state untouched by A (45 ms)
+    √ listForPurchaseOrder resolves only the owning Company's receipts — Company A's PO id is invisible from Company B (9 ms)
+    √ post of Company A's PO id through Company B's manager is rejected (wrong-resource-id DENY) (22 ms)
+    √ Test F — resolving Company A's receipts never even requests Company B's DataSource (3 ms)
+    √ D7 lifecycle gate — a Goods Receipt on a PO whose product is a DRAFT (unapproved New Item Request) is refused BEFORE any mutation; once active it posts again (34 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        28.617 s
+Ran all test suites matching /src\\domains\\procurement\\interface\\goods-receipt.company-isolation.spec.ts/i.
+RESULT PASS src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+PASS src/domains/procurement/interface/purchase-order.company-isolation.spec.ts (30.017 s)
+  PurchaseOrderController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ create for Company A writes the PO + line + process instance inside Company A's own database (50 ms)
+    √ create for Company B writes independently in Company B's own database (39 ms)
+    √ create against Company A's supplier through Company B's manager is rejected (wrong-resource-id DENY) (32 ms)
+    √ transition submit -> approve for Company A moves only Company A's PO (30 ms)
+    √ list via Company A resolves only Company A's PO (state approved); via Company B only Company B's (state draft) (11 ms)
+    √ getById / transition of Company A's PO id through Company B's manager is rejected (A→B DENY) (5 ms)
+    √ ESC-3 (maker != checker): the user who created a PO cannot approve it — refused before any state change and audited; a DIFFERENT user approves it; Company B is untouched (59 ms)
+    √ ESC-3 scope: only APPROVE is gated — the maker may still submit and cancel their own PO (existing workflow unchanged) (33 ms)
+    √ Test F — resolving Company A's purchase orders never even requests Company B's DataSource (7 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        30.085 s
+Ran all test suites matching /src\\domains\\procurement\\interface\\purchase-order.company-isolation.spec.ts/i.
+RESULT PASS src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+PASS src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts (33.869 s)
+  D5 — supplier invoice PPV + Input VAT (GRNI clearing, gross AP, atomic void) — real-Postgres, A/B
+    √ 1. SAME PRICE (GR 100 / invoice 100): Dr GRNI 100 / Cr AP 100 — no PPV line; ledger credit 100; inventory valuation untouched (537 ms)
+    √ 2. INVOICE HIGHER (GR 100 / invoice 110): Dr GRNI 100 + Dr PPV 10 / Cr AP 110; GRNI fully cleared; valuation stays at the receipt cost (375 ms)
+    √ 3. INVOICE LOWER (GR 100 / invoice 90): Dr GRNI 100 / Cr AP 90 + Cr PPV 10 — PPV moves in the CREDIT direction and the journal balances (339 ms)
+    √ 4. VAT APPLICABLE (net 100 + VAT 14, registered supplier): Dr GRNI 100 + Dr Input VAT 14 / Cr AP 114; Supplier Ledger carries the GROSS 114 (355 ms)
+    √ 4b. VAT + HIGHER price (net 110 + VAT 15.40): Dr GRNI 100 + Dr PPV 10 + Dr Input VAT 15.40 / Cr AP 125.40 — the CTO example (325 ms)
+    √ 5. VAT-FREE (net only): no VAT line, no tax account needed; and a NON-ZERO VAT on an UNREGISTERED supplier is rejected BEFORE any mutation (388 ms)
+    √ 6. PARTIAL INVOICING (GR 10): 4 @10 then 6 @11 → #1 Dr GRNI 40 / Cr AP 40; #2 Dr GRNI 60 + Dr PPV 6 / Cr AP 66; quantityInvoiced = 10, GRNI left = 0; an 11th unit is rejected (394 ms)
+    √ 7. VOID restores EVERYTHING atomically: ledger reversed, GL mirrored (GRNI, PPV, AP), state void, quantityInvoiced restored → the quantity can be invoiced again; CANCEL of a draft restores it too (357 ms)
+    √ 7b. VOID is ALL-OR-NOTHING: if the quantity cannot be restored the whole void rolls back (state, ledger and outbox unchanged) (341 ms)
+    √ 8. MISSING / INVALID PPV ACCOUNT (invoice has a variance) → postInvoice rejected BEFORE any mutation; no variance ⇒ no PPV account is needed; restored → the SAME invoice posts (472 ms)
+    √ 9. MISSING / AMBIGUOUS INPUT VAT ACCOUNT (tax_receivable) → rejected BEFORE any mutation; no VAT ⇒ not needed (282 ms)
+    √ 10. INVALID VAT-REGISTRATION CONDITION at POST time: registration removed after the draft → rejected before mutation; zero VAT is still fine (135 ms)
+    √ 11. LEGACY invoices keep their shape: a pre-D5 posted event (no receiptValueBase) posts Dr GRNI / Cr AP at the net and its VOID mirrors exactly that (126 ms)
+    √ 12/13. DEBITS = CREDITS, GRNI reconciliation (GL = subledger at PO cost, no residue) and AP reconciliation (GL = Σ Supplier Ledger, gross) (21 ms)
+    √ 14/15. ISOLATION: a full invoice post inside A never requests B; Company B is untouched; the control-plane (Platform) outbox is empty (221 ms)
+    √ 15b. a Company-A invoice id through Company B's manager cannot be posted or voided (A→B DENY) and changes nothing (102 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       16 passed, 16 total
+Snapshots:   0 total
+Time:        34.045 s
+Ran all test suites matching /src\\domains\\procurement\\interface\\supplier-invoice-ppv-vat.company-isolation.spec.ts/i.
+RESULT PASS src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts
+PASS src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts (40.173 s)
+  SupplierInvoiceController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ getInvoice for Company A's own invoice resolves Company A's own amount and 'draft' state (112 ms)
+    √ getInvoice for Company A's invoice id via Company B's manager 404s — the row genuinely does not exist in Company B's own database (49 ms)
+    √ listAll via Company A resolves only Company A's real invoice (13 ms)
+    √ listAll via Company B resolves only Company B's real invoice — no leakage of Company A's data (12 ms)
+    √ listForSupplier for Company A's own supplier resolves only Company A's own invoice (7 ms)
+    √ Test F — resolving Company A's invoices never even requests Company B's DataSource (21 ms)
+    createDraftInvoice write path (T0-F1)
+      √ A write lands ONLY in Company A (invoice + its own SINV sequence), Company B is untouched, the Platform DB is never used, and B's DataSource is never requested (54 ms)
+      √ B writes independently with its OWN sequence (also number 1) — A's invoice count and sequence are unaffected (38 ms)
+      √ A→B DENY: Company A's PO through Company B's manager is rejected and writes nothing (9 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        40.287 s
+Ran all test suites matching /src\\domains\\procurement\\interface\\supplier-invoice.company-isolation.spec.ts/i.
+RESULT PASS src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+PASS src/domains/returns/interface/returns-accounting.company-isolation.spec.ts (38.673 s)
+  D4 — returns accounting (inventory/COGS, Revenue/AR/tax reversal, customer credit) — real-Postgres, A/B
+    √ 0. SETUP — original sales through real paths: receipt @4.00, dispatches of O1/O2/O3 costed at 4.00, then the average is moved to 6.40; O1/O3 invoiced (534 ms)
+    √ 1/3/4/5/6/7. SALES RETURN linked to O1 (4 of 10): stock restored at the ORIGINAL cost 4.00 (not the 7.00 average) → Dr 1120 16 / Cr COGS 16; Revenue/AR/tax reversed from the ORIGINAL invoice value → Dr 4102 40 + Dr 2120 5.60 / Cr AR 45.60; customer credit 45.60 (238 ms)
+    √ 2. QUANTITY CAP stays enforced (shared across both return types): the remaining 6 of O1 can be returned, 7 cannot (85 ms)
+    √ 5b. the REST of O1 (6) reverses the invoice EXACTLY (cumulative rounding): net 60, tax 8.40 → invoice fully credited, customer balance for O1 back to 0, invoice paid (467 ms)
+    √ 8. SHIPMENT RETURN of a sale that was never invoiced (O2): inventory/COGS ONLY at the original exit cost — no Revenue reversal, no AR credit, no ledger entry (331 ms)
+    √ 9. SHIPMENT RETURN of an INVOICED, already PAID sale (O3): the FULL reversal — inventory/COGS + Dr Sales Returns / Cr AR — and the balance stays in the CUSTOMER's favour (no cash refund) (209 ms)
+    √ 10. INVALID / MISSING SOURCE → rejected with ZERO mutation: unknown return id; an order never dispatched (original cost indeterminable); an order without a restock warehouse (100 ms)
+    √ 11. MISSING ACCOUNTING CONFIGURATION → rejected BEFORE mutation (nothing written, document stays requested); restored → the SAME document completes and posts (290 ms)
+    √ 11b. EVENT-TIME fail-closed: a Sales Returns mapping removed after the movement → the credit event is REJECTED (config key named, no journal); re-driven once configured (76 ms)
+    √ 15. DEBITS = CREDITS and the reconciliations hold: every journal balances; Σ valuation = GL Inventory 1120; GL AR 1110 = Σ Customer Ledger (the manufactured 10.00 event aside) (11 ms)
+    √ 12/13/14. ISOLATION: everything stayed in Company A; Company B is untouched (no stock, valuation, events, journals, ledger, outbox) and the Platform/control-plane outbox is empty (33 ms)
+    √ 12b. a return id of Company A completed through Company B's manager is rejected (A→B DENY) and changes nothing (20 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        38.837 s
+Ran all test suites matching /src\\domains\\returns\\interface\\returns-accounting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+PASS src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts (29.709 s)
+  D2 — Treasury account → mapped GL bank leg (supplier + customer payments) — real-Postgres, A/B
+    √ SUPPLIER payment from an account mapped to 1102 credits 1102 (NOT the first bank control account 1101) and debits AP — in Company A only (195 ms)
+    √ SUPPLIER payment from an account mapped to 1101 credits 1101 — the account follows the paying Treasury account, not DB order (91 ms)
+    √ SUPPLIER payment from an UNMAPPED account is rejected BEFORE any mutation — zero treasury / payment / ledger / event / journal / outbox rows, invoice state unchanged (90 ms)
+    √ Company B: its own mapped account posts in B only; A is unchanged (A/B isolation of the bank leg) (116 ms)
+    √ CUSTOMER payment into an account mapped to 1102 debits 1102 (not 1101) and credits AR; an UNMAPPED account is rejected with zero side effects (132 ms)
+    √ a mapped code that is NOT in the chart fails closed at the Financial Event (REJECTED, no journal) — never silently falls back to another bank account (55 ms)
+    √ the Platform/control-plane DB was never used (no outbox rows there) (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        29.785 s
+Ran all test suites matching /src\\domains\\treasury\\interface\\treasury-bank-leg.company-isolation.spec.ts/i.
+RESULT PASS src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+
+REGRESSION DONE: 20/20 passed
+EXIT 0

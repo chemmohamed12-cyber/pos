@@ -1,0 +1,12 @@
+{
+  "testId": "T-10",
+  "runId": "T-10-20261010T232520Z-afdbfc",
+  "finishedAt": "2026-10-10T23:25:21.143Z",
+  "results": [
+    {
+      "id": "T-10",
+      "status": "STOP",
+      "note": "runs come from different commits: 258965ff1e46a07207f878d0b5ea8d8553e4dc71, d51a7512a4b549611f64b35f2963a318c7571b77, a314e1885d624815d8dee0cf136b473a6e0baa3f, 1829794f97ea8fa393231fbb620b1b5a1d369308"
+    }
+  ]
+}

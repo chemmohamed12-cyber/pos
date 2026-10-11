@@ -1,0 +1,21 @@
+{
+  "again": [
+    {
+      "ok": true,
+      "kind": "OK"
+    },
+    {
+      "ok": true,
+      "kind": "OK"
+    }
+  ],
+  "events": [
+    "POSTED",
+    "POSTED"
+  ],
+  "journals": 3,
+  "valuation": {
+    "qty": 3,
+    "value": 12
+  }
+}

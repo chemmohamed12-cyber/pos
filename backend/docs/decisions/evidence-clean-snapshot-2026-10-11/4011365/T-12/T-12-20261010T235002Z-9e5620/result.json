@@ -1,0 +1,76 @@
+{
+  "testId": "T-12",
+  "runId": "T-12-20261010T235002Z-9e5620",
+  "finishedAt": "2026-10-10T23:50:28.071Z",
+  "results": [
+    {
+      "id": "T-12-R1",
+      "status": "PASS",
+      "note": "{\"okKill\":true,\"okRetry\":true,\"killedRows\":1,\"outcome\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"terminating connection due to administrator command\",\"pgCode\":\"57P01\"},\"retry\":{\"ok\":true,\"kind\":\"OK\"},\"movementsAfter\":1,\"stateAfter\":\"posted\"}"
+    },
+    {
+      "id": "T-12-R2",
+      "status": "PASS",
+      "note": "{\"okKill\":true,\"okRetry\":true,\"killedRows\":1,\"outcome\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"terminating connection due to administrator command\",\"pgCode\":\"57P01\"},\"retry\":{\"ok\":true,\"kind\":\"OK\"},\"movementsAfter\":1,\"stateAfter\":\"posted\"}"
+    },
+    {
+      "id": "T-12-R3",
+      "status": "PASS",
+      "note": "{\"okKill\":true,\"okRetry\":true,\"killedRows\":1,\"outcome\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"terminating connection due to administrator command\",\"pgCode\":\"57P01\"},\"retry\":{\"ok\":true,\"kind\":\"OK\"},\"movementsAfter\":1,\"stateAfter\":\"posted\"}"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-12/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":1,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-12/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-12/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-12/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-12/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":0,\"declaredNonGlTreasury\":0,\"expectedGl\":0,\"glNet\":0}"
+    },
+    {
+      "id": "T-10/T-12/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-12/R7",
+      "status": "PASS",
+      "note": "{\"events\":0,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-12/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-12/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: none declared"
+    },
+    {
+      "id": "T-10/T-12/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

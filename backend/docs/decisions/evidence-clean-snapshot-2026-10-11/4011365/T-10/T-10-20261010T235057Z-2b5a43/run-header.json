@@ -1,0 +1,33 @@
+{
+  "testId": "T-10",
+  "runId": "T-10-20261010T235057Z-2b5a43",
+  "startedAt": "2026-10-10T23:50:57.914Z",
+  "commit": "4011365552f07e41b6cc95254ccb3fd53c6b1ac4",
+  "branch": "clean-snapshot",
+  "dirtyPaths": [],
+  "sourceKind": "clean-git-archive-snapshot",
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\backend\\.verify-snapshot\\final",
+  "commits": [
+    "4011365552f07e41b6cc95254ccb3fd53c6b1ac4"
+  ],
+  "consolidatedFrom": [
+    "T-01",
+    "T-03",
+    "T-05",
+    "T-06",
+    "T-07",
+    "T-08",
+    "T-00",
+    "T-09",
+    "T-11",
+    "T-12"
+  ]
+}

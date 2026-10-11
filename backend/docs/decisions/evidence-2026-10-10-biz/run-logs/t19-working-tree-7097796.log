@@ -1,0 +1,13 @@
+
+=== T-19: src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts (76.265 s)
+  T-19 — concurrent creates through the numbering-based endpoints (plain manager, as controllers call them)
+    √ every concurrent create succeeds with a distinct code (19970 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        77.521 s
+Ran all test suites matching /src\\foundation\\testing\\t19-n01-endpoint-concurrency.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

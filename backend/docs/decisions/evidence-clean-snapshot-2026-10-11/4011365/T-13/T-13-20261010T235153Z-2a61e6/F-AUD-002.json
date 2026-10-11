@@ -1,0 +1,13 @@
+{
+  "styleB_transactionManager": {
+    "valid": true,
+    "brokenAtSeq": null,
+    "forks": 0
+  },
+  "styleA_plainManager": {
+    "valid": true,
+    "brokenAtSeq": null,
+    "newForks": 0
+  },
+  "runId": "9424a603"
+}

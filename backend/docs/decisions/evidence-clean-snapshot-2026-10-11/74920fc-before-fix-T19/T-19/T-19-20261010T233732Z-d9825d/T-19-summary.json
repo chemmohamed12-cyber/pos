@@ -1,0 +1,72 @@
+{
+  "rounds": 8,
+  "conc": 10,
+  "summary": {
+    "customer.create/plain": {
+      "expected": 80,
+      "succeeded": 0,
+      "errors": {
+        "TypeError:this.events.publish is not a function": 80
+      },
+      "storedRows": 0,
+      "distinctCodes": 0
+    },
+    "customer.create/transaction": {
+      "expected": 80,
+      "succeeded": 0,
+      "errors": {
+        "TypeError:this.events.publish is not a function": 80
+      },
+      "storedRows": 0,
+      "distinctCodes": 0
+    },
+    "supplier.create/plain": {
+      "expected": 80,
+      "succeeded": 8,
+      "errors": {
+        "23505": 72
+      },
+      "storedRows": 8,
+      "distinctCodes": 8
+    },
+    "supplier.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 88,
+      "distinctCodes": 88
+    },
+    "priceList.create/plain": {
+      "expected": 80,
+      "succeeded": 8,
+      "errors": {
+        "23505": 72
+      },
+      "storedRows": 9,
+      "distinctCodes": 9
+    },
+    "priceList.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 89,
+      "distinctCodes": 89
+    },
+    "salesRep.create/plain": {
+      "expected": 80,
+      "succeeded": 22,
+      "errors": {
+        "23505": 58
+      },
+      "storedRows": 22,
+      "distinctCodes": 22
+    },
+    "salesRep.create/transaction": {
+      "expected": 80,
+      "succeeded": 80,
+      "errors": {},
+      "storedRows": 102,
+      "distinctCodes": 102
+    }
+  }
+}

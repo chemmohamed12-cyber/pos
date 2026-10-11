@@ -1,0 +1,72 @@
+{
+  "testId": "T-19",
+  "runId": "T-19-20261011T000719Z-1828a1",
+  "finishedAt": "2026-10-11T00:07:34.876Z",
+  "results": [
+    {
+      "id": "T-19-customer.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-supplier.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-priceList.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":161,\"d\":161}"
+    },
+    {
+      "id": "T-19-salesRep.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "run-aborted",
+      "status": "STOP",
+      "note": "Nest can't resolve dependencies of the PermissionGuard (Reflector, ?, AuthorizationContextService). Please make sure that the argument PermissionService at index [1] is available in the RootTestModule context.\n\nPotential solutions:\n- Is RootTestModule a valid NestJS module?\n- If PermissionService is a provider, is it part of the current RootTestModule?\n- If PermissionService is exported from a separate @Module, is that module imported within RootTestModule?\n  @Module({\n    imports: [ /* the Modu"
+    }
+  ]
+}

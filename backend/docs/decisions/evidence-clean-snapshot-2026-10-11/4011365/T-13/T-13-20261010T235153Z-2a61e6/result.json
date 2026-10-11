@@ -1,0 +1,17 @@
+{
+  "testId": "T-13",
+  "runId": "T-13-20261010T235153Z-2a61e6",
+  "finishedAt": "2026-10-10T23:52:15.139Z",
+  "results": [
+    {
+      "id": "F-AUD-002-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"valid\":true,\"forks\":0}"
+    },
+    {
+      "id": "F-AUD-002-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"valid\":true,\"brokenAtSeq\":null,\"newForks\":0}"
+    }
+  ]
+}

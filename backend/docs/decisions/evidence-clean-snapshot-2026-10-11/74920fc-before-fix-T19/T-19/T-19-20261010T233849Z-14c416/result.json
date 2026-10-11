@@ -1,0 +1,67 @@
+{
+  "testId": "T-19",
+  "runId": "T-19-20261010T233849Z-14c416",
+  "finishedAt": "2026-10-10T23:39:08.531Z",
+  "results": [
+    {
+      "id": "T-19-customer.create-plain",
+      "status": "FAIL-DEFECT",
+      "note": "{\"succeeded\":18,\"expected\":80,\"errors\":{\"23505\":62}}"
+    },
+    {
+      "id": "T-19-customer.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":98,\"d\":98}"
+    },
+    {
+      "id": "T-19-supplier.create-plain",
+      "status": "FAIL-DEFECT",
+      "note": "{\"succeeded\":9,\"expected\":80,\"errors\":{\"23505\":71}}"
+    },
+    {
+      "id": "T-19-supplier.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":89,\"d\":89}"
+    },
+    {
+      "id": "T-19-priceList.create-plain",
+      "status": "FAIL-DEFECT",
+      "note": "{\"succeeded\":8,\"expected\":80,\"errors\":{\"23505\":72}}"
+    },
+    {
+      "id": "T-19-priceList.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":89,\"d\":89}"
+    },
+    {
+      "id": "T-19-salesRep.create-plain",
+      "status": "FAIL-DEFECT",
+      "note": "{\"succeeded\":25,\"expected\":80,\"errors\":{\"23505\":55}}"
+    },
+    {
+      "id": "T-19-salesRep.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":105,\"d\":105}"
+    }
+  ]
+}

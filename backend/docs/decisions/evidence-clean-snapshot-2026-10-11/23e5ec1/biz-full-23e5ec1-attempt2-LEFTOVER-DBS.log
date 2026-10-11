@@ -1,0 +1,487 @@
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+FAIL src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (19.234 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    × creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (173 ms)
+
+  ● T-00 harness smoke — fresh disposable databases from the current migration set › creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases
+
+    expect(received).not.toContain(expected) // indexOf
+
+    Expected value: not "daii_test_biz_t00_control_plane"
+    Received array:     ["daii_test_biz_t00_company_a", "daii_test_biz_t00_company_b", "daii_test_biz_t00_control_plane", "daii_test_biz_t01_company_a", "daii_test_biz_t01_company_b", "daii_test_biz_t01_control_plane", "daii_test_biz_t03_company_a", "daii_test_biz_t03_company_b", "daii_test_biz_t03_control_plane", "daii_test_biz_t05_company_a", "daii_test_biz_t05_company_b", "daii_test_biz_t05_control_plane", "daii_test_biz_t06_company_a", "daii_test_biz_t06_company_b", "daii_test_biz_t06_control_plane", "daii_test_biz_t07_company_a", "daii_test_biz_t07_company_b", "daii_test_biz_t07_control_plane", "daii_test_biz_t08_company_a", "daii_test_biz_t08_company_b", "daii_test_biz_t08_control_plane", "daii_test_biz_t09_company_a", "daii_test_biz_t09_company_b", "daii_test_biz_t09_control_plane", "daii_test_biz_t11_company_a", "daii_test_biz_t11_company_b", "daii_test_biz_t11_control_plane", "daii_test_biz_t12_company_a", "daii_test_biz_t12_company_b", "daii_test_biz_t12_control_plane", "daii_test_biz_t13_company_a", "daii_test_biz_t13_company_b", "daii_test_biz_t13_control_plane", "daii_test_biz_t14_company_a", "daii_test_biz_t14_company_b", "daii_test_biz_t14_control_plane", "daii_test_biz_t15_company_a", "daii_test_biz_t15_company_b", "daii_test_biz_t15_control_plane", "daii_test_biz_t16_company_a", "daii_test_biz_t16_company_b", "daii_test_biz_t16_control_plane", "daii_test_biz_t17_company_a", "daii_test_biz_t17_company_b", "daii_test_biz_t17_control_plane", "daii_test_biz_t18_company_a", "daii_test_biz_t18_company_b", "daii_test_biz_t18_control_plane", "postgres", "template0", "template1"]
+
+    [0m [90m 68 |[39m       [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: unexpected PostgreSQL system_identifier ${systemIdentifier}`[39m)[33m;[39m
+     [90m 69 |[39m     }
+    [31m[1m>[22m[39m[90m 70 |[39m     [36mfor[39m ([36mconst[39m n [36mof[39m [33mNAMES[39m) expect(before[33m.[39mmap((d) [33m=>[39m d[33m.[39mdatname))[33m.[39mnot[33m.[39mtoContain(n)[33m;[39m [90m// fresh: none exist yet[39m
+     [90m    |[39m                                                                     [31m[1m^[22m[39m
+     [90m 71 |[39m
+     [90m 72 |[39m     [36mlet[39m h[33m:[39m [33mAwaited[39m[33m<[39m[33mReturnType[39m[33m<[39m[36mtypeof[39m setUpTwoCompanyHarness[33m>>[39m [33m|[39m undefined[33m;[39m
+     [90m 73 |[39m     [36mtry[39m {[0m
+
+      at Object.<anonymous> (foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts:70:69)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        19.368 s, estimated 37 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-00 exit 1
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (21.559 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    × T-01 + T-02 (345 ms)
+
+  ● T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect › T-01 + T-02
+
+    STOP: daii_test_biz_t01_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts:22:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        21.739 s, estimated 31 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-01+T-02 exit 1
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (30.127 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    × T-03 + T-04 + T-04b (278 ms)
+
+  ● T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock › T-03 + T-04 + T-04b
+
+    STOP: daii_test_biz_t03_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts:22:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        30.335 s, estimated 63 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-03+T-04 exit 1
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (49.323 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    × 10 x 30.00 from 100.00 (320 ms)
+
+  ● T-05 — concurrent treasury withdrawals never exceed the balance › 10 x 30.00 from 100.00
+
+    STOP: daii_test_biz_t05_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t05-treasury.biz.real-pg.spec.ts:23:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        49.488 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-05 exit 1
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (26.811 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    × same key replayed: one effect; different key: a second effect (232 ms)
+
+  ● T-06 — a replayed collection request has exactly one financial effect › same key replayed: one effect; different key: a second effect
+
+    STOP: daii_test_biz_t06_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts:45:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        26.996 s, estimated 38 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-06 exit 1
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t07-returns.biz.real-pg.spec.ts (26.556 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    × two concurrent returns of 4 against 6 remaining (294 ms)
+
+  ● T-07 — concurrent sales returns never exceed the returnable quantity › two concurrent returns of 4 against 6 remaining
+
+    STOP: daii_test_biz_t07_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/t07-returns.biz.real-pg.spec.ts:55:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        26.77 s, estimated 33 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-07 exit 1
+
+=== T-08: src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts (37.053 s)
+  T-08 — concurrent applications of one payment never exceed its unapplied amount
+    × 300 + 300 against 500 unapplied (347 ms)
+
+  ● T-08 — concurrent applications of one payment never exceed its unapplied amount › 300 + 300 against 500 unapplied
+
+    STOP: daii_test_biz_t08_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t08-payment-apply.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        37.278 s
+Ran all test suites matching /src\\foundation\\testing\\t08-payment-apply.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-08 exit 1
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (22.043 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    × E1–E14 (183 ms)
+
+  ● T-09 — POST /api/inventory/movements: frozen contract (F-INV-001) › E1–E14
+
+    STOP: daii_test_biz_t09_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts:46:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        22.159 s, estimated 38 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-09 exit 1
+
+=== T-11: src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts (22.202 s)
+  T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect
+    × issue -> rejected event -> restore configuration -> re-drive (x3) (213 ms)
+
+  ● T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect › issue -> rejected event -> restore configuration -> re-drive (x3)
+
+    STOP: daii_test_biz_t11_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpInventoryGl (foundation/testing/biz-inventory-gl-support.ts:43:16)
+      at Object.<anonymous> (foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts:25:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        22.37 s, estimated 55 s
+Ran all test suites matching /src\\foundation\\testing\\t11-failure-recovery.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-11 exit 1
+
+=== T-12: src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts (22.939 s)
+  T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once
+    × kill the posting backend while it waits inside its transaction (302 ms)
+
+  ● T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once › kill the posting backend while it waits inside its transaction
+
+    STOP: daii_test_biz_t12_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/t12-connection-loss.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        23.088 s, estimated 49 s
+Ran all test suites matching /src\\foundation\\testing\\t12-connection-loss.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-12 exit 1
+
+=== T-10: src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts (11.897 s)
+  T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run
+    × every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained (7 ms)
+
+  ● T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run › every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained
+
+    ENOENT: no such file or directory, open 'D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\.verify-snapshot\23e5ec1\backend\docs\decisions\evidence-2026-10-10-biz\T-01\T-01-20261010T231045Z-4ca40b\run-header.json'
+
+    [0m [90m 33 |[39m       [36mconst[39m dir [33m=[39m runs[33m.[39mlength [33m?[39m join(base[33m,[39m runs[runs[33m.[39mlength [33m-[39m [35m1[39m]) [33m:[39m [36mnull[39m[33m;[39m
+     [90m 34 |[39m       [36mif[39m ([33m![39mdir) { latest[id] [33m=[39m [36mnull[39m[33m;[39m [36mif[39m ([33mFROZEN_RUNS[39m[33m.[39mincludes(id)) problems[33m.[39mpush([32m`${id}: no evidence run found`[39m)[33m;[39m [36melse[39m informational[33m.[39mpush([32m`${id}: no evidence run found`[39m)[33m;[39m [36mcontinue[39m[33m;[39m }
+    [31m[1m>[22m[39m[90m 35 |[39m       [36mconst[39m header [33m=[39m [33mJSON[39m[33m.[39mparse(readFileSync(join(dir[33m,[39m [32m'run-header.json'[39m)[33m,[39m [32m'utf8'[39m))[33m;[39m
+     [90m    |[39m                                             [31m[1m^[22m[39m
+     [90m 36 |[39m       [36mconst[39m reconFile [33m=[39m join(dir[33m,[39m [32m'reconciliation-R1-R10.json'[39m)[33m;[39m
+     [90m 37 |[39m       [36mconst[39m recon [33m=[39m existsSync(reconFile) [33m?[39m [33mJSON[39m[33m.[39mparse(readFileSync(reconFile[33m,[39m [32m'utf8'[39m)) [33m:[39m [36mnull[39m[33m;[39m
+     [90m 38 |[39m       [36mconst[39m result [33m=[39m existsSync(join(dir[33m,[39m [32m'result.json'[39m)) [33m?[39m [33mJSON[39m[33m.[39mparse(readFileSync(join(dir[33m,[39m [32m'result.json'[39m)[33m,[39m [32m'utf8'[39m)) [33m:[39m [36mnull[39m[33m;[39m[0m
+
+      at Object.<anonymous> (foundation/testing/t10-reconciliation.biz.real-pg.spec.ts:35:45)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        12.005 s, estimated 54 s
+Ran all test suites matching /src\\foundation\\testing\\t10-reconciliation.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-10 exit 1
+
+=== F-AUD-002: src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts (17.279 s)
+  F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager
+    × records the observed behaviour of both calling styles (298 ms)
+
+  ● F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager › records the observed behaviour of both calling styles
+
+    STOP: daii_test_biz_t13_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts:24:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        17.383 s, estimated 59 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-reproducer.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): F-AUD-002 exit 1
+
+=== F-TRS-001: src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts (14.968 s)
+  F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager
+    × records overdraft occurrences for both calling styles (191 ms)
+
+  ● F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager › records overdraft occurrences for both calling styles
+
+    STOP: daii_test_biz_t14_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts:25:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        15.076 s, estimated 38 s
+Ran all test suites matching /src\\foundation\\testing\\f-trs-reproducer.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): F-TRS-001 exit 1
+
+=== T-15: src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts (13.16 s)
+  T-15 — local capacity baseline with correctness invariants under rising concurrency
+    × 1/5/10/25/50 in-flight operations on four write paths (157 ms)
+
+  ● T-15 — local capacity baseline with correctness invariants under rising concurrency › 1/5/10/25/50 in-flight operations on four write paths
+
+    STOP: daii_test_biz_t15_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts:50:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        13.24 s, estimated 30 s
+Ran all test suites matching /src\\foundation\\testing\\t15-capacity-baseline.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-15 exit 1
+
+=== T-16: src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts
+FAIL src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts (21.733 s)
+  T-16 — HTTP capacity benchmark (measurements + integrity oracle)
+    × ramp, hot-spot, sustained, peak, recovery over HTTP (210 ms)
+
+  ● T-16 — HTTP capacity benchmark (measurements + integrity oracle) › ramp, hot-spot, sustained, peak, recovery over HTTP
+
+    STOP: daii_test_biz_t16_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/t16-capacity-http.biz.real-pg.spec.ts:68:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        21.822 s, estimated 33 s
+Ran all test suites matching /src\\foundation\\testing\\t16-capacity-http.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-16 exit 1
+
+=== T-17: src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts
+FAIL src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts (27.644 s)
+  Plain-manager probes — numbering and process-engine
+    × records the behaviour of both primitives under concurrency (182 ms)
+
+  ● Plain-manager probes — numbering and process-engine › records the behaviour of both primitives under concurrency
+
+    STOP: daii_test_biz_t17_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at setUpFinance (foundation/testing/biz-finance-support.ts:45:16)
+      at Object.<anonymous> (foundation/testing/f-plain-probes.biz.real-pg.spec.ts:31:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        27.775 s, estimated 29 s
+Ran all test suites matching /src\\foundation\\testing\\f-plain-probes.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-17 exit 1
+
+=== T-18: src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts
+FAIL src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts (22.489 s)
+  TEST-03 — entity metadata vs migrated Company schema
+    × reports drift in both directions (282 ms)
+
+  ● TEST-03 — entity metadata vs migrated Company schema › reports drift in both directions
+
+    STOP: daii_test_biz_t18_control_plane already exists (fresh databases only)
+
+    [0m [90m 111 |[39m   [36mconst[39m dbNamesBefore [33m=[39m [36mawait[39m listDatabases()[33m;[39m
+     [90m 112 |[39m   [36mconst[39m databases [33m=[39m [[32m'control_plane'[39m[33m,[39m [32m'company_a'[39m[33m,[39m [32m'company_b'[39m][33m.[39mmap((s) [33m=>[39m [32m`daii_test_${prefix}_${s}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 113 |[39m   [36mfor[39m ([36mconst[39m n [36mof[39m databases) [36mif[39m (dbNamesBefore[33m.[39msome((d) [33m=>[39m d[33m.[39mdatname [33m===[39m n)) [36mthrow[39m [36mnew[39m [33mError[39m([32m`STOP: ${n} already exists (fresh databases only)`[39m)[33m;[39m
+     [90m     |[39m                                                                                    [31m[1m^[22m[39m
+     [90m 114 |[39m
+     [90m 115 |[39m   [36mconst[39m h [33m=[39m [36mawait[39m setUpTwoCompanyHarness({ namePrefix[33m:[39m prefix[33m,[39m extraCompanyTags[33m:[39m opts[33m.[39mtags [33m?[39m[33m?[39m [33mCOMPANY_TAGS[39m[33m,[39m [33m...[39m(opts[33m.[39mroleModuleCodes [33m?[39m { roleModuleCodes[33m:[39m opts[33m.[39mroleModuleCodes } [33m:[39m {}) })[33m;[39m
+     [90m 116 |[39m   [36mconst[39m dsA [33m=[39m [36mawait[39m h[33m.[39mconnections[33m.[39mgetDataSource(h[33m.[39mcompanyAId)[33m;[39m[0m
+
+      at setUpBiz (foundation/testing/biz-support.ts:113:84)
+      at Object.<anonymous> (foundation/testing/test03-schema-drift.biz.real-pg.spec.ts:23:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        22.592 s, estimated 29 s
+Ran all test suites matching /src\\foundation\\testing\\test03-schema-drift.biz.real-pg.spec.ts/i.
+
+FAILED (continuing, flag --continue-after-failure): T-18 exit 1
+
+17 step(s) failed.
+EXIT 1
