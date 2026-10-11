@@ -1,9 +1,14 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { Controller, Get, Param, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { JwtAuthGuard, AuthenticatedRequest } from '../authentication/jwt-auth.guard';
+import { RolesGuard } from '../authorization/roles.guard';
+import { RequireRole } from '../authorization/require-role.decorator';
 import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
 import { AuditService } from './audit.service';
 import { AuditRecord } from './audit-record.entity';
+import { runOperationalAdmitted } from '../company/company-lifecycle-admission';
+import { CompanyNotReadyException } from '../company/company-operational-status';
 
 /**
  * Area 14 (2026-09-25, CTO Implementation Gate). The SEPARATE
@@ -21,31 +26,39 @@ export class InstallationAuditController {
   constructor(
     private readonly connections: CompanyConnectionManagerService,
     private readonly audit: AuditService,
+    private readonly platform: DataSource,
   ) {}
 
   @RequirePlatform('platform.audit.view')
   @Get()
   async list(@Req() req: AuthenticatedRequest, @Param('companyId') companyId: string, @Query('action') action?: string, @Query('take') take?: string) {
     if (!req.user) throw new UnauthorizedException();
-    const dataSource = await this.connections.getDataSource(companyId);
+    const userId = req.user.id;
 
-    const where = action ? { action } : {};
-    const records = await dataSource.getRepository(AuditRecord).find({ where, order: { seq: 'DESC' }, take: take ? Number(take) : 100 });
+    // LA-1 Layer 2 (DP-9 O-3): reading a Company's database is Company operational access — a platform
+    // admin gets NO implicit override. Admission joins the READY check with the DataSource use; a
+    // non-READY Company yields the same 409 COMPANY_NOT_READY as Layer 1 and nothing is opened.
+    const admission = await runOperationalAdmitted(this.platform, this.connections, companyId, async (dataSource) => {
+      const where = action ? { action } : {};
+      const records = await dataSource.getRepository(AuditRecord).find({ where, order: { seq: 'DESC' }, take: take ? Number(take) : 100 });
 
-    await this.audit.record(
-      {
-        actorUserId: req.user.id,
-        organizationId: null,
-        action: 'company.audit.accessed',
-        resource: 'audit_record',
-        resourceId: null,
-        result: 'success',
-        correlationId: null,
-        after: { filter: { action: action ?? null }, count: records.length, accessedByInstallationAdmin: true },
-      },
-      dataSource.manager,
-    );
+      await this.audit.record(
+        {
+          actorUserId: userId,
+          organizationId: null,
+          action: 'company.audit.accessed',
+          resource: 'audit_record',
+          resourceId: null,
+          result: 'success',
+          correlationId: null,
+          after: { filter: { action: action ?? null }, count: records.length, accessedByInstallationAdmin: true },
+        },
+        dataSource.manager,
+      );
+      return records;
+    });
+    if (!admission.admitted) throw new CompanyNotReadyException();
 
-    return { success: true, data: records };
+    return { success: true, data: admission.value };
   }
 }

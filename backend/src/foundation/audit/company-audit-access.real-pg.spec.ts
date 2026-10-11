@@ -159,8 +159,23 @@ describe('Area 14 — CompanyAuditController / InstallationAuditController, real
     expect(after.length).toBe(before.length + 1); // exactly one access event, not zero, not more
   });
 
+  it('LA-1 Layer 2 (DP-9 O-3): InstallationAuditController gives a platform admin NO override — a non-READY Company is refused with 409 COMPANY_NOT_READY and no access event is written', async () => {
+    const controller = new InstallationAuditController(connections, audit, controlPlane);
+    const req = { user: { id: adminUserId } } as unknown as AuthenticatedRequest;
+    const dataSource = await connections.getDataSource(companyId);
+    const before = await dataSource.getRepository(AuditRecord).count({ where: { action: 'company.audit.accessed' } });
+
+    await controlPlane.query(`UPDATE "companies" SET "status" = 'SUSPENDED' WHERE "id" = $1`, [companyId]);
+    try {
+      await expect(controller.list(req, companyId)).rejects.toMatchObject({ status: 409 });
+      expect(await dataSource.getRepository(AuditRecord).count({ where: { action: 'company.audit.accessed' } })).toBe(before);
+    } finally {
+      await controlPlane.query(`UPDATE "companies" SET "status" = 'READY' WHERE "id" = $1`, [companyId]);
+    }
+  });
+
   it('item 6: InstallationAuditController reaches the named Company via its own route param, independent of self-service', async () => {
-    const controller = new InstallationAuditController(connections, audit);
+    const controller = new InstallationAuditController(connections, audit, controlPlane);
     const req = { user: { id: adminUserId } } as unknown as AuthenticatedRequest;
 
     const dataSource = await connections.getDataSource(companyId);

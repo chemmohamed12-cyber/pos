@@ -1,7 +1,7 @@
 # Final Closure Package — Control Plane / Architecture Baseline
 
 **Date:** 2026-10-05 · Lane A, documentation only.
-**CTO status:** **ARCHITECTURE BASELINE — ISSUED.** **WP-0.4 — CLOSED / VERIFIED (CTO ruling 2026-10-06).** WP-1.1 / WP-1.2: REVIEWED / SIGNED-OFF (CTO Executive Order 2026-10-06). **WP-4.1 CLOSED — VERIFIED** (DP-9 Layer 1; `WP-4.1-DP9-LAYER1-IMPLEMENTATION-RECORD.md`). Next: LA-1 Layer 2. Other implementation: HOLD. Production: HOLD.
+**CTO status:** **ARCHITECTURE BASELINE — ISSUED.** **WP-0.4 — CLOSED / VERIFIED (CTO ruling 2026-10-06).** WP-1.1 / WP-1.2: REVIEWED / SIGNED-OFF (CTO Executive Order 2026-10-06). **WP-4.1 CLOSED — VERIFIED** (DP-9 Layer 1; `WP-4.1-DP9-LAYER1-IMPLEMENTATION-RECORD.md`). **LA-1 Layer 2: PARTIAL** — mechanism verified, 3 of 10 sites wired, 7 blocked by foreign-file conflicts (`LA-1-LAYER2-SPECIFICATION-AND-IMPLEMENTATION-RECORD.md`); DP-4…DP-7 not started. Other implementation: HOLD. Production: HOLD.
 *(This file was deleted at the CTO's request in an earlier turn and recreated here because the Phase Closure order requires it; it is the Final Closure Package of record.)*
 
 ## 1. Pinned baseline (taken as-is; not edited in this pass)
@@ -53,6 +53,7 @@ WP-0.4: CLOSED / VERIFIED (CTO ruling 2026-10-06)
 Stable Execution Source: EB-WP04-20261005-155534 (pin hash ab186f9f…e001b)
 WP-1.1 / WP-1.2: REVIEWED / SIGNED-OFF (documentation gate; contents unchanged, pinned hashes unchanged)
 WP-4.1: CLOSED / VERIFIED (Real-PG PASS, Isolation PASS, Regression PASS) 2026-10-06
+LA-1: PARTIAL — mechanism VERIFIED, 7 of 10 sites blocked by foreign files; awaiting CTO decision
 Implementation Authorization: CTO Executive Order 2026-10-06 chain — LA-1 Layer 2 → DP-4 → DP-5 → DP-6 → DP-7, each only after the previous closes with proof
 Foreign Work: NEEDS RE-PROOF / UNRATIFIED
 Production: HOLD

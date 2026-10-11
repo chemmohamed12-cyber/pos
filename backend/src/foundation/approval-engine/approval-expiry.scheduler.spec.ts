@@ -2,20 +2,35 @@ import { ApprovalExpiryScheduler } from './approval-expiry.scheduler';
 import { ApprovalEngineService } from './approval-engine.service';
 import { ConfigurationEngineService } from '../configuration-engine/configuration-engine.service';
 import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
+import { DataSource } from 'typeorm';
 
 describe('ApprovalExpiryScheduler.runOnce — Multi-Company Area 9 (per-Company sweep, not ambient)', () => {
   let scheduler: ApprovalExpiryScheduler;
   const engineMock = { expire: jest.fn() };
   const configMock = { get: jest.fn() };
   const connectionsMock = { listActiveCompanyIds: jest.fn(), getDataSource: jest.fn() };
+  const platformStatus: Record<string, string> = {};
+  const platformMock = {
+    createQueryRunner: () => ({
+      isTransactionActive: true,
+      connect: async () => undefined,
+      startTransaction: async () => undefined,
+      query: async (_sql: string, params: [string]) => [{ status: platformStatus[params[0]] ?? 'READY' }],
+      commitTransaction: async () => undefined,
+      rollbackTransaction: async () => undefined,
+      release: async () => undefined,
+    }),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    for (const k of Object.keys(platformStatus)) delete platformStatus[k];
     configMock.get.mockReturnValue(true); // expire_sweep_enabled
     scheduler = new ApprovalExpiryScheduler(
       engineMock as unknown as ApprovalEngineService,
       configMock as unknown as ConfigurationEngineService,
       connectionsMock as unknown as CompanyConnectionManagerService,
+      platformMock as unknown as DataSource,
     );
   });
 
@@ -57,5 +72,19 @@ describe('ApprovalExpiryScheduler.runOnce — Multi-Company Area 9 (per-Company 
     await scheduler.runOnce();
 
     expect(engineMock.expire).toHaveBeenCalledTimes(1);
+  });
+
+  it('LA-1 Layer 2: a Company that is not READY at execution time is skipped — expire() is never called for it and its DataSource is never requested — while the other Company still runs', async () => {
+    connectionsMock.listActiveCompanyIds.mockResolvedValue(['company-1', 'company-2']);
+    platformStatus['company-1'] = 'DECOMMISSIONED';
+    const dsB = { name: 'ds-b' };
+    connectionsMock.getDataSource.mockImplementation(async (id: string) => (id === 'company-2' ? dsB : { name: 'must-not-be-used' }));
+    engineMock.expire.mockResolvedValue({ expired: 0 });
+
+    await scheduler.runOnce();
+
+    expect(connectionsMock.getDataSource).not.toHaveBeenCalledWith('company-1');
+    expect(engineMock.expire).toHaveBeenCalledTimes(1);
+    expect(engineMock.expire).toHaveBeenCalledWith(dsB);
   });
 });
