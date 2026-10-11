@@ -10,6 +10,17 @@ import { SupplierService } from '../../domains/procurement/application/supplier.
 import { PriceListsService } from '../../domains/commerce/application/price-lists.service';
 import { ProductsService } from '../../domains/commerce/application/products.service';
 import { SalesService } from '../../domains/sales/application/sales.service';
+import { Test } from '@nestjs/testing';
+import { ValidationPipe } from '@nestjs/common';
+import { CustomersController } from '../../domains/crm/interface/customers.controller';
+import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
+import { CompanyContextGuard } from '../company/company-context.guard';
+import { AllExceptionsFilter } from '../error-contract/all-exceptions.filter';
+import { ExcelService } from '../excel/excel.service';
+import { PermissionService } from '../permission/permission.service';
+import { RolePermission } from '../permission/role-permission.entity';
+import { AuthorizationContextService } from '../authorization/authorization-context.service';
+import { AccessScopeService } from '../scope/access-scope.service';
 
 /**
  * T-19 — N-01 PER-ENDPOINT CONCURRENCY (regression test for the numbering/process-engine remediation; informational, outside the frozen T-xx set).
@@ -88,6 +99,65 @@ describe('T-19 — concurrent creates through the numbering-based endpoints (pla
         const dd = (await e.dsA.query(`SELECT count(*)::int AS n, count(DISTINCT ${c.codeColumn})::int AS d FROM ${c.table} WHERE ${c.codeColumn} IS NOT NULL`))[0] as { n: number; d: number };
         result(e, `T-19-${c.name}-codes-distinct`, dd.n === dd.d ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(dd));
       }
+      // ---- HTTP level: POST /api/customers through the REAL CustomersController, guards, ValidationPipe and AllExceptionsFilter (auth and Company context are doubles) ----
+      {
+        const moduleRef = await Test.createTestingModule({
+          controllers: [CustomersController],
+          providers: [
+            { provide: CustomersService, useValue: customers },
+            { provide: ExcelService, useValue: {} },
+            // the controller's route-level PermissionGuard (other routes) is resolved at module compile time: same real services as T-09/T-16
+            { provide: PermissionService, useValue: new PermissionService(e.h.controlPlane.getRepository(RolePermission), authz) },
+            { provide: AuthorizationContextService, useValue: new AuthorizationContextService(e.h.controlPlane) },
+            { provide: AccessScopeService, useValue: new AccessScopeService(e.h.controlPlane, authz, new AuthorizationContextService(e.h.controlPlane)) },
+          ],
+        })
+          .overrideGuard(JwtAuthGuard).useValue({ canActivate: (ctx: any) => { ctx.switchToHttp().getRequest().user = { id: e.actor, email: 'n01@test.local' }; return true; } })
+          .overrideGuard(CompanyContextGuard).useValue({ canActivate: (ctx: any) => { ctx.switchToHttp().getRequest().companyContext = { companyId: e.h.companyAId, dataSource: wide }; return true; } })
+          .compile();
+        const app = moduleRef.createNestApplication();
+        app.setGlobalPrefix('api');
+        app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+        app.useGlobalFilters(new AllExceptionsFilter());
+        await app.init();
+        await app.listen(0, '127.0.0.1');
+        try {
+          const base = `http://127.0.0.1:${(app.getHttpServer().address() as { port: number }).port}/api`;
+          const statuses: Record<string, number> = {}; const codes = new Set<string>(); let total = 0;
+          for (let r = 0; r < 8; r += 1) {
+            const res = await Promise.all(Array.from({ length: 15 }, async (_, i) => {
+              const resp = await fetch(`${base}/customers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `http-${r}-${i}` }) });
+              const body = (await resp.json().catch(() => ({}))) as { code?: string };
+              return { status: resp.status, code: body.code };
+            }));
+            for (const x of res) { total += 1; statuses[x.status] = (statuses[x.status] ?? 0) + 1; if (x.code) codes.add(x.code); }
+          }
+          record(e, 'T-19-http-customers.json', { total, statuses, distinctCodes: codes.size });
+          result(e, 'T-19-http-POST-customers', statuses['201'] === total && codes.size === total ? 'PASS' : 'FAIL-DEFECT', JSON.stringify({ total, statuses, distinctCodes: codes.size }));
+        } finally {
+          await app.close();
+        }
+      }
+
+      // ---- N-02 (informational, NOT part of the N-01 remediation): NumberingService.registerDocumentType is a check-then-insert; the FIRST concurrent use of a not-yet-registered
+      // document type (e.g. the first supplier created in a Company) races on the unique document type. Lazy callers: SupplierService.create. Measured, not fixed.
+      const regStats: Record<string, { roundsWithErrors: number; errors: Record<string, number>; rows: number }> = {};
+      for (const style of ['plain', 'transaction'] as const) {
+        let bad = 0; const errs: Record<string, number> = {}; let rows = 0;
+        for (let r = 0; r < 10; r += 1) {
+          const type = `REG_${style}_${r}`.toUpperCase();
+          const settled = await Promise.allSettled(Array.from({ length: 10 }, () => (style === 'plain'
+            ? numbering.registerDocumentType(type, 'RG', false, wide.manager)
+            : wide.manager.transaction((tx) => numbering.registerDocumentType(type, 'RG', false, tx)))));
+          const rejected = settled.filter((s) => s.status === 'rejected') as PromiseRejectedResult[];
+          if (rejected.length) bad += 1;
+          for (const s of rejected) { const k = String((s.reason as { code?: string; name?: string })?.code ?? (s.reason as Error)?.name ?? 'error'); errs[k] = (errs[k] ?? 0) + 1; }
+          rows += Number((await e.dsA.query(`SELECT count(*)::int AS n FROM numbering_sequences WHERE "documentType" = $1`, [type]))[0].n);
+        }
+        regStats[style] = { roundsWithErrors: bad, errors: errs, rows };
+        result(e, `T-19-N02-registerDocumentType-${style}`, bad === 0 && rows === 10 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(regStats[style]));
+      }
+      record(e, 'T-19-N02-register-document-type.json', regStats);
       record(e, 'T-19-summary.json', { rounds, conc, summary });
       await finishBiz(e);
     } catch (err) {
