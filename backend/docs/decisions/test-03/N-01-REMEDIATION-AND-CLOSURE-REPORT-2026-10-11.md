@@ -46,3 +46,25 @@ Other primitives still use the old join-without-check idiom: `inventory.service`
 Limitations: probes use 15–20-way concurrency on a 2-core machine; no multi-instance run; the 23 internal-only sites are covered by reasoning, not by individual tests; N-02 candidates are open.
 
 **N-01 is not closed** until the regression row is PASS and the per-endpoint specs are recorded here.
+
+
+## 6A. Verification-track results (appended 2026-10-11 by the verification session)
+
+Clean `git archive` snapshot of `a6002fa` (= `23e5ec1` N-01 fix + `7097796` N-02 `registerDocumentType` fix + verification-track test commits), `dist` built from the snapshot (tsc 0 errors), evidence headers pinned to `a6002fa` with `dirtyPaths: []`. Evidence: `evidence-clean-snapshot-2026-10-11/a6002fa/`.
+| Check | Result |
+|---|---|
+| Business suite T-00…T-20, single sequential run (`biz-full.log`, exit 0) | all steps PASS: T-00 1, T-01/T-02 18 (T-02d PASS), T-03/T-04 20, T-05 13, T-06 15 + T-06x-INFO FAIL-DEFECT (known legacy-wrapper probe), T-07 13, T-08 13, T-09 36, T-10 PASS (R1–R10, one consistent commit), T-11 15, T-12 14, T-13/T-14 2+2, T-15 13, T-16 13, T-17 6, **T-19 15/15** |
+| T-19 (per-endpoint N-01) | customer / supplier / price-list / sales-rep creates 80/80 each in plain and transaction style with distinct codes; **HTTP `POST /api/customers` 120/120 → 201 with 120 distinct codes**; `registerDocumentType` first-use probe PASS (plain and transaction, 10/10 rounds, 1 row each). Contrast before the fix (`74920fc`): 18/80, 9/80, 8/80, 25/80 |
+| Isolation specs that call `registerDocumentType` (20 of the 24 files that mention it; the other 4 are business-suite T-specs) | **20/20 PASS** (`regression-registerdoc.log`) |
+| Unit suite | **59 suites / 430 tests PASS** |
+| Guard suite | **50/50 PASS** |
+| Not mine and not N-01: T-18 (schema-drift probe, 3 FAIL-DEFECT) and T-20 (parallel track's diagnostic probes: 6 FAIL-DEFECT, 2 PASS, 1 BLOCKED — limit engine, reservation release/fulfil double-dispatch, process start) | recorded, open, not remediated; outside the N-01 authorisation |
+
+Reconciliation of commits and evidence: `docs/decisions/test-program/COMMIT-AND-EVIDENCE-RECONCILIATION-2026-10-11.md`. Per-endpoint spec: `src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts`.
+
+### Remaining unverified exposure (not closed by this evidence)
+- Only the call paths in T-19 (customer, supplier, price list, sales rep), the HTTP customer endpoint and the primitives were exercised concurrently; the other numbering / transition call sites are covered by the primitive fix, not by individual tests.
+- Multi-instance deployment, concurrency above 15-20-way on a 2-core machine and long soak were not run.
+- Open findings outside N-01: T-20 diagnostics (limit engine, reservation release/fulfil double dispatch, process start), T-18 schema drift.
+
+**Verification-track conclusion:** the N-01 acceptance rows for duplicate numbers, legal transition limits, the customer-creation path (service and HTTP level), the business regression, guard, unit and the isolation specs that call the changed primitives are **PASS on a clean snapshot of `a6002fa`**. Closure of N-01 itself is the reviewer decision.

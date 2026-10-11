@@ -32,7 +32,15 @@ Purpose (CTO directive §8): state exactly which commit each piece of evidence b
 | Clean snapshot of `a6002fa` (final) | `evidence-clean-snapshot-2026-10-11/a6002fa/` | `a6002fa` exactly (contains N-01 `23e5ec1` + N-02 `7097796`) | see §4 |
 
 ## 4. Final-commit results (`a6002fa`)
-<<FINAL>>
+Clean `git archive` snapshot of `a6002fa` (= `23e5ec1` N-01 fix + `7097796` N-02 `registerDocumentType` fix + verification-track test commits), `dist` built from the snapshot (tsc 0 errors), evidence headers pinned to `a6002fa` with `dirtyPaths: []`. Evidence: `evidence-clean-snapshot-2026-10-11/a6002fa/`.
+| Check | Result |
+|---|---|
+| Business suite T-00…T-20, single sequential run (`biz-full.log`, exit 0) | all steps PASS: T-00 1, T-01/T-02 18 (T-02d PASS), T-03/T-04 20, T-05 13, T-06 15 + T-06x-INFO FAIL-DEFECT (known legacy-wrapper probe), T-07 13, T-08 13, T-09 36, T-10 PASS (R1–R10, one consistent commit), T-11 15, T-12 14, T-13/T-14 2+2, T-15 13, T-16 13, T-17 6, **T-19 15/15** |
+| T-19 (per-endpoint N-01) | customer / supplier / price-list / sales-rep creates 80/80 each in plain and transaction style with distinct codes; **HTTP `POST /api/customers` 120/120 → 201 with 120 distinct codes**; `registerDocumentType` first-use probe PASS (plain and transaction, 10/10 rounds, 1 row each). Contrast before the fix (`74920fc`): 18/80, 9/80, 8/80, 25/80 |
+| Isolation specs that call `registerDocumentType` (20 of the 24 files that mention it; the other 4 are business-suite T-specs) | **20/20 PASS** (`regression-registerdoc.log`) |
+| Unit suite | **59 suites / 430 tests PASS** |
+| Guard suite | **50/50 PASS** |
+| Not mine and not N-01: T-18 (schema-drift probe, 3 FAIL-DEFECT) and T-20 (parallel track's diagnostic probes: 6 FAIL-DEFECT, 2 PASS, 1 BLOCKED — limit engine, reservation release/fulfil double-dispatch, process start) | recorded, open, not remediated; outside the N-01 authorisation |
 
 ## 5. Uncommitted changes present in the shared working tree during the working-tree runs (excluded from the clean-snapshot claims)
 `preliminary-hold-expiry.scheduler.ts` + `.spec.ts`, `approval-expiry.scheduler.ts` + `.spec.ts`, `installation-audit.controller.ts`, `company-audit-access.real-pg.spec.ts` (other tracks, uncommitted), `company-lifecycle-admission.ts` + `.real-pg.spec.ts` and the LA-1 specification (LA-1), `FINAL-CLOSURE-PACKAGE.md`. None is imported by the business-suite specs (`src/foundation/testing/*` has no import of them) and the two scheduler specs are not in the unit-mode list, so the working-tree results are not expected to differ; the clean snapshots remove the question. These files were not staged or modified by the verification track.
