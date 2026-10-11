@@ -1,5 +1,7 @@
 # DAII — Product Capability Matrix (Team 3 Independent Product Audit) — 2026-10-11
 
+> **Addendum notice (WP-DOC-02, 2026-10-11).** This document was committed in `2c6ccf3`; its original text is **unchanged**. Evidence that arrived after the audit cutoff `b591d1f`, and the separate finding PA-43, are recorded in the final section titled "Addendum". Where the original and the addendum differ, both are kept: the original describes the state at the cutoff, the addendum the state at `49cc7d5`.
+
 Deliverable 2 of 6. Finding IDs (`PA-xx`) are defined in `DAII-PRODUCT-RISK-AND-TECHNICAL-DEBT-REGISTER-2026-10-11.md`. Independent and read-only: no product code, schema, UI, permission or configuration changed; no database-backed test run by Team 3.
 
 **Baseline.** Audit cutoff 2026-10-11, source read at HEAD `b591d1f`. Evidence baseline `a6002fa` (last complete clean-snapshot verification). Product source differs between the two only in the N-02 `fulfillReservation` fix (`a798d9d`, `b591d1f`) and LA-1 Layer 2 admission (`60b9bdf`) with their specs; rows touched by that delta say so, and the delta has no complete clean-snapshot verification (PA-42).
@@ -159,3 +161,18 @@ The counts describe the state of evidence, not the quality of the code. If a cou
 2. **The strongest evidence is on money and stock primitives; the weakest is on seams between domains, payroll-to-ledger agreement and the UI.**
 3. **Specified, not implemented ≠ defect.** Several rows are charter or ADR items awaiting their phase; others (H-16, H-15) are *specified and implemented differently*, which the register treats as defects.
 4. **Use.** If adopted as the living Capability Coverage Matrix that ADR-053 requires (PA-27), update it after each phase gate with commit-tagged evidence and add the charter's fields (dependencies, accounting impact, inventory impact, integration requirements, acceptance criteria, target phase) — they are supplied in the register's closure criteria and the roadmap input.
+
+## 8. Addendum — row updates after the audit cutoff (WP-DOC-02, 2026-10-11)
+
+Rows 1–7 above are preserved unchanged. Reference commit: `49cc7d5cb639cd492823a803019758fd2abe216e`. Updated evidence is on clean snapshots `71e5f5e` / `f881e53` (see the reconciliation note §7). Classes below are the two-axis classes of §0.
+
+| Row | Original (cutoff `b591d1f`) | Update | Class change |
+|---|---|---|---|
+| F-02 provisioning, pool, fan-out, restore | Partly — 19 real-PG specs NOT RUN, 1 BLOCKED | Of the 100-spec isolation population, 91 files ran on a clean snapshot of `71e5f5e` (89 executed PASS, 1 skipped opt-in suite, 1 BLOCKED failure of its own safety assertion); 9 are BLOCKED in total (the registry spec, which ran and failed its own safety assertion and is one of the 91, plus 5 helper-pinned and 3 role-creating specs that were not executed) and 1 held spec is NOT RUN. Six adaptation diffs remain pending line-by-line review | none (Partly) |
+| F-05 audit trail and hash chain | Partly — rollback defect (PA-33) | Fix `c764fc5` verified on clean snapshots (T-22, T-23 7/7); scope review conforms; independent review pending; PA-33 OPEN. New risk PA-43 (UUID repair rewrites hashed audit columns; code review only) | none (Partly) |
+| F-14 release engine | Partly | PA-43 concerns the Release Center's Controlled Data Repair path; the repair is not run | none |
+| F-20 lifecycle admission (LA-1 L2) | Partial; Partly (proof copy; no clean snapshot) | Admission spec PASS on clean snapshot `71e5f5e`; scheduler specs and the protected `company-audit-access` spec not run; 7 sites unwired; lint errors in LA-1 files | none (Partial / Partly) |
+| I-02 reservation lifecycle | Partly — fulfil fix working-tree only; release/limit races open | H3 and order-level fulfilment verified on clean snapshots; H1, H2, H4 fixed in `5c5b791` and verified on clean snapshots; independent review not accepted; H5 BLOCKED; siblings NOT RUN | none (Partly) |
+| Q-02 CI | Partly — lint 0 errors on earlier commits | CI script at `f881e53`: lint FAIL (3 errors in LA-1 files, plus 5 warnings); CI NOT GREEN | none |
+| Q-09 delta after `a6002fa` | Partly — implementing-track tests only | clean-snapshot evidence now exists for the N-02 / PA-33 code | none (Partly) |
+**Counts are unchanged:** 88 rows (Implemented 60, Partial 7, Specified-not-implemented 12, Not implemented 9; Verified 5, Partly 53, Unverified 6, Blocked 1, Not assessed 23). No row changed class because no independent review is accepted yet.

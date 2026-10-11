@@ -1,5 +1,7 @@
 # DAII — Quality Scorecard (Team 3 Independent Product Audit) — 2026-10-11
 
+> **Addendum notice (WP-DOC-02, 2026-10-11).** This document was committed in `2c6ccf3`; its original text is **unchanged**. Evidence that arrived after the audit cutoff `b591d1f`, and the separate finding PA-43, are recorded in the final section titled "Addendum". Where the original and the addendum differ, both are kept: the original describes the state at the cutoff, the addendum the state at `49cc7d5`.
+
 Deliverable 5 of 6. **No numeric rating is given.** The 9.5/10 ambition is a target, not a claim about current quality, and no agreed scoring method exists in the repository; the directive forbids a numeric rating without one and requires NOT ASSESSED where data is insufficient. This scorecard therefore reports an **evidence-maturity level per dimension**, with its basis, its limiting factor and its unverified areas, and proposes a method for the CTO to agree (§7). The overall figure is **NOT COMPUTED**.
 
 **Baseline.** Audit cutoff 2026-10-11, HEAD `b591d1f`; evidence baseline `a6002fa` (last complete clean-snapshot verification). The N-02 fix and LA-1 Layer 2 made after `a6002fa` have no complete clean-snapshot verification (PA-42). Findings `PA-xx`: register; capability rows: matrix. Independent and read-only; no test was run by Team 3.
@@ -104,3 +106,16 @@ Hosting and production behaviour; capacity against targets; product-level backup
 ## 8. Consistency check (internal)
 
 Dimension findings cited exist in the register (42); counts match the matrix (88 rows) and the register (42 findings); the commit used for each evidence line is the one stated in the reconciliation record or finding; N-01 appears as closure recorded by its owner for the local scope with sign-off pending (row 7), not declared by Team 3; N-02 as not closed (row 8); no numeric overall figure appears in any of the six deliverables.
+
+## 9. Addendum — dimension updates after the audit cutoff (WP-DOC-02, 2026-10-11)
+
+Sections 1–8 are preserved unchanged. Reference commit: `49cc7d5cb639cd492823a803019758fd2abe216e`. **No numeric score is issued; the rating method remains PROPOSED — NOT APPROVED.**
+
+| # | Dimension | Level at cutoff | Update | Level now | Why |
+|---|---|---|---|---|---|
+| 4 | Audit-trail integrity | L2 | Fix `c764fc5` verified on clean snapshots (T-22/T-23); scope review conforms; no independent review accepted; **PA-43** opened (UUID repair path rewrites hashed audit columns; code review only) | **L2** | an open High finding (PA-33) and an open provisional Medium–High finding (PA-43) cap the dimension |
+| 8 | Concurrency — reservation, limits, shipments | L2 | H3, H1, H2, H4 and the order-level deadlock case verified on clean snapshots; independent review not accepted; H5 BLOCKED; siblings NOT RUN | **L2** | open candidate defects and no accepted independent review |
+| 5 | Multi-company data isolation | L3 | 91 isolation files now ran on one clean snapshot (89 executed PASS, 1 skipped, 1 known-BLOCKED failure); 9 specs BLOCKED, 1 held | **L3** (scope unchanged: tested scenarios only) | provisioning/pool/role specs still not executed |
+| 21 | CI and reproducibility | L2 | CI script at `f881e53`: lint FAIL (3 errors, LA-1 files) → **CI NOT GREEN**; never run on a hosted runner | **L2** | lint red |
+| 12 | Test effectiveness | L2 | Probes added by the program now exist as specs T-21…T-24; sibling probes and H5 fixture specified, not yet executed | **L2** | unprobed siblings, H5 BLOCKED |
+Other dimensions: unchanged. Evidence of different classes and commits is never summed.

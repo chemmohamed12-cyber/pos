@@ -71,3 +71,50 @@ Consequences: by inferred timestamps, the runs behind Figure A's 76 harness-base
 3. Do not describe the working tree as fully verified on the strength of the `a6002fa` clean snapshot.
 4. The later update must preserve both historical figures (80/1/19 and 90/9/1) and label every claim as *clean-snapshot verified*, *working-tree tested*, *blocked* or *unrun*; it must carry the provenance label (inferred versus stated) and the pending-review status of the six adaptation diffs until that review is done.
 5. This note changes no source, test, guard or configuration, and does not update PA-22, the matrix F-02 row or the scorecard.
+
+## 7. Update of 2026-10-11 (WP-DOC-02) — sections 1–6 above remain the historical record and are not rewritten
+
+Reference documentation commit at the time of writing: `49cc7d5cb639cd492823a803019758fd2abe216e`. Sources added since the note: the verification track's consolidated status and final report (`f881e53`, `f37a87f`, `ba8b5b9`), the clean-snapshot pipeline of `71e5f5e` (clean `git archive`; 23 of 23 business run headers carry `71e5f5e…`, `dirtyPaths: []`, `sourceKind: clean-git-archive-snapshot`; folder `evidence-clean-snapshot-2026-10-11/71e5f5e-final/`), and the reviewer's database re-run at `f881e53` (reviewer's re-run; 6 of 6 run headers carry `f881e53…`, `dirtyPaths: []`, clean snapshot; code identical to `71e5f5e` — `git diff --stat 71e5f5e f881e53 -- src tools` is empty per the verification report; folder `…/71e5f5e-reviewer-rerun/`, despite its name).
+
+### 7.1 Provenance verification performed by Team 3 (read-only; nothing was re-run)
+| Check | Result |
+|---|---|
+| `SOURCE_COMMIT.txt` of each folder | `71e5f5ecbff0fd4a51b0f862d722950e22006a91` and `f881e53aecf9461edd1d9e583224b315fd6450f2` |
+| Run headers of the business steps (read from the JSON headers) | 71e5f5e-final: **23 of 23** headers: commit `71e5f5e`, `dirtyPaths: []`, `sourceKind: clean-git-archive-snapshot`. Reviewer re-run: **6 of 6**: commit `f881e53`, `dirtyPaths: []`, clean snapshot |
+| Code identity of the two trees | Stated by the verification report (`git diff --stat 71e5f5e f881e53 -- src tools` empty); not recomputed by Team 3 |
+| Isolation-spec run (`regression-all.log`, 91 files) | Attributed by the folder's `SOURCE_COMMIT.txt` and `regression-specs-all.txt`; **the log itself carries no commit header** (the same limitation as the earlier regression logs), so its attribution is by folder, not by a header |
+| Case results | Counted by Team 3 from the result files, not from the narrative |
+
+### 7.2 Isolation population — three historical states, kept side by side
+| State | Source | Executed PASS | SKIPPED | BLOCKED | NOT RUN | Clean-snapshot coverage |
+|---|---|---|---|---|---|---|
+| A (original) | committed verification report (`74920fc`) | 80 | — | 1 | 19 | 20 specs on `a6002fa`; the rest working-tree |
+| B (newer) | verification status record (`a33f769`) | "90 PASS" | included in the 90 | 9 | 1 | not stated per spec |
+| B corrected | `520f2e0` (runner's "90 PASS" included the opt-in `t0-clean-company-baseline`, which jest reports as skipped) | 89 | 1 | 9 | 1 | — |
+| C (clean-snapshot run) | `71e5f5e-final/regression-all.log`: 91 files run, 90 `RESULT PASS` lines, 1 `RESULT FAIL` | 89 | 1 | 1 (the known `release-migration-registry` spec failing its own port-5544 safety assertion) | — | **all 91 files on one clean snapshot (`71e5f5e`)** |
+Population: 100 specs = the 91 files run in C + 9 not run (5 helper-pinned specs BLOCKED by guard evaluation, 3 role-creating specs BLOCKED, 1 held `company-audit-access.real-pg.spec.ts` NOT RUN). Totals reconcile: executed PASS 89; skipped 1; BLOCKED 9 (1 executed-and-failed + 5 + 3); NOT RUN 1. State A and State B are **not equivalent** (8 specs moved from NOT RUN to BLOCKED by guard evaluation without being executed) and neither replaces the other. "90 PASS" must not be used.
+
+**Supersession, explicitly:** §4 of this note said 20 results were clean-snapshot verified and 70 were working-tree. That was true when written. Run C extends clean-snapshot coverage to all 91 files that can run; it does not change any earlier result and does not make working-tree runs into clean-snapshot ones retroactively. Consequences: the 10 specs that moved NOT RUN→PASS after adaptation have now also run on a clean snapshot; **the six adaptation diffs listed in §5 remain pending line-by-line review (no review record exists)**, and the nine blocked specs and the held spec are unchanged.
+
+### 7.3 `T-03` step: what "20 PASS" is made of
+The harness step named `T-03` executes the combined spec `t03-t04-concurrency`. Its result file holds **20 entries, all PASS**, on both clean snapshots (`71e5f5e` run and `f881e53` reviewer run):
+| Group | Entries | Count |
+|---|---|---|
+| T-03 | `T-03-N10`, `T-03-N25`, `T-03-N50`, `audit-chain-after-T-03` | 4 |
+| T-04 | `T-04-N10`, `T-04-N25`, `audit-chain-after-T-04`, `T-04b`, `invariant-no-negative-stock`, `audit-chain-after-T-04b` | 6 |
+| Reconciliation | `T-10/T-03/R1` … `R10` | 10 |
+So "T-03 = 20 PASS" is the **step total**. T-04 has results inside the same documented run (6 PASS) but **no separate, individual run**; the harness cannot run it alone without a spec change. Whether the combined step satisfies the CTO decision that T-03 and T-04 be re-run individually on a quiet cluster is for the CTO; it is recorded here as: T-03 step 20 PASS on clean snapshots; T-04 PASS within that step only.
+
+### 7.4 Other clean-snapshot results now on record (case level, counted from result files)
+| Step | `71e5f5e` | `f881e53` (reviewer) | Note |
+|---|---|---|---|
+| T-20 | 8 PASS, 1 BLOCKED (H5) | 8 PASS, 1 BLOCKED | H5 not executed |
+| T-21 | 13 PASS | 13 PASS | `fulfillReservation` cases A–J, E2, G, H |
+| T-22 | 2 PASS, 1 FAIL-DEFECT | same | the FAIL-DEFECT is the by-design characterisation that TypeORM ignores an explicit `seq` |
+| T-23 | 7 PASS | 7 PASS | audit seq/hash regression |
+| T-24 | 10 PASS, 1 BLOCKED (H5) | 10 PASS, 1 BLOCKED | limit / release / start |
+| Business suite (23 steps) | exit 0; T-06 keeps the known T-06x legacy-wrapper probe FAIL-DEFECT; T-18 keeps 3 FAIL-DEFECT (schema drift) | — | classification unchanged |
+Unit 59 suites / 430 tests and guard 50/50 PASS (verification report). CI script: **lint FAIL** (3 errors in LA-1 files), everything else PASS: **CI NOT GREEN**.
+
+### 7.5 What this update does not change
+No finding is closed. N-02 OPEN, PA-33 OPEN, PA-43 OPEN, CI NOT GREEN, release NOT APPROVED. The peer reviews are evidence, not an accepted independent review. Evidence from the clean snapshots covers the scenarios run and is not generalised.

@@ -18,6 +18,7 @@ Part C of the planning package. Companions: `DAII-MASTER-EXECUTION-PLAN-2026-10-
 | EV-7 | Commits `a798d9d` and `60b9bdf` were created by the Team 3 session at the user's instruction (provenance disclosure, plan EV-8) | Input to the independence assessment in DEC-08 |
 | EV-8 | Clean-snapshot pipeline of the tree `71e5f5e` published (`f881e53`, `520f2e0`): business T-00…T-24 exit 0, 89 executed-PASS + 1 skipped + 1 known BLOCKED failure of 91 isolation specs, unit 59/430, guard 50/50 | Evidence received for the PA-33 and N-02 code; reviewer still to be named (DEC-08); DEC-01b (guard) and DEC-02 open |
 | EV-9 | CTO decisions of 2026-10-11 (nine items) recorded in the plan EV-10; reviewer independence rule added to DEC-08; sequence-lag guard proposal prepared | DEC-01b, DEC-08 |
+| EV-10 | Documentation reference `49cc7d5`; WP-DOC-02 executed (addenda to the audit documents, PA-43 in the audit register); reviewer re-run at `f881e53` verified (6 of 6 run headers clean) | DEC-08: the T-03 step has 20 PASS on two clean snapshots, T-04 only inside it — the CTO is asked whether the combined step satisfies the "individually" requirement; DEC-25 open |
 
 ## 1. Classification and index
 

@@ -1,5 +1,7 @@
 # DAII — Risk and Technical-Debt Register (Team 3 Independent Product Audit) — 2026-10-11
 
+> **Addendum notice (WP-DOC-02, 2026-10-11).** This document was committed in `2c6ccf3`; its original text is **unchanged**. Evidence that arrived after the audit cutoff `b591d1f`, and the separate finding PA-43, are recorded in the final section titled "Addendum". Where the original and the addendum differ, both are kept: the original describes the state at the cutoff, the addendum the state at `49cc7d5`.
+
 Deliverable 3 of 6. Single source of Finding IDs (`PA-01 … PA-42`) for all six deliverables of directive DAII-TP3-AUDIT-01 and the follow-up request "Final Product Audit Report & Roadmap Inputs". Team 3 is independent and read-only: nothing here is a fix, no product code, schema, UI, permission or configuration was changed, no database-backed test was run by Team 3, and no production or hosting system was accessed.
 
 ## 0. Baseline, cutoff and conventions
@@ -299,3 +301,41 @@ Mandatory fields in every record: observation · evidence source · reproduction
 ## 5. Not assessed (explicit)
 
 Hosting and production behaviour; real customer data; penetration testing; browser-level UI behaviour (Team 3 ran no browser); statutory requirements of any jurisdiction; licensing opinion; frontend code quality beyond counts; dynamic dependency injection beyond static imports; data migration from the client's legacy spreadsheets. No database-backed test was run by Team 3: the isolated cluster is reserved by other sessions, and every runtime result above is taken from an existing report with its commit and class named. Items marked CONFIRMED-BY-READING need a runtime demonstration before they are quoted as observed behaviour.
+
+## 6. Addendum — evidence update after the audit cutoff (WP-DOC-02, 2026-10-11)
+
+Original sections 0–5 are preserved unchanged. Reference commit at the time of writing: `49cc7d5cb639cd492823a803019758fd2abe216e`. Clean-snapshot evidence referred to: `71e5f5e` (clean `git archive`; 23 of 23 business run headers carry `71e5f5e…`, `dirtyPaths: []`, `sourceKind: clean-git-archive-snapshot`; folder `evidence-clean-snapshot-2026-10-11/71e5f5e-final/`) and `f881e53` (reviewer's re-run; 6 of 6 run headers carry `f881e53…`, `dirtyPaths: []`, clean snapshot; code identical to `71e5f5e` — `git diff --stat 71e5f5e f881e53 -- src tools` is empty per the verification report; folder `…/71e5f5e-reviewer-rerun/`, despite its name). Working-tree results are never counted as clean-snapshot evidence; code-reading findings stay labelled as such.
+
+### 6.1 New finding
+
+### PA-43 — UUID Repair May Invalidate Historical Audit Hash Chains (added after the audit cutoff by CTO decision, 2026-10-11)
+| Field | Content |
+|---|---|
+| **Finding ID / domain / severity** | PA-43 · Audit integrity / Release Center data repair · **provisional Medium–High** (consequence conditional on the repair being needed and run; to be re-rated by WP-AUD-09) |
+| **Nature / status** | CONFIRMED-BY-READING for the code fact; INFERRED for the consequence; need UNVERIFIED. **OPEN — CODE-REVIEW FINDING.** Separate from PA-33 (which concerns the `seq` value and the hash at rollback) |
+| **Observation** | `src/database/uuid-repair.core.ts` repairs non-RFC-4122 ids by updating primary keys and then every referencing column. Its `SOFT_REFERENCES` table includes `audit_records.actorUserId` (under `users`, line 116) and `audit_records.organizationId` (under `org_units`, line 187). For each entry the core runs `UPDATE "<table>" SET "<column>" = <new id> WHERE "<column>" = <old id>` (line 461). Both columns are inputs of the audit hash. The core's header says ids inside the JSON columns `before`/`after` are deliberately not rewritten; the two scalar columns are. No hash recomputation, chain check or audit exemption exists in that file |
+| **Evidence source** | Code reading: `uuid-repair.core.ts` lines 38, 95–116, 187, 458–476; `src/foundation/release/data-repair.service.ts` lines 10–11, 212, 220, 280; migration `1755853200000-AddDataRepairRunTable.ts` (permission leaf `system.release.*`, per its comment); `src/foundation/audit/audit-hash.ts`. Nothing was executed |
+| **Reproduction** | Read-only: follow the lines above. A runtime demonstration, if ever approved, only on a disposable database with a seeded non-compliant id referenced by audit rows, comparing `verifyCompanyChain` before and after, under a separate authorization. **The repair must not be run on real or shared data** |
+| **Impact (potential)** | If run on a database whose audit rows reference a repaired id, hashed fields of historical rows change and the chain would verify as broken from the first affected row; historical rows would be altered. An integrity-verification failure of historical evidence, not a loss of business data. **Inferred risk, not an observed incident** |
+| **Proved / inferred / unknown** | Proved: the rewrite list includes the two audit columns, the `UPDATE` is generic over the list, and the hash includes those columns. Inferred: executing the repair would invalidate the chain for affected rows. Unknown: whether any Company needs the repair, whether it has ever run, whether another safeguard in the complete execution path prevents or detects the effect (the post-repair integrity check inspects references; no chain verification was found in the code read) |
+| **Confidence** | VERIFIED (code facts) · INFERRED (consequence) · UNVERIFIED (need, compensating controls) |
+| **Disposition** | Implemented — needs verification (investigation first) |
+| **Closure acceptance criteria** | (1) The whole repair path traced and reviewed; (2) actual need established or excluded per Company by a read-only audit under authorised access; (3) if needed, a chain-preserving policy approved (DEC-25) before any repair is run, with a defined post-repair chain verification; (4) no historical audit row modified, rehashed or normalised by this work |
+| **Constraints** | The repair is not run; no historical audit record is altered, re-hashed or normalised; any future handling needs independent review, explicit authorization and a separate scope |
+| **Dependencies / owner / package** | Authorised read-only access; DEC-25 (DEC-02 related but independent) · Foundation/Release owner, reviewer independent of the code path · WP-AUD-09 |
+
+### 6.2 Status and evidence updates to existing findings (original wording above is kept)
+
+| Finding | Original statement (preserved above) | Update at `49cc7d5` | Evidence and class |
+|---|---|---|---|
+| PA-04 `fulfillReservation` | fixed in code, working-tree class, clean-snapshot pending, N-02 not closed | Fix `a798d9d`; **clean-snapshot evidence** on `71e5f5e` and `f881e53` (T-21 13 PASS, T-20 H3 PASS in both styles, `fulfillReservationsForOrder` sorted-key change in `5c5b791`). Independent review: peer reviews exist (`c804845`, `89a0a2a`, `5104e1e`, `66c63b9`) but the CTO ruled they do not satisfy the independence gate (the reviewer wrote the transaction rule). **Still not accepted; N-02 OPEN** | clean-snapshot (tests) · peer review (limited) |
+| PA-05 limit / release / start | unremediated | H1, H2, H4 fixed in `5c5b791`; T-24 and T-20 PASS on `71e5f5e` and `f881e53` (clean snapshots). H5 shipment transitions still BLOCKED (fixture in progress); sibling methods NOT RUN. **Each finding keeps its own acceptance; none is closed** | clean-snapshot (tests) |
+| PA-33 audit chain after rollback | confirmed by test, working-tree class | Fix `c764fc5` (`audit.service.ts`); T-22/T-23 PASS on `71e5f5e` and `f881e53` (T-23 7/7; T-22's explicit-seq case is a by-design characterisation); Team 3 scope review: the diff conforms to the CTO's authorization (`DAII-PA33-DIFF-SCOPE-REVIEW-2026-10-11.md`); DEC-01 confirmed narrowly. **Independent review and acceptance still pending; PA-33 OPEN**; existing broken chains untouched (DEC-02) | clean-snapshot (tests) · Team 3 scope review (not an independent closure review) |
+| PA-22 isolation coverage and CI | 80 PASS / 1 BLOCKED / 19 NOT RUN; CI never run on a hosted runner | Three states preserved in the reconciliation note §7.2: A 80/1/19; B 90/9/1 (corrected: 89 executed-PASS, 1 skipped, 9 BLOCKED, 1 NOT RUN); C clean-snapshot run of 91 files on `71e5f5e`: 89 executed-PASS, 1 skipped, 1 known-BLOCKED failure. CI script at `f881e53`: install, build, structure, doc links, unit 59/430, guard PASS; **lint FAIL (3 errors, LA-1 files) → CI NOT GREEN** | clean-snapshot (isolation run: attribution by folder) |
+| PA-41 LA-1 Layer 2 | 3 of 10 sites wired; no clean-snapshot result | The admission spec `company-lifecycle-admission.real-pg.spec.ts` is in the 91-file run and passed on `71e5f5e`; the two scheduler specs and the protected `company-audit-access` spec are not in that run. Seven sites still unwired. Lint errors belong to the LA-1 owner (WP-LA1-03) | clean-snapshot (admission spec) |
+| PA-42 delta without clean-snapshot | open | **Resolved for the N-02 / PA-33 code** by the clean snapshots of `71e5f5e` / `f881e53`; open only for the LA-1 pieces not named above | clean-snapshot |
+| PA-21 N-01 | closure recorded for local scope, sign-off pending | no change | — |
+| PA-33 and PA-43 | — | kept separate: PA-43 concerns a different path that rewrites hashed historical fields | — |
+
+### 6.3 Counts
+Findings: 43 (PA-01…PA-43). Severity of the 42 original findings is unchanged by this addendum; PA-43 is provisionally Medium–High. No finding is closed by this addendum.

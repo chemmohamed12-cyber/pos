@@ -1,5 +1,7 @@
 # DAII — Independent Product Audit Report (Team 3) — 2026-10-11
 
+> **Addendum notice (WP-DOC-02, 2026-10-11).** This document was committed in `2c6ccf3`; its original text is **unchanged**. Evidence that arrived after the audit cutoff `b591d1f`, and the separate finding PA-43, are recorded in the final section titled "Addendum". Where the original and the addendum differ, both are kept: the original describes the state at the cutoff, the addendum the state at `49cc7d5`.
+
 Deliverable 1 of 6 for directive DAII-TP3-AUDIT-01 and the follow-up request "Final Product Audit Report & Roadmap Inputs". Team 3 is independent and read-only: no product code, schema, UI, permission or configuration was changed; no production or hosting access was used; no credential was read or reproduced; no database-backed test was run by Team 3 (the isolated cluster is reserved by other sessions), so every test result below comes from an existing report and names its commit and evidence class.
 
 **Deliverables (all in `backend/docs/decisions/`):**
@@ -269,3 +271,13 @@ Static reading and existing reports only; no new test execution; no browser; no 
 
 ### 12.3 Internal consistency check across the six deliverables
 Performed by script and reading on 2026-10-11 (results repeated in the roadmap input §9 and scorecard §8): every `PA-xx` cited in any deliverable exists in the register (42, extraction checked); the matrix counts quoted here (88 rows: 60/7/12/9 and 5/53/6/1/23) are computed from its tables; every document names the audit cutoff `b591d1f` and the evidence baseline `a6002fa`; N-01 and N-02 are carried identically; only the matrix's defined classes appear as capability classes; no capability is called verified on the strength of documents, menu items, entities or a typecheck.
+
+## 13. Addendum — state after the audit cutoff (WP-DOC-02, 2026-10-11)
+
+Sections 1–12 are preserved unchanged. Reference commit: `49cc7d5cb639cd492823a803019758fd2abe216e`. Details are in the register §6, the matrix §8, the scorecard §9 and the reconciliation note §7.
+
+1. **New finding PA-43** (UUID repair may invalidate historical audit hash chains): code-review finding, OPEN, separate from PA-33; the repair is not run and no historical audit row is touched.
+2. **Evidence after the cutoff:** the PA-33 fix (`c764fc5`) and the remaining N-02 fixes (`5c5b791`) are committed and verified on clean snapshots `71e5f5e` and `f881e53` for the scenarios run; independent review is **not** accepted (the CTO ruled the peer reviews do not meet the independence gate); N-02 OPEN, PA-33 OPEN.
+3. **Isolation population:** three historical states are kept (80/1/19; 90/9/1 corrected to 89 executed-PASS/1 skipped/9 BLOCKED/1 NOT RUN; and a clean-snapshot run of 91 files). Six adaptation diffs remain pending review.
+4. **CI:** NOT GREEN (3 lint errors in LA-1 files, owner LA-1; not attributed to N-02).
+5. **Unchanged:** release status NOT APPROVED; no numeric quality score; the planning baseline is in the execution plan, the work-package register and the decisions brief.
