@@ -29,7 +29,7 @@ Clean `git archive` snapshot of **`71e5f5e`** (= `a798d9d` fulfilReservation fix
 | Check | Result |
 |---|---|
 | Business suite T-00…T-24, one sequential run (`biz-full.log`, exit 0) | all steps PASS at jest level; case level: T-10 reconciliation PASS (R1–R10); T-20 **8 PASS + H5 BLOCKED**; T-21 **13/13 PASS** (A–J, E2, G, H); T-23 **7/7 PASS**; T-24 **10 PASS + H5 BLOCKED**; T-22 2 PASS + 1 informational characterisation (`explicit-seq-honoured-by-save` = FAIL-DEFECT by design: it proves TypeORM ignores an explicit seq, the reason for the fix); T-19 15/15; T-06 keeps the known T-06x legacy-wrapper probe; T-18 keeps the parallel track's 3 FAIL-DEFECT |
-| All namespaced real-Postgres isolation specs (91 files, includes every inventory / reservation / delivery / fulfilment / treasury / payment / audit area) | **90 PASS, 1 FAIL** — the single failure is `release-migration-registry.real-pg.spec.ts`, the already-classified BLOCKED spec whose own safety assertion hard-codes port 5544 ("Refusing to run … DB_PORT=5544", unchanged, not a product result) |
+| All namespaced real-Postgres isolation specs (91 files, includes every inventory / reservation / delivery / fulfilment / treasury / payment / audit area) | **89 executed-PASS, 1 skipped, 1 FAIL** (the runner printed "90 PASS", but one of them, `t0-clean-company-baseline`, is an opt-in suite that jest reports as skipped: `Tests: 1 skipped` — corrected on the reviewer's finding and verified in `regression-all.log`). The single failure is `release-migration-registry.real-pg.spec.ts`, the already-classified BLOCKED spec whose own safety assertion hard-codes port 5544 ("Refusing to run … DB_PORT=5544", unchanged, not a product result) |
 | Unit | 59 suites / 430 tests PASS |
 | Guard | 50/50 PASS |
 Not part of this run: the other 9 BLOCKED specs (6 on the 5544-pinned helper — the one above is among them — and 3 role-creating), `company-audit-access.real-pg.spec.ts` (held), multi-instance and hosting checks.
@@ -61,3 +61,6 @@ H5 shipment transition (BLOCKED); sibling reservation/limit methods (NOT RUN); t
 3. Authorise probes for the unprobed sibling methods and H5 fixture.
 4. Decide the recovery policy only if broken audit chains are found in real data (needs the operator access that is still missing).
 5. An aborted pipeline run (my own, for `5c5b791`) and two cluster collisions between the sessions are documented; runs on the shared cluster must stay serialised.
+
+## 9. Corrections
+- Counts of isolation specs reported earlier as "PASS" by the runner (16 + 60 + 4 + 7 + 3 = 90 cumulative; "60/60"; "80 PASS") each include the one opt-in suite `t0-clean-company-baseline` that jest reports as skipped; the executed-pass figures are one lower (89 cumulative executed-pass, 1 skipped). No other spec reports skipped tests (checked in the final log).
