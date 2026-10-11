@@ -1,0 +1,52 @@
+{
+  "testId": "T-21",
+  "runId": "T-21-20261011T040959Z-d29c73",
+  "finishedAt": "2026-10-11T04:10:12.210Z",
+  "results": [
+    {
+      "id": "A-plain-concurrent-duplicate-fulfilment",
+      "status": "PASS",
+      "note": "{\"callsOk\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"dispatchMovements\":1,\"onHandDelta\":-3,\"reservationStatus\":\"fulfilled\",\"reservedAfter\":0}"
+    },
+    {
+      "id": "A-transaction-concurrent-duplicate-fulfilment",
+      "status": "PASS",
+      "note": "{\"callsOk\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"dispatchMovements\":1,\"onHandDelta\":-3,\"reservationStatus\":\"fulfilled\",\"reservedAfter\":0}"
+    },
+    {
+      "id": "B-sequential-retries",
+      "status": "PASS",
+      "note": "{\"first\":true,\"retries\":[\"ConflictException:409\",\"ConflictException:409\",\"ConflictException:409\"],\"dispatchMovements\":1,\"onHand\":18}"
+    },
+    {
+      "id": "C-partial-failure-rolls-back-then-retry-once",
+      "status": "PASS",
+      "note": "{\"failedCall\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_movements\\\" violates foreign key constraint \\\"stock_movements_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(67629510-b791-419c-bb08-e86c12dd5637) is not present in table \\\"warehouses\\\".\"},\"afterFail\":{\"status\":\"active\",\"dispatchMovements\":0,\"onHand\":20,\"audit\":0},\"retry\":true,\"afterRetry\":{\"status\":\"fulfilled\",\"dispatchMovements\":1,\"onHand\":16}}"
+    },
+    {
+      "id": "D-outer-transaction-rollback",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"mid\":{\"status\":\"active\",\"dispatchMovements\":0,\"onHand\":20,\"reserved\":5},\"again\":true,\"end\":{\"status\":\"fulfilled\",\"dispatchMovements\":1,\"onHand\":15}}"
+    },
+    {
+      "id": "E-order-level-concurrent-fulfilment",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":1,\"ConflictException:409\":3},\"dispatchMovementsPerProduct\":[1,1,1],\"onHandDelta\":[-2,-2,-2],\"reservationStatuses\":[{\"status\":\"fulfilled\",\"n\":3}]}"
+    },
+    {
+      "id": "F-different-reservations-all-succeed",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":6},\"movements\":[1,1,1,1,1,1]}"
+    },
+    {
+      "id": "G-global-consistency",
+      "status": "PASS",
+      "note": "{\"fulfilledReservations\":14,\"dispatchMovements\":14,\"dispatchAuditRecords\":14,\"activeReservationsLeft\":0,\"negativeStockPairs\":0}"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "FAIL-DEFECT",
+      "note": "candidate defect: audit hash chain invalid (first break at seq 26) after final"
+    }
+  ]
+}

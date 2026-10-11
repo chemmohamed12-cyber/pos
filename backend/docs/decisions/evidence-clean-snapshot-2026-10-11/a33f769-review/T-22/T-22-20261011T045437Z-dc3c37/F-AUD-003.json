@@ -1,0 +1,28 @@
+{
+  "control": {
+    "chainValid": true,
+    "storedSeqs": [
+      1,
+      2
+    ],
+    "sequenceLastValue": 2
+  },
+  "rolledBack": true,
+  "afterRollback": {
+    "storedSeqs": [
+      1,
+      2
+    ],
+    "sequenceLastValue": 3
+  },
+  "afterNextCommittedRecord": {
+    "chainValid": false,
+    "brokenAtSeq": 4,
+    "storedSeqs": [
+      1,
+      2,
+      4
+    ],
+    "sequenceLastValue": 4
+  }
+}

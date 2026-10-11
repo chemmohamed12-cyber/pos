@@ -1,0 +1,245 @@
+{
+  "label": "after-T-04",
+  "valid": false,
+  "brokenAtSeq": 536,
+  "n": 2324,
+  "min": 1,
+  "max": 2324,
+  "neighbours": [
+    {
+      "seq": 533,
+      "prev12": "5911b18ad9e2",
+      "hash12": "abd404515fd9",
+      "ts": "2026-10-10 19:49:34.001+03",
+      "action": "inventory.movement.dispatch",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 534,
+      "prev12": "abd404515fd9",
+      "hash12": "54104c62fa47",
+      "ts": "2026-10-10 19:49:34.009+03",
+      "action": "inventory.movement.dispatch",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 535,
+      "prev12": "54104c62fa47",
+      "hash12": "ad7f7b47cc06",
+      "ts": "2026-10-10 19:49:34.015+03",
+      "action": "warehouse_transaction.post",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 536,
+      "prev12": "54104c62fa47",
+      "hash12": "18205831848e",
+      "ts": "2026-10-10 19:49:34.016+03",
+      "action": "inventory.movement.dispatch",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 537,
+      "prev12": "18205831848e",
+      "hash12": "b5a47a9064af",
+      "ts": "2026-10-10 19:49:34.023+03",
+      "action": "warehouse_transaction.post",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 538,
+      "prev12": "18205831848e",
+      "hash12": "e7757fa3216d",
+      "ts": "2026-10-10 19:49:34.024+03",
+      "action": "inventory.movement.dispatch",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 539,
+      "prev12": "e7757fa3216d",
+      "hash12": "38bd10cde655",
+      "ts": "2026-10-10 19:49:34.03+03",
+      "action": "warehouse_transaction.post",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    }
+  ],
+  "forks": [
+    {
+      "prev12": "021a1fba1e0f",
+      "n": 2,
+      "seqs": [
+        2009,
+        2010
+      ]
+    },
+    {
+      "prev12": "0672b68bd712",
+      "n": 2,
+      "seqs": [
+        866,
+        867
+      ]
+    },
+    {
+      "prev12": "0a0d32799708",
+      "n": 2,
+      "seqs": [
+        1519,
+        1520
+      ]
+    },
+    {
+      "prev12": "0ba547920019",
+      "n": 2,
+      "seqs": [
+        1395,
+        1396
+      ]
+    },
+    {
+      "prev12": "121459d0e33c",
+      "n": 2,
+      "seqs": [
+        1523,
+        1524
+      ]
+    },
+    {
+      "prev12": "18205831848e",
+      "n": 2,
+      "seqs": [
+        537,
+        538
+      ]
+    },
+    {
+      "prev12": "1c4cf761234f",
+      "n": 2,
+      "seqs": [
+        1397,
+        1398
+      ]
+    },
+    {
+      "prev12": "1ddec02b9a76",
+      "n": 2,
+      "seqs": [
+        893,
+        894
+      ]
+    },
+    {
+      "prev12": "1ecc8c430af7",
+      "n": 2,
+      "seqs": [
+        2258,
+        2259
+      ]
+    },
+    {
+      "prev12": "1f545e7f7a1f",
+      "n": 2,
+      "seqs": [
+        2132,
+        2133
+      ]
+    },
+    {
+      "prev12": "222e092e4296",
+      "n": 2,
+      "seqs": [
+        864,
+        865
+      ]
+    },
+    {
+      "prev12": "2331fb1b9f90",
+      "n": 2,
+      "seqs": [
+        1891,
+        1892
+      ]
+    },
+    {
+      "prev12": "257897b68439",
+      "n": 2,
+      "seqs": [
+        1642,
+        1643
+      ]
+    },
+    {
+      "prev12": "2c13ddf725b7",
+      "n": 2,
+      "seqs": [
+        1768,
+        1769
+      ]
+    },
+    {
+      "prev12": "2cb8f1c174e0",
+      "n": 2,
+      "seqs": [
+        1150,
+        1151
+      ]
+    },
+    {
+      "prev12": "2d9a13304c89",
+      "n": 2,
+      "seqs": [
+        929,
+        930
+      ]
+    },
+    {
+      "prev12": "2e4c47247935",
+      "n": 2,
+      "seqs": [
+        962,
+        963
+      ]
+    },
+    {
+      "prev12": "3116d7571db4",
+      "n": 2,
+      "seqs": [
+        1948,
+        1949
+      ]
+    },
+    {
+      "prev12": "360ee81073b9",
+      "n": 2,
+      "seqs": [
+        862,
+        863
+      ]
+    },
+    {
+      "prev12": "36e0594c0b27",
+      "n": 2,
+      "seqs": [
+        1153,
+        1154
+      ]
+    }
+  ],
+  "gaps": [],
+  "firstRecord": {
+    "seq": 1,
+    "prev12": "000000000000",
+    "ts": "2026-10-10 19:49:28.002+03",
+    "action": "warehouse_transaction.created"
+  },
+  "timestampColumn": {
+    "data_type": "timestamp with time zone"
+  }
+}

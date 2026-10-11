@@ -1,0 +1,57 @@
+=== install: npm ci --no-audit --no-fund
+    -> PASS
+=== build: npm run build
+    -> PASS
+=== lint: npm run lint
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\audit\installation-audit.controller.ts
+  5:10  error  'RolesGuard' is defined but never used   @typescript-eslint/no-unused-vars
+  6:10  error  'RequireRole' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\company\company-lifecycle-admission.real-pg.spec.ts
+  5:1  error  '../../domains/sales-orders/application/preliminary-hold-expiry.scheduler' import is restricted from being used by a pattern. Cross-domain internal import blocked (DAII_DOMAIN_BOUNDARIES.md: no domain leakage). Import only another domain's published interface/ contract  no-restricted-imports
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\database-registry\company-connection-manager.service.spec.ts
+  23:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-var-requires')
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\testing\biz-harness-smoke.biz.real-pg.spec.ts
+  6:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-var-requires')
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\testing\biz-support.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-var-requires')
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\testing\t09-inventory-movements-http.biz.real-pg.spec.ts
+  23:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-require-imports')
+
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\_v5\backend\src\foundation\testing\t10-reconciliation.biz.real-pg.spec.ts
+  4:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-var-requires')
+
+✖ 8 problems (3 errors, 5 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.
+
+    -> FAIL
+=== structure: npm run validate:structure
+    -> PASS
+=== doc-links: node tools/validation/check-doc-links.js --json ci-output/doc-links.json
+    -> PASS
+=== unit: npm run test:unit
+    -> PASS
+=== db-guard: npm run test:db-guard
+    -> PASS
+# CI summary
+
+- commit: a33f769
+- node: v20.20.2   npm: 10.8.2
+- started (UTC): 2026-10-11T04:44:17Z
+
+| step | result | seconds |
+|---|---|---|
+| install | PASS | 41 |
+| build | PASS | 55 |
+| lint | FAIL | 37 |
+| structure | PASS | 2 |
+| doc-links | PASS | 0 |
+| unit | PASS | 166 |
+| db-guard | PASS | 3 |
+
+**Overall: FAIL** (see the step logs)
+CI_EXIT 1

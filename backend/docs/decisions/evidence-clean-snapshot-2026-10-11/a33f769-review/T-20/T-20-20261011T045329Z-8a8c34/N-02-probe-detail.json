@@ -1,0 +1,69 @@
+{
+  "H1-plain": {
+    "cap": 10,
+    "allowed": 11,
+    "errors": 0,
+    "counter": 10
+  },
+  "H1-transaction": {
+    "cap": 10,
+    "allowed": 10,
+    "errors": 0,
+    "counter": 10
+  },
+  "H2-plain": {
+    "reserved": 5,
+    "releaseCallsOk": 12,
+    "stillActive": 0,
+    "tally": {
+      "OK": 12
+    }
+  },
+  "H2-transaction": {
+    "reserved": 5,
+    "releaseCallsOk": 5,
+    "stillActive": 0,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    }
+  },
+  "H3-plain": {
+    "reservedQty": 3,
+    "fulfilCallsOk": 1,
+    "dispatchMovements": 1,
+    "onHandBefore": 50,
+    "onHandAfter": 47,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 5
+    }
+  },
+  "H3-transaction": {
+    "reservedQty": 3,
+    "fulfilCallsOk": 1,
+    "dispatchMovements": 1,
+    "onHandBefore": 50,
+    "onHandAfter": 47,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 5
+    }
+  },
+  "H4-plain": {
+    "instances": 1,
+    "errors": 3,
+    "tally": {
+      "OK": 7,
+      "QueryFailedError": 3
+    }
+  },
+  "H4-transaction": {
+    "instances": 1,
+    "errors": 9,
+    "tally": {
+      "OK": 1,
+      "QueryFailedError": 9
+    }
+  }
+}
