@@ -19,7 +19,12 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
 
   it('T-03 + T-04 + T-04b', async () => {
     try {
-      env = await setUpBiz('T-03', 'biz_t03');
+      // DEC-08 (test-only split): DAII_T0304_PART=T-03 or T-04 runs that part alone (T-04 includes T-04b); unset = the frozen combined run, unchanged.
+      const part = process.env.DAII_T0304_PART;
+      if (part && part !== 'T-03' && part !== 'T-04') throw new Error('DAII_T0304_PART must be T-03 or T-04');
+      const runT03 = !part || part === 'T-03';
+      const runT04 = !part || part === 'T-04';
+      env = await setUpBiz(part === 'T-04' ? 'T-04' : 'T-03', part === 'T-04' ? 'biz_t04' : 'biz_t03');
       const e = env;
       const W = e.warehouseId;
       const wide = await widePool(e, 60);
@@ -28,7 +33,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
 
       // ===================== T-03: N concurrent reservations of 1 unit from on-hand 5 =====================
       const t03: Record<string, unknown[]> = {};
-      for (const N of [10, 25, 50]) {
+      for (const N of runT03 ? [10, 25, 50] : []) {
         t03[`N${N}`] = [];
         for (let round = 1; round <= 20 && !stop; round += 1) {
           const P = await seedProduct(e.dsA, `T03-N${N}-R${round}`);
@@ -50,7 +55,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
 
       // ===================== T-04: N concurrent postings of 1-unit issue documents from on-hand 5 =====================
       const t04: Record<string, unknown[]> = {};
-      for (const N of [10, 25]) {
+      for (const N of runT04 ? [10, 25] : []) {
         t04[`N${N}`] = [];
         for (let round = 1; round <= 20 && !stop; round += 1) {
           const P = await seedProduct(e.dsA, `T04-N${N}-R${round}`);
@@ -81,7 +86,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
 
       // ===================== T-04b: 5 reservations + 5 issue postings compete for 5 units =====================
       const t04b: unknown[] = [];
-      for (let round = 1; round <= 20 && !stop; round += 1) {
+      for (let round = 1; round <= 20 && !stop && runT04; round += 1) {
         const P = await seedProduct(e.dsA, `T04B-R${round}`);
         await receive(e, W, P, 5);
         const docs: string[] = [];
@@ -101,7 +106,7 @@ describe('T-03 / T-04 — concurrent reservations and issue postings never excee
         const ok = okReserve + okPost === 5 && other === 0 && oh === 5 - okPost && oh >= 0 && oh - rs >= 0;
         if (!ok) { stop = true; result(e, `T-04b-R${round}`, 'STOP', JSON.stringify(st)); }
       }
-      if (!stop) result(e, 'T-04b', 'PASS', '20 rounds: successes = 5 exactly, on-hand >= 0, available >= 0, no other error kind');
+      if (!stop && runT04) result(e, 'T-04b', 'PASS', '20 rounds: successes = 5 exactly, on-hand >= 0, available >= 0, no other error kind');
       record(e, 'T-04b-rounds.json', t04b);
 
       // ===================== global invariants =====================
