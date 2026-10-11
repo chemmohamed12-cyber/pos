@@ -130,6 +130,32 @@ describe('T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservat
         result(e, 'F-different-reservations-all-succeed', outs.every((o) => o.ok) && movements.every((m) => m === 1) ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.F));
       }
 
+      // ---- I) overlapping orders fulfilled concurrently in opposite line order must not deadlock (independent-review residual risk) ----
+      {
+        const rounds = 6;
+        const stats = { rounds, bothOk: 0, errors: {} as Record<string, number> };
+        const p1 = await seedProduct(e.dsA, 'T21-I1');
+        const p2 = await seedProduct(e.dsA, 'T21-I2');
+        await receive(e, W, p1, 200);
+        await receive(e, W, p2, 200);
+        const m0 = await dispatches(p1) + await dispatches(p2);
+        for (let r = 0; r < rounds; r += 1) {
+          const o1 = randomUUID(); const o2 = randomUUID();
+          await e.inventory.reserveStock(W, p1, 1, o1, e.actor, 'active', e.manager);
+          await e.inventory.reserveStock(W, p2, 1, o1, e.actor, 'active', e.manager);
+          await e.inventory.reserveStock(W, p2, 1, o2, e.actor, 'active', e.manager); // opposite creation order
+          await e.inventory.reserveStock(W, p1, 1, o2, e.actor, 'active', e.manager);
+          const outs = await Promise.all([o1, o2, o1, o2].map((o) => attempt(() => e.inventory.fulfillReservationsForOrder(o, W, e.actor, wide.manager))));
+          for (const o of outs.filter((x) => !x.ok)) stats.errors[(o as { pgCode?: string }).pgCode ?? o.kind] = (stats.errors[(o as { pgCode?: string }).pgCode ?? o.kind] ?? 0) + 1;
+          if (outs.filter((x) => x.ok).length >= 2) stats.bothOk += 1;
+        }
+        const moved = (await dispatches(p1)) + (await dispatches(p2)) - m0;
+        const deadlocks = stats.errors['40P01'] ?? 0;
+        const unexpected = Object.entries(stats.errors).filter(([k]) => k !== 'ConflictException:409').reduce((a, [, v]) => a + v, 0);
+        detail.I = { ...stats, dispatchMovements: moved, expectedMovements: rounds * 4, deadlocks, unexpectedErrors: unexpected };
+        result(e, 'I-overlapping-orders-no-deadlock', deadlocks === 0 && unexpected === 0 && stats.bothOk === rounds && moved === rounds * 4 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.I));
+      }
+
       // ---- G) global consistency ----
       {
         const fulfilled = Number((await e.dsA.query(`SELECT count(*)::int AS n FROM stock_reservations WHERE status = 'fulfilled'`))[0].n);

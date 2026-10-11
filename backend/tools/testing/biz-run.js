@@ -38,6 +38,8 @@ const STEPS = [
   ['T-20', 'src/foundation/testing/n02-probes.biz.real-pg.spec.ts'],
   ['T-21', 'src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts'],
   ['T-22', 'src/foundation/testing/f-aud-rollback-reproducer.biz.real-pg.spec.ts'],
+  ['T-23', 'src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts'],
+  ['T-24', 'src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts'],
   ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 

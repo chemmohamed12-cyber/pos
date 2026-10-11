@@ -1,0 +1,13 @@
+
+=== T-20: src/foundation/testing/n02-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/n02-probes.biz.real-pg.spec.ts (30.496 s)
+  N-02 probes — plain-manager hypotheses for the remaining primitives
+    √ records the observed behaviour of both calling styles for H1-H4 (13605 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.576 s, estimated 97 s
+Ran all test suites matching /src\\foundation\\testing\\n02-probes.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

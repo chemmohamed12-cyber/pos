@@ -1,0 +1,120 @@
+{
+  "A-plain": {
+    "callsOk": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    },
+    "dispatchMovements": 1,
+    "onHandDelta": -3,
+    "reservationStatus": "fulfilled",
+    "reservedAfter": 0
+  },
+  "A-transaction": {
+    "callsOk": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    },
+    "dispatchMovements": 1,
+    "onHandDelta": -3,
+    "reservationStatus": "fulfilled",
+    "reservedAfter": 0
+  },
+  "B": {
+    "first": true,
+    "retries": [
+      "ConflictException:409",
+      "ConflictException:409",
+      "ConflictException:409"
+    ],
+    "dispatchMovements": 1,
+    "onHand": 18
+  },
+  "C": {
+    "failedCall": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "insert or update on table \"stock_movements\" violates foreign key constraint \"stock_movements_warehouseId_fkey\"",
+      "pgCode": "23503",
+      "detail": "Key (warehouseId)=(4e85b1fe-a65e-4188-bcec-01386ac751ad) is not present in table \"warehouses\"."
+    },
+    "afterFail": {
+      "status": "active",
+      "dispatchMovements": 0,
+      "onHand": 20,
+      "audit": 0
+    },
+    "retry": true,
+    "afterRetry": {
+      "status": "fulfilled",
+      "dispatchMovements": 1,
+      "onHand": 16
+    }
+  },
+  "D": {
+    "rolledBack": true,
+    "mid": {
+      "status": "active",
+      "dispatchMovements": 0,
+      "onHand": 20,
+      "reserved": 5
+    },
+    "again": true,
+    "end": {
+      "status": "fulfilled",
+      "dispatchMovements": 1,
+      "onHand": 15
+    }
+  },
+  "E": {
+    "tally": {
+      "OK": 4
+    },
+    "dispatchMovementsPerProduct": [
+      1,
+      1,
+      1
+    ],
+    "onHandDelta": [
+      -2,
+      -2,
+      -2
+    ],
+    "reservationStatuses": [
+      {
+        "status": "fulfilled",
+        "n": 3
+      }
+    ]
+  },
+  "F": {
+    "tally": {
+      "OK": 6
+    },
+    "movements": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "I": {
+    "rounds": 6,
+    "bothOk": 6,
+    "errors": {},
+    "dispatchMovements": 24,
+    "expectedMovements": 24,
+    "deadlocks": 0,
+    "unexpectedErrors": 0
+  },
+  "G": {
+    "fulfilledReservations": 38,
+    "dispatchMovements": 38,
+    "dispatchAuditRecords": 38,
+    "activeReservationsLeft": 0,
+    "negativeStockPairs": 0
+  }
+}

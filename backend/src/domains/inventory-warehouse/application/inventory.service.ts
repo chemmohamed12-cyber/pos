@@ -1442,7 +1442,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
       );
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02/H2: the per-(warehouse,product) advisory lock and the read-modify-write of the reservation rows must share ONE transaction (a plain manager releases the lock at once).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
@@ -1599,6 +1600,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
     manager?: EntityManager,
   ): Promise<void> {
     const run = async (m: EntityManager): Promise<void> => {
+      // N-02 (independent-review finding, reproduced by T-21 case I: 12 deadlocks in 24 calls): two orders that share products but list them in opposite order would lock their
+      // per-(warehouse,product) keys in opposite order inside fulfillReservation and deadlock. Take ALL the keys of the order up front in one deterministic (sorted) order — the same
+      // discipline assembleProduct uses — then re-read the still-active reservations under those locks and fulfil them (the per-reservation locks are then re-entrant no-ops).
+      const preview = await this.getActiveReservationsForOrder(salesOrderId, m);
+      const keys = [...new Set(preview.map((r) => `${r.warehouseId}:${r.productId}`))].sort();
+      for (const key of keys) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
       const reservations = await this.getActiveReservationsForOrder(salesOrderId, m);
       for (const reservation of reservations) {
         await this.fulfillReservation(reservation.id, actorUserId, currentWarehouseId, m);

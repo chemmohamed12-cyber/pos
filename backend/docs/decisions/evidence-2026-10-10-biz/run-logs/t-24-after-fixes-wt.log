@@ -1,0 +1,13 @@
+
+=== T-24: src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts
+PASS src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts (30.38 s)
+  T-24 — limit engine, reservation release and process start are race-free (N-02 remaining findings)
+    √ H1, H2, H4: concurrency, rollback, retries, integrity (13919 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.46 s
+Ran all test suites matching /src\\foundation\\testing\\t24-n02-remaining.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

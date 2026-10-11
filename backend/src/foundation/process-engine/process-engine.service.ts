@@ -66,14 +66,14 @@ export class ProcessEngineService {
     });
     if (existing) return existing; // idempotent — starting twice is a no-op, not an error
 
-    return repo.save(
-      repo.create({
-        definitionKey: definition.key,
-        entityType,
-        entityId,
-        currentState: definition.initialState,
-      }),
+    // N-02/H4: check-then-insert raced (concurrent starts of one entity raised a unique-violation error). The unique index IDX_process_instances_unique makes the insert itself
+    // the arbiter: exactly one caller inserts, every other caller's INSERT is a no-op, and all of them read back the single instance.
+    await (manager ?? this.dataSource.manager).query(
+      `INSERT INTO "process_instances" ("definitionKey","entityType","entityId","currentState") VALUES ($1,$2,$3,$4)
+       ON CONFLICT ("definitionKey","entityType","entityId") DO NOTHING`,
+      [definition.key, entityType, entityId, definition.initialState],
     );
+    return repo.findOneOrFail({ where: { definitionKey: definition.key, entityType, entityId } });
   }
 
   async getState(

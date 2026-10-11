@@ -5,6 +5,7 @@ import { LimitUsageCounter } from './limit-usage-counter.entity';
 import { LimitRegistrySeeder } from './limit-registry.seeder';
 import { MODULE_REGISTRY } from '../module-registry/module-registry';
 import { AuditService } from '../audit/audit.service';
+import { runInTransaction } from '../transaction/run-in-transaction';
 
 export interface LimitKeyView {
   key: string;
@@ -118,7 +119,8 @@ export class LimitService implements OnModuleInit {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`limit:${limitKey}`]);
       return this.resolve(m, limitKey, delta, true);
     };
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02/H1: the advisory lock must be held across check + increment — join an ACTIVE caller transaction, otherwise open one on the caller's manager (a plain manager releases the lock at once).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
@@ -140,11 +142,8 @@ export class LimitService implements OnModuleInit {
       counter.currentValue = Math.max(0, counter.currentValue - delta);
       await counterRepo.save(counter);
     };
-    if (manager) {
-      await run(manager);
-      return;
-    }
-    await this.dataSource.transaction(run);
+    // N-02/H1: same rule as consume() — the read-modify-write of the counter runs under the lock inside one transaction.
+    await runInTransaction(this.dataSource, manager, run);
   }
 
   /** Read-back (P5's own deliverable) — current usage without checking or mutating anything. */

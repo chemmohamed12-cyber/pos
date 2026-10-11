@@ -1,0 +1,13 @@
+
+=== T-21: src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts
+PASS src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts (31.232 s)
+  T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservation)
+    √ duplicate, retried, partially failed and rolled-back fulfilments never create a second movement (13583 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        31.356 s, estimated 39 s
+Ran all test suites matching /src\\foundation\\testing\\t21-n02-fulfil-reservation.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED
