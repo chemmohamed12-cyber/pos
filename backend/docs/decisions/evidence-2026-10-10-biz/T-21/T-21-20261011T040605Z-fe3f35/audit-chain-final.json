@@ -1,0 +1,79 @@
+{
+  "label": "final",
+  "valid": false,
+  "brokenAtSeq": 33,
+  "n": 86,
+  "min": 1,
+  "max": 87,
+  "neighbours": [
+    {
+      "seq": 30,
+      "prev12": "057d3be79563",
+      "hash12": "1b3df96341b1",
+      "ts": "2026-10-11 07:06:18.575+03",
+      "action": "warehouse_transaction.submit",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 31,
+      "prev12": "1b3df96341b1",
+      "hash12": "4300eed9a1bc",
+      "ts": "2026-10-11 07:06:18.579+03",
+      "action": "inventory.stock.reserved",
+      "resource": "stock_reservation",
+      "result": "success"
+    },
+    {
+      "seq": 33,
+      "prev12": "4300eed9a1bc",
+      "hash12": "8b403fb76728",
+      "ts": "2026-10-11 07:06:18.594+03",
+      "action": "inventory.movement.dispatch",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 34,
+      "prev12": "8b403fb76728",
+      "hash12": "6eea3c6decc6",
+      "ts": "2026-10-11 07:06:18.611+03",
+      "action": "warehouse_transaction.created",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    },
+    {
+      "seq": 35,
+      "prev12": "6eea3c6decc6",
+      "hash12": "eebece92e106",
+      "ts": "2026-10-11 07:06:18.621+03",
+      "action": "inventory.movement.receipt",
+      "resource": "stock_movement",
+      "result": "success"
+    },
+    {
+      "seq": 36,
+      "prev12": "eebece92e106",
+      "hash12": "aa745e2f4179",
+      "ts": "2026-10-11 07:06:18.63+03",
+      "action": "warehouse_transaction.submit",
+      "resource": "warehouse_transaction",
+      "result": "success"
+    }
+  ],
+  "forks": [],
+  "gaps": [
+    {
+      "gap_after": 32
+    }
+  ],
+  "firstRecord": {
+    "seq": 1,
+    "prev12": "000000000000",
+    "ts": "2026-10-11 07:06:17.812+03",
+    "action": "warehouse_transaction.created"
+  },
+  "timestampColumn": {
+    "data_type": "timestamp with time zone"
+  }
+}

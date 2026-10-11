@@ -6,6 +6,7 @@ import { Warehouse } from '../infrastructure/warehouse.entity';
 import { MovementType } from '../domain/movement-type';
 import { canTransitionWarehouseStatus, WarehouseStatus } from '../domain/warehouse-status';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { runInTransaction } from '../../../foundation/transaction/run-in-transaction';
 import {
   SALES_PRODUCTS_CONTRACT,
   SALES_BOM_CONTRACT,
@@ -1534,6 +1535,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
   ): Promise<StockMovement> {
     const run = async (m: EntityManager): Promise<StockMovement> => {
       const reservationRepo = m.getRepository(StockReservation);
+      // N-02: the status check and the status flip must be ONE serialised unit. The first read only identifies the (warehouse, product) key; the per-(warehouse,product)
+      // advisory lock is the SAME key reserveStock / releaseReservedQuantity use, held until the end of this transaction; the reservation is then RE-READ under the lock, so a
+      // second fulfilment of the same reservation sees 'fulfilled' and is refused instead of posting a second dispatch movement.
+      const probe = await reservationRepo.findOne({ where: { id: reservationId } });
+      if (!probe) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${probe.warehouseId}:${probe.productId}`]);
       const reservation = await reservationRepo.findOne({ where: { id: reservationId } });
       if (!reservation) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
       if (reservation.status !== 'active') {
@@ -1557,7 +1564,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
       return movement;
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02: join the caller's transaction when one is ACTIVE, otherwise open one on the caller's manager (a plain manager would otherwise run every statement, and release the lock, separately).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
@@ -1597,7 +1605,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
       }
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02: the whole order is one atomic unit even when the caller passes a plain manager (see fulfillReservation).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
