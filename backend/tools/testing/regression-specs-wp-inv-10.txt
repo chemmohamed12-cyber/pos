@@ -1,0 +1,7 @@
+# WP-INV-10 (H5-D1) regression set: shipment / delivery / returns isolation specs that call ShipmentService
+src/domains/shipment/interface/shipment.company-isolation.spec.ts
+src/domains/delivery/interface/delivery.company-isolation.spec.ts
+src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+src/domains/returns/interface/returns.company-isolation.spec.ts
+src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+src/domains/returns/interface/returns-accounting.company-isolation.spec.ts

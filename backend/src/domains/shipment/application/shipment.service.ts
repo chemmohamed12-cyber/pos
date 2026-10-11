@@ -10,6 +10,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { runInTransaction } from '../../../foundation/transaction/run-in-transaction';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import {
   INVENTORY_LOGISTICS_CONTRACT,
@@ -534,7 +535,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       return newState;
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // WP-INV-10 (H5-D1): a plain manager (the controller passes the Company DataSource's manager) used to run every step as its own auto-committed statement, so a failing
+    // custody transfer left the shipment `picked_up` with a reservation drained and not re-created. The whole unit is now one transaction; a caller's transaction is joined.
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**

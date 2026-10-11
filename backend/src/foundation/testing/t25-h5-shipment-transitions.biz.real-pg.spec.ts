@@ -139,6 +139,16 @@ describe('T-25 — H5 shipment transitions (measurement, not a fix)', () => {
         detail[`H5-3-${style}`] = { call: out, before, after };
         const unchanged = !out.ok && after.state === before.state && after.relocationMovements === 0 && after.activeReservationsAtMain === before.activeReservationsAtMain && after.trackingEvents.join() === before.trackingEvents.join() && after.transitionRecords === before.transitionRecords;
         result(e, `H5-3-${style}-pickup-custody-failure-all-or-nothing`, unchanged ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail[`H5-3-${style}`]));
+
+        // H5-3b (WP-INV-10): no reservation is lost and the failed pickup can be retried safely once the custody warehouse exists
+        const activeQty = async () => Number((await e.dsA.query(`SELECT COALESCE(sum(quantity),0)::int AS n FROM stock_reservations WHERE "salesOrderId" = $1 AND status = 'active'`, [f.salesOrderId]))[0].n);
+        const qtyAfterFailure = await activeQty();
+        await e.dsA.query(`INSERT INTO "warehouses" ("id","code","name","status","kind") SELECT "warehouseId", 'WH-FIX-' || substr("warehouseId"::text,1,6), 'repaired custody', 'active', 'main' FROM vehicles WHERE id = (SELECT "vehicleId" FROM shipments WHERE id = $1)`, [f.shipmentId]);
+        const retry = await attempt(() => svc.transitionShipment(f.shipmentId, 'pickup', driver, wide.manager));
+        const afterRetry = await observe({ ...f, custodyWarehouseId: (await e.dsA.query(`SELECT "warehouseId" FROM vehicles WHERE id = (SELECT "vehicleId" FROM shipments WHERE id = $1)`, [f.shipmentId]))[0].warehouseId });
+        const qtyAfterRetry = await activeQty();
+        detail[`H5-3b-${style}`] = { qtyBefore: 6, qtyAfterFailure, retry, afterRetry, qtyAfterRetry };
+        result(e, `H5-3b-${style}-no-reservation-lost-and-retry-succeeds`, qtyAfterFailure === 6 && retry.ok && afterRetry.state === 'picked_up' && afterRetry.relocationMovements === 4 && afterRetry.activeReservationsAtCustody === 2 && afterRetry.trackingEvents.includes('pickup=1') && qtyAfterRetry === 6 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail[`H5-3b-${style}`]));
       }
 
       // ---- H5-4: pickup inside an outer transaction, then rollback ----
