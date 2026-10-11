@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { NumberingSequence } from './numbering-sequence.entity';
 import { runInTransaction } from '../transaction/run-in-transaction';
 
 interface SequenceRow {
@@ -26,10 +25,11 @@ export class NumberingService {
 
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added — same additive shape as `getNextNumber` below, needed by any Company-scoped caller that registers a per-rep/per-entity document type on the fly (e.g. `SalesOrdersService.createOrder`'s `sales_order_rep_<id>` type). */
   async registerDocumentType(documentType: string, prefix: string, includeYear = true, manager?: EntityManager): Promise<void> {
-    const repo = (manager ?? this.dataSource).getRepository(NumberingSequence);
-    const existing = await repo.findOne({ where: { documentType } });
-    if (existing) return; // idempotent
-    await repo.save(repo.create({ documentType, prefix, includeYear, lastNumber: 0, lastYear: null }));
+    // N-01 (concurrent first use): one atomic statement instead of find-then-save — concurrent callers of a not-yet-registered type no longer collide on the primary key (23505); idempotent as before.
+    await (manager ?? this.dataSource).query(
+      'INSERT INTO "numbering_sequences" ("documentType", "prefix", "includeYear", "lastNumber", "lastYear") VALUES ($1, $2, $3, 0, NULL) ON CONFLICT ("documentType") DO NOTHING',
+      [documentType, prefix, includeYear],
+    );
   }
 
   /**
