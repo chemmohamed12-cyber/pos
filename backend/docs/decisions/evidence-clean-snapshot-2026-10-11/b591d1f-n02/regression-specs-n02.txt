@@ -1,0 +1,17 @@
+# specs touching reservations / fulfilment / dispatch paths
+src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+src/domains/delivery/interface/delivery.company-isolation.spec.ts
+src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
+src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+src/domains/manufacturing/interface/work-order.company-isolation.spec.ts
+src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+src/domains/returns/interface/returns.company-isolation.spec.ts
+src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts
+src/domains/shipment/interface/shipment.company-isolation.spec.ts

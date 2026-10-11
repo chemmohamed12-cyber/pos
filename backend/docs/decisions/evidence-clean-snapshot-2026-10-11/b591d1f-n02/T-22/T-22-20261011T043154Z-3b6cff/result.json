@@ -1,0 +1,17 @@
+{
+  "testId": "T-22",
+  "runId": "T-22-20261011T043154Z-3b6cff",
+  "finishedAt": "2026-10-11T04:32:01.095Z",
+  "results": [
+    {
+      "id": "F-AUD-003-S-control",
+      "status": "PASS",
+      "note": "{\"chainValid\":true,\"storedSeqs\":[1,2],\"sequenceLastValue\":2}"
+    },
+    {
+      "id": "F-AUD-003-R-after-rollback",
+      "status": "FAIL-DEFECT",
+      "note": "{\"rolledBack\":true,\"chainValid\":false,\"brokenAtSeq\":4,\"storedSeqs\":[1,2,4],\"sequenceLastValue\":4}"
+    }
+  ]
+}

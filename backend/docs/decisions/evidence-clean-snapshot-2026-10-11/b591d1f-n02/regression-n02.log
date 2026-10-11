@@ -1,0 +1,287 @@
+
+=== REGRESSION: src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts (40.897 s)
+  D3 — inventory movement posting (Model A) — real-Postgres, A/B
+    √ 1. OPENING STOCK → GL: Dr Inventory / Cr the CONFIGURED opening-balance account for qty × supplied cost; valuation bootstrapped (137 ms)
+    √ 2. PURCHASE RECEIPT (GR) is NOT re-published by D3 — its own GRNI event posts it (Dr Inventory / Cr GRNI), valuation +60 (77 ms)
+    √ 3. ADJUSTMENT INCREASE → GL at the warehouse moving-average cost: Dr Inventory / Cr configured Gain; valuation increased at that cost (72 ms)
+    √ 4. ADJUSTMENT DECREASE → GL: Dr configured Loss / Cr Inventory at the consumed average cost; valuation decreased (72 ms)
+    √ 5. TRANSFER A→B → NO GL; valuation carried at the source average; TOTAL valuation unchanged (33 ms)
+    √ 6. RETURN-IN → a financial event EXISTS and is REJECTED with the explicit D4 reason (no invented account, no journal, valuation untouched) (26 ms)
+    √ 7. RECONCILIATION: Σ inventory valuation = GL Inventory control account, and every journal balances (9 ms)
+    √ 8. FAIL-CLOSED: unset adjustment-gain config ⇒ REJECTED with the config reason, NO fallback account, valuation NOT mutated; after configuring, redrive posts it and the reconciliation still holds (84 ms)
+    √ 9. ISOLATION: Company B is untouched (no stock, valuation, events or journals) and the Platform/control-plane DB was never used (19 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        41.249 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-posting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+PASS src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts (28.49 s)
+  D3-B — manual receipt policy (explicit cost + controlled reason → configured offset) — real-Postgres, A/B
+    √ 1. VALID cost + VALID reason → posted: stock +10, valuation 10 @ 3.50, GL Dr 1120 35.00 / Cr the reason-configured account (4201) (185 ms)
+    √ 1b. a DIFFERENT valid reason selects ITS OWN offset account (DONATION → 3105) — no shared/generic account; the movement endpoint path behaves the same (81 ms)
+    √ 2. MISSING / non-positive cost → rejected BEFORE mutation (no stock, document, valuation, outbox or journal change) — both entry paths (240 ms)
+    √ 3. MISSING reason code → rejected BEFORE mutation — both entry paths (free-text `reason` alone is not accepted) (64 ms)
+    √ 4. reason WITHOUT a configured GL account → rejected BEFORE mutation, no fallback account is ever used (34 ms)
+    √ 5. WRONG GL mapping → rejected BEFORE mutation: account not in the chart (GHOST→9999) and a control account (CTRL→1120) (51 ms)
+    √ 5b. config changes AFTER the draft was created → the post re-validates inside its transaction: rejected, document NOT posted, NOTHING mutated (46 ms)
+    √ 5c. EVENT-TIME fail-closed: mapping removed between movement and GL event → REJECTED (reason + config key named), no journal, no fallback; restored → redrive POSTS (77 ms)
+    √ 5d. a posted cost-bearing manual receipt is NOT reversible as a document (rejected before mutation) — Adjustment decrease is the approved route (95 ms)
+    √ 6/9/10. RECONCILIATION: Σ inventory valuation = GL Inventory 1120 after the whole scenario, and every journal is balanced (18 ms)
+    √ 7/8. ISOLATION: everything stayed in Company A; Company B is untouched; the Platform/control-plane DB holds no outbox/stock/journal rows (25 ms)
+    √ 7b. Company B can run its OWN manual receipt (its own chart/valuation) and it posts only in B — A stays unchanged (135 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        28.566 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\manual-receipt.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/delivery/interface/delivery.company-isolation.spec.ts
+PASS src/domains/delivery/interface/delivery.company-isolation.spec.ts (25.581 s)
+  DeliveryController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ recordOutcome ('failed') for Company A transitions its own shipment and writes the outcome inside Company A's own database (55 ms)
+    √ recordOutcome for Company B transitions independently in Company B's own database (43 ms)
+    √ recordCollection for Company A posts custody cash-in against Company A's own custody account — never Company B's (43 ms)
+    √ recordCollection for Company B posts independently against Company B's own custody account (39 ms)
+    √ listPendingRemittances via Company A resolves only Company A's own collection — never Company B's (3 ms)
+    √ remitCollection for Company A transfers custody -> settlement inside Company A's own database (45 ms)
+    √ Test F — resolving Company A's delivery data never even requests Company B's DataSource (8 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        25.655 s
+Ran all test suites matching /src\\domains\\delivery\\interface\\delivery.company-isolation.spec.ts/i.
+RESULT PASS src/domains/delivery/interface/delivery.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+PASS src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts (24.163 s)
+  FulfillmentController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createFulfillmentOrder for Company A creates its Fulfillment Order + Pick Task inside Company A's own database (48 ms)
+    √ createFulfillmentOrder for Company B creates independently in Company B's own database — no leakage of Company A's order (36 ms)
+    √ listFulfillmentOrders via Company A resolves only Company A's own Fulfillment Order — never Company B's (4 ms)
+    √ listFulfillmentOrders via Company B resolves only Company B's own Fulfillment Order — no leakage of Company A's data (2 ms)
+    √ Test F — resolving Company A's Fulfillment Orders never even requests Company B's DataSource (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        24.237 s
+Ran all test suites matching /src\\domains\\fulfillment\\interface\\fulfillment.company-isolation.spec.ts/i.
+RESULT PASS src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+PASS src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts (23.299 s)
+  InventoryValuationController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ getUnitCost for Company A's own product/warehouse resolves Company A's own average cost (6 ms)
+    √ getUnitCost for Company B's own product/warehouse resolves Company B's own average cost — never Company A's (3 ms)
+    √ getUnitCost for Company A's product/warehouse via Company B's manager resolves null — the row genuinely does not exist in Company B's own database (3 ms)
+    √ Test F — resolving Company A's valuation state never even requests Company B's DataSource (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        23.377 s
+Ran all test suites matching /src\\domains\\inventory-valuation\\interface\\inventory-valuation.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
+PASS src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts (26.116 s)
+  InventoryController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ listWarehouses via Company A resolves only Company A's real warehouse (6 ms)
+    √ listWarehouses via Company B resolves only Company B's real warehouse — no leakage of Company A's data (2 ms)
+    √ getAvailable for Company A's own warehouse/product resolves the correct on-hand/reserved figures — never Company B's (55 ms)
+    √ getAvailable for Company A's warehouse/product via Company B's manager sees nothing (the rows genuinely do not exist in Company B's own database) (56 ms)
+    √ getActiveReservationsForOrder via Company A resolves only Company A's real reservation (5 ms)
+    √ recordMovement writes into the correct Company's own ledger — verified via that Company's own getOnHand afterwards (34 ms)
+    √ Test F — resolving Company A's inventory never even requests Company B's DataSource (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        26.192 s
+Ran all test suites matching /src\\domains\\inventory-warehouse\\interface\\inventory.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+PASS src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts (16.091 s)
+  InventoryController.stockReportExport — warehouse scope
+    √ a scoped caller: the visible-warehouse set is passed to the report BEFORE aggregation (9 ms)
+    √ an unrestricted caller: no filter is applied (unchanged behaviour) (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        16.164 s
+Ran all test suites matching /src\\domains\\inventory-warehouse\\interface\\stock-report-export.scope.spec.ts/i.
+RESULT PASS src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+PASS src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts (26.489 s)
+  D1 — Item↔Warehouse assignment (master data, grid scope, backfill) — real-Postgres, A/B
+    √ 1. BACKFILL (the migration's own SQL on pre-existing data): every pair with a stock movement or an active reservation is assigned; nothing else (43 ms)
+    √ 2. MASTER DATA ONLY: warehouse_items has no quantity/value column; UNIQUE per pair (139 ms)
+    √ 3. ASSIGN is bulk + idempotent; an unknown item or warehouse is rejected with ZERO writes (42 ms)
+    √ 4. GRID default scope = assigned items + any item still holding stock; "all" = the whole catalogue; every row reports `assigned` (33 ms)
+    √ 5. DEFAULT/ORIGIN, not a restriction: removing the marker is always allowed (it is metadata) — the stock stays the ledger sum and the item stays visible as "holds stock, not a default" (32 ms)
+    √ 6. NOTHING is blocked by assignment (advisory stage): a movement for an UNASSIGNED pair still posts and stock stays the ledger sum (8 ms)
+    √ 7. ISOLATION: Company B has its own (empty) assignments; A's ids are unknown to B; the Platform/other-Company DataSource is never requested (38 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        26.558 s
+Ran all test suites matching /src\\domains\\inventory-warehouse\\interface\\warehouse-item-assignment.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+PASS src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts (21.73 s)
+  WarehouseTransactionsController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createTransaction (receipt) for Company A writes its document + lines inside Company A's own database (39 ms)
+    √ createTransaction (receipt) for Company B writes independently in Company B's own database (30 ms)
+    √ transition('submit') for Company A auto-posts the receipt and writes the stock movement only into Company A's ledger (39 ms)
+    √ listTransactions via Company A resolves only Company A's own document, and via Company B only Company B's (8 ms)
+    √ startCount for Company B creates the count document only in Company B, capturing its own on-hand (15 ms)
+    √ getOverview via Company A reports Company A's own figures (1 warehouse, 7 units on hand at 10.00) (87 ms)
+    √ Test F — resolving Company A's warehouse transactions never even requests Company B's DataSource (13 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        21.82 s
+Ran all test suites matching /src\\domains\\inventory-warehouse\\interface\\warehouse-transactions.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/manufacturing/interface/work-order.company-isolation.spec.ts
+PASS src/domains/manufacturing/interface/work-order.company-isolation.spec.ts (34.456 s)
+  WorkOrderController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createWorkOrder for Company A writes inside Company A's own database (36 ms)
+    √ createWorkOrder for Company B writes independently in Company B's own database (30 ms)
+    √ release for Company A snapshots A's BOM, reserves A's stock and creates the WIP sub-warehouse only in A's database (83 ms)
+    √ materialIssue for Company A moves A's stock warehouse -> WIP in A's ledger only; B's stock is untouched (80 ms)
+    √ hold for Company A moves only A's work order to on_hold; B's stays draft (16 ms)
+    √ listWorkOrdersWithSummary via Company A shows only A's work order (WIP 20.0000); via Company B only B's (no WIP warehouse yet -> 0.0000) (168 ms)
+    √ getWorkOrderOrThrow / release / materialIssue of Company A's work order through Company B's manager is rejected (A→B DENY) (81 ms)
+    √ Test F — resolving Company A's work orders never even requests Company B's DataSource (24 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        34.526 s
+Ran all test suites matching /src\\domains\\manufacturing\\interface\\work-order.company-isolation.spec.ts/i.
+RESULT PASS src/domains/manufacturing/interface/work-order.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+PASS src/domains/returns/interface/returns-accounting.company-isolation.spec.ts (37.281 s)
+  D4 — returns accounting (inventory/COGS, Revenue/AR/tax reversal, customer credit) — real-Postgres, A/B
+    √ 0. SETUP — original sales through real paths: receipt @4.00, dispatches of O1/O2/O3 costed at 4.00, then the average is moved to 6.40; O1/O3 invoiced (516 ms)
+    √ 1/3/4/5/6/7. SALES RETURN linked to O1 (4 of 10): stock restored at the ORIGINAL cost 4.00 (not the 7.00 average) → Dr 1120 16 / Cr COGS 16; Revenue/AR/tax reversed from the ORIGINAL invoice value → Dr 4102 40 + Dr 2120 5.60 / Cr AR 45.60; customer credit 45.60 (237 ms)
+    √ 2. QUANTITY CAP stays enforced (shared across both return types): the remaining 6 of O1 can be returned, 7 cannot (85 ms)
+    √ 5b. the REST of O1 (6) reverses the invoice EXACTLY (cumulative rounding): net 60, tax 8.40 → invoice fully credited, customer balance for O1 back to 0, invoice paid (219 ms)
+    √ 8. SHIPMENT RETURN of a sale that was never invoiced (O2): inventory/COGS ONLY at the original exit cost — no Revenue reversal, no AR credit, no ledger entry (140 ms)
+    √ 9. SHIPMENT RETURN of an INVOICED, already PAID sale (O3): the FULL reversal — inventory/COGS + Dr Sales Returns / Cr AR — and the balance stays in the CUSTOMER's favour (no cash refund) (692 ms)
+    √ 10. INVALID / MISSING SOURCE → rejected with ZERO mutation: unknown return id; an order never dispatched (original cost indeterminable); an order without a restock warehouse (137 ms)
+    √ 11. MISSING ACCOUNTING CONFIGURATION → rejected BEFORE mutation (nothing written, document stays requested); restored → the SAME document completes and posts (278 ms)
+    √ 11b. EVENT-TIME fail-closed: a Sales Returns mapping removed after the movement → the credit event is REJECTED (config key named, no journal); re-driven once configured (69 ms)
+    √ 15. DEBITS = CREDITS and the reconciliations hold: every journal balances; Σ valuation = GL Inventory 1120; GL AR 1110 = Σ Customer Ledger (the manufactured 10.00 event aside) (11 ms)
+    √ 12/13/14. ISOLATION: everything stayed in Company A; Company B is untouched (no stock, valuation, events, journals, ledger, outbox) and the Platform/control-plane outbox is empty (32 ms)
+    √ 12b. a return id of Company A completed through Company B's manager is rejected (A→B DENY) and changes nothing (19 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        37.376 s
+Ran all test suites matching /src\\domains\\returns\\interface\\returns-accounting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/returns.company-isolation.spec.ts
+PASS src/domains/returns/interface/returns.company-isolation.spec.ts (31.471 s)
+  ReturnsController Area 21 retrofit — real-Postgres Company isolation
+    √ a return request is created in its own Company; a foreign order line is not a valid reference (156 ms)
+    √ authorize → receive → inspect moves stock only inside the Company (its own return sub-location is provisioned there) (56 ms)
+    √ disposition creates the customer credit in the same Company; credits and invoice application stay Company-local (224 ms)
+    √ Test F — nothing leaked into the other Company's credits (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        31.556 s
+Ran all test suites matching /src\\domains\\returns\\interface\\returns.company-isolation.spec.ts/i.
+RESULT PASS src/domains/returns/interface/returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+PASS src/domains/returns/interface/sales-returns.company-isolation.spec.ts (33.51 s)
+  SalesReturnsController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createSalesReturn for Company A writes the return + lines inside Company A's own database (64 ms)
+    √ createSalesReturn for Company B writes independently in Company B's own database (50 ms)
+    √ createSalesReturn with Company A's order line through Company B's manager is rejected (wrong-resource-id DENY) (32 ms)
+    √ completeSalesReturn for Company A restocks into Company A's own ledger only (44 ms)
+    √ listSalesReturns via Company A returns only A's return (state completed, A's customer); via Company B only B's (state requested) (9 ms)
+    √ getSalesReturnDetail / completeSalesReturn of Company A's id through Company B's manager is rejected (A→B DENY) (5 ms)
+    √ listEligiblePurchaseLines resolves only the owning Company's own purchase history (5 ms)
+    √ Test F — resolving Company A's sales returns never even requests Company B's DataSource (10 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        33.595 s
+Ran all test suites matching /src\\domains\\returns\\interface\\sales-returns.company-isolation.spec.ts/i.
+RESULT PASS src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+PASS src/domains/returns/interface/shipment-returns.company-isolation.spec.ts (29.901 s)
+  ShipmentReturnsController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createShipmentReturn for Company A writes the return + lines inside Company A's own database (54 ms)
+    √ createShipmentReturn for Company B writes independently in Company B's own database (45 ms)
+    √ createShipmentReturn against Company A's shipment through Company B's manager is rejected (wrong-resource-id DENY) (36 ms)
+    √ getReturnableLines reflects only the owning Company's own prior returns (A: 3 returned, B: 5 returned) (12 ms)
+    √ completeShipmentReturn for Company A restocks into Company A's own ledger only (52 ms)
+    √ listShipmentReturns via Company A returns only A's (completed, 30.00, A's customer); via Company B only B's (requested, 50.00) (16 ms)
+    √ getShipmentReturnDetail / completeShipmentReturn of Company A's id through Company B's manager is rejected (A→B DENY) (7 ms)
+    √ Test F — resolving Company A's shipment returns never even requests Company B's DataSource (17 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        29.996 s
+Ran all test suites matching /src\\domains\\returns\\interface\\shipment-returns.company-isolation.spec.ts/i.
+RESULT PASS src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts
+PASS src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts (31.977 s)
+  SalesOrdersController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ listOrders via Company A resolves only Company A's real order (14 ms)
+    √ listOrders via Company B resolves only Company B's real order — no leakage of Company A's data (10 ms)
+    √ Test F — resolving Company A's orders never even requests Company B's DataSource (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        32.061 s
+Ran all test suites matching /src\\domains\\sales-orders\\interface\\sales-orders.company-isolation.spec.ts/i.
+RESULT PASS src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/shipment/interface/shipment.company-isolation.spec.ts
+PASS src/domains/shipment/interface/shipment.company-isolation.spec.ts (20.56 s)
+  ShipmentController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ createShippingCompany for Company A provisions its own warehouse + custody account inside Company A's own database (55 ms)
+    √ createShippingCompany for Company B provisions independently in Company B's own database — no leakage of Company A's warehouse/account (38 ms)
+    √ listShippingCompanies via Company A resolves only Company A's own shipping company — never Company B's (3 ms)
+    √ listShippingCompanies via Company B resolves only Company B's own shipping company — no leakage of Company A's data (2 ms)
+    √ Test F — resolving Company A's shipping companies never even requests Company B's DataSource (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        20.626 s
+Ran all test suites matching /src\\domains\\shipment\\interface\\shipment.company-isolation.spec.ts/i.
+RESULT PASS src/domains/shipment/interface/shipment.company-isolation.spec.ts
+
+REGRESSION DONE: 16/16 passed
+EXIT 0

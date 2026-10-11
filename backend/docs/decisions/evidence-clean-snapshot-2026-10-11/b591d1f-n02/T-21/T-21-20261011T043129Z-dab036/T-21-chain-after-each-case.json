@@ -1,0 +1,26 @@
+{
+  "after-A-plain": {
+    "valid": true,
+    "brokenAtSeq": null
+  },
+  "after-A-transaction": {
+    "valid": true,
+    "brokenAtSeq": null
+  },
+  "after-B": {
+    "valid": true,
+    "brokenAtSeq": null
+  },
+  "after-C": {
+    "valid": true,
+    "brokenAtSeq": null
+  },
+  "after-D": {
+    "valid": false,
+    "brokenAtSeq": 26
+  },
+  "after-E": {
+    "valid": false,
+    "brokenAtSeq": 26
+  }
+}

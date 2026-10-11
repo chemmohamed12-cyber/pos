@@ -1,0 +1,20 @@
+{
+  "request": {
+    "warehouseId": "401d1727-76fa-4a0a-8153-cdd91fdf195f",
+    "productId": "e3986c5a-80e0-4925-9aa5-25caa867b4be",
+    "quantity": 0,
+    "movementType": "dispatch"
+  },
+  "user": "6c9120e1-acf4-4ab0-975f-254b8354feeb",
+  "status": 410,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "REQUEST_ERROR",
+      "message": "Movement type \"dispatch\" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns)."
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}
