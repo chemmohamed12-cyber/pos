@@ -1,0 +1,32 @@
+=== install: npm ci --no-audit --no-fund
+    -> PASS
+=== build: npm run build
+    -> PASS
+=== lint: npm run lint
+    -> PASS
+=== structure: npm run validate:structure
+    -> PASS
+=== doc-links: node tools/validation/check-doc-links.js --json ci-output/doc-links.json
+    -> PASS
+=== unit: npm run test:unit
+    -> PASS
+=== db-guard: npm run test:db-guard
+    -> PASS
+# CI summary
+
+- commit: 4fece22
+- node: v20.20.2   npm: 10.8.2
+- started (UTC): 2026-10-11T03:49:25Z
+
+| step | result | seconds |
+|---|---|---|
+| install | PASS | 61 |
+| build | PASS | 53 |
+| lint | PASS | 42 |
+| structure | PASS | 2 |
+| doc-links | PASS | 0 |
+| unit | PASS | 144 |
+| db-guard | PASS | 4 |
+
+**Overall: PASS**
+CI_EXIT 0

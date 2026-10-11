@@ -1,6 +1,6 @@
 # N-01 — Remediation record and closure status (2026-10-11)
 
-**Status: CODE CHANGE COMMITTED (`23e5ec1`) — CLOSURE NOT DECLARED.** The acceptance evidence that still has to land is listed in §6 (clean-snapshot regression, per-endpoint concurrency specs). Authority: CTO directive "TEST-03 Findings, Decisions & Authorized Next Steps" §1.
+**Status: CLOSED for the local scope (2026-10-11) — see §7 for the closure review; originally: code change committed (`23e5ec1`), closure not declared until the clean-snapshot evidence (§6A) was received.** The acceptance evidence that still has to land is listed in §6 (clean-snapshot regression, per-endpoint concurrency specs). Authority: CTO directive "TEST-03 Findings, Decisions & Authorized Next Steps" §1.
 
 ## 1. Root cause (VERIFIED)
 `NumberingService.getNextNumber` and `ProcessEngineService.transition` took a row lock (`SELECT … FOR UPDATE`) and then wrote, using `manager ? run(manager) : dataSource.transaction(run)`. Controllers pass `req.companyContext.dataSource.manager`, a manager with **no open transaction**; every statement then auto-commits, the lock is released at once, and concurrent callers interleave. Same mechanism as F-AUD-002, F-TRS-001 and F-PAY-001.
@@ -45,7 +45,7 @@ Other primitives still use the old join-without-check idiom: `inventory.service`
 | Evidence and remaining limitations documented | this document | — |
 Limitations: probes use 15–20-way concurrency on a 2-core machine; no multi-instance run; the 23 internal-only sites are covered by reasoning, not by individual tests; N-02 candidates are open.
 
-**N-01 is not closed** until the regression row is PASS and the per-endpoint specs are recorded here.
+*(Superseded: the regression row and the per-endpoint specs are recorded in §6A and reviewed in §7 — N-01 is closed for the local scope.)*
 
 
 ## 6A. Verification-track results (appended 2026-10-11 by the verification session)
@@ -68,3 +68,38 @@ Reconciliation of commits and evidence: `docs/decisions/test-program/COMMIT-AND-
 - Open findings outside N-01: T-20 diagnostics (limit engine, reservation release/fulfil double dispatch, process start), T-18 schema drift.
 
 **Verification-track conclusion:** the N-01 acceptance rows for duplicate numbers, legal transition limits, the customer-creation path (service and HTTP level), the business regression, guard, unit and the isolation specs that call the changed primitives are **PASS on a clean snapshot of `a6002fa`**. Closure of N-01 itself is the reviewer decision.
+
+## 7. Closure review (implementation session, 2026-10-11, after the verification session reported "done")
+**Reviewer note:** the code under review was written by this session; the test evidence was produced by the separate verification session. The checks below are this session's independent re-examination of that evidence (not a re-run of the suites, which the cluster-exclusivity rule forbade while they ran). Final sign-off remains the CTO's.
+
+### 7.1 What was re-checked and how
+| Check | Method | Result |
+|---|---|---|
+| Tested commit is the one claimed, clean tree | `SOURCE_COMMIT.txt` = `a6002fa6534fd278d99263fdd01d0d61e23b50ec`; `run-header.json` of T-09, T-10, T-17, T-19 carry the same commit and `dirtyPaths: []` | confirmed |
+| Snapshot code = current HEAD code | `git diff --name-only a6002fa HEAD -- backend/src backend/tools backend/package.json` is empty (only evidence/docs commits `a205666`, `4fece22` follow) | confirmed — HEAD `4fece22` has the product code that was tested |
+| Contains both fixes | `a6002fa:…/numbering.service.ts` has `runInTransaction` and `ON CONFLICT`; `process-engine.service.ts` uses the helper | confirmed |
+| Pre-fix contrast is really pre-fix | `74920fc` numbering and process-engine files contain no `runInTransaction`; the contrast snapshot's `SOURCE_COMMIT.txt` = `74920fc…`. Note: its per-run `run-header.json` shows `6d062cb` (the parent repository HEAD at that time, because the pinning feature was not yet in the snapshot) — attribution therefore rests on `SOURCE_COMMIT.txt`, the code check above and the failing behaviour itself | accepted, with this caveat |
+| Isolation list complete | `git grep -l registerDocumentType` at `a6002fa` over spec files = 24; 4 are business-suite T-specs (T-07, T-16, T-17 probe, T-19), the other 20 equal `regression-specs-registerdoc.txt` line for line (empty `comm` both ways); `regression-registerdoc.log`: "REGRESSION DONE: 20/20 passed", exit 0 | confirmed |
+| Business suite | `biz-full.log` "ALL REQUESTED STEPS PASSED", exit 0; T-17 6 PASS, T-19 15 PASS, T-10 1 PASS (one consistent commit), T-09 36 PASS | confirmed from result files |
+| Unit and guard | `unit.log` 59 suites / 430 tests; `guard.log` 50/50 | confirmed |
+| Final tree builds, lints and passes the CI script | clean `git archive HEAD` (`4fece22`) → `tools/ci/ci.sh` (offline cache): install 61 s · build 53 s · lint 42 s (0 errors) · structure · doc links (0 unresolved) · unit 144 s (59/430) · guard 4 s → **Overall PASS** (`evidence/ci-run-final-head-snapshot.log`) | PASS |
+| Excluded evidence | `T-19-20261011T000719Z-1828a1` and `T-19-20261011T000721Z-2eb9e4` (overlapping runs / wiring defect) are not used anywhere above | excluded |
+
+### 7.2 Closure criteria (CTO directive "N-01 Final Verification")
+| Criterion | Status | Evidence |
+|---|---|---|
+| Final clean-snapshot pipeline passes all required checks | **PASS** | §6A; `evidence-clean-snapshot-2026-10-11/a6002fa/` |
+| Supplier first-use concurrency scenario verified against the database | **PASS** — `T-19-supplier.create-plain` 80/80 (before: 9/80, 71 × 23505); `T-19-N02-registerDocumentType-plain/transaction` 0 errors, 1 row, 10 rounds | `a6002fa/T-19/…/result.json`, `74920fc-before-fix-T19/` |
+| Numbering uniqueness and HTTP customer-creation behaviour | **PASS** — customer/supplier/price-list/sales-rep creates 80/80 with distinct codes (160/160, 160/160, 161/161, 160/160 incl. control style); `POST /api/customers` 120/120 → 201, 120 distinct codes; T-17 numbering 200/200 distinct, transitions capped at 2 | same |
+| Relevant isolation and regression tests pass | **PASS** — 20/20 isolation specs, T-00…T-20 sequential run exit 0, unit, guard | §6A |
+| Commit and working-tree reconciliation complete | **PASS** — `COMMIT-AND-EVIDENCE-RECONCILIATION-2026-10-11.md` + §7.1 (tested snapshot = HEAD product code; earlier working-tree runs labelled historical; other tracks' uncommitted files excluded from every snapshot) | — |
+| Closure evidence independently reviewed | **PASS** — §7.1 (author ≠ test producer; CTO sign-off pending) | — |
+
+### 7.3 Residual risks and what this closure does NOT claim
+- Only the T-19 paths (customer, supplier, price list, sales rep), the HTTP customer endpoint and the primitives were exercised concurrently; the other 78 caller-manager call sites are protected **by construction** (they all reach the primitive) and by the 20 isolation specs, not by per-site concurrency tests.
+- Concurrency was 15–20-way on a 2-core machine; no multi-instance run, no soak, no hosting evidence.
+- `T-18` (schema drift) and `T-20` (N-02 probes) record **open FAIL-DEFECT findings that are not N-01** (limit engine, reservation release/fulfil double-dispatch, process-engine start errors, integration tables). They are tracked in `N-02-DIAGNOSTIC-PROBES-REPORT-2026-10-11.md` and are not remediated.
+- Process-engine `start` (check-then-insert) still raises unique-violation errors under racing starts (N-02 H4); numbering and transitions do not.
+
+### 7.4 Decision
+**N-01: CLOSED for the local scope (2026-10-11)** — all closure criteria are met on clean-snapshot evidence of `a6002fa`, the product code is identical in HEAD `4fece22`, and the final tree passes the CI script. The closure does not extend to hosting, multi-instance operation or the N-02 findings. The earlier "NOT closed" wording in the status line of this document is superseded by this section.
