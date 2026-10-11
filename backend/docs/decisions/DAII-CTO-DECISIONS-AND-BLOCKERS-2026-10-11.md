@@ -49,6 +49,7 @@ Part C of the planning package. Companions: `DAII-MASTER-EXECUTION-PLAN-2026-10-
 | DEC-22 | C+B | CTO + Manufacturing owner | WP-P0M-01…06 | 3 |
 | DEC-23 | C+B | CTO + HR owner | WP-SEC-02 (final), P0H-03, P0H-09 | 3 |
 | DEC-24 | C+B | CTO + Treasury owner | WP-P0H-06, HR-07 | 3 |
+| DEC-25 | C+B | CTO + security/audit owner | WP-AUD-09 | 3 |
 
 Priority 1 = unblocks a P0 stream; 2 = unblocks Phase 1 critical items or a security gate; 3 = needed during Phase 1 design or review; 4 = Phase 2 or governance.
 
@@ -72,7 +73,7 @@ Format: **Question** · **Owner/type** · **Affected packages** · **Documented 
 - **Documented options.** (a) Accept and annotate: record the first broken sequence and cause, keep rows untouched. (b) Authorised repair procedure: only with a verified backup and independent review; **no in-place rewrite without separate approval** (roadmap P0A-5). No further options are documented.
 - **Consequence of deferral.** The fix can ship but existing Companies keep an unverifiable chain with no recorded policy; restore verification for them stays ambiguous.
 - **Evidence required.** WP-AUD-02 inventory (how many Companies, where the first break is, whether breaks are all rollback-caused). Supplied by: verification track on non-production databases with authorised read-only access.
-- **Related observation (CTO to decide whether to track it).** The active UUID-repair core (`src/database/uuid-repair.core.ts`, Release Center Controlled Data Repair) lists `audit_records.actorUserId` and `organizationId` among the references it rewrites; these are audit-hash inputs. Code reading only; whether any Company needs that repair is unknown.
+- **Related, separate finding PA-43 / DEC-25.** The active UUID-repair core lists `audit_records.actorUserId` and `organizationId` among the references it rewrites; these are audit-hash inputs (code reading only; need unknown). It is tracked separately and is not part of this decision.
 
 ### DEC-03 — Accounting shape of payroll
 - **Question.** What exactly is posted for a payroll run and its disbursement: posting amount (gross; gross plus commission; later tax and insurance split), accounts, treatment of partial or failed disbursement, cost-centre allocation, and what the reconciliation and closing audit must check?
@@ -231,6 +232,13 @@ Format: **Question** · **Owner/type** · **Affected packages** · **Documented 
 - **Consequence of deferral.** Disbursement stays a per-line cash-out with no instrument.
 - **Evidence required.** The owner's process description.
 
+### DEC-25 — Policy for UUID repair versus the audit hash chain (added after roadmap `50b3fc1`; DEC-01…DEC-24 unchanged)
+- **Question.** If UUID repair is ever needed on a Company database, how may it treat `audit_records.actorUserId` and `organizationId` (hash inputs) without invalidating the historical chain: exclude them from the rewrite, rewrite and re-anchor under a separately approved procedure, or forbid the repair on Companies with audit rows referencing non-compliant ids?
+- **Owner/type.** CTO with the security/audit owner (C+B). **Affects.** WP-AUD-09; PA-43. Independent of DEC-02 (already-broken chains) and of PA-33.
+- **Documented options.** None documented. The repair core states it deliberately does not rewrite ids inside the JSON columns of audit records; it does rewrite the two scalar columns.
+- **Consequence of deferral.** The repair must not be run on any database with audit rows referencing non-compliant ids; the risk stays unquantified.
+- **Evidence required.** WP-AUD-09: complete path trace and independent review; read-only need check per Company under authorised access. **No decision is taken here and nothing is run.**
+
 ## 3. Technical investigations (not decisions) that feed the decisions
 
 | Investigation | Package | Feeds | Can start now? |
@@ -262,6 +270,6 @@ Format: **Question** · **Owner/type** · **Affected packages** · **Documented 
 | Phase 0 (P0H, P0M) | DEC-05, DEC-18, DEC-22, DEC-23 | Owner inputs |
 | Phase 2 | DEC-11, DEC-12, DEC-18 | Host, tenancy option, requirement scopes |
 
-## 5. Summary counts (from the §1 "Type" column)
+## 5. Summary counts (from the §1 "Type" column plus DEC-25)
 
-24 decisions: **12 CTO decisions** (DEC-01, 06, 07, 08, 09, 10, 11, 12, 13, 19, 20, 21); **6 business-owner decisions** (DEC-03 with CTO co-signature, 04, 05, 15, 17, 18); **6 joint CTO + business-owner decisions** (DEC-02, 14, 16, 22, 23, 24). No decision is created, merged or renumbered relative to the roadmap.
+25 decisions: **12 CTO decisions** (DEC-01, 06, 07, 08, 09, 10, 11, 12, 13, 19, 20, 21); **6 business-owner decisions** (DEC-03 with CTO co-signature, 04, 05, 15, 17, 18); **7 joint CTO + business-owner decisions** (DEC-02, 14, 16, 22, 23, 24, 25). DEC-25 was added after the roadmap; DEC-01…DEC-24 keep their roadmap IDs and none is merged or renumbered.
