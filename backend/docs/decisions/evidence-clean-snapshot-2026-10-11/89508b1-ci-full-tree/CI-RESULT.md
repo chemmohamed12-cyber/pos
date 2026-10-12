@@ -1,0 +1,9 @@
+# CI on a full-tree clean `git archive` of 89508b152bd1434c2af448fcc578baf1b4f65280 (HEAD = 68c2215 + b4821ab test/docs + CI-evidence commit) — reviewer run, 2026-10-12
+DB-free. Run with `DAII_SOURCE_COMMIT=<sha>` because a `git archive` has no `.git`: without it the CI summary prints `commit: unknown` and the `db-guard` step fails its evidence-header test ("header pins commit": `unavailable`) — first run kept as `first-run-without-commit-pin.log` (install/build/lint/structure/doc-links/unit PASS, db-guard FAIL for that reason only). `summary.md` is the pinned run; its header still says `commit: unknown` (script limitation), the commit is `SOURCE_COMMIT.txt`.
+| step | result |
+|---|---|
+| install, build, lint (0 errors), structure, doc-links (82 files / 112 refs / 0 unresolved), unit (59/430), db-guard (50/50) | **PASS — Overall PASS** |
+## The 5 lint warnings (not errors; policy: not fatal)
+All are "Unused eslint-disable directive": a directive that silences a rule that does not fire any more. Cause for the four files under `src/foundation/testing/` (`biz-harness-smoke`, `biz-support`, `t09-…`, `t10-…`): the R2 override in `eslint.config.mjs` turns `no-require-imports` off for `src/foundation/testing/**`, so the in-file disables are redundant. The fifth (`src/foundation/database-registry/company-connection-manager.service.spec.ts:23`, `no-var-requires`) names a rule that no longer reports there. Removing the 5 directives is safe (no rule is re-enabled, no behaviour change) but touches 5 files outside the LA-1 change, so it was **not done**; recommended as a separate trivial cleanup if the project wants 0 warnings.
+## Scope of this note
+CI status for the specific commit above only. No DB step is part of CI. Official CI status in the program documents is not changed by this file. T-26/T-28 on `b4821ab` (relabelled expectations) and the 91-spec regression are database runs and are tracked separately.
