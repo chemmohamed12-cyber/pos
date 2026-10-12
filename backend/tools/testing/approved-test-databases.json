@@ -17,7 +17,8 @@
       "approvedBy": "CTO - DAII Autonomous Testing & Verification directive of 2026-10-10 (entry prepared by the agent for the dedicated cluster it created under that directive)",
       "approvedOn": "2026-10-10",
       "identityEvidence": "evidence-2026-10-10-biz-cluster/cluster-facts.json: dedicated cluster created by tools/testing/biz-cluster-setup.js (PostgreSQL 18, data dir .test-cluster/pg5546/data inside the project root, listen_addresses 127.0.0.1, port 5546, pg_hba loopback scram-sha-256 only); test role daii_biz_test = LOGIN CREATEDB only (no superuser/createrole/replication/bypassrls)",
-      "expectedSystemIdentifier": "7695079006474257732",
+      "expectedSystemIdentifier": "7695619915229547252",
+      "identityHistory": "2026-10-12: cluster rebuilt by tools/testing/biz-cluster-setup.js setup after the original (7695079006474257732) failed to start (checkpoint PANIC, fsync=off); same host/port/role/patterns; recorded in evidence-2026-10-12-biz-cluster-rebuild/",
       "scope": {
         "postgres": "ADMINISTRATIVE ONLY: exact CREATE/DROP DATABASE of names matching databasePatterns + read-only SELECT/SHOW; business tests can never run against it",
         "businessTests": "fresh disposable databases created by the approved harness for this run only; names must match databasePatterns",

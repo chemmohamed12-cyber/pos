@@ -9,7 +9,7 @@ const guard = require('./db-guard');
 
 const BACKEND = path.join(__dirname, '..', '..');
 const T = (database, port = 5546, host = '127.0.0.1') => ({ host, port, database });
-const facts = JSON.parse(fs.readFileSync(path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-10-biz-cluster', 'cluster-facts.json'), 'utf8'));
+const facts = JSON.parse(fs.readFileSync(path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-12-biz-cluster-rebuild', 'cluster-facts.json'), 'utf8')); // current cluster (rebuilt 2026-10-12)
 
 test('exactly one approved entry: complete, real approver text, valid date, no role patterns, postgres administrative-only', () => {
   const p = guard.loadPolicy();
@@ -64,7 +64,7 @@ test('statements: administrative connections create/drop only disposable names a
 });
 
 test('no credential value is in the policy file, the cluster facts, or the provisioning tool (checked against the live User-scope variables when available)', () => {
-  const files = [path.join(BACKEND, 'tools', 'testing', 'approved-test-databases.json'), path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-10-biz-cluster', 'cluster-facts.json'), path.join(BACKEND, 'tools', 'testing', 'biz-cluster-setup.js')];
+  const files = [path.join(BACKEND, 'tools', 'testing', 'approved-test-databases.json'), path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-10-biz-cluster', 'cluster-facts.json'), path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-12-biz-cluster-rebuild', 'cluster-facts.json'), path.join(BACKEND, 'tools', 'testing', 'biz-cluster-setup.js')];
   const secrets = [process.env.DAII_BIZ_PG_PASSWORD, process.env.DAII_BIZ_PG_BOOTSTRAP_PASSWORD].filter((s) => s && s.length >= 8);
   for (const f of files) {
     const t = fs.readFileSync(f, 'utf8');
