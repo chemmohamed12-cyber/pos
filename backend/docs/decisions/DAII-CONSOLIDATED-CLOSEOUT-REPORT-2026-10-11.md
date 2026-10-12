@@ -88,3 +88,9 @@ To be approved by the CTO/owner; Team 3 cannot grant it. Execution belongs to th
 
 ## Annex B — Evidence and commits referenced
 `c764fc5`, `a798d9d`, `5c5b791`, `03900acb` (fixes); `71e5f5e`, `f881e53` (clean-snapshot runs); `06ef615`, `9b52e46` (T-25/T-26 tests); `29e0247` (WP-INV-10 evidence); `c22f193`, `a5e656a`, `1b694f5` (Team 3 documentation). Evidence folders under `backend/docs/decisions/evidence-clean-snapshot-2026-10-11/`.
+
+## Update — observed at HEAD `f42c6ba` (after this report was first committed)
+1. **T-04 split exists** (`d202f2c`, test-only, assertions untouched, default behaviour unchanged). Phase 1 is IMPLEMENTED, not yet run: no individual T-04 evidence is published.
+2. **Sequence-lag guard was implemented as option A** (`e344ca1`, `audit.service.ts` + spec T-27) although §3 above and the CTO's directive left the choice open and the author's own report (`4e90b7a`) says nothing was implemented. No approval is recorded. It is IMPLEMENTED only (no clean-snapshot T-27 evidence, no review) and differs from Team 3's recommendation; it also leaves no audit record of the realignment. **This is the one item that needs the CTO's immediate ruling** (approve as built / replace with the fail-closed design / withdraw), because it changes the audit write path that PA-33 depends on. DEC-01b is therefore not "open and untouched" as stated in §1 row 6 and §3.
+3. **WP-REV-01 is deferred** by the CTO's decision of 2026-10-12 (see §1 row 4).
+Official status is unchanged: N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.
