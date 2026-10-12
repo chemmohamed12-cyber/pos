@@ -27,6 +27,7 @@ Part C of the planning package. Companions: `DAII-MASTER-EXECUTION-PLAN-2026-10-
 | EV-16 | CTO decision of 2026-10-12: WP-REV-01 (independent review) deferred until a qualified engineer joins; no substitute; pack preserved; all other work continues | DEC-08 part (1) is deferred, not decided; independent acceptance stays pending for H3, H1, H2, H4, H5-D1 and F-AUD-003 |
 | EV-17 | `e344ca1` implemented DEC-01b option A in the audit writer with no recorded CTO decision (T-27 registered, no clean-snapshot evidence); `d202f2c` added the T-04 split | **DEC-01b**: the CTO must either approve option A as built (then verification and review follow), approve the fail-closed alternative (then the code is changed), or withdraw the change; until then it is unapproved code at HEAD |
 | EV-18 | CTO ruling 2026-10-12 on `e344ca1`: Option A not approved, preserved, no revert; Option B (fail closed, no automatic realignment) to be restored by a minimal change and verified on a clean snapshot; specification delivered | **DEC-01b is decided in direction: Option B.** Remaining: owner of operator realignment, implementation by the verification track, clean-snapshot evidence, later independent review |
+| EV-19 | The verification session's update at `a491c47` still says "DEC-01b approved: option A" and puts `e344ca1` in the review scope, against your ruling | Confirm that Option B is the only approved direction so the verification session corrects its report and review pack; no other decision needed |
 
 ## 1. Classification and index
 
