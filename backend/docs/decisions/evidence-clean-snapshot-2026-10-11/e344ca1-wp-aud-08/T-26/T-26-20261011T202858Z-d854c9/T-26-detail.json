@@ -1,0 +1,102 @@
+{
+  "healthy": {
+    "rows": [
+      {
+        "seq": 1,
+        "prev10": "0000000000",
+        "hash10": "8c76f056ea"
+      },
+      {
+        "seq": 2,
+        "prev10": "8c76f056ea",
+        "hash10": "70893e012b"
+      },
+      {
+        "seq": 3,
+        "prev10": "70893e012b",
+        "hash10": "1f86c8ceda"
+      }
+    ],
+    "chainValid": true,
+    "brokenAtSeq": null,
+    "sequenceLastValue": 3
+  },
+  "L1": {
+    "append": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "8c76f056ea"
+        },
+        {
+          "seq": 2,
+          "prev10": "8c76f056ea",
+          "hash10": "70893e012b"
+        },
+        {
+          "seq": 3,
+          "prev10": "70893e012b",
+          "hash10": "1f86c8ceda"
+        },
+        {
+          "seq": 4,
+          "prev10": "1f86c8ceda",
+          "hash10": "77022a62c9"
+        }
+      ],
+      "chainValid": true,
+      "brokenAtSeq": null,
+      "sequenceLastValue": 4
+    }
+  },
+  "L2": {
+    "importedSeq": 104,
+    "chainValidBeforeAppend": true,
+    "append": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "8c76f056ea"
+        },
+        {
+          "seq": 2,
+          "prev10": "8c76f056ea",
+          "hash10": "70893e012b"
+        },
+        {
+          "seq": 3,
+          "prev10": "70893e012b",
+          "hash10": "1f86c8ceda"
+        },
+        {
+          "seq": 4,
+          "prev10": "1f86c8ceda",
+          "hash10": "77022a62c9"
+        },
+        {
+          "seq": 104,
+          "prev10": "77022a62c9",
+          "hash10": "3f7ddb0297"
+        },
+        {
+          "seq": 105,
+          "prev10": "3f7ddb0297",
+          "hash10": "bbd555efca"
+        }
+      ],
+      "chainValid": true,
+      "brokenAtSeq": null,
+      "sequenceLastValue": 105
+    }
+  }
+}

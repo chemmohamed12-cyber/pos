@@ -1,0 +1,52 @@
+{
+  "t2": {
+    "realigns": 0,
+    "chainValid": true
+  },
+  "t3": {
+    "append": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "sameHistory": true,
+    "added": 1,
+    "stillBroken": true
+  },
+  "t4": {
+    "ok": 40,
+    "added": 40,
+    "dupSeq": 0,
+    "forks": 0,
+    "tailLinked": true,
+    "realignments": 1
+  },
+  "t5": {
+    "rolledBack": true,
+    "sequenceAfterRollback": 47,
+    "nextAppend": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "maxSeq": 48,
+    "unique": true,
+    "tailPrev": true
+  },
+  "t6-setval-throws": {
+    "call": {
+      "ok": false,
+      "kind": "Error",
+      "message": "permission denied for sequence audit_records_seq_seq"
+    },
+    "rowsBefore": 47,
+    "rowsAfter": 47
+  },
+  "t6-setval-no-op": {
+    "call": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "audit sequence could not be brought ahead of the stored tail (tail 48, drawn 3); no audit record written"
+    },
+    "rowsBefore": 47,
+    "rowsAfter": 47
+  }
+}

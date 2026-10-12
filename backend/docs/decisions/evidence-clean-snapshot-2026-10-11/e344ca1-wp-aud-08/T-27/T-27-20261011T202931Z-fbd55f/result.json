@@ -1,0 +1,37 @@
+{
+  "testId": "T-27",
+  "runId": "T-27-20261011T202931Z-fbd55f",
+  "finishedAt": "2026-10-11T20:29:45.412Z",
+  "results": [
+    {
+      "id": "AT2-healthy-path-no-realignment",
+      "status": "PASS",
+      "note": "{\"realigns\":0,\"chainValid\":true}"
+    },
+    {
+      "id": "AT3-broken-chain-preserved",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":true,\"kind\":\"OK\"},\"sameHistory\":true,\"added\":1,\"stillBroken\":true}"
+    },
+    {
+      "id": "AT4-concurrent-appends-under-lag",
+      "status": "PASS",
+      "note": "{\"ok\":40,\"added\":40,\"dupSeq\":0,\"forks\":0,\"tailLinked\":true,\"realignments\":1}"
+    },
+    {
+      "id": "AT5-rollback-after-realignment",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"sequenceAfterRollback\":47,\"nextAppend\":{\"ok\":true,\"kind\":\"OK\"},\"maxSeq\":48,\"unique\":true,\"tailPrev\":true}"
+    },
+    {
+      "id": "AT6-fail-closed-setval-throws",
+      "status": "PASS",
+      "note": "{\"call\":{\"ok\":false,\"kind\":\"Error\",\"message\":\"permission denied for sequence audit_records_seq_seq\"},\"rowsBefore\":47,\"rowsAfter\":47}"
+    },
+    {
+      "id": "AT6-fail-closed-setval-no-op",
+      "status": "PASS",
+      "note": "{\"call\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"audit sequence could not be brought ahead of the stored tail (tail 48, drawn 3); no audit record written\"},\"rowsBefore\":47,\"rowsAfter\":47}"
+    }
+  ]
+}
