@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AuditRecord, AuditResult } from './audit-record.entity';
 import { computeAuditHash, GENESIS_HASH } from './audit-hash';
@@ -50,7 +50,7 @@ export interface RecordAuditInput {
 /** Arbitrary constant, unique to the audit chain; the lock is released automatically at the end of the writer's transaction. */
 const AUDIT_CHAIN_LOCK_KEY = 7_419_203_511;
 
-/** WP-AUD-08: raised (and the writer's transaction aborted) when the audit sequence cannot be brought ahead of the stored tail; no record is written. */
+/** WP-AUD-08 (DEC-01b, Option B — fail closed): raised (and the writer's transaction aborted) when the audit sequence is not ahead of the stored tail; no record is written and the sequence is not changed. */
 export class AuditSequenceLagError extends Error {
   constructor(message: string) {
     super(message);
@@ -60,8 +60,6 @@ export class AuditSequenceLagError extends Error {
 
 @Injectable()
 export class AuditService {
-  private readonly logger = new Logger(AuditService.name);
-
   constructor(private readonly dataSource: DataSource) {}
 
   async record(input: RecordAuditInput, manager?: EntityManager): Promise<AuditRecord> {
@@ -80,15 +78,17 @@ export class AuditService {
       // insert it explicitly. Gaps in seq are legitimate (verification checks hashes and prevHash links, not contiguity). Hash format and existing records are untouched.
       const seqName: string | null = (await m.query(`SELECT pg_get_serial_sequence('audit_records', 'seq') AS name`))[0]?.name ?? null;
       if (!seqName) throw new Error('audit_records.seq has no serial sequence; refusing to write an audit record whose hash input cannot be tied to the stored seq');
-      let seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
-      // WP-AUD-08 (DEC-01b, option A): the new row must sit strictly after the stored tail whose hash is `prevHash`, otherwise seq order and chain order disagree (sequence behind
-      // the data after a reset/restore/import: a duplicate-key outage or a silently broken chain). Realign the SEQUENCE (never the data) to the tail, under this same lock, then draw again.
-      // `setval(.., true)` is monotone here (only used when nextval <= tail), non-transactional (it survives a rollback, which is intended) and needs UPDATE on the sequence; any failure aborts the transaction.
-      if (tailSeq !== null && seq <= tailSeq) {
-        await m.query('SELECT setval($1::regclass, $2::bigint, true)', [seqName, tailSeq]);
-        seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
-        if (!(seq > tailSeq)) throw new AuditSequenceLagError(`audit sequence could not be brought ahead of the stored tail (tail ${tailSeq}, drawn ${seq}); no audit record written`);
-        this.logger.warn(`audit sequence was behind the stored tail and was realigned (tail ${tailSeq} -> next ${seq})`);
+      // WP-AUD-08 (DEC-01b, Option B — fail closed; CTO ruling 2026-10-12): the new row must sit strictly after the stored tail whose hash is `prevHash`, otherwise seq order and chain
+      // order disagree (sequence behind the data after a reset/restore/import: a duplicate-key outage or a silently broken chain). Refuse BEFORE drawing a value so a refusal does not
+      // consume sequence values and cannot recover by erosion. The sequence is NEVER realigned here (no setval); an authorised operator does it under change control after investigating the cause.
+      const state = (await m.query(`SELECT last_value::bigint AS last, is_called AS called FROM ${seqName}`))[0];
+      const nextSeq = Number(state.last) + (state.called ? 1 : 0); // audit_records.seq is a plain SERIAL: increment 1, cache 1
+      if (tailSeq !== null && nextSeq <= tailSeq) {
+        throw new AuditSequenceLagError(`AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq ${tailSeq}, nextSeq ${nextSeq}); no audit record written; realign the sequence under change control`);
+      }
+      const seq = Number((await m.query('SELECT nextval($1::regclass) AS seq', [seqName]))[0].seq);
+      if (tailSeq !== null && !(seq > tailSeq)) {
+        throw new AuditSequenceLagError(`AUDIT_SEQUENCE_LAG: audit sequence returned ${seq} at or below the stored tail ${tailSeq}; no audit record written`);
       }
       const timestamp = new Date();
 

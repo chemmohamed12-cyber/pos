@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { BizEnv, abortBiz, attempt, finishBiz, record, result, setUpBiz, widePool } from './biz-support';
 
 /**
+ * SUPERSEDED (CTO ruling 2026-10-12): Option A is NOT approved; T-28 is the acceptance test for Option B (fail closed). This file is kept as the record of the withdrawn option and is no longer registered in biz-run.js.
  * T-27 — WP-AUD-08 acceptance tests for the audit sequence-lag guard (DEC-01b option A). Acceptance test 1 (both T-26 failure modes now succeed with a valid chain) is the T-26 spec itself,
  * run unchanged against the guarded code; this spec holds tests 2–6 (test 7 = the regression runs listed in the report). Disposable databases `daii_test_biz_t27_*` only.
  * 2 healthy path: no realignment happens; 3 a broken chain is preserved byte for byte (only the new row is added); 4 concurrent appends under lag: no fork, no duplicate;
