@@ -34,3 +34,11 @@ Terms: **IMPLEMENTED** = code/test committed · **VERIFIED** = clean-snapshot ev
 DEC-01b: A (conditional). Reviewer nomination: immediately. LA-1 owner: fix in a separate change then run CI. PA-43: provide read-only role + DB list or accept "need not established". Dependencies: authorise T1 only. Capacity/staging: name targets and host.
 
 Official status unchanged: **N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.**
+
+## Update — WP-AUD-08 implemented (DEC-01b approved: option A) and T-04 split
+- **IMPLEMENTED:** `e344ca1` (`audit.service.ts` guard + `AuditSequenceLagError`; `t27-audit-seq-lag-guard` spec; `biz-run` step). `d202f2c`: `DAII_T0304_PART=T-03|T-04` test-only split (default unchanged).
+- **VERIFIED (author track), clean snapshot of `e344ca1`, `dirtyPaths: []`** (`evidence-clean-snapshot-2026-10-11/e344ca1-wp-aud-08/`, commit `63c44db`): acceptance 1–6 PASS (T-26 3/3 incl. both failure modes; T-27 6/6: healthy no-realign, broken chain preserved byte for byte, 40 concurrent appends under lag, rollback after realign, fail-closed for failing and non-moving `setval`); T-21 13/13, T-22 2 PASS + expected characterization FAIL-DEFECT, T-23 7/7; unit 59/430; guard 50/50; build; eslint of touched files.
+- **Acceptance 7 (isolation regression) NOT COMPLETE:** 64 of 91 specs run, 0 failures, interrupted (session end); 27 remain; resume after the peer session finishes its own T-04-alone and T-27 runs. Not counted as passed.
+- **T-04 alone:** being run by the external-review session (not by this one); evidence pending from them.
+- **INDEPENDENTLY ACCEPTED:** nothing. The external-review session declared a conflict of independence for the N-02 and PA-33 patches (evidence audit only). No eligible reviewer named; the guard and H5-D1 are in the review scope.
+- Status unchanged: N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.
