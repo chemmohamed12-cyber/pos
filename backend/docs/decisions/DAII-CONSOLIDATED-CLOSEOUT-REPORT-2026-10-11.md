@@ -4,6 +4,33 @@ Prepared by Team 3 (documentation and coordination) under the Mandatory Sequenti
 
 **Official status (unchanged): N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.**
 
+## FINAL STATE — 2026-10-12 (supersedes the task table below where they differ)
+HEAD at writing: `27a2e44`. Evidence below was produced by the verification track on clean `git archive` snapshots and **re-checked by Team 3** (run headers, `dirtyPaths: []`, manifests, log sha256). Team 3 ran no database test. Rebuilt cluster 5546 (system id `7695619915229547252`; old id `7695079006474257732` is in earlier evidence headers).
+
+| Task | Owner | IMPLEMENTED | VERIFIED (author's track, clean snapshot) | INDEPENDENTLY ACCEPTED |
+|---|---|---|---|---|
+| WP-AUD-08 Option B (fail closed, no setval) | Team 3 wrote `4d4ed0d`; verification track ran it | `4d4ed0d` (+T-28 `4d4ed0d`, B9 in `b4821ab`) | T-28 11/11 (`1ae0ae7`), T-28 12/12 and T-26 3/3 relabelled (`bcfce72`), T-23 7/7, T-21 13/13, T-22 2 PASS + case X by design | **No** |
+| T-04 alone | Verification track | `d202f2c` | PASS, 17 entries, clean `0dd0074` (`d3655e1`); T-03 not re-run | **No** |
+| WP-INV-10 / H5-D1 | Verification track | `03900ac` | T-25 11/11, regression 6/6 (`29e0247`) | **No** |
+| LA-1 lint | LA-1 owner / verification track | `0406f11` | lint 0 errors / 5 warnings and CI script Overall PASS on clean `89508b1` (`f8883e3`) | **No** |
+| Isolation regression (91 specs) | Verification track | list `68c2215` | 89 executed-PASS · 1 SKIPPED · 1 BLOCKED · 0 FAIL (clean `68c2215`, `bcfce72`); 6 suites failed only in teardown, re-run 6/6 | **No** |
+| WP-AUD-09 / PA-43 | Audit/Architecture | trace + protocol; T-29 pilot | Pilot on a disposable DB only (P1/S1/N1 PASS): not a need check of any real database; **NEED NOT ESTABLISHED** | **No** |
+| Runbook | Team 3 | experimental scenario, virtual roles | T-28 B5/B5b/B9 exercise the realignment on a disposable DB; escalation/roles untested | **No** |
+| WP-REV-01 | Coordinator / CTO | — | — | **Deferred** (no qualified engineer) |
+
+**Final status of the three findings:** N-02 **OPEN** (H3, H1, H2, H4, H5-D1 implemented and author-verified; no independent acceptance; sibling methods unprobed). PA-33 **OPEN** (`c764fc5` and the guard `4d4ed0d` implemented and author-verified; no independent acceptance; DEC-02 undecided; realignment owner unnamed). PA-43 **OPEN** (risk confirmed by code reading and a simulated fixture; real need not established; DEC-25 final pending).
+
+**Tests that failed or were not run:** T-22 case X (FAIL-DEFECT by design, a characterisation); T-29 S1 first run FAIL-DEFECT from an over-strict expectation, corrected and re-run PASS (both kept); 6 isolation specs failed in teardown only on the first run (re-run 6/6 PASS); T-27 (Option A, withdrawn) not run; `release-migration-registry` BLOCKED (needs the 5544 pin); `t0-clean-company-baseline` SKIPPED (opt-in); the combined T-03 step was not re-run after the rebuild.
+
+**Open items and blockers:** no independent reviewer; harness teardown race (forced `DROP DATABASE` as a non-superuser; suggested fix: test-only bounded retry, do not grant terminate rights); CI classification: the CI script passes on `89508b1` (DB-free) and every DB gate listed above passed, but no single snapshot covers all gates (product-identical commits) and the official status stays **CI NOT GREEN** until the CTO classifies it; 5 lint warnings; DEC-02, DEC-25, DEC-01b record entry and realignment owner; DEC-08 "individually" question; F-INV-001, D-04, PA-34/35/36, capacity/staging, dependency decisions; the six adaptation diffs without line-by-line review.
+
+**Why the release cannot be approved:** N-02, PA-33 and PA-43 are OPEN; nothing is independently accepted; the real-data audit-chain state and UUID-repair history are unknown; the open items above.
+
+**Recommendations to the CTO:** (1) record the Option B decision verbatim and name the realignment owner; (2) classify CI after confirming source identity, or ask for one run of the full gate on the final HEAD; (3) accept the combined T-03 + standalone T-04 for DEC-08 or ask for a T-03 re-run; (4) approve the test-only teardown retry; (5) keep WP-REV-01 deferred and treat all author-track results as unreviewed.
+
+---
+(The sections below are the first version of this report and the later updates, kept as history.)
+
 Vocabulary: **IMPLEMENTED** = a commit contains the change. **VERIFIED** = clean-snapshot evidence of that commit exists (here produced by the same verification track that wrote the fix, unless stated). **INDEPENDENTLY ACCEPTED** = a reviewer who meets the independence rule has recorded a decision. **No item below is INDEPENDENTLY ACCEPTED.**
 
 Team 3's limits in this closeout: product code and database-backed tests are outside Team 3's mandate (documentation and coordination only; it has no database access and may not certify independent closure). Phases 1 and 3 therefore belong to other tracks and are reported as found.
