@@ -76,8 +76,8 @@ describe('T-29 — PA-43 pilot: audit-row exposure to the UUID repair (read-only
         expectedPrev = r.hash;
       }
       const chainNow = await e.audit.verifyCompanyChain(e.manager);
-      detail.simulation = { chainValidToday: chainNow.valid, rowsWhoseHashInputWouldChange: rowsWhoseHashInputChanges, rowsThatWouldStillVerify: rowsStoredHashStillMatches, totalRows: rows.length, chainWouldFirstBreakAtSeq: firstBrokenSeq, note: 'computed in memory; no UPDATE was issued; the stored hash/prevHash are not recomputed by the repair' };
-      result(e, 'S1-simulated-repair-would-break-chain-at-first-legacy-row', chainNow.valid && rowsWhoseHashInputChanges === 4 && firstBrokenSeq === 1 && rowsStoredHashStillMatches === 0 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.simulation));
+      detail.simulation = { chainValidToday: chainNow.valid, rowsWhoseHashInputWouldChange: rowsWhoseHashInputChanges, rowsThatWouldStillVerifyIndividually: rowsStoredHashStillMatches, totalRows: rows.length, chainWouldFirstBreakAtSeq: firstBrokenSeq, note: 'computed in memory; no UPDATE was issued; the stored hash/prevHash are not recomputed by the repair' };
+      result(e, 'S1-simulated-repair-would-break-chain-at-first-legacy-row', chainNow.valid && rowsWhoseHashInputChanges === 4 && firstBrokenSeq === 1 && rowsStoredHashStillMatches === rows.length - rowsWhoseHashInputChanges ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.simulation));
 
       // ---- nothing was written ----
       const after = { audit: await auditFingerprint(), users: await usersFingerprint() };

@@ -1,0 +1,22 @@
+{
+  "testId": "T-26",
+  "runId": "T-26-20261012T050150Z-118491",
+  "finishedAt": "2026-10-12T05:01:58.092Z",
+  "results": [
+    {
+      "id": "L0-healthy-baseline",
+      "status": "PASS",
+      "note": "{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"fda7ac75ff\"},{\"seq\":2,\"prev10\":\"fda7ac75ff\",\"hash10\":\"cb4824b463\"},{\"seq\":3,\"prev10\":\"cb4824b463\",\"hash10\":\"482bed7358\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":3}"
+    },
+    {
+      "id": "L1-sequence-behind-max-seq-refused-chain-valid-sequence-unchanged",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 3, nextSeq 2); no audit record written; realign the sequence under change control\"},\"after\":{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"fda7ac75ff\"},{\"seq\":2,\"prev10\":\"fda7ac75ff\",\"hash10\":\"cb4824b463\"},{\"seq\":3,\"prev10\":\"cb4824b463\",\"hash10\":\"482bed7358\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":1}}"
+    },
+    {
+      "id": "L2-explicit-seq-above-sequence-refused-no-out-of-order-row-chain-valid",
+      "status": "PASS",
+      "note": "{\"importedSeq\":103,\"chainValidBeforeAppend\":true,\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 103, nextSeq 4); no audit record written; realign the sequence under change control\"},\"after\":{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"fda7ac75ff\"},{\"seq\":2,\"prev10\":\"fda7ac75ff\",\"hash10\":\"cb4824b463\"},{\"seq\":3,\"prev10\":\"cb4824b463\",\"hash10\":\"482bed7358\"},{\"seq\":103,\"prev10\":\"482bed7358\",\"hash10\":\"a05fb80276\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":3}}"
+    }
+  ]
+}
