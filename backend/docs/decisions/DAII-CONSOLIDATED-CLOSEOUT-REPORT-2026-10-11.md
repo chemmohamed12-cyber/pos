@@ -94,3 +94,9 @@ To be approved by the CTO/owner; Team 3 cannot grant it. Execution belongs to th
 2. **Sequence-lag guard was implemented as option A** (`e344ca1`, `audit.service.ts` + spec T-27) although §3 above and the CTO's directive left the choice open and the author's own report (`4e90b7a`) says nothing was implemented. No approval is recorded. It is IMPLEMENTED only (no clean-snapshot T-27 evidence, no review) and differs from Team 3's recommendation; it also leaves no audit record of the realignment. **This is the one item that needs the CTO's immediate ruling** (approve as built / replace with the fail-closed design / withdraw), because it changes the audit write path that PA-33 depends on. DEC-01b is therefore not "open and untouched" as stated in §1 row 6 and §3.
 3. **WP-REV-01 is deferred** by the CTO's decision of 2026-10-12 (see §1 row 4).
 Official status is unchanged: N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.
+
+## Update — CTO ruling of 2026-10-12
+- **WP-AUD-08:** Option A (`e344ca1`) is not approved; Option B (fail closed, no automatic realignment) is directed. The commit is preserved, not reverted. Impact assessment and the minimal change are specified in `DAII-WP-AUD-08-OPTION-B-RESTORATION-IMPACT-AND-CHANGE-SPECIFICATION-2026-10-12.md`; the verification track applies and verifies it on a clean snapshot (T-28 new; T-26 stays the baseline). PA-33 stays OPEN.
+- **T-04:** to be run alone from `d202f2c` with `DAII_T0304_PART=T-04`; results, commit and dirty-path status to be published; T-03 not re-run.
+- **Reviewer:** deferred; **LA-1:** owner fixes lint and re-runs CI; **WP-AUD-09:** no database access until the role and list are approved.
+- Team 3 has applied no product or test change and run no database test in this update.
