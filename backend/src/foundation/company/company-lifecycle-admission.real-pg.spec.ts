@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import { CompanyActivationService } from './company-activation.service';
 import { CompanyRegistryService } from './company-registry.service';
 import { runOperationalAdmitted } from './company-lifecycle-admission';
+// Test-only: this spec proves the lifecycle-admission boundary on the REAL scheduler class of another domain; there is no published contract for it (same documented pattern as integrations.service.ts).
+// eslint-disable-next-line no-restricted-imports
 import { PreliminaryHoldExpiryScheduler } from '../../domains/sales-orders/application/preliminary-hold-expiry.scheduler';
 import { ApprovalExpiryScheduler } from '../approval-engine/approval-expiry.scheduler';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../testing/two-company-real-pg-harness';
