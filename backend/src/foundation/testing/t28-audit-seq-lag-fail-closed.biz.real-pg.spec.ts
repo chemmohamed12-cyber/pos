@@ -43,7 +43,11 @@ describe('T-28 — audit sequence lag fails closed (WP-AUD-08, Option B)', () =>
         return { out, sql };
       };
       const detail: Record<string, unknown> = {};
-      const operatorRealign = () => e.dsA.query(`SELECT setval('${seqName}', (SELECT max(seq) FROM audit_records), true)`);
+      // exactly the runbook §5 template: advisory lock (same key as the writer) + setval to max(seq), one transaction
+      const operatorRealign = () => e.dsA.transaction(async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(7419203511)');
+        await tx.query(`SELECT setval('${seqName}', (SELECT max(seq) FROM audit_records), true)`);
+      });
 
       // ---- B0: healthy path ----
       for (let i = 0; i < 5; i += 1) await e.audit.record(input('healthy', i), e.manager);
@@ -124,6 +128,11 @@ describe('T-28 — audit sequence lag fails closed (WP-AUD-08, Option B)', () =>
       const b7 = await attempt(() => e.audit.record(input('on-broken', 0), e.manager));
       detail.b7 = { append: b7, rowsIdentical: JSON.stringify(await rows()) === damaged, stillBroken: !(await valid()), sequenceUnchanged: (await seqState()) === sBroken };
       result(e, 'B7-broken-chain-not-changed-by-refusal', isLag(b7) && (detail.b7 as { rowsIdentical: boolean }).rowsIdentical && (detail.b7 as { stillBroken: boolean }).stillBroken && (detail.b7 as { sequenceUnchanged: boolean }).sequenceUnchanged ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.b7));
+
+      // ---- B9: the pre-check arithmetic (next = is_called ? last+1 : last) is only valid for a plain increment-1, cache-1 sequence (design G-11) ----
+      const sq = (await e.dsA.query(`SELECT increment_by::int AS inc, cache_size::int AS cache FROM pg_sequences WHERE schemaname || '.' || sequencename = $1 OR sequencename = regexp_replace($1, '^.*\\.', '')`, [seqName.replace(/"/g, '')]))[0];
+      detail.b9 = sq;
+      result(e, 'B9-audit-sequence-is-increment-1-cache-1', sq && sq.inc === 1 && sq.cache === 1 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(sq ?? null));
 
       record(e, 'T-28-detail.json', detail);
       await finishBiz(e);

@@ -1,7 +1,8 @@
 import { BizEnv, abortBiz, attempt, finishBiz, record, result, setUpBiz } from './biz-support';
 
 /**
- * T-26 — PA-33 sequence-lag BASELINE (observation only; nothing is fixed and no guard is proposed here as implemented).
+ * T-26 — PA-33 sequence-lag scenarios. History: first written as a BASELINE of the unguarded writer (L1 duplicate-key failure, L2 silent chain break, recorded commit 9b52e46).
+ * Since WP-AUD-08 Option B (4d4ed0d) the EXPECTED outcome of L1/L2 is a refusal (AuditSequenceLagError), nothing written, chain valid, sequence unchanged; the checks below assert that.
  * Question: what does the CURRENT audit writer do when `audit_records.seq`'s sequence is behind the data (a restore/import that did not set the sequence, or a manual reset)?
  * Shapes (all on a disposable Company database, healthy chain first): L1 sequence set back below max(seq); L2 a row with an explicit seq far above the sequence's last value
  * (valid hash, as an import would carry), then one ordinary append. Each shape records: did the append succeed, which seq/prevHash did it get, and is the chain verifiable.
@@ -37,7 +38,9 @@ describe('T-26 — audit sequence lag baseline (PA-33 input)', () => {
       await e.dsA.query(`SELECT setval('${seqName}', 1, true)`);
       const l1 = await attempt(() => e.audit.record(input('l1', 0), e.manager));
       detail.L1 = { append: l1, after: await state() };
-      result(e, 'L1-sequence-behind-max-seq', l1.ok && (detail.L1 as { after: { chainValid: boolean } }).after.chainValid ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.L1));
+      // Option B (DEC-01b, fail closed): the expected result is a REFUSAL with the identifiable error, nothing written, chain still valid, sequence untouched (still 1).
+      const l1after = (detail.L1 as { after: { chainValid: boolean; rows: unknown[]; sequenceLastValue: number } }).after;
+      result(e, 'L1-sequence-behind-max-seq-refused-chain-valid-sequence-unchanged', !l1.ok && l1.kind === 'AuditSequenceLagError' && l1after.chainValid && l1after.rows.length === 3 && l1after.sequenceLastValue === 1 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.L1));
 
       // L2: realign, then insert a row with an explicit seq above the sequence (valid hash) and append once more
       await e.dsA.query(`SELECT setval('${seqName}', (SELECT max(seq) FROM audit_records), true)`);
@@ -52,7 +55,9 @@ describe('T-26 — audit sequence lag baseline (PA-33 input)', () => {
       const l2pre = await state();
       const l2 = await attempt(() => e.audit.record(input('l2', 0), e.manager));
       detail.L2 = { importedSeq: bigSeq, chainValidBeforeAppend: l2pre.chainValid, append: l2, after: await state() };
-      result(e, 'L2-explicit-seq-above-sequence-then-append', l2.ok && (detail.L2 as { after: { chainValid: boolean } }).after.chainValid ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.L2));
+      // Option B: refused BEFORE an out-of-order row exists; the imported row stays the tail, the chain stays valid, the sequence is untouched.
+      const l2after = (detail.L2 as { after: { chainValid: boolean; rows: Array<{ seq: number }>; sequenceLastValue: number } }).after;
+      result(e, 'L2-explicit-seq-above-sequence-refused-no-out-of-order-row-chain-valid', !l2.ok && l2.kind === 'AuditSequenceLagError' && l2pre.chainValid && l2after.chainValid && l2after.rows.length === l2pre.rows.length && l2after.rows[l2after.rows.length - 1].seq === bigSeq && l2after.sequenceLastValue === l2pre.sequenceLastValue ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail.L2));
 
       record(e, 'T-26-detail.json', detail);
       await finishBiz(e);

@@ -44,6 +44,7 @@ const STEPS = [
   ['T-26', 'src/foundation/testing/t26-audit-seq-lag-baseline.biz.real-pg.spec.ts'],
   // T-27 (Option A, NOT approved — CTO ruling 2026-10-12) is superseded by T-28 (Option B, fail closed); its file stays in the repository as the record of the withdrawn option.
   ['T-28', 'src/foundation/testing/t28-audit-seq-lag-fail-closed.biz.real-pg.spec.ts'],
+  ['T-29', 'src/foundation/testing/t29-pa43-uuid-repair-audit-impact.biz.real-pg.spec.ts'],
   ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 

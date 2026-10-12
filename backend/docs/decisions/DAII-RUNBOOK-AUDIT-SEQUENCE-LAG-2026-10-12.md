@@ -1,6 +1,6 @@
 # DAII — Runbook (EXPERIMENTAL SCENARIO, not approved for production): audit sequence lag — when appends are blocked, escalation and verification — 2026-10-12
 
-Prepared by Team 3 (documentation) under the CTO directive of 2026-10-12, item 4. **Status: EXPERIMENTAL operating scenario (CTO directive of 2026-10-12: the environment is experimental; virtual functional roles are used and no personal names are requested). It is not approved for production, and nothing in it has been executed or tested: the audit writer's Option B behaviour exists in commit `4d4ed0d` but has not been run against a database (the test cluster is down), so every statement below about system behaviour is a design statement, not a test result.** It applies to the Option B behaviour (fail closed on sequence lag, no automatic realignment) specified in `DAII-WP-AUD-08-OPTION-B-RESTORATION-IMPACT-AND-CHANGE-SPECIFICATION-2026-10-12.md`. This task covers no production system and no historical audit record; this runbook must be approved before any real operation, and its statements about production are procedure, not authorization.
+Prepared by Team 3 (documentation) under the CTO directive of 2026-10-12, item 4. **Status: EXPERIMENTAL operating scenario (CTO directive of 2026-10-12: the environment is experimental; virtual functional roles are used and no personal names are requested). It is not approved for production, and the operational steps (roles, escalation, §5 execution) have never been performed. Update 2026-10-12: the writer's Option B behaviour (`4d4ed0d`) was run on disposable databases (T-28 11/11 at `1ae0ae7`), so the refusal and post-realignment statements are measured; see §8 for what remains untested.** It applies to the Option B behaviour (fail closed on sequence lag, no automatic realignment) specified in `DAII-WP-AUD-08-OPTION-B-RESTORATION-IMPACT-AND-CHANGE-SPECIFICATION-2026-10-12.md`. This task covers no production system and no historical audit record; this runbook must be approved before any real operation, and its statements about production are procedure, not authorization.
 
 ## 1. Roles — virtual functional roles (experimental)
 | Role | Function | In this experiment |
@@ -60,10 +60,11 @@ Production use under this task; any write to `audit_records`; any re-hash or nor
 ## 8. What is and is not tested
 | Item | State |
 |---|---|
-| Writer refuses on lag, no `setval`, sequence untouched (Option B) | IMPLEMENTED in `4d4ed0d`; **NOT RUN** against a database; acceptance spec T-28 written, not run |
-| Operator realignment as in §5, and the post-checks of §6 | Part of T-28 (B5, B5b, B7) — **NOT RUN** |
-| Escalation levels and roles | Design only; no drill performed |
-| Test cluster | **Down** (PANIC: no valid checkpoint record, per the 2026-10-12 review report) — blocks every database-backed check |
+| Writer refuses on lag, no `setval`, sequence untouched (Option B) | IMPLEMENTED in `4d4ed0d`; T-28 11/11 PASS on a clean snapshot of `1ae0ae7` (`evidence-clean-snapshot-2026-10-12/1ae0ae7-option-b/`), disposable databases only; the §2 statements about refusal are now **measured**, not only designed |
+| Operator realignment as in §5, and the post-checks of §6 | T-28 B5/B5b/B7 passed at `1ae0ae7` with a plain `setval`; the spec was then changed to run the exact §5 template (advisory lock + `setval` in one transaction) and awaits a new clean-snapshot run (status in the consolidated update). Rehearsal on a disposable database only — no real operation |
+| Audit sequence is increment 1, cache 1 | Test B9 added to T-28 (not yet run on a clean snapshot); no runtime/startup assertion exists in the product |
+| Escalation levels and roles | Design only; no drill performed; virtual roles, no person assigned |
+| Test cluster | Rebuilt 2026-10-12 (see `evidence-2026-10-12-biz-cluster-rebuild/`); healthy |
 
 ## 9. Open items (for any use beyond the experiment)
-Real assignment of the four roles; escalation time targets; the approved databases where §5 may ever be used; confirmation that the audit sequence is increment 1, cache 1 (assumed by the pre-check; asserted nowhere yet); a rehearsal on a disposable database once the cluster is available (T-28); independent review of this runbook once a reviewer exists.
+Real assignment of the four roles; escalation time targets; the approved databases where §5 may ever be used; a runtime or startup assertion that the audit sequence is increment 1, cache 1 (assumed by the pre-check; so far asserted only by test B9); the T-28 re-run with the §5 template and B9; a decision whether a read-only lag check (design option C) is added to the chain verification and health checks; independent review of this runbook once a reviewer exists.
