@@ -40,6 +40,9 @@ No human has been identified in the records; every party above is an AI session 
 4. Will record the decision per finding and the evidence examined, and will state limitations and conflicts of interest.
 Until a candidate is named, the review does not start; no one in the register in §3.1 substitutes.
 
+### 3.3 Status and intake when an engineer joins (CTO decision, 2026-10-12)
+The review is **deferred** until a qualified engineer joins; no substitute is appointed and no review is claimed. This pack is preserved as is and is kept current if new evidence arrives. On arrival, send the CTO: (1) name and identity, (2) role and organisation, (3) whether the person took part earlier in any of: the fixes, the tests or fixtures, `runInTransaction`, the peer reviews, committing the reviewed changes, or Team 3 work (and how), (4) access available (repository and evidence only), (5) declared conflicts of interest. The CTO then fixes the review scope and the review starts; findings are decided one by one.
+
 ## 4. Review checklist (per finding)
 **H3 / order-level:** lock key shared with `reserveStock` and `releaseReservedQuantity`; first read only learns `(warehouse, product)`; re-read under the lock; status flip and movement in one transaction; behaviour under `READ COMMITTED` only; lock ordering across reservation key → valuation key → audit key; sorted up-front locking in `fulfillReservationsForOrder`; retry semantics (second call refused 409 for a single reservation, no-op at order level); rollback restores reservation and movements; reach through `delivery.service.recordOutcome` and the shipment state machine.
 **H1/H2/H4:** the shared transaction rule applied unchanged; `ON CONFLICT` target equals the unique index; counters and reservations after rollback; unchanged behaviour of successful single calls.
