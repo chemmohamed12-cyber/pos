@@ -64,3 +64,6 @@ It is not an acceptance of any finding and not a release decision. Evidence for 
 
 ## 7. Companion pack
 The verification track also published `test-program/INDEPENDENT-REVIEW-EVIDENCE-PACK-2026-10-11.md` (commit `29e0247`), a per-finding table of commits, specs and evidence folders. It agrees with this index on the exclusions (the fix, test and helper authors are not eligible) and adds the H5-D1 fix to the review scope; this index additionally holds the independence register (§3) and the checklists (§4). The reviewer should receive both.
+
+## 8. Update 2026-10-12 — review scope for the audit-sequence guard
+The guard to be reviewed is the **Option B** commit `4d4ed0d` (authored by Team 3, which is therefore not eligible; implemented, not yet verified), not `e344ca1` (Option A, not approved; kept as history; its evidence `63c44db` is a comparison baseline only). The untracked report `test-program/EXTERNAL-INDEPENDENT-REVIEW-REPORT-2026-10-12.md` is an evidence audit by a verification-lineage session and is not an independent review.

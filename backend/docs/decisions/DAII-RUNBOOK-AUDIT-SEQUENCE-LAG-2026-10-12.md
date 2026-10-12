@@ -1,15 +1,15 @@
-# DAII — Runbook (DRAFT for approval): audit sequence lag — when appends are blocked, escalation and verification — 2026-10-12
+# DAII — Runbook (EXPERIMENTAL SCENARIO, not approved for production): audit sequence lag — when appends are blocked, escalation and verification — 2026-10-12
 
-Prepared by Team 3 (documentation) under the CTO directive of 2026-10-12, item 4. **Status: DRAFT. It is not approved, no person is named in it, and nothing in it has been executed.** It applies to the Option B behaviour (fail closed on sequence lag, no automatic realignment) specified in `DAII-WP-AUD-08-OPTION-B-RESTORATION-IMPACT-AND-CHANGE-SPECIFICATION-2026-10-12.md`. This task covers no production system and no historical audit record; this runbook must be approved before any real operation, and its statements about production are procedure, not authorization.
+Prepared by Team 3 (documentation) under the CTO directive of 2026-10-12, item 4. **Status: EXPERIMENTAL operating scenario (CTO directive of 2026-10-12: the environment is experimental; virtual functional roles are used and no personal names are requested). It is not approved for production, and nothing in it has been executed or tested: the audit writer's Option B behaviour exists in commit `4d4ed0d` but has not been run against a database (the test cluster is down), so every statement below about system behaviour is a design statement, not a test result.** It applies to the Option B behaviour (fail closed on sequence lag, no automatic realignment) specified in `DAII-WP-AUD-08-OPTION-B-RESTORATION-IMPACT-AND-CHANGE-SPECIFICATION-2026-10-12.md`. This task covers no production system and no historical audit record; this runbook must be approved before any real operation, and its statements about production are procedure, not authorization.
 
-## 1. Authority — nothing is assumed
-| Role | Who | State |
+## 1. Roles — virtual functional roles (experimental)
+| Role | Function | In this experiment |
 |---|---|---|
-| Authorised database administrator (executor) | **Not designated** | The CTO designates one in writing, with the exact permission granted (which databases, which privilege, for how long), **before any real operation** |
-| Approver of a specific realignment | **Not designated** | A person other than the executor; approves each execution in writing |
-| Escalation owner (security/audit) | **Not designated** | Receives every unexplained lag |
-| Operations contact (first responder) | **Not designated** | Detects and reports; performs no remediation |
-Until these are recorded, the only permitted actions are those in §3 (detect, stop, report) and read-only diagnosis (§4) by someone already authorised to read the database.
+| `DB_OPERATOR` | The only role allowed to run the §5 remediation, on the experimental database only | Virtual role; no person assigned |
+| `APPROVER` | Approves each §5 execution in writing; never the same holder as `DB_OPERATOR` | Virtual role |
+| `ESCALATION_OWNER` | Receives every unexplained lag and decides with the CTO | Virtual role |
+| `OPS_CONTACT` | First responder: detects and reports; performs no remediation | Virtual role |
+Names, real permissions and the approved database list are required before any use outside the experiment. Until a real assignment exists, the only actions are §3 (detect, stop, report) and read-only diagnosis (§4).
 
 ## 2. When appends must be blocked (trigger)
 Appending is blocked **by the system** when the audit writer refuses with `AuditSequenceLagError` (the sequence's next value is not above the stored tail `seq`). Consequences: audited operations in that Company fail with an identifiable error; no audit row is written; the sequence is unchanged. People must additionally **stop** the following while a lag is open:
@@ -28,7 +28,7 @@ Collect: Company, time, the error text (it contains the tail and the next value,
 | L1 | Operations contact | §3 report | incident record opened |
 | L2 | Authorised DBA (read-only first) | Diagnose with read-only statements below | cause classification |
 | L3 | Escalation owner, then CTO | Decide whether realignment is allowed | written approval or hold |
-Escalation time targets are for the owner to set; none is invented here.
+Escalation time targets are left to the owner; none is invented here. An *unexplained* lag is treated as a possible data-integrity incident: no realignment before an explicit decision (CTO directive).
 Read-only diagnosis (counts and numbers only; no row contents):
 ```sql
 SELECT last_value, is_called FROM <audit sequence>;          -- the sequence named by pg_get_serial_sequence('audit_records','seq')
@@ -57,5 +57,13 @@ COMMIT;
 ## 7. Prohibited (always)
 Production use under this task; any write to `audit_records`; any re-hash or normalisation; UUID repair; automatic or scheduled realignment; running §5 without the written designation and approval; copying audit content into incident tickets (numbers only).
 
-## 8. Open items before this runbook can be approved
-Names/roles of the four positions in §1; escalation time targets; the approved list of databases where §5 may ever be used; confirmation that the audit sequence is increment 1, cache 1 (so the arithmetic of the pre-check holds); a rehearsal on a disposable database (covered by the Option B acceptance test B-5, which performs the realignment as an operator would); independent review of this runbook once a reviewer exists.
+## 8. What is and is not tested
+| Item | State |
+|---|---|
+| Writer refuses on lag, no `setval`, sequence untouched (Option B) | IMPLEMENTED in `4d4ed0d`; **NOT RUN** against a database; acceptance spec T-28 written, not run |
+| Operator realignment as in §5, and the post-checks of §6 | Part of T-28 (B5, B5b, B7) — **NOT RUN** |
+| Escalation levels and roles | Design only; no drill performed |
+| Test cluster | **Down** (PANIC: no valid checkpoint record, per the 2026-10-12 review report) — blocks every database-backed check |
+
+## 9. Open items (for any use beyond the experiment)
+Real assignment of the four roles; escalation time targets; the approved databases where §5 may ever be used; confirmation that the audit sequence is increment 1, cache 1 (assumed by the pre-check; asserted nowhere yet); a rehearsal on a disposable database once the cluster is available (T-28); independent review of this runbook once a reviewer exists.

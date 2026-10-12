@@ -100,3 +100,6 @@ Official status is unchanged: N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GR
 - **T-04:** to be run alone from `d202f2c` with `DAII_T0304_PART=T-04`; results, commit and dirty-path status to be published; T-03 not re-run.
 - **Reviewer:** deferred; **LA-1:** owner fixes lint and re-runs CI; **WP-AUD-09:** no database access until the role and list are approved.
 - Team 3 has applied no product or test change and run no database test in this update.
+
+## Update — final sequential directive (experimental environment)
+See plan EV-24 and brief EV-20: Option B is IMPLEMENTED in `4d4ed0d` (not run, not verified); the test cluster is down, which blocks T-04 alone, T-28 and the T-22/T-23 re-run; WP-AUD-09 has specific technical blockers (no read-only role, cluster down, guard denials, no `psql`); the runbook is an experimental scenario with virtual roles; the independent review stays deferred. The unified final report will be issued once the cluster is recovered or the user decides to close with these blockers.
