@@ -1347,30 +1347,43 @@ export class InventoryService implements InventoryReservationContract, Inventory
       );
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02/WP-INV-09 (C14): the two advisory locks and the whole read-modify-write (reservation rows, transfer movements, audit) must share ONE transaction — join an ACTIVE caller
+    // transaction, otherwise open one on the caller's manager (a plain manager releases each lock at once and leaves a failed relocation half-applied).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   async releaseReservation(reservationId: string, actorUserId: string | null, manager?: EntityManager): Promise<void> {
-    const repo = (manager ?? this.dataSource).getRepository(StockReservation);
-    const reservation = await repo.findOne({ where: { id: reservationId } });
-    if (!reservation) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
-    if (reservation.status !== 'active') {
-      throw new ConflictException(`Cannot release a reservation in status "${reservation.status}".`);
-    }
-    reservation.status = 'released';
-    await repo.save(reservation);
-    await this.audit.record(
-      {
-        actorUserId,
-        organizationId: null,
-        action: 'inventory.reservation.released',
-        resource: 'stock_reservation',
-        resourceId: reservationId,
-        result: 'success',
-        correlationId: null,
-      },
-      manager,
-    );
+    const run = async (m: EntityManager): Promise<void> => {
+      const repo = m.getRepository(StockReservation);
+      // N-02/WP-INV-09 (C14): the status check and the status flip must be ONE serialised unit (T-30 S3: 8 concurrent releases of one reservation all succeeded and wrote 8 audit rows).
+      // The first read only identifies the (warehouse, product) key; the per-(warehouse,product) advisory lock is the SAME key reserveStock / releaseReservedQuantity /
+      // fulfillReservation use, so a release also excludes a concurrent fulfilment of the same reservation; the reservation is then RE-READ under the lock.
+      const probe = await repo.findOne({ where: { id: reservationId } });
+      if (!probe) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${probe.warehouseId}:${probe.productId}`]);
+      const reservation = await repo.findOne({ where: { id: reservationId } });
+      if (!reservation) throw new NotFoundException(`Reservation "${reservationId}" not found.`);
+      if (reservation.status !== 'active') {
+        throw new ConflictException(`Cannot release a reservation in status "${reservation.status}".`);
+      }
+      reservation.status = 'released';
+      await repo.save(reservation);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'inventory.reservation.released',
+          resource: 'stock_reservation',
+          resourceId: reservationId,
+          result: 'success',
+          correlationId: null,
+        },
+        m,
+      );
+    };
+
+    // Join the caller's transaction when one is ACTIVE, otherwise open one on the caller's manager (the controller passes a plain Company manager).
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
@@ -1507,7 +1520,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
       );
     };
 
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    // N-02/WP-INV-09 (C14): same rule as releaseReservedQuantity above — the per-(warehouse,product) lock and the read-modify-write of the reservation rows run in ONE transaction.
+    return runInTransaction(this.dataSource, manager, run);
   }
 
   /**
