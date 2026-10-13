@@ -52,7 +52,7 @@ Total items: **37** across **16** roles.
 | A1 | H0-4 payroll posting shape (DEC-03) | Posting amount (gross; gross + commission; later tax/insurance split), disbursement entry and partial/failed disbursement, wages-payable reconciliation and closing-audit category. Measured today: journal = gross only; commission in no journal; disbursement posts nothing. | CTO (co-signs DEC-03) | DAII-PHASE-0-CONTRACTS-…; evidence-clean-snapshot-2026-10-13/3bf740b-wp-pay-01/ | PA-34/35; Phase 1 | PENDING |
 | A2 | DEC-04 commission account and timing; H0-8 reversal | Expense account, recognition timing, and reversal on void/return/credit (automatic vs reviewed queue) with the payroll cut-off interaction. | — | DAII-PHASE-0-CONTRACTS-…; FX-H08 | PA-35/38 | PENDING |
 | A3 | M0-2 costing | Is standard costing, variance accounting or labour/overhead absorption required (today: moving average, material only). | MANUFACTURING_OWNER | DAII-PHASE-0-CONTRACTS-… | PH0-GATE | PENDING |
-| A4 | grni / fixed_asset template (with C11) | Account code/name for GRNI (proposal: 2115) or the alternative; fixed_asset: pre-create disposal gain/loss/clearing accounts or not. | CTO | DAII-TEMPLATE-GRNI-AND-FIXED-ASSET-PROPOSAL-2026-10-14.md | C11 | PENDING |
+| A4 | grni / fixed_asset template (with C11) | Confirm for GRNI the account code, name, purpose and template (proposal: 2115 Goods Received Not Invoiced, parent 21; compatibility inputs in proposal section 2a) or the alternative; fixed_asset: pre-create disposal gain/loss/clearing accounts or not. Until recorded the gap is BLOCKED - OWNER DECISION and nothing is added. | CTO | DAII-TEMPLATE-GRNI-AND-FIXED-ASSET-PROPOSAL-2026-10-14.md | C11 | PENDING |
 
 ## `PAYROLL_POLICY_OWNER`
 
