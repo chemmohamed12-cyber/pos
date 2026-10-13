@@ -91,6 +91,32 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
   const eventCount = async (where: string, params: unknown[] = []): Promise<number> =>
     Number((await dataSource.query(`SELECT COUNT(*)::int AS n FROM accounting_financial_events WHERE ${where}`, params))[0].n);
 
+  it('TEMPLATE COMPLETENESS (M0-6): payroll posting in a Company whose chart has no active wages_payable control account — what happens to the run and to its Financial Event', async () => {
+    const wpBefore = Number((await dataSource.query(`SELECT COUNT(*)::int AS n FROM accounting_gl_accounts WHERE "controlFunction" = 'wages_payable' AND "isActive" = true`))[0].n);
+    await makeEmployee('1000.00');
+    const periodId = await makePeriod();
+    const run = await payroll.calculate(periodId, ADMIN_A);
+    await approveRun(run.id);
+    await events.dispatchPending();
+    const { run: after } = await payroll.getRun(run.id);
+    const fe: Array<{ status: string; rejectionReason: string | null }> = await dataSource.query(
+      `SELECT status, "rejectionReason" FROM accounting_financial_events WHERE "sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`,
+      [run.id],
+    );
+    measured('M0-6 wages_payable', { activeWagesPayableAccountsBefore: wpBefore, payrollRunStatus: after.status, financialEvents: fe });
+    if (wpBefore === 0) {
+      // Pinned (observed on a freshly provisioned Company): the run reaches 'posted' while its Financial Event is REJECTED for lack of the control account.
+      expect(fe).toHaveLength(1);
+      expect(fe[0].status.toUpperCase()).toBe('REJECTED');
+      expect(fe[0].rejectionReason ?? '').toMatch(/wages_payable/i);
+      // Test fixture only (the same hand-seeding the earlier fixtures did for grni/wip): give the Company the account so the next test can measure the posting path.
+      await dataSource.query(
+        `INSERT INTO accounting_gl_accounts ("code","name","nameAr","accountType","normalBalance","isContra","parentAccountId","isPostable","controlFunction","currencyMode","allowManualJournal","isActive")
+         VALUES ('2150','Wages Payable','wages payable','liability','credit',false,NULL,true,'wages_payable','functional_only',false,true)`,
+      );
+    }
+  }, 120_000);
+
   it('PA-35 + PA-34: a run with salary 4000.00 and approved commission 200.00 — what the ledger receives at posting, and what it receives at disbursement', async () => {
     // fixture: employee with basic 4000.00, a customer assigned to the linked user, a 10% customer-scope commission on a 2000.00 invoice
     const rep = await makeEmployee('4000.00');
