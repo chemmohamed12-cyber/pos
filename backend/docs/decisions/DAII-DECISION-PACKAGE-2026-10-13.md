@@ -18,6 +18,8 @@
 - **Approval required (exact).** *"DEC-02: the standing policy for an already-broken audit chain is accept-and-annotate under a break register; no historical audit row is modified, re-hashed or re-ordered; any repair requires a separate written approval naming the database, with a verified backup and an independent review."* Signed by the CTO and the security/audit owner.
 
 ## DEC-20 — dependency update, tier T1 (and the plan to apply it)
+> **Update 2026-10-14.** The CTO's execution directive of 2026-10-13 authorised implementing T1 per the prepared scope; it was applied at `8ec6de4` exactly as rehearsed (22 version changes in 6 packages, 8 MIT additions, `package.json` unchanged — resolved with `--before` so a package published after the rehearsal did not alter the scope) and verified on a clean snapshot with a fresh install (`evidence-clean-snapshot-2026-10-13/8ec6de4-final-verification/`). The approval wording below is kept as the record of what was prepared; what remains open: the T2 owner, the host proxy check, review of the lockfile diff.
+
 - **Evidence.** `npm audit` re-run 2026-10-13: 65 advisories (3 critical, 44 high, 14 moderate, 4 low), identical to 2026-10-11; manifests unchanged since. **Rehearsal in a scratch copy** (repository untouched; `evidence-clean-snapshot-2026-10-13/dependency-t1-rehearsal/`): `package.json` unchanged; 22 lockfile entries change (6 packages) and 8 are added; advisories **65 → 64**, critical **3 → 1**, high **44 → 41**; build PASS, lint PASS (0 errors), unit PASS, db-guard 50/50 when the commit is pinned (49/50 unpinned — the archive artefact).
 - **What would change.**
 

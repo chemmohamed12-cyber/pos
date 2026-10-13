@@ -1,0 +1,13 @@
+{
+ "commit": "8ec6de4a615c4e9962317ce6a6e9c5b6c91d37ec",
+ "treeId": "b446df542c98d4fad99eb331ad7a59b57e03def5",
+ "filesInCommit": 4688,
+ "blobIdIdentical": 1228,
+ "identicalAfterCrlfToLf": 3460,
+ "missingOrDifferent": 0,
+ "differing": [],
+ "dirtyPaths": [],
+ "sourceKind": "clean-git-archive-snapshot",
+ "snapshotManifestSha256": "f35dbde27806175ffc9f6778043acba93407098d78d28ab043e6cca8509afa28",
+ "note": "Measured on the actual snapshot directory after ALL gates ran (CI, ambient suites, isolation regression, business suite). Tracked files compared with their git blobs (exact, or after normalising the CRLF that git archive writes on this machine). Untracked outputs (node_modules installed fresh from the committed lockfile, dist, ci-output, new evidence directories) are not part of the comparison. dirtyPaths is empty by construction: an archive has no working tree."
+}

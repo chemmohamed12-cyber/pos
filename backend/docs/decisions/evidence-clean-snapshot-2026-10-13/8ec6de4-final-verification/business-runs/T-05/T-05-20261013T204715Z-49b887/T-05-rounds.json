@@ -1,0 +1,68 @@
+[
+  {
+    "round": 1,
+    "tally": {
+      "OK": 3,
+      "ConflictException:409": 7
+    },
+    "errorsByMessage": [
+      [
+        "ConflictException:409 | - | Insufficient treasury balance: requested 30.00, available 10.00, short by 20.00.",
+        7
+      ]
+    ],
+    "balance": "10.00",
+    "treasuryMovements": 4,
+    "cashOutTotal": "90.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 3
+      }
+    ]
+  },
+  {
+    "round": 2,
+    "tally": {
+      "ConflictException:409": 7,
+      "OK": 3
+    },
+    "errorsByMessage": [
+      [
+        "ConflictException:409 | - | Insufficient treasury balance: requested 30.00, available 10.00, short by 20.00.",
+        7
+      ]
+    ],
+    "balance": "10.00",
+    "treasuryMovements": 4,
+    "cashOutTotal": "90.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 3
+      }
+    ]
+  },
+  {
+    "round": 3,
+    "tally": {
+      "OK": 3,
+      "ConflictException:409": 7
+    },
+    "errorsByMessage": [
+      [
+        "ConflictException:409 | - | Insufficient treasury balance: requested 30.00, available 10.00, short by 20.00.",
+        7
+      ]
+    ],
+    "balance": "10.00",
+    "treasuryMovements": 4,
+    "cashOutTotal": "90.00",
+    "events": [
+      {
+        "status": "POSTED",
+        "n": 3
+      }
+    ]
+  }
+]

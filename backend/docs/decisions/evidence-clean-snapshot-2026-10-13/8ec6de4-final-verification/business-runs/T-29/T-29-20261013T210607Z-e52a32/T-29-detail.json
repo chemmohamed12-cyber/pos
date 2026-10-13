@@ -1,0 +1,45 @@
+{
+  "protocol": {
+    "Q0": {
+      "users": true,
+      "org_units": true,
+      "audit_records": true,
+      "data_repair_runs": true
+    },
+    "Q1": 1,
+    "Q2": 0,
+    "Q3": 4,
+    "Q4": {
+      "n": 7,
+      "min": 1,
+      "max": 7
+    },
+    "Q5": 0,
+    "Q6": [],
+    "writeAttemptInsideReadOnlyTransactionRefused": true
+  },
+  "simulation": {
+    "chainValidToday": true,
+    "rowsWhoseHashInputWouldChange": 4,
+    "rowsThatWouldStillVerifyIndividually": 3,
+    "totalRows": 7,
+    "chainWouldFirstBreakAtSeq": 1,
+    "note": "computed in memory; no UPDATE was issued; the stored hash/prevHash are not recomputed by the repair"
+  },
+  "untouched": {
+    "before": {
+      "audit": {
+        "h": "560caa72c7678582871ee7774f4b336e",
+        "n": 7
+      },
+      "users": "adb6e56d3a9964e8720b45fffbc4f85b"
+    },
+    "after": {
+      "audit": {
+        "h": "560caa72c7678582871ee7774f4b336e",
+        "n": 7
+      },
+      "users": "adb6e56d3a9964e8720b45fffbc4f85b"
+    }
+  }
+}

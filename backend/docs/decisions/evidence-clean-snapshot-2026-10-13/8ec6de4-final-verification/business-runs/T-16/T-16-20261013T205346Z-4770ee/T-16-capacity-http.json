@@ -1,0 +1,820 @@
+{
+  "hardware": {
+    "cpuModel": "Intel(R) Core(TM) i7-7600U CPU @ 2.80GHz",
+    "logicalCpus": 4,
+    "totalMemGB": 15.9,
+    "node": "v20.20.2",
+    "profile": "tools/testing/capacity-profile.json",
+    "scale": 1,
+    "note": "load generator + application + PostgreSQL share one machine; fsync=off, autovacuum=off; local only"
+  },
+  "profile": {
+    "version": 1,
+    "status": "PROPOSED — not approved (see docs/decisions/test-program/CAPACITY-WORKLOAD-ASSUMPTIONS-AND-PROPOSED-TARGETS-2026-10-10.md). Thresholds are NOT applied to any verdict until the CTO approves them.",
+    "usage": "Local: node tools/testing/biz-run.js --only T-16 (optionally CAPACITY_SCALE=0.2 to shorten every phase). Hosting-like: same spec against an authorised cluster after adding its approved-databases entry; the profile below is the reproducible workload.",
+    "companies": 2,
+    "perCompany": {
+      "treasuryAccounts": 8,
+      "products": 40,
+      "warehouses": 1,
+      "customers": 1
+    },
+    "funding": "1000000.00 per treasury account (non-emitting opening cash-in)",
+    "mix": [
+      {
+        "op": "payment.on-account",
+        "weight": 35
+      },
+      {
+        "op": "inventory.receipt",
+        "weight": 20
+      },
+      {
+        "op": "treasury.cash-in",
+        "weight": 12.5
+      },
+      {
+        "op": "treasury.cash-out",
+        "weight": 12.5
+      },
+      {
+        "op": "read.treasury-accounts",
+        "weight": 10
+      },
+      {
+        "op": "read.movements-report",
+        "weight": 10
+      }
+    ],
+    "phases": [
+      {
+        "name": "ramp-distributed",
+        "kind": "distributed",
+        "virtualUsers": [
+          5,
+          10,
+          25,
+          50
+        ],
+        "secondsEach": 15
+      },
+      {
+        "name": "ramp-hot",
+        "kind": "hot",
+        "virtualUsers": [
+          5,
+          25,
+          50
+        ],
+        "secondsEach": 15
+      },
+      {
+        "name": "sustained",
+        "kind": "distributed",
+        "virtualUsers": [
+          20
+        ],
+        "secondsEach": 90
+      },
+      {
+        "name": "peak",
+        "kind": "distributed",
+        "virtualUsers": [
+          60
+        ],
+        "secondsEach": 45
+      },
+      {
+        "name": "recovery",
+        "kind": "distributed",
+        "virtualUsers": [
+          5
+        ],
+        "secondsEach": 45,
+        "windowSeconds": 5
+      }
+    ],
+    "proposedTargets": {
+      "writeLatencyMs": {
+        "p50": 300,
+        "p95": 1000,
+        "p99": 2000
+      },
+      "readLatencyMsP95": 500,
+      "errorRate": "0 at target rate; <= 0.1% transient at 3x peak",
+      "resourceCeilings": {
+        "cpuPct": 70,
+        "memoryGrowthPct": 10,
+        "dbConnectionsPctOfMax": 60
+      },
+      "recoveryMinutes": 2,
+      "integrity": "0 duplicate financial effects, 0 unexplained reconciliation differences, audit chain valid, no negative stock"
+    }
+  },
+  "phases": [
+    {
+      "phase": "ramp-distributed",
+      "kind": "distributed",
+      "virtualUsers": 5,
+      "seconds": 15.1,
+      "requests": 385,
+      "success2xx": 385,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 75,
+        "201": 310
+      },
+      "requestsPerSec": 25.5,
+      "p50": 181,
+      "p95": 482,
+      "p99": 935,
+      "perOp": {
+        "inventory.receipt": {
+          "n": 74,
+          "p50": 60,
+          "p95": 166,
+          "p99": 538
+        },
+        "treasury.cash-out": {
+          "n": 54,
+          "p50": 250,
+          "p95": 410,
+          "p99": 786
+        },
+        "read.treasury-accounts": {
+          "n": 42,
+          "p50": 18,
+          "p95": 65,
+          "p99": 487
+        },
+        "payment.on-account": {
+          "n": 138,
+          "p50": 262,
+          "p95": 809,
+          "p99": 936
+        },
+        "treasury.cash-in": {
+          "n": 44,
+          "p50": 261,
+          "p95": 659,
+          "p99": 970
+        },
+        "read.movements-report": {
+          "n": 33,
+          "p50": 11,
+          "p95": 28,
+          "p99": 31
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 79.3,
+        "systemCpuMaxPct": 91.4,
+        "nodeRssMaxMB": 1002,
+        "postgresRssMaxMB": 1013,
+        "dbConnectionsMax": 30
+      }
+    },
+    {
+      "phase": "ramp-distributed",
+      "kind": "distributed",
+      "virtualUsers": 10,
+      "seconds": 15.2,
+      "requests": 439,
+      "success2xx": 439,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 77,
+        "201": 362
+      },
+      "requestsPerSec": 28.8,
+      "p50": 287,
+      "p95": 909,
+      "p99": 1183,
+      "perOp": {
+        "read.treasury-accounts": {
+          "n": 41,
+          "p50": 18,
+          "p95": 31,
+          "p99": 52
+        },
+        "inventory.receipt": {
+          "n": 76,
+          "p50": 92,
+          "p95": 193,
+          "p99": 260
+        },
+        "read.movements-report": {
+          "n": 36,
+          "p50": 12,
+          "p95": 32,
+          "p99": 41
+        },
+        "payment.on-account": {
+          "n": 163,
+          "p50": 491,
+          "p95": 1015,
+          "p99": 1276
+        },
+        "treasury.cash-out": {
+          "n": 55,
+          "p50": 423,
+          "p95": 662,
+          "p99": 955
+        },
+        "treasury.cash-in": {
+          "n": 68,
+          "p50": 468,
+          "p95": 1029,
+          "p99": 1152
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 77,
+        "systemCpuMaxPct": 92.6,
+        "nodeRssMaxMB": 1061,
+        "postgresRssMaxMB": 1062,
+        "dbConnectionsMax": 28
+      }
+    },
+    {
+      "phase": "ramp-distributed",
+      "kind": "distributed",
+      "virtualUsers": 25,
+      "seconds": 15.7,
+      "requests": 518,
+      "success2xx": 518,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 114,
+        "201": 404
+      },
+      "requestsPerSec": 32.9,
+      "p50": 528,
+      "p95": 2168,
+      "p99": 2678,
+      "perOp": {
+        "read.movements-report": {
+          "n": 59,
+          "p50": 21,
+          "p95": 182,
+          "p99": 197
+        },
+        "inventory.receipt": {
+          "n": 93,
+          "p50": 249,
+          "p95": 630,
+          "p99": 770
+        },
+        "read.treasury-accounts": {
+          "n": 55,
+          "p50": 150,
+          "p95": 480,
+          "p99": 627
+        },
+        "treasury.cash-out": {
+          "n": 69,
+          "p50": 601,
+          "p95": 1761,
+          "p99": 2517
+        },
+        "payment.on-account": {
+          "n": 187,
+          "p50": 1102,
+          "p95": 2527,
+          "p99": 3286
+        },
+        "treasury.cash-in": {
+          "n": 55,
+          "p50": 898,
+          "p95": 2342,
+          "p99": 4340
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 73.8,
+        "systemCpuMaxPct": 81.2,
+        "nodeRssMaxMB": 1129,
+        "postgresRssMaxMB": 1094,
+        "dbConnectionsMax": 28
+      }
+    },
+    {
+      "phase": "ramp-distributed",
+      "kind": "distributed",
+      "virtualUsers": 50,
+      "seconds": 16.5,
+      "requests": 549,
+      "success2xx": 549,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 134,
+        "201": 415
+      },
+      "requestsPerSec": 33.2,
+      "p50": 973,
+      "p95": 4732,
+      "p99": 7179,
+      "perOp": {
+        "read.movements-report": {
+          "n": 63,
+          "p50": 183,
+          "p95": 830,
+          "p99": 1065
+        },
+        "treasury.cash-out": {
+          "n": 69,
+          "p50": 1073,
+          "p95": 3280,
+          "p99": 6822
+        },
+        "payment.on-account": {
+          "n": 172,
+          "p50": 1880,
+          "p95": 6257,
+          "p99": 9559
+        },
+        "treasury.cash-in": {
+          "n": 66,
+          "p50": 1587,
+          "p95": 5388,
+          "p99": 7179
+        },
+        "read.treasury-accounts": {
+          "n": 71,
+          "p50": 530,
+          "p95": 1749,
+          "p99": 1868
+        },
+        "inventory.receipt": {
+          "n": 108,
+          "p50": 583,
+          "p95": 1797,
+          "p99": 1924
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 75.1,
+        "systemCpuMaxPct": 93.2,
+        "nodeRssMaxMB": 1208,
+        "postgresRssMaxMB": 1130,
+        "dbConnectionsMax": 28
+      }
+    },
+    {
+      "phase": "ramp-hot",
+      "kind": "hot",
+      "virtualUsers": 5,
+      "seconds": 15.3,
+      "requests": 222,
+      "success2xx": 222,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 55,
+        "201": 167
+      },
+      "requestsPerSec": 14.5,
+      "p50": 284,
+      "p95": 598,
+      "p99": 3035,
+      "perOp": {
+        "inventory.receipt": {
+          "n": 39,
+          "p50": 97,
+          "p95": 162,
+          "p99": 2673
+        },
+        "treasury.cash-in": {
+          "n": 29,
+          "p50": 416,
+          "p95": 566,
+          "p99": 3041
+        },
+        "treasury.cash-out": {
+          "n": 26,
+          "p50": 464,
+          "p95": 1569,
+          "p99": 2945
+        },
+        "read.movements-report": {
+          "n": 31,
+          "p50": 17,
+          "p95": 24,
+          "p99": 24
+        },
+        "payment.on-account": {
+          "n": 73,
+          "p50": 450,
+          "p95": 1510,
+          "p99": 3105
+        },
+        "read.treasury-accounts": {
+          "n": 24,
+          "p50": 17,
+          "p95": 28,
+          "p99": 30
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 94,
+        "systemCpuMaxPct": 100,
+        "nodeRssMaxMB": 1237,
+        "postgresRssMaxMB": 1136,
+        "dbConnectionsMax": 28
+      }
+    },
+    {
+      "phase": "ramp-hot",
+      "kind": "hot",
+      "virtualUsers": 25,
+      "seconds": 16.4,
+      "requests": 232,
+      "success2xx": 232,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 46,
+        "201": 186
+      },
+      "requestsPerSec": 14.2,
+      "p50": 1483,
+      "p95": 3722,
+      "p99": 5183,
+      "perOp": {
+        "read.movements-report": {
+          "n": 18,
+          "p50": 266,
+          "p95": 616,
+          "p99": 616
+        },
+        "treasury.cash-in": {
+          "n": 26,
+          "p50": 2164,
+          "p95": 4358,
+          "p99": 4455
+        },
+        "treasury.cash-out": {
+          "n": 36,
+          "p50": 1880,
+          "p95": 3833,
+          "p99": 6014
+        },
+        "read.treasury-accounts": {
+          "n": 28,
+          "p50": 732,
+          "p95": 1363,
+          "p99": 1390
+        },
+        "inventory.receipt": {
+          "n": 45,
+          "p50": 827,
+          "p95": 1470,
+          "p99": 1492
+        },
+        "payment.on-account": {
+          "n": 79,
+          "p50": 2194,
+          "p95": 4482,
+          "p99": 7761
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 92.8,
+        "systemCpuMaxPct": 100,
+        "nodeRssMaxMB": 1271,
+        "postgresRssMaxMB": 841,
+        "dbConnectionsMax": 19
+      }
+    },
+    {
+      "phase": "ramp-hot",
+      "kind": "hot",
+      "virtualUsers": 50,
+      "seconds": 18.3,
+      "requests": 272,
+      "success2xx": 272,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 47,
+        "201": 225
+      },
+      "requestsPerSec": 14.9,
+      "p50": 2587,
+      "p95": 6578,
+      "p99": 12068,
+      "perOp": {
+        "read.movements-report": {
+          "n": 20,
+          "p50": 698,
+          "p95": 2370,
+          "p99": 2370
+        },
+        "treasury.cash-out": {
+          "n": 37,
+          "p50": 4108,
+          "p95": 7620,
+          "p99": 8008
+        },
+        "treasury.cash-in": {
+          "n": 33,
+          "p50": 3083,
+          "p95": 5513,
+          "p99": 18291
+        },
+        "payment.on-account": {
+          "n": 100,
+          "p50": 3565,
+          "p95": 8673,
+          "p99": 16955
+        },
+        "read.treasury-accounts": {
+          "n": 27,
+          "p50": 1537,
+          "p95": 2966,
+          "p99": 3219
+        },
+        "inventory.receipt": {
+          "n": 55,
+          "p50": 1819,
+          "p95": 3252,
+          "p99": 3316
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 81.9,
+        "systemCpuMaxPct": 86.2,
+        "nodeRssMaxMB": 1043,
+        "postgresRssMaxMB": 853,
+        "dbConnectionsMax": 18
+      }
+    },
+    {
+      "phase": "sustained",
+      "kind": "distributed",
+      "virtualUsers": 20,
+      "seconds": 90.7,
+      "requests": 2228,
+      "success2xx": 2228,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 448,
+        "201": 1780
+      },
+      "requestsPerSec": 24.6,
+      "p50": 542,
+      "p95": 2540,
+      "p99": 3429,
+      "perOp": {
+        "read.movements-report": {
+          "n": 244,
+          "p50": 31,
+          "p95": 237,
+          "p99": 580
+        },
+        "read.treasury-accounts": {
+          "n": 204,
+          "p50": 54,
+          "p95": 451,
+          "p99": 1043
+        },
+        "inventory.receipt": {
+          "n": 466,
+          "p50": 239,
+          "p95": 756,
+          "p99": 1728
+        },
+        "payment.on-account": {
+          "n": 761,
+          "p50": 1154,
+          "p95": 3000,
+          "p99": 4102
+        },
+        "treasury.cash-out": {
+          "n": 291,
+          "p50": 710,
+          "p95": 2180,
+          "p99": 3129
+        },
+        "treasury.cash-in": {
+          "n": 262,
+          "p50": 1240,
+          "p95": 2772,
+          "p99": 3517
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 82,
+        "systemCpuMaxPct": 99.8,
+        "nodeRssMaxMB": 1132,
+        "postgresRssMaxMB": 1239,
+        "dbConnectionsMax": 29
+      }
+    },
+    {
+      "phase": "peak",
+      "kind": "distributed",
+      "virtualUsers": 60,
+      "seconds": 47.6,
+      "requests": 1163,
+      "success2xx": 1163,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 227,
+        "201": 936
+      },
+      "requestsPerSec": 24.5,
+      "p50": 1787,
+      "p95": 7939,
+      "p99": 11770,
+      "perOp": {
+        "read.movements-report": {
+          "n": 110,
+          "p50": 455,
+          "p95": 1293,
+          "p99": 1554
+        },
+        "treasury.cash-in": {
+          "n": 153,
+          "p50": 1858,
+          "p95": 8928,
+          "p99": 12587
+        },
+        "treasury.cash-out": {
+          "n": 143,
+          "p50": 1531,
+          "p95": 5060,
+          "p99": 7699
+        },
+        "payment.on-account": {
+          "n": 415,
+          "p50": 2519,
+          "p95": 9312,
+          "p99": 13269
+        },
+        "read.treasury-accounts": {
+          "n": 117,
+          "p50": 807,
+          "p95": 2757,
+          "p99": 2958
+        },
+        "inventory.receipt": {
+          "n": 225,
+          "p50": 1974,
+          "p95": 2903,
+          "p99": 3259
+        }
+      },
+      "windows": [],
+      "resources": {
+        "systemCpuAvgPct": 80.9,
+        "systemCpuMaxPct": 95.3,
+        "nodeRssMaxMB": 1275,
+        "postgresRssMaxMB": 1291,
+        "dbConnectionsMax": 29
+      }
+    },
+    {
+      "phase": "recovery",
+      "kind": "distributed",
+      "virtualUsers": 5,
+      "seconds": 45.2,
+      "requests": 1134,
+      "success2xx": 1134,
+      "nonSuccess": 0,
+      "statusCodes": {
+        "200": 215,
+        "201": 919
+      },
+      "requestsPerSec": 25.1,
+      "p50": 185,
+      "p95": 433,
+      "p99": 970,
+      "perOp": {
+        "read.movements-report": {
+          "n": 110,
+          "p50": 27,
+          "p95": 43,
+          "p99": 72
+        },
+        "read.treasury-accounts": {
+          "n": 105,
+          "p50": 16,
+          "p95": 37,
+          "p99": 48
+        },
+        "payment.on-account": {
+          "n": 399,
+          "p50": 299,
+          "p95": 865,
+          "p99": 1011
+        },
+        "treasury.cash-out": {
+          "n": 135,
+          "p50": 245,
+          "p95": 345,
+          "p99": 977
+        },
+        "inventory.receipt": {
+          "n": 234,
+          "p50": 41,
+          "p95": 105,
+          "p99": 151
+        },
+        "treasury.cash-in": {
+          "n": 151,
+          "p50": 252,
+          "p95": 854,
+          "p99": 1005
+        }
+      },
+      "windows": [
+        {
+          "t": 5,
+          "p95": 420,
+          "n": 118
+        },
+        {
+          "t": 10,
+          "p95": 434,
+          "n": 136
+        },
+        {
+          "t": 15,
+          "p95": 423,
+          "n": 123
+        },
+        {
+          "t": 20,
+          "p95": 596,
+          "n": 113
+        },
+        {
+          "t": 25,
+          "p95": 428,
+          "n": 134
+        },
+        {
+          "t": 30,
+          "p95": 477,
+          "n": 118
+        },
+        {
+          "t": 35,
+          "p95": 380,
+          "n": 139
+        },
+        {
+          "t": 40,
+          "p95": 390,
+          "n": 130
+        }
+      ],
+      "resources": {
+        "systemCpuAvgPct": 78.5,
+        "systemCpuMaxPct": 92.9,
+        "nodeRssMaxMB": 1248,
+        "postgresRssMaxMB": 1332,
+        "dbConnectionsMax": 29
+      }
+    }
+  ],
+  "oracle": {
+    "drainedEvents": 14,
+    "idempotencyProbe": {
+      "keys": 15,
+      "httpOk": 45,
+      "storedEffects": 15,
+      "ok": true
+    },
+    "companyA": {
+      "balErrors": [],
+      "payRows": 1460,
+      "expectedPayments": 1460,
+      "onHandUnits": 808,
+      "expectedReceiptUnits": 808,
+      "unpostedEvents": 0,
+      "unbalancedJournals": 0,
+      "auditChainValid": true,
+      "negativeStockPairs": 0,
+      "ok": true
+    },
+    "companyB": {
+      "balErrors": [],
+      "payRows": 1035,
+      "expectedPayments": 1035,
+      "onHandUnits": 607,
+      "expectedReceiptUnits": 607,
+      "unpostedEvents": 0,
+      "unbalancedJournals": 0,
+      "auditChainValid": true,
+      "negativeStockPairs": 0,
+      "ok": true
+    }
+  }
+}

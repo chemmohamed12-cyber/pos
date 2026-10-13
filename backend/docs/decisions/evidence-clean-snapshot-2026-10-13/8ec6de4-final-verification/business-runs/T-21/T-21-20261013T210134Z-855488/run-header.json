@@ -1,0 +1,38 @@
+{
+  "testId": "T-21",
+  "runId": "T-21-20261013T210134Z-855488",
+  "startedAt": "2026-10-13T21:01:34.260Z",
+  "commit": "8ec6de4a615c4e9962317ce6a6e9c5b6c91d37ec",
+  "branch": "clean-snapshot",
+  "dirtyPaths": [],
+  "sourceKind": "clean-git-archive-snapshot",
+  "applicationVersion": "1.1.9",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\_verify-snapshot",
+  "systemIdentifier": "7695619915229547252",
+  "databases": [
+    "daii_test_biz_t21_control_plane",
+    "daii_test_biz_t21_company_a",
+    "daii_test_biz_t21_company_b"
+  ],
+  "prefix": "biz_t21",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "out": {
+    "ok": true,
+    "kind": "OK"
+  },
+  "events": [
+    {
+      "id": "2f503ded-a26b-40ee-9e80-ec27092e9b54",
+      "status": "POSTED",
+      "rejectionReason": null,
+      "journalEntryId": "be681fdd-1d07-45b7-8f24-83d4dd889e8a"
+    }
+  ],
+  "valuation": {
+    "qty": 4,
+    "value": 16
+  }
+}

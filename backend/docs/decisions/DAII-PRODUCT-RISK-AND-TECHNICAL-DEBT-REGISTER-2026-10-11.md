@@ -365,3 +365,11 @@ No finding is closed by this update.
 | Dependencies | T1 rehearsed: 65→64 advisories, critical 3→1 (`proxy-addr`, `handlebars` cleared; `tar` remains, install-time); not applied | `evidence-clean-snapshot-2026-10-13/dependency-t1-rehearsal/` |
 | F-INV-001 | collector proven end to end on a synthetic fixture; real measurement still needs DEC-10 | `evidence-clean-snapshot-2026-10-13/f-inv-001-collector-rehearsal/` |
 No finding is closed by this update.
+
+### 6.6 Update 2026-10-14 (CTO final execution directive; original text above unchanged)
+| Finding / item | Effect | Evidence |
+|---|---|---|
+| Fresh-Company `wages_payable` gap (M0-6, found by WP-PAY-01) | **fixed for new Companies** (chart data only, `d3ad24b`); existing Companies still need the documented recovery (owner's go); `grni`/`fixed_asset` template items still open. PA-34/PA-35 unchanged | `WAGES-PAYABLE-CONTROL-ACCOUNT-TEMPLATE-2026-10-13.md`; `…/8ec6de4-final-verification/` |
+| Dependencies | tier T1 applied (`8ec6de4`): advisories 65 → 64; criticals 3 → 1 (`proxy-addr`, `handlebars` cleared); `tar` critical remains (install-time; T2 `bcrypt`); the shared development `node_modules` still follow the old lockfile until someone runs `npm ci` | same |
+| `work-order-phase3-e2e` Items 6/12 | passes at HEAD (7/7); the earlier "pre-existing" failure was observed on a pre-H2 baseline copy | same |
+No finding is closed by this update.

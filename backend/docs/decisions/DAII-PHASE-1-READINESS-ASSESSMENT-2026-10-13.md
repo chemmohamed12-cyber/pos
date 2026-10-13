@@ -32,7 +32,7 @@
 ## 4. Mandatory gates (roadmap §8) as they stand
 | Gate | State |
 |---|---|
-| Security: dependency T1 before the Phase 1 gate; host proxy check; no new reachable High | T1 rehearsed, **not applied** (DEC-20); host check not done; no new advisory observed (65 unchanged) |
+| Security: dependency T1 before the Phase 1 gate; host proxy check; no new reachable High | **T1 applied** (`8ec6de4`, lockfile only; 65 → 64 advisories, critical 3 → 1, the runtime-reachable `proxy-addr` critical cleared) and verified on a clean snapshot with a fresh install; **host proxy check not done** (needs host access); independent review of the lockfile diff pending; T2/T3 open |
 | Data integrity: plain-manager concurrency probe for lock primitives; oracle R1–R11 clean; audit-chain verification clean; payroll in the oracle | R1–R10 clean in the business-suite runs on record (T-03/T-04 runs this week included); **R11 (payroll in the oracle) does not exist** (PH1-HR-3); chain verification clean in the runs |
 | Company isolation: A/B spec for data access; LA-1 admission for any background path | A/B specs green (91-spec regression 0 FAIL); **10 call sites in 6 files still open a Company DataSource without admission** (`DAII-LA1-REMAINING-SITES-TRACKER-2026-10-13.md`) |
 | Independent verification: clean-snapshot evidence of a named commit; reviewer ≠ author; no merging across commits; skipped/blocked never counted as pass | clean-snapshot evidence kept per commit; skipped and blocked specs listed and not counted; **reviewer absent** |
@@ -43,3 +43,6 @@ ACC-1 (golden fixtures) has no dependency and could start; ACC-2/PH1-HR-1 (payro
 
 ## 6. Conclusion and what would change it
 Phase 1 may begin design once PH0-GATE is met (owner answers for the contracts, CTO sign-off or deferral). Its exit gate additionally needs: the independent reviews of P0-A…P0-D; DEC-02, DEC-20 (T1 applied), DEC-25 inputs and DEC-01b holders; the Layer 2 sites wired; no open High finding in HR/Accounting (which requires PA-33 reviewed, PA-34/35 fixed after the H0-4 decision, and PA-16 resolved or explicitly accepted by decision). Until then: **Phase 1 not accepted · release NOT APPROVED.**
+
+## 7. Update 2026-10-14
+Since this assessment was written: dependency T1 applied and verified (`8ec6de4`); the `wages_payable` template gap fixed for new Companies (`d3ad24b`); the PH0 fixture catalog and F-INV-001 operator kit prepared. None of these changes the verdict on the exit gate: criteria 1, 2, 3, 5, 6 remain NOT MET, 4 PARTIAL, PH0-GATE NOT MET. PA-34/PA-35 (posting amount, commission, disbursement leg) are unchanged and stay open under H0-4.

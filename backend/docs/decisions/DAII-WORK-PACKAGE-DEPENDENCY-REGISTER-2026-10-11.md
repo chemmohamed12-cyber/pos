@@ -253,3 +253,12 @@ Contract drafts for WP-P0H-01…09 and WP-P0M-01…06 exist in `DAII-PHASE-0-CON
 | WP-SEC-03 | T1 rehearsed in a scratch copy; awaiting DEC-20 |
 | WP-LA1-01 | tracked per call site (10) with owner titles and closure criteria; awaiting DEC-19 and three design answers |
 | WP-P0H-01…09, WP-P0M-01…06 | contract drafts exist (§17); owner request consolidated |
+
+## 19. Update 2026-10-14 (the table and counts above are unchanged)
+| Package | State |
+|---|---|
+| WP-SEC-03 (dependency T1) | applied at `8ec6de4` under the CTO directive of 2026-10-13; verified on a clean snapshot with a fresh install; independent review of the lockfile diff and the host proxy check pending |
+| WP-SEC-04 (T2 plan) | outline written (`DAII-DEPENDENCY-T2-OUTLINE-2026-10-13.md`); owner requested; not approved, not started |
+| WP-PAY-01 follow-up | `wages_payable` template fix `d3ad24b` + 8-test spec, in the isolation regression list (92 specs) |
+| WP-FIV-01 | operator kit ready (`DAII-F-INV-001-OPERATOR-KIT-2026-10-13.md`); awaiting DEC-10 |
+| WP-P0H / WP-P0M | fixture catalog prepared (`DAII-PHASE-0-FIXTURE-CATALOG-2026-10-13.md`) |

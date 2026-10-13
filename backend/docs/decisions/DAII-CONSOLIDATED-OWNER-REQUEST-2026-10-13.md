@@ -18,7 +18,7 @@
 |---|---|---|---|
 | C1 | DEC-02 already-broken audit chains | Choose (a) accept-and-annotate (recommended) or (b) authorised repair, in writing | WP-AUD-05/07, Phase 1 gate; meanwhile: no rewrite |
 | C2 | DEC-01b realignment functions | Name the holders for `AUDIT_DB_OPERATOR`, `AUDIT_CHANGE_APPROVER`, `AUDIT_INDEPENDENT_REVIEWER`, `AUDIT_OPS_ESCALATION_OWNER` (three different people at least) | any future realignment; meanwhile none is permitted |
-| C3 | DEC-20 dependency T1 | Approve the T1 package list (or a stated subset) for one scoped change; name an owner for T2 | the security gate before the Phase 1 gate |
+| C3 | DEC-20 dependency | **T1 was executed under the CTO directive of 2026-10-13** (`8ec6de4`, verified — `evidence-clean-snapshot-2026-10-13/8ec6de4-final-verification/`). Still needed: name the T2 owner (`DAII-DEPENDENCY-T2-OUTLINE-2026-10-13.md`); confirm the host proxy check; assign a reviewer for the lockfile diff | the security gate before the Phase 1 gate |
 | C4 | DEC-25 UUID repair vs audit hash | Keep the interim prohibition and approve the read-only need check (see D1), or decide differently | PA-43 |
 | C5 | DEC-06 business date | UTC helper or Cairo | H0-5; fixtures for attendance/commission/payroll |
 | C6 | D-04 integrations | Authorise implementation (or keep on hold) and answer the plan's [REVIEW] items; name the module owner | PA-20 |
@@ -27,7 +27,7 @@
 | C9 | DEC-11 capacity / staging | Provide a staging-like host, a separate load-generator machine, a named load-test authoriser; sign or replace the capacity targets | PA-24/PA-26 |
 | C10 | Reviewer | Nominate an eligible independent reviewer (profile in `DAII-INDEPENDENT-REVIEW-EVIDENCE-PACKAGE-INDEX-2026-10-11.md` §3.2), or record the continued deferral | acceptance of N-02, PA-33, WP-INV-10, WP-AUD-08 |
 | C11 | CI | Classify the documented CI result for `715c22d` (official line still reads "CI NOT GREEN") | release gate |
-| C12 | M0-6 | Which of: template completeness (`grni`, `wages_payable`, `fixed_asset`), H2-R recovery audit, Event Engine batching to open, in what order (T2 shows the `wages_payable` gap is real) | payroll posting in new Companies |
+| C12 | M0-6 | `wages_payable` is **done** for new Companies (`d3ad24b`, `WAGES-PAYABLE-CONTROL-ACCOUNT-TEMPLATE-2026-10-13.md`); still to open or decline, in what order: template completeness for `grni` and `fixed_asset`, the H2-R recovery audit for Companies provisioned before the fixes (including applying the documented recovery to existing Companies), Event Engine batching | payroll/inventory/fixed-asset posting in new and existing Companies |
 
 ### B2. `ACCOUNTING_POLICY_OWNER`
 | # | Item | Decision needed |
