@@ -227,3 +227,17 @@ P0H/P0M ─► P0-GATE ─► Phase 1 build ─► P1-GATE ─► Phase 2 (REL-0
 - No package is READY FOR IMPLEMENTATION if an unresolved accounting policy, safety boundary, required authorisation or essential technical fact would make it speculative: e.g. AUD-03 (DEC-01), PAY-03/04 (DEC-03/04), HR-05 (DEC-05), INV-04..06 (DEC-08), ACC-03 (DEC-16) are BLOCKED.
 - Packages marked READY FOR IMPLEMENTATION are read-only analyses, reviews, documentation or verification artefacts (GOV excluded); none changes product code, schema, UI, permissions or configuration.
 - Aliases (WP-ACC-02, HR-01, HR-02, HR-06) point to the owning stream and carry no separate status or closure.
+
+## 16. Update 2026-10-13 (handover closeout; statuses and the counting table above are unchanged)
+| Package | State after the 2026-10-13 closeout | Evidence |
+|---|---|---|
+| WP-INV-01 | T-03 and T-04 each have an individual passing run (T-03 `b8ed9c2`, `4dc3862`; T-04 `0dd0074` on the Option A writer and `4dc3862` on the Option B writer); DEC-08 individual-runs question answered (EV-23); reviewer still pending | `evidence-clean-snapshot-2026-10-12/0dd0074-t04-standalone/`, `…-10-13/` |
+| WP-AUD-05 | DEC-02 decision package prepared; recommendation accept-and-annotate; decision required | `DAII-DEC-01B-AND-DEC-02-AUDIT-CHAIN-DECISIONS-2026-10-13.md` |
+| WP-AUD-06 | clean-snapshot evidence of the Option B writer: T-28 12/12, T-26 3/3 (expectations inverted in `b4821ab`), T-23 7/7, T-22; regression 89/1/1/0 on `4dc3862`; author track only | `…-10-12/bcfce72-audit-regression/`, `…-10-13/4dc3862-harness-retry/` |
+| WP-AUD-07, WP-INV-10, WP-REV-01 | independent review pending; pack split into code and test-evidence tracks | `DAII-INDEPENDENT-REVIEW-SCOPE-AND-READINESS-2026-10-13.md` |
+| WP-AUD-08 | IMPLEMENTED (`4d4ed0d`) and author-verified; DEC-01b holders prepared, unassigned | same decision document |
+| WP-AUD-09 | pilot re-reviewed; real check not started (no role, no database list): NEED NOT ESTABLISHED | `DAII-PA43-WP-AUD-09-STATUS-2026-10-13.md` |
+| WP-FIV-01/02/03 | unchanged: awaiting the operator (DEC-10); the operator tool's offline test passes 3/3 | `DAII-CARRIED-ITEMS-STATUS-2026-10-13.md` §1 |
+| WP-SEC-03 / WP-SEC-04 | audit re-run unchanged; T1 sized by dry run; nothing applied (DEC-20) | same, §3 |
+| WP-LA1-01 | unchanged: 7 sites unwired (DEC-19) | — |
+| WP-REL-01, WP-P2-07 | unchanged: targets unsigned, no staging host; D-04 not authorised | same, §2, §4, §5 |

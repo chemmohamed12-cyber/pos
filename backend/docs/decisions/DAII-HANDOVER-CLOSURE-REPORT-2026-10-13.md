@@ -52,7 +52,7 @@ If a future teardown exhausts its attempts, the failure is a test-infrastructure
 ## 3. The five lint warnings (analysed, not changed)
 `npm run lint` (`eslint "{src,tools,test}/**/*.ts"`): **0 errors, 5 warnings**, all "Unused eslint-disable directive": `company-connection-manager.service.spec.ts:23` (`no-var-requires`), `biz-harness-smoke.biz.real-pg.spec.ts:6`, `biz-support.ts:1`, `t10-reconciliation.biz.real-pg.spec.ts:4` (all `no-var-requires`), `t09-inventory-movements-http.biz.real-pg.spec.ts:23` (`no-require-imports`). The four under `src/foundation/testing/` are redundant because `eslint.config.mjs` turns those rules off for that folder; the fifth names a rule that no longer reports. The warning set is the same as on `68c2215`/`89508b1`; the harness change adds none. No suppression was removed: removing them touches five files unrelated to this work and no safety proof beyond the reading above was produced.
 
-## 4. Phase 3 — CI on the final HEAD
+## 4. Phase 3 — CI on `c80395b` (re-run later on `715c22d`; see `DAII-FINAL-PROGRAM-CLOSURE-REPORT-2026-10-13.md` §2)
 One full run of the project script (`bash tools/ci/ci.sh`) on a clean full-tree `git archive` of **`c80395bb5281a78185f5ba1a6ca65a6d28984d6f`** — the commit that contains the final code, tests, tools and this report (the only later commit adds the CI evidence files and this section; documentation only). Code and test files of `c80395b` and of the database runs' commit `4dc3862` are identical (`git diff 4dc3862 c80395b` outside `backend/docs` is empty).
 
 ## 5. CI result

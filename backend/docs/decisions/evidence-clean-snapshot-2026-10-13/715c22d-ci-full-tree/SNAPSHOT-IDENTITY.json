@@ -1,0 +1,13 @@
+{
+ "commit": "715c22d02cb88f9187cb9f753d55c6e086d5025e",
+ "treeId": "9170e2b91e03afb86bd303de3e7161aa9ccb82e8",
+ "filesInCommit": 4651,
+ "filesInArchive": 4651,
+ "blobIdIdentical": 1228,
+ "identicalAfterCrlfToLf": 3423,
+ "missingOrDifferent": 0,
+ "dirtyPaths": [],
+ "sourceKind": "clean-git-archive-snapshot",
+ "archiveManifestSha256": "ad8d71e44ef31cbdd56b520de9f62eb4b8a2fb017a72ebf31627393be8c61bd4",
+ "note": "Archive re-created on 2026-10-13 from the same commit (the CI snapshot was extracted the same way and deleted after the run). On this machine git archive writes text files with CRLF, so each file was compared with its git blob id exactly, or after CRLF->LF normalisation; the sorted list of path+sha256 of the extracted files was hashed (archiveManifestSha256 is the hash of THIS re-created archive as written with CRLF, not of the deleted CI snapshot, which cannot be re-hashed). dirtyPaths is empty by construction: an archive has no working tree."
+}

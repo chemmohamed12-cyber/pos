@@ -2,6 +2,14 @@
 
 PA-43: the active UUID-repair core rewrites `audit_records.actorUserId` and `organizationId`, which are inputs of the audit hash, so a repair on a database whose audit rows reference non-compliant ids would invalidate hashes. Whether any real database needs such a repair is **not known**. DEC-25 interim policy stands (no repair path that rewrites hash-input fields; no re-hash or normalisation of history; the read-only check establishes the need). **Nothing was run on any real database.**
 
+## 0. Proven versus still needing authority
+| | Proven | Not proven / needs an authority or an independent decision |
+|---|---|---|
+| Code path | The 13-stage trace (protocol, step 1) shows the two audit columns are rewritten only when a `users`/`org_units` primary key is rewritten; by code reading | independent review of the trace (WP-REV-01 deferred) |
+| Effect on the hash | On a disposable fixture, 4 of 7 audit rows would change a hash input and the chain would first break at seq 1 (in-memory simulation, repair never called) | — |
+| Read-only queries | Q0–Q6 run in READ ONLY sessions (write refused with 25006) and classify a legacy-like fixture | — |
+| Any real database | **nothing** | whether any real database has non-compliant ids referenced by audit rows, or whether the repair ever ran: needs the read-only role and the database list (owner: CTO / environment owner), then DEC-25 final |
+
 ## 4.1 Review of the T-29 pilot (re-checked from the spec source and the evidence files)
 | Requirement | Finding | Where |
 |---|---|---|

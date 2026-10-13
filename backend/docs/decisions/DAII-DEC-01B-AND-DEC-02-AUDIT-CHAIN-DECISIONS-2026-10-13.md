@@ -2,6 +2,15 @@
 
 **Status: PREPARED FOR DECISION.** Nothing here is executed, and nothing here authorises an operation on any real database. Names of people are not requested; functional titles are used and are placeholders until the authority assigns holders. Assigning a title grants no permission. Direction already decided by the CTO (2026-10-12): Option B — the audit writer fails closed on sequence lag and never realigns the sequence by itself (`4d4ed0d`).
 
+## 0. What is proven, and what still needs an authority or an independent decision
+| Subject | Proven (author-track evidence, disposable databases only) | Still needs an authority-holder / independent review |
+|---|---|---|
+| DEC-01b — writer behaviour | The writer refuses **before** `nextval` when the next value would not exceed the stored tail, never realigns (`setval` only in a comment), and leaves the sequence unchanged: code read; T-28 12/12 and T-26 3/3 on `bcfce72`; T-04 alone on the Option B writer and the 91-spec regression (0 FAIL) on `4dc3862` | independent review of the guard (`4d4ed0d`); the CTO's recording of Option B verbatim |
+| DEC-01b — operator realignment | The runbook §5 template (advisory lock + one `setval`) was rehearsed on a disposable database (T-28 B5/B5b/B7) and its post-checks measured | **every real use**: holders of the four functions, a diagnosis, a scope, a recovery plan, written approval; nothing here authorises it |
+| DEC-01b — assumption | Increment 1 / cache 1 is asserted by test B9 only | a runtime/startup assertion does not exist and is not authorised here |
+| DEC-02 — new breaks | The cause family (hash/sequence mismatch after a rolled-back insert) is fixed for new writes by `c764fc5` (T-22/T-23); existing rows untouched | independent review of `c764fc5` |
+| DEC-02 — existing breaks | **Not proven**: whether any real database has a break, where, or why — no inventory exists | the decision between (a) and (b); read-only access for the inventory (WP-AUD-02) |
+
 ## 1. DEC-01b — responsibilities for a future operator realignment of the audit sequence
 Source of the mechanics: `DAII-RUNBOOK-AUDIT-SEQUENCE-LAG-2026-10-12.md` (roles there are `DB_OPERATOR`, `APPROVER`, `ESCALATION_OWNER`, `OPS_CONTACT`). This section fixes the four functions the owner asked for and maps them to the runbook's roles; the runbook's steps are unchanged.
 
