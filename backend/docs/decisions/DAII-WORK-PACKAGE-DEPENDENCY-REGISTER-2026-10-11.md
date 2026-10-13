@@ -262,3 +262,6 @@ Contract drafts for WP-P0H-01…09 and WP-P0M-01…06 exist in `DAII-PHASE-0-CON
 | WP-PAY-01 follow-up | `wages_payable` template fix `d3ad24b` + 8-test spec, in the isolation regression list (92 specs) |
 | WP-FIV-01 | operator kit ready (`DAII-F-INV-001-OPERATOR-KIT-2026-10-13.md`); awaiting DEC-10 |
 | WP-P0H / WP-P0M | fixture catalog prepared (`DAII-PHASE-0-FIXTURE-CATALOG-2026-10-13.md`) |
+
+## 20. Update 2026-10-14 (the table and counts above are unchanged)
+WP-SEC-03: implemented and author-verified; acceptance pending the independent lockfile review and the host proxy check (packets prepared). WP-SEC-04 (T2): owner requested, not authorised. Template items (`grni`, `fixed_asset`): proposal only. All outstanding decisions and resources: `DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md` (37 items, 16 roles; one request per role in `owner-requests-2026-10-14/`).

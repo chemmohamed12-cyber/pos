@@ -373,3 +373,11 @@ No finding is closed by this update.
 | Dependencies | tier T1 applied (`8ec6de4`): advisories 65 → 64; criticals 3 → 1 (`proxy-addr`, `handlebars` cleared); `tar` critical remains (install-time; T2 `bcrypt`); the shared development `node_modules` still follow the old lockfile until someone runs `npm ci` | same |
 | `work-order-phase3-e2e` Items 6/12 | passes at HEAD (7/7); the earlier "pre-existing" failure was observed on a pre-H2 baseline copy | same |
 No finding is closed by this update.
+
+### 6.7 Update 2026-10-14 (final closure directive; original text above unchanged)
+| Item | Effect | Evidence |
+|---|---|---|
+| Dependencies (T1) | applied and author-verified; **final acceptance pending**: independent review of the exact lockfile diff (packet ready, mechanical equivalence to the rehearsal shown) and the host-level proxy check (protocol ready, not performed) | `evidence-clean-snapshot-2026-10-13/t1-review-packet/`; `DAII-T1-HOST-PROXY-CHECK-PROTOCOL-2026-10-14.md` |
+| Template completeness | `grni` and `fixed_asset`: separate proposal, nothing added. Trace: fixed assets need only account shape (template suffices); their onboarding gap is three unset configuration accounts that fail closed. The `wages_payable` fix stays limited to new Companies | `DAII-TEMPLATE-GRNI-AND-FIXED-ASSET-PROPOSAL-2026-10-14.md` |
+| Observation (deployment, not caused by T1) | behind a reverse proxy with `trust proxy` off, the rate limiter would see the proxy's address for every client; to be confirmed by the host check | protocol H4 |
+No finding is closed by this update.

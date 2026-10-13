@@ -1,0 +1,16 @@
+{
+ "beforeCommit": "d3ad24b558b72dec60d55b4ec5b61fb2619eff85",
+ "afterCommit": "8ec6de4a615c4e9962317ce6a6e9c5b6c91d37ec",
+ "lockfileSha256Before": "4c710e00d21c388644ef05cf075f4e3565b5547591b8adf7437b62ab79fae3be",
+ "lockfileSha256After": "81d2bc1eb8855890a877653c28aae4cb81b31d09bbc9fd427047d5241084007d",
+ "packageJsonIdentical": true,
+ "entriesChanged": 22,
+ "entriesAdded": 8,
+ "entriesRemoved": 0,
+ "sameVersionEntriesWithAnyOtherFieldChange": [],
+ "equivalentToRehearsalChanged": true,
+ "equivalentToRehearsalAdded": true,
+ "allTouchedResolvedFromRegistryNpmjsOrg": true,
+ "nonRegistryResolved": [],
+ "diffstat": "1 file changed, 176 insertions(+), 67 deletions(-)"
+}

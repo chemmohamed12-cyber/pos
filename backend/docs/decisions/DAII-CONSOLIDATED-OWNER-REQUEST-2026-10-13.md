@@ -1,5 +1,7 @@
 # DAII — One consolidated request to the decision owners — 2026-10-13
 
+> **Superseded 2026-10-14 by `DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md` and the per-role requests in `owner-requests-2026-10-14/`.** Kept as history; send the newer files.
+
 **Purpose.** Everything the engineering team needs from people, in one batch, so no owner is asked twice. Nothing here is assumed approved; silence is not approval. Each item states the question, the exact decision needed, the responsible functional role (a title — the CTO assigns the person), what it unblocks, and what continues meanwhile. Supporting detail is in the linked documents; this page is the index of asks. Official status is unchanged: N-02, PA-33, PA-43 OPEN · independent review PENDING · CI PASS only for the run on `715c22d` · release NOT APPROVED.
 
 ## A. Technical questions already answered by the team (no owner input needed — for information)
