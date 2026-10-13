@@ -1,0 +1,42 @@
+# DAII — N-02 sibling probes (WP-INV-09): results — 2026-10-14
+
+**What this is.** The measurement the CTO authorised on 2026-10-11 (item 6): local, isolated, test-only probes for the methods that use the same "join the caller's manager" idiom as the already-fixed N-02/H1–H4 primitives. Specification: `DAII-N02-SIBLING-PROBES-AND-H5-FIXTURE-TEST-SPECIFICATION-2026-10-11.md` §2. Spec file `src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts` (commit `d68fd10`, registered in `biz-run.js` as **T-30**). **No product logic was changed.** The results below are measurements of the tested shape; every FAIL-DEFECT is a **candidate defect for the CTO to judge** — changing product code needs its own authorisation (not requested here, none made). Nothing here is an independent acceptance: it is author-track evidence.
+
+**Where it ran.** Dedicated test cluster 127.0.0.1:5546, disposable database `daii_test_biz_t30_*` (guard-approved pattern), clean `git archive` snapshot of `d68fd10` with a fresh `npm ci` (evidence: `evidence-clean-snapshot-2026-10-13/d68fd10-t30-sibling-probes/`). Two earlier working-tree runs are not counted (the first stopped on a harness mistake — HR tables not provisioned; the second exposed a probe flaw: the negative-stock check was database-wide and carried the first defect into later cases; it was scoped per product before the committed run). Magnitudes of the plain-manager failures vary from run to run (a race), the direction does not.
+
+## Results (T-30 on `d68fd10`)
+| Probe | Method / scenario | A) plain manager (what a controller passes) | B) inside `manager.transaction` |
+|---|---|---|---|
+| S1 | `relocateReservedStock` — 8 concurrent relocations of 1 unit against 5 reserved | **FAIL-DEFECT** — 6 of 8 succeeded (limit 5); source on-hand −1 (negative stock); 6 transfer pairs and 6 audit rows for 5 reserved units; destination reservation 5 (a lost update hid the sixth) | **PASS** — exactly 5 succeed, 3 refused 409; conserved; 5 movements; 5 audit rows |
+| S1-C | rollback of an outer transaction after a relocation | n/a (needs a transaction) | **PASS** — reservations, movements, audit as before |
+| S1-C | forced failure after the source rows moved (destination warehouse does not exist) | **FAIL-DEFECT** — the call is refused (FK 23503) **but the source reservation stays reduced (5 → 3) with no destination row and no movement**: two reserved units silently disappear | **PASS** — all-or-nothing, state unchanged |
+| S1-D | opposite-direction relocations W1↔W2 + concurrent `reserveStock` (6+6+4 calls) | **FAIL-DEFECT** — no deadlock and no unexpected error, but per-order reserved totals are not conserved (closure run: order 1 reserved total 5 → 8, order 2: 5 → 6) and the concurrent reserve was refused | **PASS** — totals conserved (5/5), all 4 reserves succeeded, on-hand 20, no deadlock |
+| S2 | `releaseReservedQuantityForReference` — 12 concurrent releases of 1 against 5 reserved | **FAIL-DEFECT** — all 12 "succeeded", 12 audit rows, 4 units still active (the reservation did not reach 0) | **PASS** — exactly 5 succeed, 7 refused, 0 active, 5 audit rows |
+| S2-C | rollback after a reference release | n/a | **PASS** — quantities restored; retry works |
+| S3 | `releaseReservation` — 8 concurrent releases of ONE reservation id | **FAIL-DEFECT** — 8 of 8 succeed, 8 "released" audit rows for one reservation | **FAIL-DEFECT** — same: the method takes no lock and does not condition the write on the state it read, so a transaction does not help |
+| S4 | `CustomersService.createCustomer` (`sales.max_customers`=5) and `HrService.createEmployee` (`hr.max_employees`=5), 10 concurrent creations each | **PASS** both — exactly 5 rows, counter 5, 5 refused with 409 | not probed (A is the controller-reachable shape) |
+Totals: 14 cases — **8 PASS · 6 FAIL-DEFECT · 0 BLOCKED**.
+
+## What the pattern says
+* The three inventory methods behave as predicted by the N-01/N-02 idiom analysis: **with a transaction manager the guarantees hold (S1, S2: all PASS); with a plain manager the advisory lock is released at once and the read–modify–write is unserialised**, which is the same defect shape that N-02 fixed for `releaseReservedQuantity` and `fulfillReservation` by moving them to `runInTransaction`. `relocateReservedStock` and `releaseReservedQuantityForReference` still use `manager ? run(manager) : dataSource.transaction(run)`.
+* `releaseReservation` (S3) is a different, smaller defect: no lock and an unconditional write, so concurrent calls all succeed and duplicate the audit row, in either style. No quantity effect was observed (the reservation ends `released`); an interaction with a concurrent fulfilment of the same reservation was **not probed**.
+* The limit-gated creation paths (S4) are safe in the shape tested: the pre-check is advisory but the in-transaction `consume` is the real gate.
+
+## S5 — reach (from source reading, `d68fd10`): which callers can pass a plain manager
+| Method | Caller | Manager the caller passes | Plain-manager reach |
+|---|---|---|---|
+| `relocateReservedStock` | `fulfillment.service.ts:334` (prepare a pick-task line) | the caller's optional `manager` as given | **possible** — depends on what the controller path passes |
+| | `returns.service.ts:234` (custody return) | the caller's optional `manager` as given | **possible** |
+| | `returns.service.ts:425` (disposition restock) | the transaction manager of `em(manager).transaction(...)` | no (transaction) |
+| | `shipment.service.ts:1281` (`transferCustodyOnPickup`) | the caller's optional `manager` | **possible**; T-25 (H5) measured the transition path |
+| `releaseReservedQuantityForReference` | `work-order.service.ts:395` (material issue) | `txManager` (a transaction) | no |
+| | `work-order.service.ts:722` (`releaseRemainingReservations`) | parameter `manager = this.dataSource.manager` (default = a plain manager) | **possible** whenever the caller does not supply a transaction |
+| `releaseReservation` | `inventory.controller.ts:585` (HTTP) | `req.companyContext.dataSource.manager` (plain) | **yes, HTTP-reachable** — a double submit produces duplicate audit rows |
+"Possible" means the call sites accept an optional manager and the probe shows the failure when a plain manager is supplied; whether each real controller path supplies one was **not** traced end to end here and is part of the CTO's judgement.
+
+## Decisions requested (none executed; no product change)
+1. Authorise a fix for the three candidate defects, in this order of evidence strength: (a) `relocateReservedStock` and `releaseReservedQuantityForReference` → `runInTransaction` (same one-line shape as the H2/H3 fixes, with the T-30 probes turned into regression expectations and the 92-spec isolation list); (b) `releaseReservation` → lock + conditional state change. Or accept the residual risk with a recorded rationale. Owner: CTO with the inventory owner — register item **C14**.
+2. Until decided: T-30 stays in the business suite as a **characterization** — its 6 FAIL-DEFECT cases are known and expected, like the five already on record, and must not be read as a regression.
+
+## Reproduce
+`node tools/testing/biz-run.js --only T-30` (dedicated cluster; DB guard enforced). Evidence: `evidence-clean-snapshot-2026-10-13/d68fd10-t30-sibling-probes/` (header `commit` = `d68fd10`, `dirtyPaths: []`, manifest-verified; CI script on the same snapshot: Overall PASS).

@@ -1,0 +1,31 @@
+{
+ "database": "daii_test_biz_t95_avprobe",
+ "startedAt": "2026-10-13T22:14:42.066Z",
+ "cluster": {
+  "server": "18.6",
+  "autovacuum": "on",
+  "naptime": "1min",
+  "systemIdentifier": "7695619915229547252"
+ },
+ "preparedAt": "2026-10-13T22:15:29.832Z",
+ "vacuumWorkerSeenAtDropTime": {
+  "pid": 6868,
+  "datname": "daii_test_biz_t95_avprobe",
+  "rel": null,
+  "phase": null
+ },
+ "dropIssuedAt": "2026-10-13T22:15:31.398Z",
+ "drop": {
+  "outcome": "error",
+  "code": "42501",
+  "message": "permission denied to terminate process",
+  "detail": "Only roles with privileges of the role whose process is being terminated or with privileges of the \"pg_signal_backend\" role may terminate this process.",
+  "lastError": {
+   "code": "42501",
+   "message": "permission denied to terminate process"
+  }
+ },
+ "databaseStillExists": true,
+ "cleanup": "FAILED: permission denied to terminate process",
+ "finishedAt": "2026-10-13T22:15:40.481Z"
+}

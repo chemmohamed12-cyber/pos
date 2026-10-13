@@ -1,0 +1,65 @@
+{
+ "expression": "lines.reduce((sum, l) => sum + Number(l.amount), 0).toFixed(2)",
+ "node": "v20.20.2",
+ "seed": 20261014,
+ "results": [
+  {
+   "scenario": "worked-example-12-lines",
+   "linesPerRun": 12,
+   "trials": 5000,
+   "totalRunsWithWrongCents": 0,
+   "maxAbsoluteErrorBeforeRounding": 2.9103830456733704e-11,
+   "largestExactTotal": "91880.83",
+   "firstMismatch": null
+  },
+  {
+   "scenario": "small-company-200-lines",
+   "linesPerRun": 200,
+   "trials": 5000,
+   "totalRunsWithWrongCents": 0,
+   "maxAbsoluteErrorBeforeRounding": 2.7939677238464355e-9,
+   "largestExactTotal": "2291920.73",
+   "firstMismatch": null
+  },
+  {
+   "scenario": "realistic-large-run-10k-lines-up-to-50k",
+   "linesPerRun": 10000,
+   "trials": 400,
+   "totalRunsWithWrongCents": 0,
+   "maxAbsoluteErrorBeforeRounding": 0.000002086162567138672,
+   "largestExactTotal": "254342549.92",
+   "firstMismatch": null
+  },
+  {
+   "scenario": "stress-100k-lines-up-to-100k (total ~5e9)",
+   "linesPerRun": 100000,
+   "trials": 40,
+   "totalRunsWithWrongCents": 0,
+   "maxAbsoluteErrorBeforeRounding": 0.000141143798828125,
+   "largestExactTotal": "5021710441.14",
+   "firstMismatch": null
+  },
+  {
+   "scenario": "extreme-1M-lines-up-to-100k (total ~5e10)",
+   "linesPerRun": 1000000,
+   "trials": 8,
+   "totalRunsWithWrongCents": 0,
+   "maxAbsoluteErrorBeforeRounding": 0.0022735595703125,
+   "largestExactTotal": "50049390449.10",
+   "firstMismatch": null
+  },
+  {
+   "scenario": "extreme-1M-lines-up-to-9999999 (total ~5e12)",
+   "linesPerRun": 1000000,
+   "trials": 4,
+   "totalRunsWithWrongCents": 4,
+   "maxAbsoluteErrorBeforeRounding": 0.2646484375,
+   "largestExactTotal": "4999935665485.40",
+   "firstMismatch": {
+    "exact": "4993290731579.14",
+    "got": "4993290731579.23",
+    "absErr": 0.0908203125
+   }
+  }
+ ]
+}

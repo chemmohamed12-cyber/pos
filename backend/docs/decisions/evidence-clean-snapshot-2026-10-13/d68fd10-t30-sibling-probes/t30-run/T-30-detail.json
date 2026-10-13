@@ -1,0 +1,190 @@
+{
+  "S1-plain": {
+    "reserved": 5,
+    "calls": 8,
+    "ok": 6,
+    "tally": {
+      "OK": 6,
+      "ConflictException:409": 2
+    },
+    "activeAtW1": 0,
+    "activeAtW2": 5,
+    "onHandW1": -1,
+    "onHandW2": 6,
+    "transferOut": 6,
+    "transferIn": 6,
+    "auditRows": 6,
+    "negativeStock": 1
+  },
+  "S1-transaction": {
+    "reserved": 5,
+    "calls": 8,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 3
+    },
+    "activeAtW1": 0,
+    "activeAtW2": 5,
+    "onHandW1": 0,
+    "onHandW2": 5,
+    "transferOut": 5,
+    "transferIn": 5,
+    "auditRows": 5,
+    "negativeStock": 0
+  },
+  "S1-C-rollback": {
+    "rolledBack": true,
+    "before": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "aud": 0
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "aud": 0
+    }
+  },
+  "S1-C-partial-plain": {
+    "refused": true,
+    "outcome": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "insert or update on table \"stock_reservations\" violates foreign key constraint \"stock_reservations_warehouseId_fkey\"",
+      "pgCode": "23503",
+      "detail": "Key (warehouseId)=(c5ead434-ea59-4508-ae98-d2457834b96d) is not present in table \"warehouses\"."
+    },
+    "before": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":3,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "reservationsAtMissingWarehouse": 0
+  },
+  "S1-C-partial-transaction": {
+    "refused": true,
+    "outcome": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "insert or update on table \"stock_reservations\" violates foreign key constraint \"stock_reservations_warehouseId_fkey\"",
+      "pgCode": "23503",
+      "detail": "Key (warehouseId)=(9c834ad3-f0f8-4aad-a40a-25bad0e5c4e7) is not present in table \"warehouses\"."
+    },
+    "before": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "reservationsAtMissingWarehouse": 0
+  },
+  "S1-D-plain": {
+    "tally": {
+      "OK": 12,
+      "ConflictException:409": 4
+    },
+    "deadlocks": 0,
+    "unexpectedFailures": [],
+    "o1Total": 8,
+    "o2Total": 6,
+    "o3Reserved": 0,
+    "onHandTotal": 20,
+    "negativeStock": 0
+  },
+  "S1-D-transaction": {
+    "tally": {
+      "OK": 14,
+      "ConflictException:409": 2
+    },
+    "deadlocks": 0,
+    "unexpectedFailures": [],
+    "o1Total": 5,
+    "o2Total": 5,
+    "o3Reserved": 4,
+    "onHandTotal": 20,
+    "negativeStock": 0
+  },
+  "S2-plain": {
+    "reserved": 5,
+    "calls": 12,
+    "ok": 12,
+    "tally": {
+      "OK": 12
+    },
+    "stillActive": 4,
+    "onHandDelta": 0,
+    "auditRows": 12
+  },
+  "S2-transaction": {
+    "reserved": 5,
+    "calls": 12,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    },
+    "stillActive": 0,
+    "onHandDelta": 0,
+    "auditRows": 5
+  },
+  "S2-rollback": {
+    "rolledBack": true,
+    "activeAfterRollback": 5,
+    "retryOk": true,
+    "activeEnd": 2
+  },
+  "S3-plain": {
+    "calls": 8,
+    "ok": 8,
+    "tally": {
+      "OK": 8
+    },
+    "status": "released",
+    "releasedAuditRows": 8
+  },
+  "S3-transaction": {
+    "calls": 8,
+    "ok": 8,
+    "tally": {
+      "OK": 8
+    },
+    "status": "released",
+    "releasedAuditRows": 8
+  },
+  "S4-customers": {
+    "cap": 5,
+    "calls": 10,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "rows": 5,
+    "counter": 5
+  },
+  "S4-employees": {
+    "cap": 5,
+    "calls": 10,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "rows": 5,
+    "counter": 5
+  }
+}

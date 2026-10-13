@@ -1,0 +1,77 @@
+{
+  "testId": "T-30",
+  "runId": "T-30-20261013T221032Z-4fda80",
+  "finishedAt": "2026-10-13T22:10:54.785Z",
+  "results": [
+    {
+      "id": "S1-A-plain-manager-concurrent-relocation-conserves-reservation",
+      "status": "FAIL-DEFECT",
+      "note": "{\"reserved\":5,\"calls\":8,\"ok\":6,\"tally\":{\"OK\":6,\"ConflictException:409\":2},\"activeAtW1\":0,\"activeAtW2\":5,\"onHandW1\":-1,\"onHandW2\":6,\"transferOut\":6,\"transferIn\":6,\"auditRows\":6,\"negativeStock\":1}"
+    },
+    {
+      "id": "S1-B-transaction-manager-concurrent-relocation-conserves-reservation",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"calls\":8,\"ok\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":3},\"activeAtW1\":0,\"activeAtW2\":5,\"onHandW1\":0,\"onHandW2\":5,\"transferOut\":5,\"transferIn\":5,\"auditRows\":5,\"negativeStock\":0}"
+    },
+    {
+      "id": "S1-C-outer-rollback-restores-reservation-movements-audit",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"before\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":5,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"aud\":0},\"after\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":5,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"aud\":0}}"
+    },
+    {
+      "id": "S1-C-A-plain-manager-failed-relocation-is-all-or-nothing",
+      "status": "FAIL-DEFECT",
+      "note": "{\"refused\":true,\"outcome\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_reservations\\\" violates foreign key constraint \\\"stock_reservations_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(c5ead434-ea59-4508-ae98-d2457834b96d) is not present in table \\\"warehouses\\\".\"},\"before\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":5,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"inn\":0,\"onHand\":5},\"after\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":3,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"inn\":0,\"onHand\":5},\"reservationsAtMissingWarehouse\":0}"
+    },
+    {
+      "id": "S1-C-B-transaction-manager-failed-relocation-is-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"refused\":true,\"outcome\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_reservations\\\" violates foreign key constraint \\\"stock_reservations_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(9c834ad3-f0f8-4aad-a40a-25bad0e5c4e7) is not present in table \\\"warehouses\\\".\"},\"before\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":5,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"inn\":0,\"onHand\":5},\"after\":{\"rows\":\"[{\\\"warehouseId\\\":\\\"d35bc8dc-8ddc-41f6-9795-4dce5ab64eed\\\",\\\"quantity\\\":5,\\\"status\\\":\\\"active\\\"}]\",\"out\":0,\"inn\":0,\"onHand\":5},\"reservationsAtMissingWarehouse\":0}"
+    },
+    {
+      "id": "S1-D-A-plain-manager-opposite-relocations-and-reserve",
+      "status": "FAIL-DEFECT",
+      "note": "{\"tally\":{\"OK\":12,\"ConflictException:409\":4},\"deadlocks\":0,\"unexpectedFailures\":[],\"o1Total\":8,\"o2Total\":6,\"o3Reserved\":0,\"onHandTotal\":20,\"negativeStock\":0}"
+    },
+    {
+      "id": "S1-D-B-transaction-manager-opposite-relocations-and-reserve",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":14,\"ConflictException:409\":2},\"deadlocks\":0,\"unexpectedFailures\":[],\"o1Total\":5,\"o2Total\":5,\"o3Reserved\":4,\"onHandTotal\":20,\"negativeStock\":0}"
+    },
+    {
+      "id": "S2-A-plain-manager-concurrent-reference-release-never-exceeds-reserved",
+      "status": "FAIL-DEFECT",
+      "note": "{\"reserved\":5,\"calls\":12,\"ok\":12,\"tally\":{\"OK\":12},\"stillActive\":4,\"onHandDelta\":0,\"auditRows\":12}"
+    },
+    {
+      "id": "S2-B-transaction-manager-concurrent-reference-release-never-exceeds-reserved",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"calls\":12,\"ok\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":7},\"stillActive\":0,\"onHandDelta\":0,\"auditRows\":5}"
+    },
+    {
+      "id": "S2-C-outer-rollback-restores-reservation",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"activeAfterRollback\":5,\"retryOk\":true,\"activeEnd\":2}"
+    },
+    {
+      "id": "S3-A-plain-manager-single-release-per-reservation",
+      "status": "FAIL-DEFECT",
+      "note": "{\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"status\":\"released\",\"releasedAuditRows\":8}"
+    },
+    {
+      "id": "S3-B-transaction-manager-single-release-per-reservation",
+      "status": "FAIL-DEFECT",
+      "note": "{\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"status\":\"released\",\"releasedAuditRows\":8}"
+    },
+    {
+      "id": "S4-A-plain-manager-customer-creation-respects-cap",
+      "status": "PASS",
+      "note": "{\"cap\":5,\"calls\":10,\"ok\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":5},\"rows\":5,\"counter\":5}"
+    },
+    {
+      "id": "S4-A-plain-manager-employee-creation-respects-cap",
+      "status": "PASS",
+      "note": "{\"cap\":5,\"calls\":10,\"ok\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":5},\"rows\":5,\"counter\":5}"
+    }
+  ]
+}

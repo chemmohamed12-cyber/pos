@@ -8,7 +8,7 @@ Kinds: **D** decision/approval Â· **A** business answer for a Phase 0 contract Â
 
 | Role | Items | Count |
 |---|---|---|
-| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13 | 13 |
+| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14 | 14 |
 | `ACCOUNTING_POLICY_OWNER` | A1, A2, A3, A4 | 4 |
 | `PAYROLL_POLICY_OWNER` | P1 | 1 |
 | `HR_OWNER` | P2, P3, P4 | 3 |
@@ -25,7 +25,7 @@ Kinds: **D** decision/approval Â· **A** business answer for a Phase 0 contract Â
 | `SITE_OWNERS` | O6 | 1 |
 | `SECURITY_AND_DEPENDENCY_OWNER` | O7 | 1 |
 
-Total items: **37** across **16** roles.
+Total items: **38** across **16** roles.
 
 ## `CTO`
 
@@ -44,6 +44,7 @@ Total items: **37** across **16** roles.
 | C11 | Template: grni and fixed_asset (separate question) | Record the accounting decision first: grni option A/B/C; fixed_asset direction (B/D etc.). Nothing is added until recorded. Also: open or decline the H2-R recovery audit for Companies provisioned before the fixes. | ACCOUNTING_POLICY_OWNER | DAII-TEMPLATE-GRNI-AND-FIXED-ASSET-PROPOSAL-2026-10-14.md | new-Company procurement posting; existing-Company recovery | PENDING |
 | C12 | DEC-06 business date | UTC or Cairo (fixtures for both are computed). | â€” | DAII-PHASE-0-FIXTURE-CATALOG-2026-10-13.md | H0-5; attendance/commission/payroll fixtures | PENDING |
 | C13 | T1 final acceptance prerequisites | Assign (a) the reviewer of the exact lockfile diff (with C4) and (b) the person with host access for the proxy compatibility check; approve a coordinated time for any `npm ci` in the shared development tree. | ENVIRONMENT_OWNER | evidence-clean-snapshot-2026-10-13/t1-review-packet/; DAII-T1-HOST-PROXY-CHECK-PROTOCOL-2026-10-14.md | T1 final acceptance | PENDING |
+| C14 | N-02 sibling candidate defects (WP-INV-09, T-30) | Decide: authorise a fix (relocateReservedStock and releaseReservedQuantityForReference to runInTransaction; releaseReservation to a lock plus conditional state change; T-30 expectations become regression) or accept the residual risk with a recorded rationale. Measured at d68fd10: plain-manager calls lose guarantees (6 FAIL-DEFECT cases), transaction-manager calls hold; releaseReservation fails in both styles. | INVENTORY_OWNER | DAII-N02-SIBLING-PROBES-RESULTS-2026-10-14.md; evidence-clean-snapshot-2026-10-13/d68fd10-t30-sibling-probes/ | N-02 remainder (WP-INV-09); no source change until authorised | PENDING |
 
 ## `ACCOUNTING_POLICY_OWNER`
 

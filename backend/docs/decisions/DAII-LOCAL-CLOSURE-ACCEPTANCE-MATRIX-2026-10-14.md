@@ -43,6 +43,10 @@ One matrix for the "Final Local Execution & Phase Closure Order" of 2026-10-14: 
 | 26 | T2 (bcrypt 6 → `tar` critical, NestJS, react-router, Jest) | C | outline | register C9/O7 | BLOCKED — OWNER DECISION; not started | separate approval per upgrade |
 | 27 | Phase 0 contracts (H0-1…M0-6) | C | contracts + fixture catalog | register A/P/R/M/S items | BLOCKED — OWNER DECISION | owner answers or recorded CTO deferral |
 | 28 | R11 payroll in the integrity oracle | A in principle, not authorised | — | does not exist (PH1-HR-3) | NOT RUN — Phase 1 work, no authorisation | after PH0-GATE |
+| 29 | WP-INV-09 sibling probes (relocateReservedStock, releaseReservedQuantityForReference, releaseReservation, limit-gated creation) | A | `t30-n02-sibling-probes.biz.real-pg.spec.ts` (test only) | `evidence-clean-snapshot-2026-10-13/d68fd10-t30-sibling-probes/` (`d68fd10`, clean snapshot; CI script on it: Overall PASS) | MEASURED: 8 PASS · 6 FAIL-DEFECT (candidate defects: plain-manager misuse of the lock idiom in 2 methods; no lock in `releaseReservation`) · 0 BLOCKED | fix/accept decision → register C14 (BLOCKED — MANDATORY OWNER DECISION for any product change) |
+| 30 | Internal verification checklist (separate from the code under test) | A | `internal-verification-2026-10-14/internal_verification.py` | same folder, run on `d68fd10` | 18 checks · 18 PASS · 0 FAIL — INTERNAL VERIFICATION, not an independent review | independent review → rows 19–20 |
+| 31 | PA-36 float arithmetic in payroll totals | A | `pa36-float-characterization-2026-10-14/` | standalone, synthetic, no product code | MEASURED for the sum idiom: no wrong cent for totals up to ~5e10; wrong cents at ~5e12 | accept vs integer-cent/decimal → with H0-4 (row 14) |
+| 32 | Teardown race root cause | A | `teardown-race-root-cause-2026-10-14/` | direct experiment on the dedicated cluster | ESTABLISHED (autovacuum worker in the database at drop time); mitigation `4dc3862` stands; residual: vacuum longer than the 3.75 s retry window | optional harness/cluster hardening (not required by any criterion) |
 
 ## 3. Reading of the result
 * **Class A, authorised, executable locally:** rows 1–13 are complete and PASS at `8ec6de4` (= final candidate). Nothing more can be proven locally for them without a source change; re-running would only repeat evidence.
@@ -53,7 +57,7 @@ One matrix for the "Final Local Execution & Phase Closure Order" of 2026-10-14: 
 
 ## 4. Final outcomes under the CTO "Close Local Development Phase" order (Step 8, 2026-10-14)
 **Step 1 re-verified:** HEAD `003cf41`, tree clean (only untracked `_release-output/`); 0 paths differ from `8ec6de4` outside `backend/docs` (and 0 outside `backend/docs/decisions`). **Evidence integrity re-checked:** `sha256sum -c` over all 29 `MANIFEST.sha256` of `8ec6de4-final-verification/`, `715c22d-ci-full-tree/` and `0810300-ci-full-tree/` — 235 files OK, 0 problems; `SNAPSHOT-IDENTITY.json` `dirtyPaths: []`, source commit `8ec6de4a615c4e9962317ce6a6e9c5b6c91d37ec`. No source change, so no test was re-run (nothing in the matrix requires it).
-**Steps 3–5:** no owner response and no reviewer appointment exist as of this check; the register's 37 requests stand (nothing resent, no approval inferred). No decision-dependent change was authorised, so Step 4 has nothing to implement and Step 6 nothing new to verify.
+**Steps 3–5:** no owner response and no reviewer appointment exist as of this check; the register's 37 requests stand (C14 was added later) (nothing resent, no approval inferred). No decision-dependent change was authorised, so Step 4 has nothing to implement and Step 6 nothing new to verify.
 | Rows | Final outcome (order's vocabulary) | Note |
 |---|---|---|
 | 1, 2, 3, 5, 6, 9, 11, 13 | **PASS — LOCAL PHASE ACCEPTED** (technical criterion, author evidence at `8ec6de4`) | rows 9 and 11 additionally need independent review (rows 19–20) |
@@ -80,3 +84,9 @@ One matrix for the "Final Local Execution & Phase Closure Order" of 2026-10-14: 
 | 7. PHASE CLOSED — LOCAL VERIFICATION PASSED | **not declared**: rows 19–20 and 14, 17, 21, 27 are unmet | NOT CLOSED |
 | 8. Phase 0 / 1 / 2 / Release | separate: PH0-GATE NOT MET · Phase 1 exit NOT MET · Phase 2 NOT READY · release NOT APPROVED | unchanged |
 **The shortest path to closure** is now exactly: (a) the CTO appoints the reviewer; (b) four owner decisions — payroll posting/commission/disbursement (A1, A2, R1), LA-1 ownership and Q-L1…Q-L3 (C7, O6), DEC-02/DEC-25/DEC-01b with Security/Audit co-signature (C1–C3, S1), Phase 0 contract answers or CTO deferral (P1–P4, S2, A3, M1–M3, C12). Engineering has nothing further it can execute for those rows without them.
+
+## 6. Local technical work executed under the CTO decision "No external reviewer available" (2026-10-14)
+* **New commit:** `d68fd10` — one test-only spec (T-30) and one line in `biz-run.js`; no production source changed (internal check IV-05). It is the first source change since `8ec6de4`, so it was verified on its own clean snapshot: CI script Overall PASS and T-30 exit 0 (row 29). Nothing else needed re-running: the commit changes no code those suites exercise.
+* **Source after this order:** product code identical to `8ec6de4`; tests/tools differ by `d68fd10` only. Latest verified source commit for the new probes: `d68fd10`; the rest of the evidence still stands on `8ec6de4`.
+* **Rows 29–32** are new, all Class A and now executed. They produced evidence, not closure: row 29 is a *new set of candidate defects* awaiting a decision (C14), row 31 an accepted-or-fix decision, row 32 an explanation.
+* **What remains executable locally without a decision:** nothing identified. The remaining local items are all decision- or review-gated: product fixes for row 29 (C14), LA-1 wiring (C7/O6), payroll/accounting changes (A1/A2/R1, A4), D-04 (C6), and optional teardown hardening (row 32, no criterion requires it).
