@@ -339,3 +339,17 @@ Original sections 0–5 are preserved unchanged. Reference commit at the time of
 
 ### 6.3 Counts
 Findings: 43 (PA-01…PA-43). Severity of the 42 original findings is unchanged by this addendum; PA-43 is provisionally Medium–High. No finding is closed by this addendum.
+
+### 6.4 Update 2026-10-13 (handover closeout; original text above unchanged)
+| Finding / item | Effect of the 2026-10-13 closeout | Evidence |
+|---|---|---|
+| PA-33 / WP-AUD-08 | Option B writer re-verified: T-04 alone PASS on it (`4dc3862`); T-03 alone PASS; 91-spec regression 89/1/1/0 on the first pass; T-26 expectations were **inverted** (success → refusal) in `b4821ab`, with stronger post-conditions — recorded for the reviewer. Still OPEN; independent review pending; DEC-01b holders unassigned; DEC-02 decision required | `DAII-HANDOVER-CLOSURE-REPORT-2026-10-13.md`; `DAII-DEC-01B-AND-DEC-02-AUDIT-CHAIN-DECISIONS-2026-10-13.md` |
+| Test infrastructure (teardown race) | New test-infrastructure item closed in practice, not in cause: bounded retry `4dc3862`; recovered 2 real occurrences; root cause **unproven** | `evidence-clean-snapshot-2026-10-13/4dc3862-harness-retry/` |
+| PA-43 | Pilot re-reviewed; real check not started (no approved role / database list): `NEED NOT ESTABLISHED`; not closed | `DAII-PA43-WP-AUD-09-STATUS-2026-10-13.md` |
+| PA-04/05 (N-02), WP-INV-10 | No new evidence; review scope split (code / test-evidence); `INDEPENDENT REVIEW PENDING` | `DAII-INDEPENDENT-REVIEW-SCOPE-AND-READINESS-2026-10-13.md` |
+| PA-29 (F-INV-001 residual) | 410 contract locally verified (T-09 36 PASS); release blocked on the usage measurement (DEC-10) | `DAII-CARRIED-ITEMS-STATUS-2026-10-13.md` §1 |
+| PA-20 (D-04 integrations) | Decision Company-scoped; implementation not authorised; unchanged risk | same, §2 |
+| Dependencies | Audit re-run: 65 advisories, unchanged; T1 sized (22 changes / 9 additions), none applied (DEC-20 open) | same, §3 |
+| PA-24 / PA-26 (capacity, hosting) | unchanged: targets unsigned, no staging host | same, §4–5 |
+| PA-41 (LA-1) | unchanged: 3 of 10 sites wired, 7 unwired (DEC-19) | — |
+No finding is closed by this update.
