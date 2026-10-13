@@ -1,0 +1,12 @@
+{
+ "commit": "0810300f56df0396c44b43daf6b6127bb16a1c70",
+ "treeId": "8151aa94fca35b9de212db7c83624d9f3c93854e",
+ "filesInCommit": 4680,
+ "blobIdIdentical": 1228,
+ "identicalAfterCrlfToLf": 3452,
+ "missingOrDifferent": 0,
+ "dirtyPaths": [],
+ "sourceKind": "clean-git-archive-snapshot",
+ "snapshotManifestSha256": "25c5744b90da97bee0fd649290ca3482dd1890e79f499dde91521881466a614c",
+ "note": "Measured on the actual CI directory AFTER the run (before it was deleted): every tracked file of the commit was compared with its git blob (exactly, or after normalising the CRLF that git archive writes on this machine): 0 missing or different \u2014 so the CI run did not modify any tracked file. Untracked outputs (node_modules, dist, ci-output) are not part of the comparison; snapshotManifestSha256 is the hash of the sorted path+sha256 list of the tracked files as extracted. dirtyPaths is empty by construction: an archive has no working tree."
+}

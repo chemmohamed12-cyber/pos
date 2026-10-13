@@ -11,14 +11,14 @@ Starting HEAD `a614a22` (clean tree except untracked `_release-output/`); closeo
 | Check | Source commit | Result | Evidence |
 |---|---|---|---|
 | Full CI gate (install, build, lint, structure, doc-links, unit, db-guard) | `715c22d` | Overall PASS; lint 0 errors / 5 warnings; unit 60 suites / 436 tests; db-guard 50/50 | `evidence-clean-snapshot-2026-10-13/715c22d-ci-full-tree/` (identity, tree id, manifest) |
-| Full CI gate on the HEAD that contains this sequence's test-only spec | *(see §2.1)* | *(see §2.1)* | *(see §2.1)* |
+| Full CI gate on the HEAD that contains this sequence's test-only spec | `0810300` | Overall PASS; lint 0 errors / 5 warnings; unit 60 suites / 436 tests; db-guard 50/50 | `evidence-clean-snapshot-2026-10-13/0810300-ci-full-tree/` (identity, tree id, manifest) |
 | WP-PAY-01 runtime characterization (3 tests) | `3bf740b` (clean `git archive`, built in the snapshot) | PASS 3/3 on a disposable database of the dedicated cluster; two earlier attempts failed in the test itself and are kept | `evidence-clean-snapshot-2026-10-13/3bf740b-wp-pay-01/` |
 | Dependency T1 rehearsal in a scratch copy | HEAD at the time (`SOURCE_COMMIT.txt`) | install PASS · build PASS · lint PASS · unit PASS · db-guard 49/50 unpinned (archive artefact), 50/50 pinned (console-observed, log not retained); real-PostgreSQL gates **NOT RUN** | `evidence-clean-snapshot-2026-10-13/dependency-t1-rehearsal/` |
 | F-INV-001 collector rehearsal | repository at that time | works end to end on a synthetic fixture; **not a real measurement** | `evidence-clean-snapshot-2026-10-13/f-inv-001-collector-rehearsal/` |
 | Database regression, T-03/T-04 | `4dc3862` (unchanged; no code change since except the test-only spec, which is not part of the 91-spec list) | as in the previous report | `evidence-clean-snapshot-2026-10-13/4dc3862-harness-retry/` |
 Skipped/blocked remain what they were: `release-migration-registry` BLOCKED, `t0-clean-company-baseline` SKIPPED, T-27 withdrawn/NOT RUN. The new spec boots the whole application and therefore needs a seeded database like the other "ambient" specs; it **fails or errors in a bare default `jest` run without one** (same class as the 19 environment-dependent suites recorded earlier) — it was run only as described above.
 ### 2.1 CI on the HEAD with the new spec
-*(filled after the run)*
+Run on a clean full-tree archive of `0810300`: install PASS · build PASS · lint PASS (0 errors, 5 warnings) · structure PASS · doc-links PASS (0 unresolved) · unit PASS (60 suites / 436 tests) · db-guard PASS (50/50) → **Overall PASS**. Source identity measured on the CI directory itself: git tree `8151aa94…`, 4680 files, `dirtyPaths: []`, 0 tracked files differ after the run. This PASS belongs to `0810300` only; the HEAD that carries this text is later and differs from it in documentation/evidence only (checked with `git diff 0810300 HEAD -- . ':(exclude)backend/docs'`).
 
 ## 3. Steps completed
 | Step | Done | Where |
