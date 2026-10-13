@@ -28,3 +28,19 @@ Owners are functional titles (none assigned; DEC-19). Common closure criterion f
 Verified by reading the code at `a614a22`: the call sites, whether each reads or writes, and that none uses `runOperationalAdmitted`. Not run: any new test (nothing was changed). Each row's closure needs its own spec and the regression; the foreign-file rule applies (the files belong to other tracks and were classified FOREIGN / NEEDS RE-PROOF in the WP-0.4 manifest; they have since been committed in `1517d81`, which does not change their ownership classification).
 
 Tracker status for all ten rows: `BLOCKED` — owner unassigned (DEC-19) and, for rows 3, 9, 10, an open design question.
+
+## Appendix (2026-10-14): per-site behaviour, boundary and cases — documentation only, nothing wired
+Today (all rows): the call opens the Company DataSource without admission, so a Company that is not READY (suspended, archived, restoring, migrating) can still be operated on by that path. Required (all rows): while the Company is READY the behaviour is unchanged (**allow case**); while it is not READY the site performs no operational work, opens no DataSource and leaves a defined, recoverable state (**deny case**); a Company in another state is never affected (**isolation case**: Company B sweeps/serves normally while A is suspended); the **lifecycle case** is the transition suspended→READY, after which deferred work is applied exactly once.
+| # | Deny outcome required | Lifecycle case to test | Blocked by |
+|---|---|---|---|
+| 1 | skip A, log; B swept | A resumes → next sweep retries A | owner |
+| 2 | 409 `COMPANY_NOT_READY`, no role row, no platform membership half-state | grant succeeds after READY | owner |
+| 3 | per Q-L1 (defined outcome, no half state) | cleanup completed by reconciliation after READY | owner + Q-L1 |
+| 4 | refused, role set unchanged (no "no-role window") | change succeeds after READY | owner + Q-L1 |
+| 5 | mirror unchanged, operation stays pending | healed after READY | owner |
+| 6 | replay deferred, not failed | applied once after READY | owner |
+| 7 | retry deferred, not failed | applied once after READY | owner |
+| 8 | no event dispatched, backlog accumulates | backlog drains after READY, no duplicate dispatch | owner + Event Engine approval |
+| 9 | entitlement recorded, `rolesSynced:false` with reason, no Company-DB write | re-sync on READY | owner + Q-L2 |
+| 10 | 409 `COMPANY_NOT_READY`, no manager returned | normal after READY | owner + Q-L3 |
+Per-site regression = one real-Postgres A/B spec per row (positive, negative, isolation, lifecycle) plus the 92-spec isolation list. No guard is to be weakened; no site is to be wired before its owner and, where listed, its design answer exist (register C7/O6).
