@@ -241,3 +241,6 @@ P0H/P0M ─► P0-GATE ─► Phase 1 build ─► P1-GATE ─► Phase 2 (REL-0
 | WP-SEC-03 / WP-SEC-04 | audit re-run unchanged; T1 sized by dry run; nothing applied (DEC-20) | same, §3 |
 | WP-LA1-01 | unchanged: 7 sites unwired (DEC-19) | — |
 | WP-REL-01, WP-P2-07 | unchanged: targets unsigned, no staging host; D-04 not authorised | same, §2, §4, §5 |
+
+## 17. Update 2026-10-13 — Phase 0 started (statuses and the counting table above are unchanged)
+Contract drafts for WP-P0H-01…09 and WP-P0M-01…06 exist in `DAII-PHASE-0-CONTRACTS-HR-PAYROLL-MANUFACTURING-2026-10-13.md` (documentation only; current verified behaviour, options on record, questions per functional owner, acceptance fixtures to be written). All 15 stay `READY FOR PLANNING` in the table above until an owner supplies the rule: none is signed and no policy was decided. `PH0-GATE` is not met. Suggested first conversations: H0-4/H0-8 (accounting shape and commission reversal), M0-3 (scrap — a live data-correctness exposure), H0-5 (business date).
