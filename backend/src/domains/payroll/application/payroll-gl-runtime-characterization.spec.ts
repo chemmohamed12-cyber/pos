@@ -157,7 +157,8 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
 
     // --- disbursement ---
     const account = await makeFundedAccount('100000000.00');
-    const feBefore = await eventCount('1=1');
+    const idsBefore = new Set<string>((await dataSource.query(`SELECT id::text AS id FROM accounting_financial_events`)).map((r: { id: string }) => r.id));
+    const feBefore = idsBefore.size;
     const cashBefore = Number((await dataSource.query(`SELECT COALESCE(SUM(CASE WHEN type IN ('cash_in','transfer_in') THEN amount ELSE -amount END),0)::numeric AS b FROM treasury_transactions WHERE "treasuryAccountId" = $1`, [account]))[0].b);
     const feForRunBefore = await eventCount(`"sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`, [run.id]);
     const disbursed = await payroll.disburse(run.id, account, ADMIN_A);
@@ -165,16 +166,16 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
     const feAfter = await eventCount('1=1');
     const feForRunAfter = await eventCount(`"sourceEntityType" = 'PayrollRun' AND "sourceEntityId"::text = $1`, [run.id]);
     const cashAfter = Number((await dataSource.query(`SELECT COALESCE(SUM(CASE WHEN type IN ('cash_in','transfer_in') THEN amount ELSE -amount END),0)::numeric AS b FROM treasury_transactions WHERE "treasuryAccountId" = $1`, [account]))[0].b);
-    const newFinancialEvents: Array<{ sourceDomain: string; eventType: string; status: string }> = await dataSource.query(
-      `SELECT "sourceDomain", "eventType", status FROM accounting_financial_events ORDER BY "createdAt" DESC LIMIT ${Math.max(feAfter - feBefore, 1)}`,
-    );
+    const newFinancialEvents: Array<{ sourceDomain: string; eventType: string; status: string }> = (
+      await dataSource.query(`SELECT id::text AS id, "sourceDomain", "eventType", status FROM accounting_financial_events`)
+    ).filter((r: { id: string }) => !idsBefore.has(r.id));
 
     measured('PA-35/PA-34', {
       lineGross: Number(line.grossPay), lineCommission: Number(line.commissionAmount ?? 0), lineNet: Number(line.netPay),
       runSumGross: sumGross, runSumCommission: sumCommission, runSumNet: sumNet,
       postedJournalDebit: journalDebit, postedJournalCredit: journalCredit, postedJournalLines: jl.map((l) => ({ code: l.code, fn: l.controlFunction, debit: l.debit, credit: l.credit })),
       cashPaidOut: cashBefore - cashAfter, disbursedAt: !!disbursed.disbursedAt,
-      financialEventsCreatedByDisburse: feAfter - feBefore, payrollRunEventsBefore: feForRunBefore, payrollRunEventsAfter: feForRunAfter, eventsCreatedByDisburse: newFinancialEvents.slice(0, feAfter - feBefore),
+      financialEventsCreatedByDisburse: feAfter - feBefore, payrollRunEventsBefore: feForRunBefore, payrollRunEventsAfter: feForRunAfter, eventsCreatedByDisburse: newFinancialEvents,
     });
 
     // Pinned to what the code-reading predicted (PA-35): the posted journal carries the GROSS pay only; commission is not in it.
