@@ -1,0 +1,242 @@
+[
+  {
+    "round": 1,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 2,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 3,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 4,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 5,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 6,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 7,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 8,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 9,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 10,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 11,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 12,
+    "N": 10,
+    "tally": {
+      "ConflictException:409": 5,
+      "OK": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 13,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 14,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 15,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 16,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 17,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 18,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 19,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  },
+  {
+    "round": 20,
+    "N": 10,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "sumQuantity": 0,
+    "dispatches": 5,
+    "posted": 5,
+    "halfPosted": 0
+  }
+]

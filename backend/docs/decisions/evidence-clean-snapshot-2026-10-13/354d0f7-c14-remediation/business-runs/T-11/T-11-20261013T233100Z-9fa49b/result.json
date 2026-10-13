@@ -1,0 +1,81 @@
+{
+  "testId": "T-11",
+  "runId": "T-11-20261013T233100Z-9fa49b",
+  "finishedAt": "2026-10-13T23:31:09.460Z",
+  "results": [
+    {
+      "id": "T-11-1",
+      "status": "PASS",
+      "note": "{\"ev1\":[{\"id\":\"cb4c2ae6-1fd1-4eeb-b8f7-fca6482f330c\",\"status\":\"POSTED\",\"rejectionReason\":null,\"journalEntryId\":\"ba898886-8290-45a8-b4ab-6f90564b034d\"}],\"val1\":{\"qty\":4,\"value\":16}}"
+    },
+    {
+      "id": "T-11-2",
+      "status": "PASS",
+      "note": "{\"rejected\":[{\"id\":\"ff7b1158-4d7b-4235-bce6-0d5f824f8711\",\"status\":\"REJECTED\",\"rejectionReason\":\"inventory movement: COGS account is unset — set accounting.inventory_cogs_account_code to a postable non-control GL account\",\"journalEntryId\":null}],\"movement2\":2,\"val2\":{\"qty\":4,\"value\":16}}"
+    },
+    {
+      "id": "T-11-3",
+      "status": "PASS",
+      "note": "{\"redriven\":{\"ok\":true,\"kind\":\"OK\"},\"statuses\":[\"POSTED\",\"POSTED\"],\"val3\":{\"qty\":3,\"value\":12}}"
+    },
+    {
+      "id": "T-11-4",
+      "status": "PASS",
+      "note": "{\"again\":[{\"ok\":true,\"kind\":\"OK\"},{\"ok\":true,\"kind\":\"OK\"}],\"journals3\":3,\"journals4\":3,\"val4\":{\"qty\":3,\"value\":12}}"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-11/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":1,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-11/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":1,\"valuationTotal\":12,\"glInventory\":12,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-11/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-11/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-11/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":0,\"declaredNonGlTreasury\":0,\"expectedGl\":0,\"glNet\":0}"
+    },
+    {
+      "id": "T-10/T-11/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-11/R7",
+      "status": "PASS",
+      "note": "{\"events\":3,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-11/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-11/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: T-11 step (2) intentionally left one REJECTED event; it was re-driven in steps (3)-(4), so no event remains unexplained at reconciliation time"
+    },
+    {
+      "id": "T-10/T-11/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

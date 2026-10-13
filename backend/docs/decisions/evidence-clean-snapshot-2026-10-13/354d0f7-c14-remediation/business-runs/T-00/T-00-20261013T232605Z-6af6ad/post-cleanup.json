@@ -1,0 +1,8 @@
+{
+  "removed": [
+    "daii_test_biz_t00_control_plane",
+    "daii_test_biz_t00_company_a",
+    "daii_test_biz_t00_company_b"
+  ],
+  "otherDatabasesUnchanged": true
+}

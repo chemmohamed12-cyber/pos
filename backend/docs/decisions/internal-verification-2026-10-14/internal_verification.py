@@ -9,8 +9,9 @@ NEVER recorded as an independent acceptance.
 import hashlib, json, re, subprocess, sys
 
 REPO, COMMIT = sys.argv[1], sys.argv[2]
+COMMIT_HAS_C14 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '354d0f7', COMMIT], capture_output=True).returncode == 0
 BASE = 'e5b8e2a'  # HEAD at the start of the 2026-10-13 closing directive (before d3ad24b / 8ec6de4)
-PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)'}
+PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)', '354d0f7': 'C14 remediation (inventory.service.ts + T-30)'}
 
 
 def git(*a, raw=False):
@@ -105,8 +106,11 @@ for c, what in PROGRAM_CODE_COMMITS.items():
     ch = [x for x in git('diff', '--name-only', f'{c}^', c).split('\n') if x]
     p = [x for x in ch if x.startswith('backend/src/') and not x.endswith('.spec.ts') and '/testing/' not in x]
     prod_touched[c] = {'scope': what, 'production_paths_touched': p}
-allowed = {'backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts'}
-unexpected = {c: [x for x in v['production_paths_touched'] if x not in allowed] for c, v in prod_touched.items()}
+allowed = {  # production paths each program commit is authorised to touch (CTO authorisations of 2026-10-13 and 2026-10-14)
+    'd3ad24b': {'backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts'},
+    '354d0f7': {'backend/src/domains/inventory-warehouse/application/inventory.service.ts'},
+}
+unexpected = {c: [x for x in v['production_paths_touched'] if x not in allowed.get(c, set())] for c, v in prod_touched.items()}
 check('IV-05', 'Program code commits change no production source other than the authorised template data row', not any(unexpected.values()), prod_touched)
 
 # IV-06 protected baseline: DB guard, approved-instance list and authorization guards not modified by the program commits
@@ -142,6 +146,32 @@ def biz_steps(rev):
 now, base_steps = biz_steps(COMMIT), biz_steps(BASE)
 check('IV-09', 'biz-run.js keeps the order of every existing step; T-30 is the only addition and follows T-29',
       [x for x in now if x != 'T-30'] == base_steps and 'T-30' in now and now.index('T-30') == now.index('T-29') + 1, {'base_steps': len(base_steps), 'now_steps': len(now), 'T-30_after': now[now.index('T-30') - 1] if 'T-30' in now else None})
+
+# IV-10 the C14 correction changes only the three named methods in inventory.service.ts
+inv = 'backend/src/domains/inventory-warehouse/application/inventory.service.ts'
+if COMMIT_HAS_C14:
+    dd = git('diff', '-U0', '354d0f7^', '354d0f7', '--', inv)
+    hunks = [l for l in dd.split('\n') if l.startswith('@@')]
+    ctx = ' '.join(re.findall(r'@@ [^@]*@@ (.*)', dd))
+    touched_methods = sorted(set(re.findall(r'(relocateReservedStock|releaseReservedQuantityForReference|releaseReservation)', dd)))
+    other_methods = [m for m in re.findall(r'^[+-]\s+async (\w+)\(', dd, re.M) if m not in ('releaseReservation',)]
+    check('IV-10a', 'The C14 diff to inventory.service.ts has only the three expected hunks', len(hunks) == 3, {'hunks': hunks})
+    new_lines = show('354d0f7', inv).split('\n')
+    enclosing = set()
+    for h in hunks:
+        m = re.match(r'@@ -\d+(?:,\d+)? \+(\d+)', h)
+        start = int(m.group(1)) if m else 0
+        for k in range(min(start, len(new_lines)) - 1, -1, -1):  # nearest preceding method declaration in the NEW file
+            mm = re.match(r'\s+(?:async\s+)?(\w+)\(', new_lines[k]) if re.match(r'\s+async\s+\w+\(', new_lines[k]) else None
+            if mm:
+                enclosing.add(mm.group(1))
+                break
+    sig_changed = [l for l in dd.split('\n') if re.match(r'^[+-]\s+async \w+\(', l)]
+    check('IV-10b', 'Each C14 hunk lies inside one of the three named methods and no method signature changed',
+          enclosing == {'relocateReservedStock', 'releaseReservedQuantityForReference', 'releaseReservation'} and not sig_changed, {'enclosing_methods_of_hunks': sorted(enclosing), 'signature_lines_changed': sig_changed})
+    t30_old, t30_new = show('d68fd10', 'backend/src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts'), show('354d0f7', 'backend/src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts')
+    ids_old = set(re.findall(r"result\(e, `?'?([A-Za-z0-9-]+)", t30_old)); ids_new = set(re.findall(r"result\(e, `?'?([A-Za-z0-9-]+)", t30_new))
+    check('IV-10c', 'T-30 keeps every original case id and expectation count; the correction only adds cases', ids_old <= ids_new and t30_new.count("'PASS' : 'FAIL-DEFECT'") >= t30_old.count("'PASS' : 'FAIL-DEFECT'"), {'ids_before': len(ids_old), 'ids_after': len(ids_new)})
 
 summary = {'commit': COMMIT, 'baseline': BASE, 'checks': len(results), 'pass': sum(r['result'] == 'PASS' for r in results), 'fail': sum(r['result'] == 'FAIL' for r in results),
            'label': 'INTERNAL VERIFICATION (implementation-team automated checks) — NOT an independent review'}

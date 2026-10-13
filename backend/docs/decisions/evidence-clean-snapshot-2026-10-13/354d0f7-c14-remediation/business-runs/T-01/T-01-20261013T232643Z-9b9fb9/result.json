@@ -1,0 +1,96 @@
+{
+  "testId": "T-01",
+  "runId": "T-01-20261013T232643Z-9b9fb9",
+  "finishedAt": "2026-10-13T23:26:52.840Z",
+  "results": [
+    {
+      "id": "T-01a",
+      "status": "PASS",
+      "note": "{\"outA\":{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient stock for 1 line(s) — nothing was posted: T01-P1 (T01-P1 Product): requested 6, available 5, short by 1\"},\"auditBeforeA\":8,\"auditAfterA\":8}"
+    },
+    {
+      "id": "T-01b",
+      "status": "PASS",
+      "note": "{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient stock for 1 line(s) — nothing was posted: T01-P2 (T01-P2 Product): requested 9, available 5, short by 4\"}"
+    },
+    {
+      "id": "T-01c",
+      "status": "PASS",
+      "note": "{\"outC\":{\"ok\":true,\"kind\":\"OK\"},\"dispatches\":1}"
+    },
+    {
+      "id": "T-02a",
+      "status": "PASS",
+      "note": "{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient stock for 1 line(s) — nothing was posted: T01-P2 (T01-P2 Product): requested 6, available 5, short by 1\"}"
+    },
+    {
+      "id": "T-02b",
+      "status": "PASS",
+      "note": "{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient available stock for product \\\"07ea983a-e9d6-4607-a273-ecbd68fe733a\\\" in warehouse \\\"52a77678-0620-40eb-a607-56a07175e584\\\": requested 6, available 5.\"}"
+    },
+    {
+      "id": "T-02c",
+      "status": "PASS",
+      "note": "{\"r1\":{\"ok\":true,\"kind\":\"OK\"},\"r2\":{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient available stock for product \\\"07ea983a-e9d6-4607-a273-ecbd68fe733a\\\" in warehouse \\\"52a77678-0620-40eb-a607-56a07175e584\\\": requested 3, available 2.\"}}"
+    },
+    {
+      "id": "T-02d",
+      "status": "PASS",
+      "note": "{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Insufficient available stock for component \\\"34e4d2a2-237c-4bea-9c5a-fe63c90da22a\\\" in warehouse \\\"52a77678-0620-40eb-a607-56a07175e584\\\": requested 6 (3 x 2), available 5.\"}"
+    },
+    {
+      "id": "invariant-no-negative-stock",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-01/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":4,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-01/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-01/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-01/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-01/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":0,\"declaredNonGlTreasury\":0,\"expectedGl\":0,\"glNet\":0}"
+    },
+    {
+      "id": "T-10/T-01/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-01/R7",
+      "status": "PASS",
+      "note": "{\"events\":0,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-01/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-01/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: none declared"
+    },
+    {
+      "id": "T-10/T-01/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

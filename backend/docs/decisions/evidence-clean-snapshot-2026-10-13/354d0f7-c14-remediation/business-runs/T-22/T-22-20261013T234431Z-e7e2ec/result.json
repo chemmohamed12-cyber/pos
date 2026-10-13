@@ -1,0 +1,22 @@
+{
+  "testId": "T-22",
+  "runId": "T-22-20261013T234431Z-e7e2ec",
+  "finishedAt": "2026-10-13T23:44:40.503Z",
+  "results": [
+    {
+      "id": "F-AUD-003-X-explicit-seq-honoured-by-save",
+      "status": "FAIL-DEFECT",
+      "note": "{\"requested\":9000,\"storedSeq\":5}"
+    },
+    {
+      "id": "F-AUD-003-S-control",
+      "status": "PASS",
+      "note": "{\"chainValid\":true,\"storedSeqs\":[1,2],\"sequenceLastValue\":2}"
+    },
+    {
+      "id": "F-AUD-003-R-after-rollback",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"chainValid\":true,\"brokenAtSeq\":null,\"storedSeqs\":[1,2,4],\"sequenceLastValue\":4}"
+    }
+  ]
+}
