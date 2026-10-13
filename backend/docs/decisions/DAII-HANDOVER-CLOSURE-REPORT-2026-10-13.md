@@ -2,7 +2,7 @@
 
 Responds to the CTO "Handover & Sequential Closeout Directive" (Option B, N-02, PA-33, PA-43, CI). One report; no interim updates. Source documents: `DAII-CONSOLIDATED-CLOSEOUT-REPORT-2026-10-11.md` and the evidence it cites, re-checked here against the original files.
 
-**Official status (unchanged by this report): N-02 OPEN · PA-33 OPEN · PA-43 OPEN · RELEASE NOT APPROVED.** CI classification: see §4 — the gate result is reported, the classification as "green" is the CTO's. Nothing below is an independent acceptance (WP-REV-01 is deferred; this session wrote part of the harness change it then verified, so it is not independent).
+**Official status (unchanged by this report): N-02 OPEN · PA-33 OPEN · PA-43 OPEN · RELEASE NOT APPROVED.** CI: the full gate passed on `c80395b` (§5); the official line "CI NOT GREEN" stays until the CTO classifies it. Nothing below is an independent acceptance (WP-REV-01 is deferred; this session wrote part of the harness change it then verified, so it is not independent).
 
 Vocabulary: IMPLEMENTED = a commit contains the change · VERIFIED = clean-snapshot evidence of that commit · INDEPENDENTLY ACCEPTED = recorded by a reviewer who meets the independence rule (none).
 
@@ -53,10 +53,20 @@ If a future teardown exhausts its attempts, the failure is a test-infrastructure
 `npm run lint` (`eslint "{src,tools,test}/**/*.ts"`): **0 errors, 5 warnings**, all "Unused eslint-disable directive": `company-connection-manager.service.spec.ts:23` (`no-var-requires`), `biz-harness-smoke.biz.real-pg.spec.ts:6`, `biz-support.ts:1`, `t10-reconciliation.biz.real-pg.spec.ts:4` (all `no-var-requires`), `t09-inventory-movements-http.biz.real-pg.spec.ts:23` (`no-require-imports`). The four under `src/foundation/testing/` are redundant because `eslint.config.mjs` turns those rules off for that folder; the fifth names a rule that no longer reports. The warning set is the same as on `68c2215`/`89508b1`; the harness change adds none. No suppression was removed: removing them touches five files unrelated to this work and no safety proof beyond the reading above was produced.
 
 ## 4. Phase 3 — CI on the final HEAD
-See §5 (filled after the run on the commit named there).
+One full run of the project script (`bash tools/ci/ci.sh`) on a clean full-tree `git archive` of **`c80395bb5281a78185f5ba1a6ca65a6d28984d6f`** — the commit that contains the final code, tests, tools and this report (the only later commit adds the CI evidence files and this section; documentation only). Code and test files of `c80395b` and of the database runs' commit `4dc3862` are identical (`git diff 4dc3862 c80395b` outside `backend/docs` is empty).
 
 ## 5. CI result
-*(pending)*
+| step | result |
+|---|---|
+| install (`npm ci`, fresh, no `node_modules` before) | PASS |
+| build | PASS |
+| lint | PASS — 0 errors, 5 warnings (§3, unchanged) |
+| structure | PASS |
+| doc-links | PASS — 82 files, 112 references, 0 unresolved |
+| unit (unit mode) | PASS — 60 suites / 436 tests |
+| db-guard | PASS — 50/50 |
+| **Overall** | **PASS** (exit 0) |
+Provenance caveats, stated so the result is not over-read: the script prints `commit: unknown` on an archive snapshot (the commit is pinned by `SOURCE_COMMIT.txt` and `DAII_SOURCE_COMMIT`, which db-guard's header test requires); the CI script is database-free, so it does not cover the real-PostgreSQL gates — those are §2 (on `4dc3862`) and are separate runs of identical code; no single run covers both kinds. The run was made by the same session that wrote the harness change. Evidence: `evidence-clean-snapshot-2026-10-13/c80395b-ci-full-tree/` (logs on disk, git-ignored; `summary.md`, `CI-RESULT.md`). **Classification as CI green is left to the CTO**; the official status line stays "CI NOT GREEN" until recorded.
 
 ## 6. Open items (unchanged unless stated)
 - WP-REV-01 independent reviewer: deferred; nothing independently accepted.
