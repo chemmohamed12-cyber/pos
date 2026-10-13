@@ -4,6 +4,8 @@ Prepared by Team 3 (documentation and coordination) under the Mandatory Sequenti
 
 **Official status (unchanged): N-02 OPEN · PA-33 OPEN · PA-43 OPEN · CI NOT GREEN · RELEASE NOT APPROVED.**
 
+> **Follow-up 2026-10-13:** the handover closeout (T-03 alone, teardown retry `4dc3862`, 91-spec regression re-run on one commit, five lint warnings, CI on the final HEAD, and one difference found in this report — T-04's standalone PASS ran on the Option A writer) is in `DAII-HANDOVER-CLOSURE-REPORT-2026-10-13.md`.
+
 ## FINAL STATE — 2026-10-12 (supersedes the task table below where they differ)
 HEAD at writing: `27a2e44`. Evidence below was produced by the verification track on clean `git archive` snapshots and **re-checked by Team 3** (run headers, `dirtyPaths: []`, manifests, log sha256). Team 3 ran no database test. Rebuilt cluster 5546 (system id `7695619915229547252`; old id `7695079006474257732` is in earlier evidence headers).
 

@@ -1,0 +1,2 @@
+src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts  {"database":"daii_test_biz_t90_fixed_asset_isolation_company_a","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+src/foundation/company/company-lifecycle-admission.real-pg.spec.ts  {"database":"daii_test_biz_t90_la1_layer2_company_a","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
