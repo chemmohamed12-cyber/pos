@@ -104,8 +104,13 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
       [run.id],
     );
     measured('M0-6 wages_payable', { activeWagesPayableAccountsBefore: wpBefore, payrollRunStatus: after.status, financialEvents: fe });
+    if (wpBefore > 0) {
+      // Since the 2026-10-13 template fix (`2150 Wages Payable` in ifrs-sme; see WAGES-PAYABLE-CONTROL-ACCOUNT-TEMPLATE-2026-10-13.md) a freshly provisioned Company has the control account and the event POSTS.
+      expect(fe).toHaveLength(1);
+      expect(fe[0].status.toUpperCase()).toBe('POSTED');
+    }
     if (wpBefore === 0) {
-      // Pinned (observed on a freshly provisioned Company): the run reaches 'posted' while its Financial Event is REJECTED for lack of the control account.
+      // Pinned (observed on 3bf740b, before the template fix, on a freshly provisioned Company): the run reaches 'posted' while its Financial Event is REJECTED for lack of the control account.
       expect(fe).toHaveLength(1);
       expect(fe[0].status.toUpperCase()).toBe('REJECTED');
       expect(fe[0].rejectionReason ?? '').toMatch(/wages_payable/i);

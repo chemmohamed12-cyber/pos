@@ -70,6 +70,7 @@ export const IFRS_SME_TEMPLATE: AccountTemplate = {
     { code: '2110', nameEn: 'Accrued Expenses', nameAr: 'مصروفات مستحقة', accountType: 'liability', parentCode: '21' },
     { code: '2120', nameEn: 'Output VAT / Tax Payable', nameAr: 'ضريبة القيمة المضافة — المبيعات', accountType: 'liability', parentCode: '21', controlFunction: 'tax_payable' },
     { code: '2130', nameEn: 'Short-Term Loans', nameAr: 'قروض قصيرة الأجل', accountType: 'liability', parentCode: '21' },
+    { code: '2150', nameEn: 'Wages Payable', nameAr: 'رواتب وأجور مستحقة', accountType: 'liability', parentCode: '21', controlFunction: 'wages_payable' },
     { code: '22', nameEn: 'Non-Current Liabilities', nameAr: 'الالتزامات غير المتداولة', accountType: 'liability', isPostable: false, parentCode: '2' },
     { code: '2201', nameEn: 'Long-Term Loans', nameAr: 'قروض طويلة الأجل', accountType: 'liability', parentCode: '22' },
 
