@@ -25,9 +25,18 @@ Vocabulary: `IMPLEMENTED` (a commit contains it) · `VERIFIED` (clean-snapshot e
 No product, test or tool code changed after `4dc3862`; every commit of this closeout after it changes documentation and evidence only (`git diff 4dc3862 <HEAD> -- . ':(exclude)backend/docs'` is empty — verified at the final HEAD, §2).
 
 ## 2. CI and full regression
-See the table filled below after the run on the final HEAD.
-
-*(CI on the final HEAD: pending at the time of writing this paragraph.)*
+The full gate was re-run, as the owner required, on a clean full-tree `git archive` of **`715c22d02cb88f9187cb9f753d55c6e086d5025e`** — the commit that contains every document of this closeout (the one later commit only adds this CI evidence and this table; documentation only). No code, test or tool file differs from `4dc3862`.
+| step | result |
+|---|---|
+| install (`npm ci`, fresh) | PASS |
+| build | PASS |
+| lint | PASS — 0 errors, 5 warnings (§7.1) |
+| structure | PASS |
+| doc-links | PASS — 82 files, 112 references, 0 unresolved |
+| unit (unit mode) | PASS — 60 suites / 436 tests |
+| db-guard | PASS — 50/50 |
+| **Overall** | **PASS** (exit 0) |
+Evidence: `evidence-clean-snapshot-2026-10-13/715c22d-ci-full-tree/` (logs on disk, git-ignored; `summary.md`, `CI-RESULT.md`). Caveats unchanged: the script prints `commit: unknown` on an archive (the commit is pinned by `SOURCE_COMMIT.txt` and `DAII_SOURCE_COMMIT`); it is database-free, so the real-PostgreSQL gates are the separate runs of §1/§3 on `4dc3862`; the run was made by the session that wrote the `4dc3862` harness change. The official line "CI NOT GREEN" stays until the CTO classifies the result.
 
 Database-backed regression: not repeated — no code changed after the `4dc3862` run (which passed 89 executed-PASS · 1 SKIPPED · 1 BLOCKED · 0 FAIL, 598 tests passed / 1 skipped / 21 failed, all 21 inside the blocked spec). The earlier CI result is **not** used as proof for any code change: there is none.
 
