@@ -244,3 +244,12 @@ P0H/P0M ─► P0-GATE ─► Phase 1 build ─► P1-GATE ─► Phase 2 (REL-0
 
 ## 17. Update 2026-10-13 — Phase 0 started (statuses and the counting table above are unchanged)
 Contract drafts for WP-P0H-01…09 and WP-P0M-01…06 exist in `DAII-PHASE-0-CONTRACTS-HR-PAYROLL-MANUFACTURING-2026-10-13.md` (documentation only; current verified behaviour, options on record, questions per functional owner, acceptance fixtures to be written). All 15 stay `READY FOR PLANNING` in the table above until an owner supplies the rule: none is signed and no policy was decided. `PH0-GATE` is not met. Suggested first conversations: H0-4/H0-8 (accounting shape and commission reversal), M0-3 (scrap — a live data-correctness exposure), H0-5 (business date).
+
+## 18. Update 2026-10-13 (second sequence; the table and counts above are unchanged)
+| Package | State |
+|---|---|
+| WP-PAY-01 | executed as a test-only runtime characterization (`3bf740b`; evidence `…/3bf740b-wp-pay-01/`): PA-34 and PA-35 confirmed at runtime, `wages_payable` template gap confirmed, PA-36 not shown at small scale. Author track; not independently reviewed |
+| WP-FIV-01 | operator tooling rehearsed on a synthetic fixture; the real run awaits DEC-10 |
+| WP-SEC-03 | T1 rehearsed in a scratch copy; awaiting DEC-20 |
+| WP-LA1-01 | tracked per call site (10) with owner titles and closure criteria; awaiting DEC-19 and three design answers |
+| WP-P0H-01…09, WP-P0M-01…06 | contract drafts exist (§17); owner request consolidated |

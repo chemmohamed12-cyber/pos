@@ -1,0 +1,213 @@
+{
+ "sourceCommit": "3bf740b98da1a2fd59274abe579a4223867c3c12",
+ "lockfileChanged": [
+  {
+   "path": "node_modules/@eslint/config-array/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/@istanbuljs/load-nyc-config/node_modules/js-yaml",
+   "from_": "3.15.1",
+   "to": "3.15.2",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/@jest/reporters/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/@nestjs/common",
+   "from_": "10.4.15",
+   "to": "10.4.22",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/archiver-utils/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/brace-expansion",
+   "from_": "5.0.9",
+   "to": "5.0.12",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/eslint/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/fork-ts-checker-webpack-plugin/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/fstream/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/glob/node_modules/brace-expansion",
+   "from_": "2.1.4",
+   "to": "2.1.7",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/handlebars",
+   "from_": "4.7.9",
+   "to": "4.7.10",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/jest-config/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/jest-runtime/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/joi",
+   "from_": "17.13.6",
+   "to": "17.13.8",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/js-yaml",
+   "from_": "4.3.1",
+   "to": "4.3.2",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/proxy-addr",
+   "from_": "2.0.7",
+   "to": "2.0.8",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/readdir-glob/node_modules/brace-expansion",
+   "from_": "2.1.4",
+   "to": "2.1.7",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/rimraf/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/test-exclude/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "dev"
+  },
+  {
+   "path": "node_modules/typeorm/node_modules/brace-expansion",
+   "from_": "2.1.4",
+   "to": "2.1.7",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/zip-stream/node_modules/brace-expansion",
+   "from_": "1.1.18",
+   "to": "1.1.21",
+   "scope": "runtime"
+  }
+ ],
+ "lockfileAdded": [
+  {
+   "path": "node_modules/@borewit/text-codec",
+   "version": "0.2.2",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/@tokenizer/inflate",
+   "version": "0.2.7",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/@tokenizer/token",
+   "version": "0.3.0",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/fflate",
+   "version": "0.8.3",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/file-type",
+   "version": "20.4.1",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/strtok3",
+   "version": "10.4.1",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/token-types",
+   "version": "6.1.2",
+   "license": "MIT",
+   "scope": "runtime"
+  },
+  {
+   "path": "node_modules/uint8array-extras",
+   "version": "1.6.0",
+   "license": "MIT",
+   "scope": "runtime"
+  }
+ ],
+ "packageJsonChanged": false,
+ "auditBefore": {
+  "info": 0,
+  "low": 4,
+  "moderate": 14,
+  "high": 44,
+  "critical": 3,
+  "total": 65
+ },
+ "auditAfter": {
+  "info": 0,
+  "low": 4,
+  "moderate": 18,
+  "high": 41,
+  "critical": 1,
+  "total": 64
+ },
+ "noLongerReported": [
+  "brace-expansion",
+  "handlebars",
+  "joi",
+  "proxy-addr"
+ ],
+ "remainingCritical": [
+  "tar"
+ ]
+}

@@ -1,0 +1,8 @@
+install-before PASS 39s
+audit-fix FAIL 34s
+build PASS 56s
+lint PASS 42s
+unit PASS 155s
+db-guard FAIL 5s
+done
+db-guard (rerun with DAII_SOURCE_COMMIT pinned, in the same scratch copy): PASS 50/50

@@ -353,3 +353,15 @@ Findings: 43 (PA-01…PA-43). Severity of the 42 original findings is unchanged 
 | PA-24 / PA-26 (capacity, hosting) | unchanged: targets unsigned, no staging host | same, §4–5 |
 | PA-41 (LA-1) | unchanged: 3 of 10 sites wired, 7 unwired (DEC-19) | — |
 No finding is closed by this update.
+
+### 6.5 Update 2026-10-13 (second sequence; original text above unchanged)
+| Finding / item | Effect | Evidence |
+|---|---|---|
+| PA-34 payroll disbursement posts no GL leg | confidence raised from CONFIRMED-BY-READING to **CONFIRMED-TESTED** (runtime, disposable database): disbursement paid the cash and created 0 financial events; the wages-payable credit is never debited. Severity unchanged (High); unfixed | `evidence-clean-snapshot-2026-10-13/3bf740b-wp-pay-01/` |
+| PA-35 commission never recognised | **CONFIRMED-TESTED**: posted journal = gross (5000.00 for the run) while 5200.00 net is paid; commission is in no journal. Unfixed | same |
+| PA-36 floating-point arithmetic | stays CONFIRMED-BY-READING; no drift observed with 12 cent-valued lines; larger scale not tested | same |
+| New observation (M0-6 / template completeness) | a freshly provisioned Company has no `wages_payable` account: the payroll run reaches `posted`, its Financial Event is REJECTED. Same failure class as the open `grni`/`fixed_asset` template items | same |
+| PA-41 LA-1 | the "seven sites" are 6 files / 10 call sites; tracker with owner titles, closure criteria and 3 design questions | `DAII-LA1-REMAINING-SITES-TRACKER-2026-10-13.md` |
+| Dependencies | T1 rehearsed: 65→64 advisories, critical 3→1 (`proxy-addr`, `handlebars` cleared; `tar` remains, install-time); not applied | `evidence-clean-snapshot-2026-10-13/dependency-t1-rehearsal/` |
+| F-INV-001 | collector proven end to end on a synthetic fixture; real measurement still needs DEC-10 | `evidence-clean-snapshot-2026-10-13/f-inv-001-collector-rehearsal/` |
+No finding is closed by this update.

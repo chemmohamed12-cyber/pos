@@ -1,0 +1,113 @@
+{
+  "tool": "f-inv-001-usage-collect",
+  "version": 1,
+  "operator": "Rehearsal (synthetic fixture, no real data)",
+  "database": "daii_test_biz_t93_finv_rehearsal",
+  "host": "127.0.0.1",
+  "collectedAtUtc": "2026-10-13T15:20:08.649Z",
+  "periods": {
+    "all-history": {
+      "Q1": [
+        {
+          "movementType": "adjustment",
+          "n": 1,
+          "first_use": "2025-09-08T15:20:08.019Z",
+          "last_use": "2025-09-08T15:20:08.019Z",
+          "negative_rows": 1
+        },
+        {
+          "movementType": "dispatch",
+          "n": 1,
+          "first_use": "2026-10-08T15:20:08.019Z",
+          "last_use": "2026-10-08T15:20:08.019Z",
+          "negative_rows": 1
+        },
+        {
+          "movementType": "receipt",
+          "n": 2,
+          "first_use": "2026-09-13T15:20:08.019Z",
+          "last_use": "2026-10-03T15:20:08.019Z",
+          "negative_rows": 0
+        }
+      ],
+      "Q2": [
+        {
+          "movementType": "adjustment",
+          "createdByUserId": "u-manager",
+          "n": 1,
+          "last_use": "2025-09-08T15:20:08.019Z"
+        },
+        {
+          "movementType": "dispatch",
+          "createdByUserId": "svc-integration-7",
+          "n": 1,
+          "last_use": "2026-10-08T15:20:08.019Z"
+        }
+      ],
+      "Q3": [
+        {
+          "action": "inventory.movement.dispatch",
+          "n": 1,
+          "first_use": "2026-10-08T15:20:08.022Z",
+          "last_use": "2026-10-08T15:20:08.022Z"
+        }
+      ],
+      "Q4": [
+        {
+          "warehouseId": "W2",
+          "productId": "P2",
+          "on_hand": -2
+        }
+      ],
+      "META": [
+        {
+          "movements": 5,
+          "oldest": "2025-09-08T15:20:08.019Z",
+          "newest": "2026-10-10T15:20:08.019Z"
+        }
+      ]
+    },
+    "last-90-days": {
+      "Q1": [
+        {
+          "movementType": "dispatch",
+          "n": 1,
+          "first_use": "2026-10-08T15:20:08.019Z",
+          "last_use": "2026-10-08T15:20:08.019Z",
+          "negative_rows": 1
+        },
+        {
+          "movementType": "receipt",
+          "n": 2,
+          "first_use": "2026-09-13T15:20:08.019Z",
+          "last_use": "2026-10-03T15:20:08.019Z",
+          "negative_rows": 0
+        }
+      ],
+      "Q2": [
+        {
+          "movementType": "dispatch",
+          "createdByUserId": "svc-integration-7",
+          "n": 1,
+          "last_use": "2026-10-08T15:20:08.019Z"
+        }
+      ],
+      "Q3": [
+        {
+          "action": "inventory.movement.dispatch",
+          "n": 1,
+          "first_use": "2026-10-08T15:20:08.022Z",
+          "last_use": "2026-10-08T15:20:08.022Z"
+        }
+      ],
+      "Q4": [
+        {
+          "warehouseId": "W2",
+          "productId": "P2",
+          "on_hand": -2
+        }
+      ]
+    }
+  },
+  "serverReadOnly": "on"
+}
