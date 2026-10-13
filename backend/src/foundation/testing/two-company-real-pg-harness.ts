@@ -16,6 +16,7 @@ import { Role } from '../authorization/role.entity';
 import { UserRole } from '../authorization/user-role.entity';
 import { applyCompanyAuthorizationSchemaAdjustment } from '../company/company-authorization-schema-adjustment';
 import { seedCompanyRoleTemplates, seedCompanyAdminRole } from '../company/company-role-seeding';
+import { dropWithBoundedRetry } from './test-teardown-retry';
 
 /**
  * Area 21 Retrofit Preparation (2026-09-25, CTO-authorized — Test Harness
@@ -82,9 +83,13 @@ async function createDatabase(name: string): Promise<void> {
 }
 
 async function dropDatabase(name: string): Promise<void> {
-  await withAdminConnection(async (admin) => {
-    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-  });
+  // Bounded retry for the known transient teardown race (see test-teardown-retry.ts): same statement, fresh admin connection per attempt,
+  // at most 5 attempts, original error + attempts + outcome recorded. Test infrastructure only; no extra privilege is involved.
+  await dropWithBoundedRetry(name, () =>
+    withAdminConnection(async (admin) => {
+      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+    }),
+  );
 }
 
 export async function setUpTwoCompanyHarness(config: TwoCompanyHarnessConfig): Promise<TwoCompanyHarness> {
@@ -172,9 +177,16 @@ export async function setUpTwoCompanyHarness(config: TwoCompanyHarnessConfig): P
   async function teardown(): Promise<void> {
     await connections.onModuleDestroy();
     if (controlPlane.isInitialized) await controlPlane.destroy();
-    await dropDatabase(controlPlaneDb);
-    await dropDatabase(companyADbName);
-    await dropDatabase(companyBDbName);
+    // Attempt EVERY database this harness created (a failure on one must not leave the other two behind), then fail once with all causes.
+    const failures: string[] = [];
+    for (const db of [controlPlaneDb, companyADbName, companyBDbName]) {
+      try {
+        await dropDatabase(db);
+      } catch (err) {
+        failures.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    if (failures.length > 0) throw new Error(failures.join(' | '));
   }
 
   return { controlPlane, connections, users, memberships, companies, companyAId, companyBId, companyADbName, companyBDbName, createUserWithAdminRoleIn, teardown };

@@ -14,6 +14,7 @@ import { ProcessEngineService } from '../process-engine/process-engine.service';
 import { InventoryPostingPolicyRegistry } from '../inventory-posting-policy/inventory-posting-policy.registry';
 import { Role } from '../authorization/role.entity';
 import { UserRole } from '../authorization/user-role.entity';
+import { teardownDropRecords } from './test-teardown-retry';
 
 const ev = require('../../../tools/testing/biz-evidence');
 const guard = require('../../../tools/testing/db-guard');
@@ -211,7 +212,7 @@ export async function finishBiz(env: BizEnv): Promise<void> {
   const after = await listDatabases();
   const gone = env.databases.every((n) => !after.some((d) => d.datname === n));
   const othersUnchanged = JSON.stringify(after) === JSON.stringify(env.dbNamesBefore);
-  ev.writeJson(env.run, 'post-cleanup.json', { removed: env.databases, allRemoved: gone, otherDatabasesUnchanged: othersUnchanged, databasesAfter: after });
+  ev.writeJson(env.run, 'post-cleanup.json', { removed: env.databases, allRemoved: gone, otherDatabasesUnchanged: othersUnchanged, databasesAfter: after, teardownDropRecords: teardownDropRecords() });
   ev.finalize(env.run);
   if (!gone || !othersUnchanged) throw new Error('STOP: cleanup did not leave the instance as found');
   const bad = env.results.filter((r) => r.status === 'FAIL' || r.status === 'STOP');
