@@ -169,7 +169,9 @@ export class PaymentsService {
       return saved;
     };
 
-    const saved = manager ? await run(manager) : await this.dataSource.transaction(run);
+    // C15 (T-31): the advisory lock, the remaining-balance check and every write below must share ONE transaction — join an ACTIVE caller transaction, otherwise open one on the
+    // caller's manager (a plain manager releases the lock at once: 8 concurrent payments of 60.00 were all accepted against an invoice with 100.00 remaining). Same rule as applyPayment (F-PAY-001).
+    const saved = await runInTransaction(this.dataSource, manager, run);
     // Same "who dispatches" convention as `TreasuryService.cashInCore`: only the call that owns the
     // transaction (no manager supplied) dispatches — a caller-supplied manager means the CALLER
     // decides when to dispatch, since only it knows when its own outer transaction actually commits.
@@ -257,7 +259,9 @@ export class PaymentsService {
       );
       return saved;
     };
-    const saved = manager ? await run(manager) : await this.dataSource.transaction(run);
+    // C15 (T-31): the cash-in, the payment row, the ledger credit, the event and the audit row must be ONE unit of work — join an ACTIVE caller transaction, otherwise open one on the
+    // caller's manager (a plain manager commits each statement separately, so a failure part-way leaves a real cash movement with no complete record). Same rule as recordPayment above.
+    const saved = await runInTransaction(this.dataSource, manager, run);
     await this.events.dispatchAfterCommit(manager);
     return saved;
   }

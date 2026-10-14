@@ -3,7 +3,7 @@ import { abortBiz, attempt, auditChainValid, finishBiz, record, result, tally, w
 import { FinEnv, seedPostedInvoice, setUpFinance } from './biz-finance-support';
 
 /**
- * T-31 — LATENT plain-manager probes (TASK 5 and the C15 follow-up of the post-C14 sequence; TEST-ONLY; changes no product logic; outside the frozen T-xx set).
+ * T-31 — plain-manager probes for customer payments (found by the TASK 5 class scan; C15 reproduction and, after the CTO's authorisation of 2026-10-14, its REGRESSION test; outside the frozen T-xx set). The product fix is `payments.service.ts` (`recordPayment`, `recordOnAccountPayment` through `runInTransaction`); before it, P1-A, P5-A recordPayment and P5-A recordOnAccountPayment were FAIL-DEFECT.
  * A scan of production code for the lock-losing idiom `manager ? run(manager) : dataSource.transaction(run)` (the N-01/N-02 class) found three sites that were not
  * covered by T-19/T-24/T-30: `PaymentsService.recordPayment` and `recordOnAccountPayment` (payments.service.ts), and the private `run` of `MovingAverageCostEngine`.
  * Reach by reading: the HTTP path of `recordPayment` is wrapped by `IdempotencyService.withIdempotencyInTransaction` (a transaction manager); the cost engine is called from
@@ -13,6 +13,9 @@ import { FinEnv, seedPostedInvoice, setUpFinance } from './biz-finance-support';
  *       distinct treasury transactions, `customer_finance.payment.recorded` audit rows, and the invoice remaining.
  *   P2  rollback: a payment recorded inside an outer transaction that is rolled back leaves no payment, ledger credit, treasury transaction or audit row, and the treasury
  *       balance unchanged (transaction manager only — a plain manager has no transaction to roll back).
+ *   P4  a single payment inside the balance behaves exactly as before and the exact remainder is accepted, then nothing more (both calling styles).
+ *   P5  a failure part-way (the ledger credit throws after the treasury cash-in) leaves no payment row, no orphan cash-in and an unchanged balance, for recordPayment and
+ *       recordOnAccountPayment, in both calling styles; a retry then succeeds.
  *   P3  after everything above, the company audit chain is valid.
  * Disposable databases `daii_test_biz_t31_*` only.
  */
@@ -73,6 +76,47 @@ describe('T-31 — latent plain-manager probe: concurrent customer payments neve
         const fxRetry = await effects(inv);
         detail['P2-retry'] = { retryOk: retry.ok, ...fxRetry };
         result(e, 'P2-outer-rollback-leaves-no-payment-ledger-treasury-or-audit-trace', !out.ok && fx.payments === 0 && fx.ledgerCredits === 0 && fx.treasuryTxns === 0 && fx.auditRows === 0 && balanceBefore === balanceAfter && retry.ok && fxRetry.payments === 1 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail['P2-rollback']) + ' / ' + JSON.stringify(detail['P2-retry']));
+      }
+
+      // ---------------- P4 a single payment inside the balance behaves exactly as before (both calling styles) ----------------
+      for (const style of ['plain', 'transaction'] as const) {
+        const inv = await seedPostedInvoice(e, e.dsA, '100.00', `p4${style[0]}`);
+        const before = await e.treasury.getAccountBalance(e.bankAccountId, e.manager);
+        const pay = await (style === 'plain'
+          ? e.payments.recordPayment(e.customerId, inv, '60.00', 'bank_transfer', e.bankAccountId, `T31-single-${style}`, e.actor, wide.manager)
+          : wide.manager.transaction((tx) => e.payments.recordPayment(e.customerId, inv, '60.00', 'bank_transfer', e.bankAccountId, `T31-single-${style}`, e.actor, tx)));
+        const fx = await effects(inv);
+        const after = await e.treasury.getAccountBalance(e.bankAccountId, e.manager);
+        const second = await attempt(() => e.payments.recordPayment(e.customerId, inv, '60.00', 'bank_transfer', e.bankAccountId, `T31-single2-${style}`, e.actor, wide.manager)); // 40.00 remains: refused
+        const third = await attempt(() => e.payments.recordPayment(e.customerId, inv, '40.00', 'bank_transfer', e.bankAccountId, `T31-single3-${style}`, e.actor, wide.manager)); // exactly the remainder: accepted
+        const fxEnd = await effects(inv);
+        detail[`P4-${style}`] = { paymentId: pay.id, balanceDelta: Number(after) - Number(before), ...fx, secondRefused: !second.ok && second.kind === 'ConflictException:409', remainderAccepted: third.ok, ...{ end: fxEnd } };
+        result(e, `P4-${style === 'plain' ? 'A-plain-manager' : 'B-transaction-manager'}-single-payment-and-exact-remainder`, Number(after) - Number(before) === 60 && fx.payments === 1 && fx.ledgerCredits === 1 && fx.treasuryTxns === 1 && fx.auditRows === 1 && !second.ok && second.kind === 'ConflictException:409' && third.ok && fxEnd.paidTotal === 100 && fxEnd.payments === 2 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail[`P4-${style}`]));
+      }
+
+      // ---------------- P5 a failure part-way (after the treasury cash-in) is all-or-nothing, plain manager and transaction manager ----------------
+      {
+        const ledger = (e.payments as unknown as { ledger: { postEntry: (...a: unknown[]) => Promise<unknown> } }).ledger;
+        for (const method of ['recordPayment', 'recordOnAccountPayment'] as const) {
+          for (const style of ['plain', 'transaction'] as const) {
+            const inv = method === 'recordPayment' ? await seedPostedInvoice(e, e.dsA, '100.00', `p5${style[0]}`) : null;
+            const ref = `T31-fail-${method}-${style}`;
+            const before = await e.treasury.getAccountBalance(e.bankAccountId, e.manager);
+            const spy = jest.spyOn(ledger, 'postEntry').mockRejectedValueOnce(new Error('forced failure after the treasury cash-in'));
+            const call = (m: import('typeorm').EntityManager) => (method === 'recordPayment'
+              ? e.payments.recordPayment(e.customerId, inv as string, '50.00', 'bank_transfer', e.bankAccountId, ref, e.actor, m)
+              : e.payments.recordOnAccountPayment(e.customerId, null, '50.00', 'bank_transfer', e.bankAccountId, ref, e.actor, m));
+            const out = await attempt(() => (style === 'plain' ? call(wide.manager) : wide.manager.transaction((tx) => call(tx))));
+            spy.mockRestore();
+            const after = await e.treasury.getAccountBalance(e.bankAccountId, e.manager);
+            const payRows = await n(`SELECT count(*)::int AS n FROM customer_payments WHERE reference = $1`, [ref]);
+            const cashRows = await n(`SELECT count(*)::int AS n FROM treasury_transactions WHERE "treasuryAccountId" = $1 AND amount = 50 AND "createdAt" > now() - interval '5 minutes' AND id NOT IN (SELECT "treasuryTransactionId" FROM customer_payments WHERE "treasuryTransactionId" IS NOT NULL)`, [e.bankAccountId]);
+            const retry = await attempt(() => call(wide.manager));
+            const d = { method, style, failed: !out.ok, balanceBefore: before, balanceAfter: after, paymentRows: payRows, orphanCashIn: cashRows, retryOk: retry.ok };
+            detail[`P5-${method}-${style}`] = d;
+            result(e, `P5-${style === 'plain' ? 'A-plain-manager' : 'B-transaction-manager'}-${method}-failure-after-cash-in-is-all-or-nothing`, !out.ok && before === after && payRows === 0 && cashRows === 0 && retry.ok ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(d));
+          }
+        }
       }
 
       // ---------------- P3 audit chain ----------------
