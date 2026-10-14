@@ -1,0 +1,27 @@
+{
+  "testId": "T-31",
+  "runId": "T-31-20261014T021246Z-5b59ff",
+  "finishedAt": "2026-10-14T02:12:57.624Z",
+  "results": [
+    {
+      "id": "P1-A-plain-manager-concurrent-payments-never-overpay",
+      "status": "FAIL-DEFECT",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":1,\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"invoiceTotal\":100,\"remainingAfter\":-380,\"payments\":8,\"paidTotal\":480,\"ledgerCredits\":8,\"treasuryTxns\":8,\"auditRows\":8},{\"round\":2,\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"invoiceTotal\":100,\"remainingAfter\":-380,\"payments\":8,\"paidTotal\":480,\"ledgerCredits\":8,\"treasuryTxns\":8,\"auditRows\":8}]"
+    },
+    {
+      "id": "P1-B-transaction-manager-concurrent-payments-never-overpay",
+      "status": "PASS",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":1,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":2,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1}]"
+    },
+    {
+      "id": "P2-outer-rollback-leaves-no-payment-ledger-treasury-or-audit-trace",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"balanceBefore\":\"11200.00\",\"balanceAfter\":\"11200.00\",\"payments\":0,\"paidTotal\":0,\"ledgerCredits\":0,\"treasuryTxns\":0,\"auditRows\":0} / {\"retryOk\":true,\"payments\":1,\"paidTotal\":40,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1}"
+    },
+    {
+      "id": "P3-audit-chain-valid-after-all-payment-probes",
+      "status": "PASS",
+      "note": "{\"chainValid\":true}"
+    }
+  ]
+}
