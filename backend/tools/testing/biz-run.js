@@ -46,6 +46,7 @@ const STEPS = [
   ['T-28', 'src/foundation/testing/t28-audit-seq-lag-fail-closed.biz.real-pg.spec.ts'],
   ['T-29', 'src/foundation/testing/t29-pa43-uuid-repair-audit-impact.biz.real-pg.spec.ts'],
   ['T-30', 'src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts'],
+  ['T-31', 'src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts'],
   ['T-18', 'src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts'],
 ];
 

@@ -8,7 +8,7 @@ Kinds: **D** decision/approval · **A** business answer for a Phase 0 contract �
 
 | Role | Items | Count |
 |---|---|---|
-| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14 | 14 |
+| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15 | 15 |
 | `ACCOUNTING_POLICY_OWNER` | A1, A2, A3, A4 | 4 |
 | `PAYROLL_POLICY_OWNER` | P1 | 1 |
 | `HR_OWNER` | P2, P3, P4 | 3 |
@@ -25,7 +25,7 @@ Kinds: **D** decision/approval · **A** business answer for a Phase 0 contract �
 | `SITE_OWNERS` | O6 | 1 |
 | `SECURITY_AND_DEPENDENCY_OWNER` | O7 | 1 |
 
-Total items: **38** across **16** roles.
+Total items: **39** across **16** roles.
 
 ## `CTO`
 
@@ -37,7 +37,7 @@ Total items: **38** across **16** roles.
 | C4 | Independent reviewer (WP-REV-01) — also for the T1 lockfile diff | Appoint an eligible reviewer who took no part in implementing or producing the evidence (not in the independence register; profile in the review pack). Mandatory for matrix rows 19-20 (CTO decision 2026-10-14). Deliver the evidence pack and DAII-LOCAL-CLOSURE-ACCEPTANCE-MATRIX-2026-10-14.md; the reviewer records ACCEPT, REJECT or NEEDS EVIDENCE per finding and for the T1 packet. | — | DAII-INDEPENDENT-REVIEW-SCOPE-AND-READINESS-2026-10-13.md; evidence-clean-snapshot-2026-10-13/t1-review-packet/ | acceptance of N-02, PA-33, WP-INV-10, WP-AUD-08, T1 | PENDING |
 | C5 | DEC-10 F-INV-001 real usage measurement | Name the operator and the databases; later decide the 410 release from the measurement (not from synthetic data). | READ_ONLY_OPERATOR | DAII-F-INV-001-OPERATOR-KIT-2026-10-13.md | release of the 410 contract | PENDING |
 | C6 | D-04 integrations Company-scoped | Authorise implementation or keep on hold; answer the plan's [REVIEW] items (routing source, back-fill marker, unrouted-connector behaviour, authorization-model change); name the module owner. | INTEGRATIONS_MODULE_OWNER | DAII-D04-AND-ENVIRONMENT-READINESS-2026-10-13.md | PA-20 | PENDING |
-| C7 | LA-1 remaining sites (DEC-19) | Assign an owner per call site (10 sites in 6 files) and answer the three design questions: Q-L1 revoke/role change while a Company is not READY; Q-L2 package role-sync while not READY; Q-L3 the view-context request path. | site owners | DAII-LA1-REMAINING-SITES-TRACKER-2026-10-13.md | PA-41 | PENDING |
+| C7 | LA-1 remaining sites (DEC-19) | Assign an owner per call site (10 sites in 6 files in the tracker, AND the five additional call sites in 3 files found at the Task 4 review: auth-me.service.ts:161, company-invitation.service.ts:157, support-access.service.ts:82 and :145, plus the Layer-1 guard - classify each) and answer the three design questions: Q-L1 revoke/role change while a Company is not READY; Q-L2 package role-sync while not READY; Q-L3 the view-context request path. | site owners | DAII-LA1-REMAINING-SITES-TRACKER-2026-10-13.md | PA-41 | PENDING |
 | C8 | Capacity targets, staging host, load-test authorisation (DEC-11) | Sign or replace the workload assumptions and acceptance targets; provide a staging-like host and a separate load-generator machine; name the load-test authoriser. No test runs before all three exist. | CAPACITY_APPROVER; ENVIRONMENT_OWNER; LOAD_TEST_AUTHORISER | DAII-D04-AND-ENVIRONMENT-READINESS-2026-10-13.md §2–3 | PA-24 / PA-26 | PENDING |
 | C9 | T2 owner and scope (DEC-20) | Name the T2 owner. T2 is NOT authorised by this request; scope as outlined (NestJS major, bcrypt 6, react-router 7, Jest 30) needs a separate approval per upgrade. | SECURITY_AND_DEPENDENCY_OWNER | DAII-DEPENDENCY-T2-OUTLINE-2026-10-13.md | security gate (tar critical) | PENDING |
 | C10 | CI classification | Classify the documented CI result (runs on 715c22d, 0810300, 8ec6de4) for the official status line, which still reads "CI NOT GREEN". | — | evidence-clean-snapshot-2026-10-13/*-ci-full-tree/, 8ec6de4-final-verification/ci/ | release gate | PENDING |
@@ -45,6 +45,7 @@ Total items: **38** across **16** roles.
 | C12 | DEC-06 business date | UTC or Cairo (fixtures for both are computed). | — | DAII-PHASE-0-FIXTURE-CATALOG-2026-10-13.md | H0-5; attendance/commission/payroll fixtures | PENDING |
 | C13 | T1 final acceptance prerequisites | Assign (a) the reviewer of the exact lockfile diff (with C4) and (b) the person with host access for the proxy compatibility check; approve a coordinated time for any `npm ci` in the shared development tree. | ENVIRONMENT_OWNER | evidence-clean-snapshot-2026-10-13/t1-review-packet/; DAII-T1-HOST-PROXY-CHECK-PROTOCOL-2026-10-14.md | T1 final acceptance | PENDING |
 | C14 | N-02 sibling defects (WP-INV-09, T-30) - remediation | AUTHORISED by the CTO on 2026-10-14 and IMPLEMENTED in 354d0f7 (relocateReservedStock and releaseReservedQuantityForReference through runInTransaction; releaseReservation through runInTransaction with the per-warehouse-product lock and a re-read under it). All six original FAIL-DEFECT cases now PASS on the clean snapshot of 354d0f7 (T-30: 17 PASS, 0 FAIL-DEFECT); CI script, ambient, isolation 92 and business suite T-00..T-30 unchanged from 8ec6de4 apart from the added T-30 cases. Author-verified only; independent acceptance is not available. Nothing further is asked unless the CTO wants the accepted-risk record or the controller-path trace. | INVENTORY_OWNER | DAII-N02-SIBLING-PROBES-RESULTS-2026-10-14.md (Remediation); evidence-clean-snapshot-2026-10-13/354d0f7-c14-remediation/ | N-02 remainder (WP-INV-09) | IMPLEMENTED (author-verified) |
+| C15 | Customer payment recording with a plain manager (T-31, latent) | Decide: authorise a fix or accept the residual risk. Measured at the working tree on 2026-10-14: PaymentsService.recordPayment called with a plain manager lets 8 concurrent payments of 60.00 all succeed against an invoice with 100.00 remaining (480.00 paid); with a transaction manager exactly one succeeds. Not reachable today: the only production caller (PaymentsController.record) passes the transaction manager of withIdempotencyInTransaction. Proposed fix (needs your authorisation): payments.service.ts recordPayment and recordOnAccountPayment use runInTransaction(this.dataSource, manager, run), the same rule as applyPayment (F-PAY-001); acceptance: T-31 P1-A flips to PASS, T-06/T-08 and the payment isolation specs unchanged. | ACCOUNTING_POLICY_OWNER | DAII-SEQUENTIAL-TASK-REPORTS-2026-10-14.md (Task 5); t31-latent-idiom-probes.biz.real-pg.spec.ts | latent money-integrity candidate; no source change until authorised | PENDING |
 
 ## `ACCOUNTING_POLICY_OWNER`
 
