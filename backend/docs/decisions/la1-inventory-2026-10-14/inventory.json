@@ -1,0 +1,131 @@
+{
+ "commit": "925fe6c",
+ "M1_connection_manager_calls": {
+  "sites": 23,
+  "files": 15,
+  "by_file": {
+   "domains/accounting/application/closing-snapshot-recovery.scheduler.ts": [
+    "51",
+    "54"
+   ],
+   "domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts": [
+    "50"
+   ],
+   "foundation/approval-engine/approval-expiry.scheduler.ts": [
+    "71"
+   ],
+   "foundation/authentication/auth-me.service.ts": [
+    "161"
+   ],
+   "foundation/company/company-context.guard.ts": [
+    "61",
+    "82"
+   ],
+   "foundation/company/company-invitation.service.ts": [
+    "157"
+   ],
+   "foundation/company/company-lifecycle-admission.ts": [
+    "60"
+   ],
+   "foundation/company/company-membership-provisioning.service.ts": [
+    "52",
+    "125",
+    "192"
+   ],
+   "foundation/company/membership-reconciliation.scheduler.ts": [
+    "80",
+    "94",
+    "111"
+   ],
+   "foundation/events/company-event-dispatcher.scheduler.ts": [
+    "53",
+    "56"
+   ],
+   "foundation/events/event-bus.service.ts": [
+    "126"
+   ],
+   "foundation/plans/company-package.service.ts": [
+    "131"
+   ],
+   "foundation/plans/company-view-context.service.ts": [
+    "36"
+   ],
+   "foundation/platform/support-access.service.ts": [
+    "82",
+    "145"
+   ],
+   "foundation/release/company-baseline-backup.scheduler.ts": [
+    "57"
+   ]
+  }
+ },
+ "M2_direct_construction": {
+  "sites": 15,
+  "files": 11,
+  "by_file": {
+   "database/data-source.ts": [
+    "52"
+   ],
+   "foundation/company/company-authorization-schema-adjustment.ts": [
+    "48"
+   ],
+   "foundation/company/company-database-allocator.ts": [
+    "74"
+   ],
+   "foundation/company/company-entitlement-provisioning.ts": [
+    "89"
+   ],
+   "foundation/company/company-role-seeding.ts": [
+    "35",
+    "92",
+    "128"
+   ],
+   "foundation/database-provisioning/database-provisioning.service.ts": [
+    "248",
+    "263"
+   ],
+   "foundation/database-registry/company-connection-manager.service.ts": [
+    "88"
+   ],
+   "foundation/database-registry/company-datasource-factory.ts": [
+    "26",
+    "27"
+   ],
+   "foundation/database-registry/company-entity-registry.ts": [
+    "33"
+   ],
+   "foundation/release/migration-datasource.ts": [
+    "64"
+   ],
+   "foundation/release/restore-manager.service.ts": [
+    "209"
+   ]
+  }
+ },
+ "M3_files_injecting_the_manager": {
+  "files": 21,
+  "list": [
+   "domains/accounting/application/closing-snapshot-recovery.scheduler.ts",
+   "domains/sales-orders/application/preliminary-hold-expiry.scheduler.ts",
+   "foundation/approval-engine/approval-expiry.scheduler.ts",
+   "foundation/audit/installation-audit.controller.ts",
+   "foundation/authentication/auth-me.service.ts",
+   "foundation/company/company-context.guard.ts",
+   "foundation/company/company-invitation.service.ts",
+   "foundation/company/company-lifecycle-admission.ts",
+   "foundation/company/company-membership-provisioning.service.ts",
+   "foundation/company/membership-reconciliation.scheduler.ts",
+   "foundation/database-provisioning/database-provisioning.service.ts",
+   "foundation/database-registry/company-connection-manager.service.ts",
+   "foundation/database-registry/company-datasource-factory.ts",
+   "foundation/database-registry/company-entity-registry.ts",
+   "foundation/database-registry/database-registry.service.ts",
+   "foundation/events/company-event-dispatcher.scheduler.ts",
+   "foundation/events/event-bus.service.ts",
+   "foundation/plans/company-package.service.ts",
+   "foundation/plans/company-view-context.service.ts",
+   "foundation/platform/support-access.service.ts",
+   "foundation/release/company-baseline-backup.scheduler.ts"
+  ]
+ }
+}
