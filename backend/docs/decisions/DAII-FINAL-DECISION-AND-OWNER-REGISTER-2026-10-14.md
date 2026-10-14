@@ -8,7 +8,7 @@ Kinds: **D** decision/approval Â· **A** business answer for a Phase 0 contract Â
 
 | Role | Items | Count |
 |---|---|---|
-| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16 | 16 |
+| `CTO` | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17 | 17 |
 | `ACCOUNTING_POLICY_OWNER` | A1, A2, A3, A4 | 4 |
 | `PAYROLL_POLICY_OWNER` | P1 | 1 |
 | `HR_OWNER` | P2, P3, P4 | 3 |
@@ -25,7 +25,7 @@ Kinds: **D** decision/approval Â· **A** business answer for a Phase 0 contract Â
 | `SITE_OWNERS` | O6 | 1 |
 | `SECURITY_AND_DEPENDENCY_OWNER` | O7 | 1 |
 
-Total items: **40** across **16** roles.
+Total items: **41** across **16** roles.
 
 ## `CTO`
 
@@ -47,6 +47,7 @@ Total items: **40** across **16** roles.
 | C14 | N-02 sibling defects (WP-INV-09, T-30) - remediation | AUTHORISED by the CTO on 2026-10-14 and IMPLEMENTED in 354d0f7 (relocateReservedStock and releaseReservedQuantityForReference through runInTransaction; releaseReservation through runInTransaction with the per-warehouse-product lock and a re-read under it). All six original FAIL-DEFECT cases now PASS on the clean snapshot of 354d0f7 (T-30: 17 PASS, 0 FAIL-DEFECT); CI script, ambient, isolation 92 and business suite T-00..T-30 unchanged from 8ec6de4 apart from the added T-30 cases. Author-verified only; independent acceptance is not available. Nothing further is asked unless the CTO wants the accepted-risk record or the controller-path trace. | INVENTORY_OWNER | DAII-N02-SIBLING-PROBES-RESULTS-2026-10-14.md (Remediation); evidence-clean-snapshot-2026-10-13/354d0f7-c14-remediation/ | N-02 remainder (WP-INV-09) | IMPLEMENTED (author-verified) |
 | C15 | Customer payment recording with a plain manager (T-31) - remediation | AUTHORISED by the CTO on 2026-10-14 and IMPLEMENTED in 9a693fc (payments.service.ts: recordPayment and recordOnAccountPayment through runInTransaction). T-31 regression: concurrent payments never exceed the invoice (P1), rollback leaves no trace (P2), single payment and exact remainder (P4), failure after the cash-in is all-or-nothing (P5), audit chain valid (P3) - 10 of 10 PASS on the clean snapshot of 9a693fc; red-first: P1-A and both P5-A cases failed on the unfixed service in two runs. CI PASS; ambient, isolation (606/21/1) and business suite (309 PASS / 5 FAIL-DEFECT / 2 BLOCKED) equal the 8ec6de4 baseline plus the new cases. Author-verified only; independent acceptance is not available. Nothing further is asked. | ACCOUNTING_POLICY_OWNER | DAII-SEQUENTIAL-TASK-REPORTS-2026-10-14.md (C15 Remediation); evidence-clean-snapshot-2026-10-13/9a693fc-c15-remediation/ | closes the latent money-integrity candidate | IMPLEMENTED (author-verified) |
 | C16 | Approval status of ADR-070 / ADR-071 / ADR-072 (payroll, commission, integrated GL) and the ADR-057 reference | Record the actual approval of ADR-070, ADR-071 and ADR-072 (their headers still say HOLD IMPLEMENTATION / awaiting CTO approval, yet the code was implemented on 2026-09-20 and shipped in v1.1.0; no approval record exists in the repository), or ratify retroactively, and update the headers. Also confirm which ADR the ADR-057 gate meant for HR/Payroll: ADR-057 is the procurement GRNI posting contract. | â€” | DAII-SEQUENTIAL-TASK-REPORTS-2026-10-14.md (Tasks 6 and 7) | any new HR/Payroll implementation; documentation consistency | PENDING |
+| C17 | Scope of the next release candidate (v1.1.10) after the protected v1.1.9 | Decide which post-1.1.9 changes a v1.1.10 candidate may contain. The N-01/N-02/F-PAY/F-AUD-002/F-TRS/C14/C15 set is one dependency chain (shared runInTransaction helper from 23e5ec1) and ships together or not at all. Gated items to include, defer or remove from the candidate: (a) the fail-closed audit writer 4d4ed0d with c764fc5 - needs the read-only inventory of real audit sequences (E1), DEC-01b holders and runbook (C3) and DEC-02 (C1/S1), otherwise a lagging sequence refuses audited writes; (b) the 410 closure of non-receipt movement types fc9282d - needs the F-INV-001 measurement decision (C5); (c) the partial LA-1 Layer 2 wiring 60b9bdf, held out of 1.1.9 (C7); (d) the T1 lockfile 8ec6de4 - needs the host proxy check (E3). No candidate is built until the gates pass and a separate release decision is taken. | SECURITY_AUDIT_OWNER; INVENTORY_OWNER | DAII-SEQUENTIAL-TASK-REPORTS-2026-10-14.md (Final consolidated report, section 3) | v1.1.10 candidate; release approval | PENDING |
 
 ## `ACCOUNTING_POLICY_OWNER`
 
