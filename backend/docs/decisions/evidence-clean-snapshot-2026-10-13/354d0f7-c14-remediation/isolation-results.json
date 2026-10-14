@@ -1,0 +1,843 @@
+{
+ "derivedFrom": "isolation-regression-full-run.log (git-ignored, sha256 in LOG-SHA256.txt)",
+ "specFiles": 92,
+ "runnerPass": 91,
+ "runnerFail": [
+  "src/foundation/release/release-migration-registry.real-pg.spec.ts"
+ ],
+ "jestTests": {
+  "passed": 606,
+  "failed": 21,
+  "skipped": 1
+ },
+ "specs": [
+  {
+   "spec": "src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/accounting.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/event-engine.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/general-ledger.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/grni.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/t0-clean-company-baseline.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/wages-payable-control-account.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/accounting/interface/wip.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/attendance/interface/attendance.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/commerce/interface/bom.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/commerce/interface/price-lists.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/commerce/interface/products.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/commission/interface/commission.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/crm/interface/customers.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/customer-finance/interface/invoices.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/customer-finance/interface/payments.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/delivery/interface/delivery.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/deposit-control/interface/deposits.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/hr/interface/hr.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/manufacturing/interface/manufacturing-entitlement-permission.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/manufacturing/interface/manufacturing-master-data.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/manufacturing/interface/work-order.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/payroll/interface/payroll.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/new-item-request.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/purchase-order.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/purchase-request.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/supplier-master.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/supplier-payment.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/procurement/interface/warehouse-reference.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/reports/interface/reports.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/returns/interface/returns-accounting.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/returns/interface/returns.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/returns/interface/sales-returns.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/returns/interface/shipment-returns.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/sales/interface/sales.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/shipment/interface/shipment.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/targets/interface/targets.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/domains/treasury/interface/treasury.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/approval-engine/approval-engine.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/audit/area14-company-audit.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/audit/audit-chain-concurrency.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/authentication/auth-me.contract.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/authorization/authorization-context.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/area6-company-isolation.acceptance.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-lifecycle-admission.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-lifecycle-layer1.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-membership-provisioning.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-roles.f3.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/company-users.f2.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/cto-decisions-2026-10-07.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/memberships-mine.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/company/permission-path-company-isolation.acceptance.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/database-provisioning/database-provisioning.service.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/database-registry/company-connection-manager.service.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/database-registry/company-datasource-registry-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/organization/organization.company-isolation.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/plans/company-packages.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/platform/platform-authorization.f4.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/release-orchestration/company-migration-runner.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/release/company-fanout.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/release/release-execution-environment-check.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/release/release-migration-registry.real-pg.spec.ts",
+   "runner": "FAIL",
+   "tests": {
+    "passed": 0,
+    "failed": 21,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   }
+  },
+  {
+   "spec": "src/foundation/scope/access-scope.f6.real-pg.spec.ts",
+   "runner": "PASS",
+   "tests": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+   }
+  }
+ ]
+}

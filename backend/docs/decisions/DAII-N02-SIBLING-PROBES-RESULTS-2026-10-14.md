@@ -34,9 +34,8 @@ Totals: 14 cases — **8 PASS · 6 FAIL-DEFECT · 0 BLOCKED**.
 | `releaseReservation` | `inventory.controller.ts:585` (HTTP) | `req.companyContext.dataSource.manager` (plain) | **yes, HTTP-reachable** — a double submit produces duplicate audit rows |
 "Possible" means the call sites accept an optional manager and the probe shows the failure when a plain manager is supplied; whether each real controller path supplies one was **not** traced end to end here and is part of the CTO's judgement.
 
-## Decisions requested (none executed; no product change)
-1. Authorise a fix for the three candidate defects, in this order of evidence strength: (a) `relocateReservedStock` and `releaseReservedQuantityForReference` → `runInTransaction` (same one-line shape as the H2/H3 fixes, with the T-30 probes turned into regression expectations and the 92-spec isolation list); (b) `releaseReservation` → lock + conditional state change. Or accept the residual risk with a recorded rationale. Owner: CTO with the inventory owner — register item **C14**.
-2. Until decided: T-30 stays in the business suite as a **characterization** — its 6 FAIL-DEFECT cases are known and expected, like the five already on record, and must not be read as a regression.
+## Decisions requested — superseded
+At `d68fd10` this section asked the CTO to authorise a fix or accept the risk (register **C14**). The CTO authorised the fix on 2026-10-14; it is implemented in `354d0f7` (see "Remediation" below). The statement that T-30 would stay as a characterization with six expected FAIL-DEFECT cases no longer applies: **T-30 now has 17 PASS and 0 FAIL-DEFECT**, and any FAIL-DEFECT in T-30 from now on is a regression.
 
 ## Reproduce
 `node tools/testing/biz-run.js --only T-30` (dedicated cluster; DB guard enforced). Evidence: `evidence-clean-snapshot-2026-10-13/d68fd10-t30-sibling-probes/` (header `commit` = `d68fd10`, `dirtyPaths: []`, manifest-verified; CI script on the same snapshot: Overall PASS).
