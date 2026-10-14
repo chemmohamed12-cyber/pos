@@ -1,3 +1,13 @@
+// LA-1 Layer 2: the scheduler now runs each Company's work through `runOperationalAdmitted`. This UNIT spec isolates the scheduler from the Platform database, so the admission helper is replaced by an
+// always-admitting stand-in that still acquires the Company DataSource through the (mocked) connection manager — the assertions below are unchanged. The admission behaviour itself (READY / not READY, isolation,
+// lifecycle) is proven against real Postgres in `la1-layer2-sites-1-5-6-7.real-pg.spec.ts` and `company-lifecycle-admission.real-pg.spec.ts`.
+jest.mock('../../../foundation/company/company-lifecycle-admission', () => ({
+  runOperationalAdmitted: async (_platform: unknown, connections: { getDataSource: (id: string) => Promise<unknown> }, companyId: string, work: (ds: unknown) => Promise<unknown>) => ({
+    admitted: true,
+    value: await work(await connections.getDataSource(companyId)),
+  }),
+}));
+
 import { ClosingSnapshotRecoveryScheduler } from './closing-snapshot-recovery.scheduler';
 import { ClosingSnapshotService } from './closing-snapshot.service';
 import { CompanyConnectionManagerService } from '../../../foundation/database-registry/company-connection-manager.service';
@@ -13,6 +23,7 @@ describe('ClosingSnapshotRecoveryScheduler.runOnce — Multi-Company Area 9 (per
     scheduler = new ClosingSnapshotRecoveryScheduler(
       snapshotsMock as unknown as ClosingSnapshotService,
       connectionsMock as unknown as CompanyConnectionManagerService,
+      {} as never, // platform DataSource: unused, the admission helper is replaced above
     );
   });
 

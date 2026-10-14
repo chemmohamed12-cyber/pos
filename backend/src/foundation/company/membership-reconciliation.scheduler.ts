@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { MembershipOperationService } from './membership-operation.service';
 import { MembershipService } from './membership.service';
 import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { provisionUserRoleForMembership, deprovisionUserRoleForMembership } from './membership-role-provisioning';
 import { MembershipOperation } from './membership-operation.entity';
 import { currentRoleKeys, primaryRoleKey } from './company-user-roles';
+import { runOperationalAdmitted } from './company-lifecycle-admission';
 
 const MAX_ATTEMPTS = 5;
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -54,6 +55,7 @@ export class MembershipReconciliationScheduler implements OnModuleInit, OnModule
     private readonly memberships: MembershipService,
     private readonly connections: CompanyConnectionManagerService,
     private readonly audit: AuditService,
+    private readonly platform: DataSource,
   ) {}
 
   onModuleInit(): void {
@@ -76,9 +78,16 @@ export class MembershipReconciliationScheduler implements OnModuleInit, OnModule
           // always recomputed from the authority (never from the ledger), so a stale/duplicate operation can never overwrite a newer decision.
           const current = await this.memberships.findByUserAndCompany(op.userId, op.companyId);
           if (current) {
-            await this.operations.markRetrying(op.id);
-            const ds = await this.connections.getDataSource(op.companyId);
-            await this.memberships.setRoleMirror(op.userId, op.companyId, primaryRoleKey(await currentRoleKeys(ds.manager, op.userId), current.roleKey));
+            // LA-1 Layer 2 (tracker site 5): reading the Company's roles is Company work — admitted only while the Company is READY. Not admitted: the operation is left
+            // exactly as it is (still FAILED, `attempts` untouched, no Company connection opened) and is picked up again by a later sweep once the Company is READY.
+            const admission = await runOperationalAdmitted(this.platform, this.connections, op.companyId, async (ds) => {
+              await this.operations.markRetrying(op.id);
+              await this.memberships.setRoleMirror(op.userId, op.companyId, primaryRoleKey(await currentRoleKeys(ds.manager, op.userId), current.roleKey));
+            });
+            if (!admission.admitted) {
+              this.logger.log(`Membership reconciliation of operation ${op.id} deferred: Company ${op.companyId} is not READY.`);
+              continue;
+            }
           }
           await this.operations.markCompleted(op.id);
           continue;
@@ -90,12 +99,19 @@ export class MembershipReconciliationScheduler implements OnModuleInit, OnModule
             await this.operations.markCompleted(op.id);
             continue;
           }
-          await this.operations.markRetrying(op.id);
-          const ds = await this.connections.getDataSource(op.companyId);
-          await ds.transaction(async (manager) => {
-            for (const key of op.targetRoleKeys!) await provisionUserRoleForMembership(manager, op.userId, key);
-            await this.recordCompanyAudit(op, 'company.membership.granted', manager, { after: { userId: op.userId, roleKeys: op.targetRoleKeys } });
+          // LA-1 Layer 2 (tracker site 6): the replay writes Company roles and a Company audit row in one transaction — admitted only while the Company is READY; otherwise deferred
+          // (operation untouched, replayed once after READY).
+          const admission = await runOperationalAdmitted(this.platform, this.connections, op.companyId, async (ds) => {
+            await this.operations.markRetrying(op.id);
+            await ds.transaction(async (manager) => {
+              for (const key of op.targetRoleKeys!) await provisionUserRoleForMembership(manager, op.userId, key);
+              await this.recordCompanyAudit(op, 'company.membership.granted', manager, { after: { userId: op.userId, roleKeys: op.targetRoleKeys } });
+            });
           });
+          if (!admission.admitted) {
+            this.logger.log(`Membership reconciliation of operation ${op.id} deferred: Company ${op.companyId} is not READY.`);
+            continue;
+          }
           await this.operations.markCompleted(op.id);
           continue;
         }
@@ -107,22 +123,28 @@ export class MembershipReconciliationScheduler implements OnModuleInit, OnModule
           }
         }
 
-        await this.operations.markRetrying(op.id);
-        const dataSource = await this.connections.getDataSource(op.companyId);
-
-        if (op.operationType === 'grant') {
-          await provisionUserRoleForMembership(dataSource, op.userId, op.targetRoleKey!);
-          await this.recordCompanyAudit(op, 'company.membership.granted', dataSource.manager, { after: { userId: op.userId, roleKey: op.targetRoleKey } });
-        } else if (op.operationType === 'revoke') {
-          await deprovisionUserRoleForMembership(dataSource, op.userId, op.previousRoleKey!);
-          await this.recordCompanyAudit(op, 'company.membership.revoked', dataSource.manager, { before: { roleKey: op.previousRoleKey } });
-        } else {
-          await dataSource.transaction(async (manager) => {
-            await deprovisionUserRoleForMembership(manager, op.userId, op.previousRoleKey!);
-            await provisionUserRoleForMembership(manager, op.userId, op.targetRoleKey!);
-            // Area 14 (2026-09-25) — same transaction as the replayed mutation itself.
-            await this.recordCompanyAudit(op, 'company.membership.role_changed', manager, { before: { roleKey: op.previousRoleKey }, after: { roleKey: op.targetRoleKey } });
-          });
+        // LA-1 Layer 2 (tracker site 7): the retried grant / revoke / role_change writes Company data — admitted only while the Company is READY; otherwise deferred (operation
+        // untouched: still FAILED, `attempts` not incremented, no Company connection opened) and retried by a later sweep.
+        const admission = await runOperationalAdmitted(this.platform, this.connections, op.companyId, async (dataSource) => {
+          await this.operations.markRetrying(op.id);
+          if (op.operationType === 'grant') {
+            await provisionUserRoleForMembership(dataSource, op.userId, op.targetRoleKey!);
+            await this.recordCompanyAudit(op, 'company.membership.granted', dataSource.manager, { after: { userId: op.userId, roleKey: op.targetRoleKey } });
+          } else if (op.operationType === 'revoke') {
+            await deprovisionUserRoleForMembership(dataSource, op.userId, op.previousRoleKey!);
+            await this.recordCompanyAudit(op, 'company.membership.revoked', dataSource.manager, { before: { roleKey: op.previousRoleKey } });
+          } else {
+            await dataSource.transaction(async (manager) => {
+              await deprovisionUserRoleForMembership(manager, op.userId, op.previousRoleKey!);
+              await provisionUserRoleForMembership(manager, op.userId, op.targetRoleKey!);
+              // Area 14 (2026-09-25) — same transaction as the replayed mutation itself.
+              await this.recordCompanyAudit(op, 'company.membership.role_changed', manager, { before: { roleKey: op.previousRoleKey }, after: { roleKey: op.targetRoleKey } });
+            });
+          }
+        });
+        if (!admission.admitted) {
+          this.logger.log(`Membership reconciliation of operation ${op.id} deferred: Company ${op.companyId} is not READY.`);
+          continue;
         }
 
         await this.operations.markCompleted(op.id);

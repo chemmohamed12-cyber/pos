@@ -132,7 +132,7 @@ describe('Track A live grant paths — ADR-073 §6 targeted re-verification, rea
     users = new UsersService(controlPlane.getRepository(User));
     const audit = new AuditService(controlPlane);
     provisioning = new CompanyMembershipProvisioningService(memberships, connections, operations, users, audit);
-    scheduler = new MembershipReconciliationScheduler(operations, memberships, connections, audit);
+    scheduler = new MembershipReconciliationScheduler(operations, memberships, connections, audit, controlPlane);
   });
 
   afterAll(async () => {

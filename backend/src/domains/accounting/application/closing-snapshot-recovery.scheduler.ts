@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { ClosingSnapshotService } from './closing-snapshot.service';
 import { CompanyConnectionManagerService } from '../../../foundation/database-registry/company-connection-manager.service';
+import { runOperationalAdmitted } from '../../../foundation/company/company-lifecycle-admission';
 
 /**
  * ADR-051 §12/§14 (Month-End Closing / Black Box, Phase 6). Same
@@ -34,6 +36,7 @@ export class ClosingSnapshotRecoveryScheduler implements OnModuleInit, OnModuleD
   constructor(
     private readonly snapshots: ClosingSnapshotService,
     private readonly connections: CompanyConnectionManagerService,
+    private readonly platform: DataSource,
   ) {}
 
   onModuleInit(): void {
@@ -51,12 +54,16 @@ export class ClosingSnapshotRecoveryScheduler implements OnModuleInit, OnModuleD
     const companyIds = await this.connections.listActiveCompanyIds();
     for (const companyId of companyIds) {
       try {
-        const dataSource = await this.connections.getDataSource(companyId);
-        await this.snapshots.retryPending(dataSource.manager);
-        const overdue = await this.snapshots.detectOverdue(10, dataSource.manager);
-        if (overdue.length > 0) {
-          this.logger.warn(`Closing Snapshot recovery sweep — Company ${companyId}: ${overdue.length} run(s) still overdue after retry.`);
-        }
+        // LA-1 Layer 2 (DP-9 O-1; tracker site 1): retrying a snapshot writes Company data, so it is OPERATIONAL work — admitted only while the Company is READY and re-checked here
+        // at execution time (a Company suspended after this sweep's list was built is skipped; the rest of the sweep continues).
+        const admission = await runOperationalAdmitted(this.platform, this.connections, companyId, async (dataSource) => {
+          await this.snapshots.retryPending(dataSource.manager);
+          const overdue = await this.snapshots.detectOverdue(10, dataSource.manager);
+          if (overdue.length > 0) {
+            this.logger.warn(`Closing Snapshot recovery sweep — Company ${companyId}: ${overdue.length} run(s) still overdue after retry.`);
+          }
+        });
+        if (!admission.admitted) this.logger.log(`Closing Snapshot recovery sweep skipped for Company ${companyId}: not READY.`);
       } catch (err) {
         this.logger.error(`Closing Snapshot recovery sweep failed for Company ${companyId}`, err instanceof Error ? err.stack : String(err));
       }

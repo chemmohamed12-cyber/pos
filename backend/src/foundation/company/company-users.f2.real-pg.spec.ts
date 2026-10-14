@@ -326,7 +326,7 @@ describe('F2 — Company Users, invitations, multi-role (real Postgres, two Comp
     await cp.query(`UPDATE user_company_memberships SET "roleKey"='stale' WHERE "userId"=$1 AND "companyId"=$2`, [ida, h.companyAId]);
     const op = await ops.start(ida, h.companyAId, 'role_set', 'stale', null, { targetRoleKeys: ['sales.manager'] });
     await ops.markFailed(op.id, 'simulated mirror failure');
-    const sched = new MembershipReconciliationScheduler(ops, memberships, h.connections, audit);
+    const sched = new MembershipReconciliationScheduler(ops, memberships, h.connections, audit, h.controlPlane);
     await sched.runOnce();
     expect((await memberships.findByUserAndCompany(ida, h.companyAId))?.roleKey).toBe('sales.manager');
     expect(await rolesOf(dsA, ida)).toEqual(['sales.manager']); // authority untouched by the reconciler
