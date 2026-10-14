@@ -243,6 +243,20 @@ describe('T-30 — N-02 sibling probes (WP-INV-09): relocation, reference releas
         result(e, 'S4-A-plain-manager-employee-creation-respects-cap', empRows === 5 && (await counter('hr.max_employees')) === 5 && empOuts.filter((o) => o.ok).length === 5 && empOuts.filter((o) => !o.ok).every((o) => o.kind === 'ConflictException:409') ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail['S4-employees']));
       }
 
+      // ================= S6 audit and ledger consistency after everything above (rollbacks, failed relocations, concurrent writers) — TASK 2 of the post-C14 sequence =================
+      {
+        const chain = await e.audit.verifyCompanyChain(e.manager);
+        const auditRows = await sum(`SELECT count(*)::int AS n FROM audit_records`, []);
+        const relocatedAudit = await sum(`SELECT count(*)::int AS n FROM audit_records WHERE action = 'inventory.reservation.relocated'`, []);
+        const probeTransfers = await sum(`SELECT count(*)::int AS n FROM stock_movements WHERE "movementType" = 'transfer_out' AND "referenceType" = 'probe'`, []);
+        const releasedAudit = await sum(`SELECT count(*)::int AS n FROM audit_records WHERE action = 'inventory.reservation.released'`, []);
+        const releasedOrFulfilled = await sum(`SELECT count(*)::int AS n FROM stock_reservations WHERE status = 'released'`, []);
+        detail['S6'] = { chainValid: chain.valid, auditRows, relocatedAudit, probeTransfers, releasedAudit, reservationsReleased: releasedOrFulfilled };
+        result(e, 'S6-A-audit-chain-valid-after-all-rollbacks-failures-and-concurrent-writers', chain.valid && auditRows > 0 ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail['S6']));
+        // every committed relocation has exactly one transfer-out movement and one audit row; rolled-back or refused ones left neither
+        result(e, 'S6-B-relocation-audit-rows-equal-transfer-movements', relocatedAudit === probeTransfers ? 'PASS' : 'FAIL-DEFECT', JSON.stringify(detail['S6']));
+      }
+
       record(e, 'T-30-detail.json', detail);
       await finishBiz(e);
     } catch (err) {
