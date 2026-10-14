@@ -1,0 +1,17 @@
+{
+  "tag": "biz-t12-T-12-20261014T051418Z-d5df20-r2",
+  "waiting": 1,
+  "matching": 1,
+  "killedRows": 1,
+  "outcome": {
+    "ok": false,
+    "kind": "QueryFailedError",
+    "message": "terminating connection due to administrator command",
+    "pgCode": "57P01"
+  },
+  "state": "approved",
+  "movements": 0,
+  "onHandBefore": 4,
+  "onHandAfter": 4,
+  "fingerprintDiff": []
+}

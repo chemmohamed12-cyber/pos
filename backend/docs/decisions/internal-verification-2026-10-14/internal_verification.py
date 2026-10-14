@@ -146,8 +146,9 @@ check('IV-08', 'The isolation regression list only grew (no entry removed)', old
 def biz_steps(rev):
     return re.findall(r"\['(T-\d\d(?:\+T-\d\d)?|F-[A-Z]+-\d+)', '", show(rev, 'backend/tools/testing/biz-run.js'))
 now, base_steps = biz_steps(COMMIT), biz_steps(BASE)
-check('IV-09', 'biz-run.js keeps the order of every existing step; T-30 is the only addition and follows T-29',
-      [x for x in now if x != 'T-30'] == base_steps and 'T-30' in now and now.index('T-30') == now.index('T-29') + 1, {'base_steps': len(base_steps), 'now_steps': len(now), 'T-30_after': now[now.index('T-30') - 1] if 'T-30' in now else None})
+check('IV-09', 'biz-run.js keeps the order of every existing step; T-30 (and, from the C15 work, T-31) are the only additions and follow T-29 in order',
+      [x for x in now if x not in ('T-30', 'T-31')] == base_steps and 'T-30' in now and now.index('T-30') == now.index('T-29') + 1 and ('T-31' not in now or now.index('T-31') == now.index('T-30') + 1),
+      {'base_steps': len(base_steps), 'now_steps': len(now), 'added': [x for x in now if x in ('T-30', 'T-31')]})
 
 # IV-10 the C14 correction changes only the three named methods in inventory.service.ts
 inv = 'backend/src/domains/inventory-warehouse/application/inventory.service.ts'

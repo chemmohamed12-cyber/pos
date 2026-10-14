@@ -1,0 +1,89 @@
+{
+  "healthy": {
+    "rows": [
+      {
+        "seq": 1,
+        "prev10": "0000000000",
+        "hash10": "aa4fbfc0a7"
+      },
+      {
+        "seq": 2,
+        "prev10": "aa4fbfc0a7",
+        "hash10": "5d3a1f626f"
+      },
+      {
+        "seq": 3,
+        "prev10": "5d3a1f626f",
+        "hash10": "29ce5722cf"
+      }
+    ],
+    "chainValid": true,
+    "brokenAtSeq": null,
+    "sequenceLastValue": 3
+  },
+  "L1": {
+    "append": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 3, nextSeq 2); no audit record written; realign the sequence under change control"
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "aa4fbfc0a7"
+        },
+        {
+          "seq": 2,
+          "prev10": "aa4fbfc0a7",
+          "hash10": "5d3a1f626f"
+        },
+        {
+          "seq": 3,
+          "prev10": "5d3a1f626f",
+          "hash10": "29ce5722cf"
+        }
+      ],
+      "chainValid": true,
+      "brokenAtSeq": null,
+      "sequenceLastValue": 1
+    }
+  },
+  "L2": {
+    "importedSeq": 103,
+    "chainValidBeforeAppend": true,
+    "append": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 103, nextSeq 4); no audit record written; realign the sequence under change control"
+    },
+    "after": {
+      "rows": [
+        {
+          "seq": 1,
+          "prev10": "0000000000",
+          "hash10": "aa4fbfc0a7"
+        },
+        {
+          "seq": 2,
+          "prev10": "aa4fbfc0a7",
+          "hash10": "5d3a1f626f"
+        },
+        {
+          "seq": 3,
+          "prev10": "5d3a1f626f",
+          "hash10": "29ce5722cf"
+        },
+        {
+          "seq": 103,
+          "prev10": "29ce5722cf",
+          "hash10": "25a51b9472"
+        }
+      ],
+      "chainValid": true,
+      "brokenAtSeq": null,
+      "sequenceLastValue": 3
+    }
+  }
+}
