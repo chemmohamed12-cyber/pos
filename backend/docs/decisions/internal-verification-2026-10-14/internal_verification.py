@@ -9,9 +9,10 @@ NEVER recorded as an independent acceptance.
 import hashlib, json, re, subprocess, sys
 
 REPO, COMMIT = sys.argv[1], sys.argv[2]
+COMMIT_HAS_C15 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '9a693fc', COMMIT], capture_output=True).returncode == 0
 COMMIT_HAS_C14 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '354d0f7', COMMIT], capture_output=True).returncode == 0
 BASE = 'e5b8e2a'  # HEAD at the start of the 2026-10-13 closing directive (before d3ad24b / 8ec6de4)
-PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)', '354d0f7': 'C14 remediation (inventory.service.ts + T-30)'}
+PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)', '354d0f7': 'C14 remediation (inventory.service.ts + T-30)', '9a693fc': 'C15 remediation (payments.service.ts + T-31)'}
 
 
 def git(*a, raw=False):
@@ -109,6 +110,7 @@ for c, what in PROGRAM_CODE_COMMITS.items():
 allowed = {  # production paths each program commit is authorised to touch (CTO authorisations of 2026-10-13 and 2026-10-14)
     'd3ad24b': {'backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts'},
     '354d0f7': {'backend/src/domains/inventory-warehouse/application/inventory.service.ts'},
+    '9a693fc': {'backend/src/domains/customer-finance/application/payments.service.ts'},
 }
 unexpected = {c: [x for x in v['production_paths_touched'] if x not in allowed.get(c, set())] for c, v in prod_touched.items()}
 check('IV-05', 'Program code commits change no production source other than the authorised template data row', not any(unexpected.values()), prod_touched)
@@ -172,6 +174,21 @@ if COMMIT_HAS_C14:
     t30_old, t30_new = show('d68fd10', 'backend/src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts'), show('354d0f7', 'backend/src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts')
     ids_old = set(re.findall(r"result\(e, `?'?([A-Za-z0-9-]+)", t30_old)); ids_new = set(re.findall(r"result\(e, `?'?([A-Za-z0-9-]+)", t30_new))
     check('IV-10c', 'T-30 keeps every original case id and expectation count; the correction only adds cases', ids_old <= ids_new and t30_new.count("'PASS' : 'FAIL-DEFECT'") >= t30_old.count("'PASS' : 'FAIL-DEFECT'"), {'ids_before': len(ids_old), 'ids_after': len(ids_new)})
+
+# IV-11 the C15 correction changes only recordPayment / recordOnAccountPayment in payments.service.ts, replacing exactly the two plain-manager transaction lines
+if COMMIT_HAS_C15:
+    pay = 'backend/src/domains/customer-finance/application/payments.service.ts'
+    dd = git('diff', '-U0', '9a693fc^', '9a693fc', '--', pay)
+    hunks = [l for l in dd.split('\n') if l.startswith('@@')]
+    removed = [l for l in dd.split('\n') if l.startswith('-') and not l.startswith('---')]
+    added_code = [l for l in dd.split('\n') if l.startswith('+') and not l.startswith('+++') and not l.strip().lstrip('+').strip().startswith('//')]
+    check('IV-11a', 'The C15 diff to payments.service.ts has exactly two hunks and removes exactly the two lines `manager ? await run(manager) : await this.dataSource.transaction(run)`',
+          len(hunks) == 2 and len(removed) == 2 and all('manager ? await run(manager) : await this.dataSource.transaction(run)' in l for l in removed), {'hunks': hunks, 'removed': [l.strip() for l in removed]})
+    check('IV-11b', 'The only non-comment lines added are `const saved = await runInTransaction(this.dataSource, manager, run);` (twice)',
+          len(added_code) == 2 and all('const saved = await runInTransaction(this.dataSource, manager, run);' in l for l in added_code), {'added_code_lines': [l.strip() for l in added_code]})
+    t_old, t_new = show('d4bda3b', 'backend/src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts'), show('9a693fc', 'backend/src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts')
+    ids_o = set(re.findall(r"result\(e, [`'](P\d[A-Za-z0-9-]*)", t_old)); ids_n = set(re.findall(r"result\(e, [`'](P\d[A-Za-z0-9-]*)", t_new))
+    check('IV-11c', 'T-31 keeps every earlier case id and only adds cases (P4, P5)', ids_o <= ids_n and len(ids_n) > len(ids_o), {'before': sorted(ids_o), 'after_new': sorted(ids_n - ids_o)})
 
 summary = {'commit': COMMIT, 'baseline': BASE, 'checks': len(results), 'pass': sum(r['result'] == 'PASS' for r in results), 'fail': sum(r['result'] == 'FAIL' for r in results),
            'label': 'INTERNAL VERIFICATION (implementation-team automated checks) — NOT an independent review'}
