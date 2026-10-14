@@ -1,0 +1,8 @@
+{
+  "outcome": {
+    "ok": false,
+    "kind": "ConflictException:409",
+    "message": "Insufficient stock for 1 line(s) — nothing was posted: T01-P2 (T01-P2 Product): requested 9, available 5, short by 4"
+  },
+  "fingerprintDiff": []
+}

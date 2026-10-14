@@ -1,0 +1,345 @@
+{
+  "S1-plain": [
+    {
+      "round": 0,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 1,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 2,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 3,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    }
+  ],
+  "S1-transaction": [
+    {
+      "round": 0,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 1,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 2,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    },
+    {
+      "round": 3,
+      "reserved": 5,
+      "calls": 8,
+      "ok": 5,
+      "tally": {
+        "OK": 5,
+        "ConflictException:409": 3
+      },
+      "activeAtW1": 0,
+      "activeAtW2": 5,
+      "onHandW1": 0,
+      "onHandW2": 5,
+      "transferOut": 5,
+      "transferIn": 5,
+      "auditRows": 5,
+      "negativeStock": 0
+    }
+  ],
+  "S1-C-rollback": {
+    "rolledBack": true,
+    "before": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "aud": 0
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "aud": 0
+    }
+  },
+  "S1-C-partial-plain": {
+    "refused": true,
+    "outcome": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "insert or update on table \"stock_reservations\" violates foreign key constraint \"stock_reservations_warehouseId_fkey\"",
+      "pgCode": "23503",
+      "detail": "Key (warehouseId)=(3ff9d2bf-55b8-4782-a314-51a272c49696) is not present in table \"warehouses\"."
+    },
+    "before": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "reservationsAtMissingWarehouse": 0
+  },
+  "S1-C-partial-transaction": {
+    "refused": true,
+    "outcome": {
+      "ok": false,
+      "kind": "QueryFailedError",
+      "message": "insert or update on table \"stock_reservations\" violates foreign key constraint \"stock_reservations_warehouseId_fkey\"",
+      "pgCode": "23503",
+      "detail": "Key (warehouseId)=(a172ab2f-3537-4e8c-8fc1-333b5a5d7728) is not present in table \"warehouses\"."
+    },
+    "before": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "after": {
+      "rows": "[{\"warehouseId\":\"2711b792-4437-40e2-9097-cc56248a8edc\",\"quantity\":5,\"status\":\"active\"}]",
+      "out": 0,
+      "inn": 0,
+      "onHand": 5
+    },
+    "reservationsAtMissingWarehouse": 0
+  },
+  "S1-D-plain": {
+    "tally": {
+      "OK": 14,
+      "ConflictException:409": 2
+    },
+    "deadlocks": 0,
+    "unexpectedFailures": [],
+    "o1Total": 5,
+    "o2Total": 5,
+    "o3Reserved": 4,
+    "onHandTotal": 20,
+    "negativeStock": 0
+  },
+  "S1-D-transaction": {
+    "tally": {
+      "OK": 14,
+      "ConflictException:409": 2
+    },
+    "deadlocks": 0,
+    "unexpectedFailures": [],
+    "o1Total": 5,
+    "o2Total": 5,
+    "o3Reserved": 4,
+    "onHandTotal": 20,
+    "negativeStock": 0
+  },
+  "S2-plain": {
+    "reserved": 5,
+    "calls": 12,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    },
+    "stillActive": 0,
+    "onHandDelta": 0,
+    "auditRows": 5
+  },
+  "S2-transaction": {
+    "reserved": 5,
+    "calls": 12,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    },
+    "stillActive": 0,
+    "onHandDelta": 0,
+    "auditRows": 5
+  },
+  "S2-rollback": {
+    "rolledBack": true,
+    "activeAfterRollback": 5,
+    "retryOk": true,
+    "activeEnd": 2
+  },
+  "S3-plain": {
+    "calls": 8,
+    "ok": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    },
+    "status": "released",
+    "releasedAuditRows": 1
+  },
+  "S3-transaction": {
+    "calls": 8,
+    "ok": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    },
+    "status": "released",
+    "releasedAuditRows": 1
+  },
+  "S3-C-plain": {
+    "releaseOk": 1,
+    "fulfilOk": 0,
+    "status": "released",
+    "dispatches": 0,
+    "onHandDelta": 0,
+    "releasedAuditRows": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    }
+  },
+  "S3-C-transaction": {
+    "releaseOk": 1,
+    "fulfilOk": 0,
+    "status": "released",
+    "dispatches": 0,
+    "onHandDelta": 0,
+    "releasedAuditRows": 1,
+    "tally": {
+      "OK": 1,
+      "ConflictException:409": 7
+    }
+  },
+  "S3-D-rollback": {
+    "rolledBack": true,
+    "statusAfterRollback": "active",
+    "retryOk": true,
+    "auditRows": 1
+  },
+  "S4-customers": {
+    "cap": 5,
+    "calls": 10,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "rows": 5,
+    "counter": 5
+  },
+  "S4-employees": {
+    "cap": 5,
+    "calls": 10,
+    "ok": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 5
+    },
+    "rows": 5,
+    "counter": 5
+  },
+  "S6": {
+    "chainValid": true,
+    "auditRows": 306,
+    "relocatedAudit": 60,
+    "probeTransfers": 60,
+    "releasedAudit": 5,
+    "reservationsReleased": 19
+  }
+}

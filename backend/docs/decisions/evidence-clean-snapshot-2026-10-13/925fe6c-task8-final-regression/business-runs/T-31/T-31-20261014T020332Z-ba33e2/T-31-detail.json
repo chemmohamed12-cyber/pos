@@ -1,0 +1,70 @@
+{
+  "P1-plain": [
+    {
+      "round": 0,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "paidTotal": 60,
+      "invoiceTotal": 100
+    },
+    {
+      "round": 1,
+      "calls": 8,
+      "ok": 8,
+      "tally": {
+        "OK": 8
+      },
+      "paidTotal": 480,
+      "invoiceTotal": 100
+    },
+    {
+      "round": 2,
+      "calls": 8,
+      "ok": 8,
+      "tally": {
+        "OK": 8
+      },
+      "paidTotal": 480,
+      "invoiceTotal": 100
+    }
+  ],
+  "P1-transaction": [
+    {
+      "round": 0,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "paidTotal": 60,
+      "invoiceTotal": 100
+    },
+    {
+      "round": 1,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "paidTotal": 60,
+      "invoiceTotal": 100
+    },
+    {
+      "round": 2,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "paidTotal": 60,
+      "invoiceTotal": 100
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "testId": "T-18",
+  "runId": "T-18-20261014T020409Z-9da4d8",
+  "finishedAt": "2026-10-14T02:04:23.815Z",
+  "results": [
+    {
+      "id": "T-18-entity-to-schema",
+      "status": "FAIL-DEFECT",
+      "note": "739 statement(s) the schema builder would need; first: ALTER TABLE \"user_roles\" DROP CONSTRAINT \"user_roles_roleId_fkey\""
+    },
+    {
+      "id": "T-18-schema-to-entity-tables",
+      "status": "FAIL-DEFECT",
+      "note": "36 table(s) without an entity: _daii_bootstrap_check, backup_artifacts, backup_operations, backup_runs, companies, company_backup_settings, company_invitations, company_plan_assignments, config_keys, config_values, credentials, data_repair_runs"
+    },
+    {
+      "id": "T-18-schema-to-entity-columns",
+      "status": "PASS",
+      "note": "0 column(s) without an entity property: "
+    },
+    {
+      "id": "T-18-control-plane-structural",
+      "status": "FAIL-DEFECT",
+      "note": "34 platform entities; 99 statement(s), 5 structural: CREATE TABLE \"integration_sync_logs\" (\"id\" uuid NOT NULL DEFAULT uuid_generate_v4(), \"connectorId\" uuid NOT NULL, \"direction\" character varying(16) NOT NULL, \"eventType\" character varying(64) NOT NULL, \"externalReference\" character varying(128), \"status\" character varying(16) NOT NULL, \"detail\" text | CREATE TABLE \"integration_product_mappings\" (\"id\" uuid NOT NULL DEFAULT uuid_generate_v4(), \"connectorId\" uuid NOT NULL, \"daiiProductId\" uuid NOT NULL, \"externalProductId\" character varying(128) NOT NULL, \"lastSyncedAt\" TIMESTAMP WITH TIME ZONE, \"updatedAt\" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT  | CREATE TABLE \"integration_credentials\" (\"id\" uuid NOT NULL DEFAULT uuid_generate_v4(), \"connectorId\" uuid NOT NULL, \"encryptedValue\" text NOT NULL, \"revoked\" boolean NOT NULL DEFAULT false, \"createdAt\" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), \"revokedAt\" TIMESTAMP WITH TIME ZONE, CONSTRAINT  | CREATE TABLE \"integration_connectors\" (\"id\" uuid NOT NULL DEFAULT uuid_generate_v4(), \"connectorType\" character varying(32) NOT NULL, \"name\" character varying(255) NOT NULL, \"status\" character varying(16) NOT NULL DEFAULT 'pending', \"config\" jsonb NOT NULL DEFAULT '{}', \"lastConnectedAt\" TIMESTAMP W | ALTER TABLE \"credentials\" ALTER COLUMN \"passwordChangedAt\" DROP DEFAULT"
+    }
+  ]
+}

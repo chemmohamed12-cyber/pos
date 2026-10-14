@@ -1,0 +1,5 @@
+{
+  "customerLedgerNet": "-10000.00",
+  "glArNet": "-10000.0000",
+  "note": "seeded posted invoices (direct inserts) have no ledger/GL rows by construction; R3 is evaluated in T-10 on the declared baseline"
+}

@@ -1,0 +1,17 @@
+{
+  "testId": "T-31",
+  "runId": "T-31-20261014T020332Z-ba33e2",
+  "finishedAt": "2026-10-14T02:03:45.569Z",
+  "results": [
+    {
+      "id": "P1-A-plain-manager-concurrent-payments-never-overpay",
+      "status": "FAIL-DEFECT",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"paidTotal\":60,\"invoiceTotal\":100},{\"round\":1,\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"paidTotal\":480,\"invoiceTotal\":100},{\"round\":2,\"calls\":8,\"ok\":8,\"tally\":{\"OK\":8},\"paidTotal\":480,\"invoiceTotal\":100}]"
+    },
+    {
+      "id": "P1-B-transaction-manager-concurrent-payments-never-overpay",
+      "status": "PASS",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"paidTotal\":60,\"invoiceTotal\":100},{\"round\":1,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"paidTotal\":60,\"invoiceTotal\":100},{\"round\":2,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"paidTotal\":60,\"invoiceTotal\":100}]"
+    }
+  ]
+}

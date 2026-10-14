@@ -1,0 +1,86 @@
+{
+  "testId": "T-06",
+  "runId": "T-06-20261014T014415Z-2ad831",
+  "finishedAt": "2026-10-14T01:44:27.660Z",
+  "results": [
+    {
+      "id": "T-06-1-sequential",
+      "status": "PASS",
+      "note": "{\"payments\":1,\"treasuryRows\":1,\"treasuryTotal\":\"400.00\",\"ledgerEntries\":1,\"remaining\":\"600.00\",\"gl\":{\"status\":\"POSTED\",\"lines\":[\"1102 D 400.00\",\"1110 C 400.00\"]}}"
+    },
+    {
+      "id": "T-06-2-concurrent",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":5},\"effects\":{\"payments\":1,\"treasuryRows\":1,\"treasuryTotal\":\"400.00\",\"ledgerEntries\":1,\"remaining\":\"600.00\",\"gl\":{\"status\":\"POSTED\",\"lines\":[\"1102 D 400.00\",\"1110 C 400.00\"]}}}"
+    },
+    {
+      "id": "T-06-3-different-key",
+      "status": "PASS",
+      "note": "{\"out3\":{\"ok\":true,\"kind\":\"OK\"},\"eff3\":{\"payments\":2,\"treasuryRows\":2,\"treasuryTotal\":\"800.00\",\"ledgerEntries\":2,\"remaining\":\"200.00\",\"gl\":{\"status\":\"POSTED\",\"lines\":[\"1102 D 400.00\",\"1110 C 400.00\"]}}}"
+    },
+    {
+      "id": "T-06x-INFO",
+      "status": "FAIL-DEFECT",
+      "note": "treasury cash-in with the SAME idempotency key sent 5x concurrently produced 5 treasury movement(s) (INFORMATIONAL — outside the frozen T-06 scope)"
+    },
+    {
+      "id": "T-06y-CONTROLLER",
+      "status": "PASS",
+      "note": "TreasuryController.cashIn, same Idempotency-Key 5x concurrently: 1 movement(s), 1 distinct result id(s); different key: 1 movement"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-06/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":0,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-06/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-06/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":-1200,\"glArNet\":-1200}"
+    },
+    {
+      "id": "T-10/T-06/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-06/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":6270,\"declaredNonGlTreasury\":5000,\"expectedGl\":1270,\"glNet\":1270}"
+    },
+    {
+      "id": "T-10/T-06/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-06/R7",
+      "status": "PASS",
+      "note": "{\"events\":10,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-06/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-06/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 5000.00 funding cash-in is deliberately non-emitting"
+    },
+    {
+      "id": "T-10/T-06/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}
