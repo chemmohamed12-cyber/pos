@@ -1,0 +1,15 @@
+# Release 1.1.8 — addendum (2026-10-10)
+
+**Package:** `D:\DAII-LOCAL-DEPLOY\release-out\Daii-Release-v1.1.8-2026-10-10.zip` (the name carries the build date, which crossed midnight) — SHA-256 `5c7a15d16acb66418b584c5bd37e71c2219e41f2dd202b2be943fca278c0d45c` (4 976 077 bytes). Built from commit `0039e8e` (`VERIFY: PASSED`, 288 migrations, secret scan clean). Not deployed.
+1.1.8 = 1.1.7 (deployed on the host 2026-10-10 with the one-time engine hotfix) + two fixes found on the host:
+1. **`COMPANY_DB_POOL`** (`127989d`): the host's environment editor delivered `["a","b","c"]` as `[a,b,c]`; JSON.parse threw a plain Error → "An unexpected error occurred" (host log 7:53 PM EDT: `Config COMPANY_DB_POOL is not valid JSON`). The pool now accepts a JSON array or a plain list (quotes optional); every entry must be a plain database identifier; a bad value answers `422 COMPANY_DB_POOL_INVALID` naming the entry, before anything is allocated or created. 6 parser cases + 1 controller case.
+2. **Other list-like environment values** (`0039e8e`): `RELEASE_HEALTH_ENDPOINTS` / `RELEASE_SMOKE_GET_ENDPOINTS` accept a plain list; `ENTITLEMENT_PUBLIC_KEYS` (JSON objects, cannot survive quote stripping) also accepts `base64:<json>` and its error names that form. Review covered every JSON-parsing config value; `configuration-engine` json values come from the database, not the environment. 6 cases.
+
+## Regression (HEAD `0039e8e`, isolated PostgreSQL 5544, SERIAL `--runInBand`)
+**189 suites passed, 0 failed, 1 skipped (190) · 1321 tests passed, 0 failed, 1 skipped (1322).** Skipped by design: `t0-clean-company-baseline`.
+- `grni-posting`: passes outside the 00:00–03:00 Cairo window (re-run 03:05: 2/2) — confirms the earlier failure was the known day-boundary defect, not a regression.
+- A first, PARALLEL run gave 187 passed / 2 failed (`wip-reconciliation`, `closing-snapshot-key-rotation`; 3 tests). Classified **test-isolation defect, pre-existing**: both pass alone (2 serial runs, 8/8) and `wip-reconciliation` fails 2 of 3 times when run in parallel with the work-order specs on the same shared ambient database (they measure deltas on a shared WIP account). The authorization closure used `--runInBand` for this reason. Follow-up: run those suites without parallelism in the regression pipeline (tests unchanged).
+- An earlier invalid run (109 suites `ECONNREFUSED`, PostgreSQL stopped by a machine interruption) was discarded and repeated.
+
+## Open (unchanged, need host evidence or a decision)
+Audit chain break at production `seq 1`; secrets rotation (JWT_REFRESH_SECRET equals INTEGRATION_ENCRYPTION_KEY; counts of `database_credentials` / `integration_credentials` decide whether the two encryption keys can be rotated); four bare `PROVISIONING` Companies (no database) — not to be touched without an approved plan; pool mode first real-host acceptance; SQL statements per request unmeasured; task 1.1.9: staging lifecycle/retention (`release-staging`), async deploy, `MEDIA_STORAGE_PATH` off-tree.
