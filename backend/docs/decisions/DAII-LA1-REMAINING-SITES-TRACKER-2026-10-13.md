@@ -50,6 +50,9 @@ A re-inventory of `connections.getDataSource(` in production source finds **four
 
 ## Disposition (2026-10-14, "Finalization" directive): every site classified; no source change made
 Basis: `la1-inventory-2026-10-14/inventory.json` (run on `925fe6c`; the source is unchanged since), the tracker table above, and the decisions register (C7/O6, Q-L1…Q-L3). **No recorded decision authorises wiring any site** (owners unassigned, DEC-19; Q-L1…Q-L3 open; the Event Engine needs its own approval), so **no LA-1 source change was made** — "authorised local corrections" is the empty set today. Classes: **R** = ready to wire the moment the CTO authorises it (the pattern is fixed by the tracker and the wired reference sites; no open design question) · **D** = needs a design answer first · **X** = expected or excluded, no correction · **C** = classification question for the owners.
+## Status update (2026-10-14, after the CTO authorisation of sites 1, 5, 6, 7): IMPLEMENTED at `4a42dc3` (author-verified)
+Sites **#1** (`closing-snapshot-recovery.scheduler.ts`), **#5**, **#6**, **#7** (`membership-reconciliation.scheduler.ts`) of the Disposition table above now run through `runOperationalAdmitted`; a non-READY Company is deferred with its operation untouched. Evidence: `la1-layer2-sites-1-5-6-7.real-pg.spec.ts` (11 cases, red-first 8 failing on the unwired code) and the clean snapshot `evidence-clean-snapshot-2026-10-13/4a42dc3-la1-sites-1-5-6-7/` (CI PASS; isolation 628 passed / 21 failed in the known blocked spec / 1 skipped; business suite equals the baseline); internal checklist 27/27. **Remaining: 10 unadmitted acquisitions in 7 files** (#2, #3, #4, #8, #9, #10, #11, #12, #13 need a design answer; #14 needs a classification); 7 of 17 acquisitions are wired in total. LA-1 is not closed.
+
 **A. Connection-manager acquisitions without admission — 14 sites in 9 files**
 | # | Site | What it does | Class | Needs |
 |---|---|---|---|---|

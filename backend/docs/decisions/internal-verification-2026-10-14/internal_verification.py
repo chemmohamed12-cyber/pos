@@ -9,10 +9,11 @@ NEVER recorded as an independent acceptance.
 import hashlib, json, re, subprocess, sys
 
 REPO, COMMIT = sys.argv[1], sys.argv[2]
+COMMIT_HAS_LA1 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '4a42dc3', COMMIT], capture_output=True).returncode == 0
 COMMIT_HAS_C15 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '9a693fc', COMMIT], capture_output=True).returncode == 0
 COMMIT_HAS_C14 = subprocess.run(['git', '-C', REPO, 'merge-base', '--is-ancestor', '354d0f7', COMMIT], capture_output=True).returncode == 0
 BASE = 'e5b8e2a'  # HEAD at the start of the 2026-10-13 closing directive (before d3ad24b / 8ec6de4)
-PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)', '354d0f7': 'C14 remediation (inventory.service.ts + T-30)', '9a693fc': 'C15 remediation (payments.service.ts + T-31)'}
+PROGRAM_CODE_COMMITS = {'4dc3862': 'teardown retry (test harness)', 'd3ad24b': 'wages_payable template + spec', '8ec6de4': 'T1 lockfile', 'd68fd10': 'T-30 sibling probes (test only)', '354d0f7': 'C14 remediation (inventory.service.ts + T-30)', '9a693fc': 'C15 remediation (payments.service.ts + T-31)', '4a42dc3': 'LA-1 sites 1, 5, 6, 7 (two schedulers + specs)'}
 
 
 def git(*a, raw=False):
@@ -111,6 +112,7 @@ allowed = {  # production paths each program commit is authorised to touch (CTO 
     'd3ad24b': {'backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts'},
     '354d0f7': {'backend/src/domains/inventory-warehouse/application/inventory.service.ts'},
     '9a693fc': {'backend/src/domains/customer-finance/application/payments.service.ts'},
+    '4a42dc3': {'backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts', 'backend/src/foundation/company/membership-reconciliation.scheduler.ts'},
 }
 unexpected = {c: [x for x in v['production_paths_touched'] if x not in allowed.get(c, set())] for c, v in prod_touched.items()}
 check('IV-05', 'Program code commits change no production source other than the authorised template data row', not any(unexpected.values()), prod_touched)
@@ -190,6 +192,19 @@ if COMMIT_HAS_C15:
     t_old, t_new = show('d4bda3b', 'backend/src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts'), show('9a693fc', 'backend/src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts')
     ids_o = set(re.findall(r"result\(e, [`'](P\d[A-Za-z0-9-]*)", t_old)); ids_n = set(re.findall(r"result\(e, [`'](P\d[A-Za-z0-9-]*)", t_new))
     check('IV-11c', 'T-31 keeps every earlier case id and only adds cases (P4, P5)', ids_o <= ids_n and len(ids_n) > len(ids_o), {'before': sorted(ids_o), 'after_new': sorted(ids_n - ids_o)})
+
+# IV-12 LA-1 sites 1, 5, 6, 7: no Company connection is acquired outside the admission helper in the two wired schedulers, and the helper is used the expected number of times
+if COMMIT_HAS_LA1:
+    f1 = show('4a42dc3', 'backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts')
+    f2 = show('4a42dc3', 'backend/src/foundation/company/membership-reconciliation.scheduler.ts')
+    code1, code2 = strip_comments(f1), strip_comments(f2)
+    check('IV-12a', 'Neither wired scheduler calls connections.getDataSource( directly any more (the acquisition happens inside runOperationalAdmitted)',
+          'connections.getDataSource(' not in code1 and 'connections.getDataSource(' not in code2, {'closing': code1.count('connections.getDataSource('), 'membership': code2.count('connections.getDataSource(')})
+    check('IV-12b', 'runOperationalAdmitted is used once in the closing-snapshot scheduler and three times (sites 5, 6, 7) in the membership scheduler',
+          code1.count('runOperationalAdmitted(') == 1 and code2.count('runOperationalAdmitted(') == 3, {'closing': code1.count('runOperationalAdmitted('), 'membership': code2.count('runOperationalAdmitted(')})
+    ch = [x for x in git('diff', '--name-only', '4a42dc3^', '4a42dc3').split('\n') if x]
+    prod = [x for x in ch if x.startswith('backend/src/') and not x.endswith('.spec.ts') and '/testing/' not in x]
+    check('IV-12c', 'The LA-1 commit changes exactly two production files', sorted(prod) == sorted(allowed['4a42dc3']), {'production_files': prod, 'all_files': ch})
 
 summary = {'commit': COMMIT, 'baseline': BASE, 'checks': len(results), 'pass': sum(r['result'] == 'PASS' for r in results), 'fail': sum(r['result'] == 'FAIL' for r in results),
            'label': 'INTERNAL VERIFICATION (implementation-team automated checks) — NOT an independent review'}

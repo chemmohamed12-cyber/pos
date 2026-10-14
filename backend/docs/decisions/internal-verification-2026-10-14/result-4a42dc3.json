@@ -1,0 +1,371 @@
+{
+ "summary": {
+  "commit": "4a42dc3",
+  "baseline": "e5b8e2a",
+  "checks": 27,
+  "pass": 27,
+  "fail": 0,
+  "label": "INTERNAL VERIFICATION (implementation-team automated checks) \u2014 NOT an independent review"
+ },
+ "results": [
+  {
+   "id": "IV-01a",
+   "requirement": "No production source calls setval (audit sequences are never realigned by code)",
+   "result": "PASS",
+   "observed": {
+    "files_with_setval": []
+   }
+  },
+  {
+   "id": "IV-01b",
+   "requirement": "No migration calls setval on an audit sequence",
+   "result": "PASS",
+   "observed": {
+    "migration_files_with_setval": []
+   }
+  },
+  {
+   "id": "IV-01c",
+   "requirement": "The audit writer uses nextval and a refusal path for sequence lag",
+   "result": "PASS",
+   "observed": {
+    "nextval": true,
+    "AUDIT_SEQUENCE_LAG_present": true
+   }
+  },
+  {
+   "id": "IV-02",
+   "requirement": "No production source UPDATEs or DELETEs audit_records",
+   "result": "PASS",
+   "observed": {
+    "files": []
+   }
+  },
+  {
+   "id": "IV-03a",
+   "requirement": "d3ad24b adds exactly one template account line (2150 wages_payable) and removes none",
+   "result": "PASS",
+   "observed": {
+    "added": [
+     "+    { code: '2150', nameEn: 'Wages Payable', nameAr: '\u0631\u0648\u0627\u062a\u0628 \u0648\u0623\u062c\u0648\u0631 \u0645\u0633\u062a\u062d\u0642\u0629', accountType: 'liability', parentCode: '21', controlFunction: 'wages_payable' },"
+    ],
+    "removed": []
+   }
+  },
+  {
+   "id": "IV-03b",
+   "requirement": "d3ad24b touches no payroll/commission/disbursement/handler production code",
+   "result": "PASS",
+   "observed": {
+    "files_changed": [
+     "backend/docs/decisions/WAGES-PAYABLE-CONTROL-ACCOUNT-TEMPLATE-2026-10-13.md",
+     "backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts",
+     "backend/src/domains/accounting/interface/wages-payable-control-account.company-isolation.spec.ts",
+     "backend/src/domains/payroll/application/payroll-gl-runtime-characterization.spec.ts",
+     "backend/tools/testing/regression-specs-all.txt"
+    ],
+    "suspect": []
+   }
+  },
+  {
+   "id": "IV-03c",
+   "requirement": "The template supplies exactly one wages_payable account",
+   "result": "PASS",
+   "observed": {}
+  },
+  {
+   "id": "IV-04a",
+   "requirement": "Every locked package resolves from https://registry.npmjs.org/",
+   "result": "PASS",
+   "observed": {
+    "packages": 917,
+    "non_registry": []
+   }
+  },
+  {
+   "id": "IV-04b",
+   "requirement": "Every locked package carries an integrity hash (sha512)",
+   "result": "PASS",
+   "observed": {
+    "missing": [],
+    "non_sha512": []
+   }
+  },
+  {
+   "id": "IV-04c",
+   "requirement": "package.json is byte-identical to its state before T1",
+   "result": "PASS",
+   "observed": {
+    "sha256_now": "d35e11dba5695dcf",
+    "sha256_before": "d35e11dba5695dcf"
+   }
+  },
+  {
+   "id": "IV-04d",
+   "requirement": "The 8 packages added by T1 are MIT-licensed",
+   "result": "PASS",
+   "observed": {
+    "added": [
+     [
+      "node_modules/@borewit/text-codec",
+      "0.2.2",
+      "MIT"
+     ],
+     [
+      "node_modules/@tokenizer/inflate",
+      "0.2.7",
+      "MIT"
+     ],
+     [
+      "node_modules/@tokenizer/token",
+      "0.3.0",
+      "MIT"
+     ],
+     [
+      "node_modules/fflate",
+      "0.8.3",
+      "MIT"
+     ],
+     [
+      "node_modules/file-type",
+      "20.4.1",
+      "MIT"
+     ],
+     [
+      "node_modules/strtok3",
+      "10.4.1",
+      "MIT"
+     ],
+     [
+      "node_modules/token-types",
+      "6.1.2",
+      "MIT"
+     ],
+     [
+      "node_modules/uint8array-extras",
+      "1.6.0",
+      "MIT"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "IV-04e",
+   "requirement": "The lock root declares the same dependency set as package.json",
+   "result": "PASS",
+   "observed": {}
+  },
+  {
+   "id": "IV-05",
+   "requirement": "Program code commits change no production source other than the authorised template data row",
+   "result": "PASS",
+   "observed": {
+    "4dc3862": {
+     "scope": "teardown retry (test harness)",
+     "production_paths_touched": []
+    },
+    "d3ad24b": {
+     "scope": "wages_payable template + spec",
+     "production_paths_touched": [
+      "backend/src/domains/accounting/domain/account-templates/ifrs-sme.template.ts"
+     ]
+    },
+    "8ec6de4": {
+     "scope": "T1 lockfile",
+     "production_paths_touched": []
+    },
+    "d68fd10": {
+     "scope": "T-30 sibling probes (test only)",
+     "production_paths_touched": []
+    },
+    "354d0f7": {
+     "scope": "C14 remediation (inventory.service.ts + T-30)",
+     "production_paths_touched": [
+      "backend/src/domains/inventory-warehouse/application/inventory.service.ts"
+     ]
+    },
+    "9a693fc": {
+     "scope": "C15 remediation (payments.service.ts + T-31)",
+     "production_paths_touched": [
+      "backend/src/domains/customer-finance/application/payments.service.ts"
+     ]
+    },
+    "4a42dc3": {
+     "scope": "LA-1 sites 1, 5, 6, 7 (two schedulers + specs)",
+     "production_paths_touched": [
+      "backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts",
+      "backend/src/foundation/company/membership-reconciliation.scheduler.ts"
+     ]
+    }
+   }
+  },
+  {
+   "id": "IV-06",
+   "requirement": "No program code commit modifies the DB guard or any guard class",
+   "result": "PASS",
+   "observed": {
+    "changed": {}
+   }
+  },
+  {
+   "id": "IV-07a",
+   "requirement": "No spec file was deleted since the baseline",
+   "result": "PASS",
+   "observed": {
+    "removed": []
+   }
+  },
+  {
+   "id": "IV-07b",
+   "requirement": "No program commit adds a skip/only marker to a spec",
+   "result": "PASS",
+   "observed": {
+    "added_markers": []
+   }
+  },
+  {
+   "id": "IV-08",
+   "requirement": "The isolation regression list only grew (no entry removed)",
+   "result": "PASS",
+   "observed": {
+    "before": 91,
+    "after": 95,
+    "removed": [],
+    "added": [
+     "src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts",
+     "src/domains/accounting/interface/wages-payable-control-account.company-isolation.spec.ts",
+     "src/foundation/company/la1-layer2-sites-1-5-6-7.real-pg.spec.ts",
+     "src/foundation/company/membership-reconciliation.scheduler.spec.ts"
+    ]
+   }
+  },
+  {
+   "id": "IV-09",
+   "requirement": "biz-run.js keeps the order of every existing step; T-30 (and, from the C15 work, T-31) are the only additions and follow T-29 in order",
+   "result": "PASS",
+   "observed": {
+    "base_steps": 27,
+    "now_steps": 29,
+    "added": [
+     "T-30",
+     "T-31"
+    ]
+   }
+  },
+  {
+   "id": "IV-10a",
+   "requirement": "The C14 diff to inventory.service.ts has only the three expected hunks",
+   "result": "PASS",
+   "observed": {
+    "hunks": [
+     "@@ -1350 +1350,3 @@ export class InventoryService implements InventoryReservationContract, Inventory",
+     "@@ -1354,20 +1356,31 @@ export class InventoryService implements InventoryReservationContract, Inventory",
+     "@@ -1510 +1523,2 @@ export class InventoryService implements InventoryReservationContract, Inventory"
+    ]
+   }
+  },
+  {
+   "id": "IV-10b",
+   "requirement": "Each C14 hunk lies inside one of the three named methods and no method signature changed",
+   "result": "PASS",
+   "observed": {
+    "enclosing_methods_of_hunks": [
+     "releaseReservation",
+     "releaseReservedQuantityForReference",
+     "relocateReservedStock"
+    ],
+    "signature_lines_changed": []
+   }
+  },
+  {
+   "id": "IV-10c",
+   "requirement": "T-30 keeps every original case id and expectation count; the correction only adds cases",
+   "result": "PASS",
+   "observed": {
+    "ids_before": 9,
+    "ids_after": 11
+   }
+  },
+  {
+   "id": "IV-11a",
+   "requirement": "The C15 diff to payments.service.ts has exactly two hunks and removes exactly the two lines `manager ? await run(manager) : await this.dataSource.transaction(run)`",
+   "result": "PASS",
+   "observed": {
+    "hunks": [
+     "@@ -172 +172,3 @@ export class PaymentsService {",
+     "@@ -260 +262,3 @@ export class PaymentsService {"
+    ],
+    "removed": [
+     "-    const saved = manager ? await run(manager) : await this.dataSource.transaction(run);",
+     "-    const saved = manager ? await run(manager) : await this.dataSource.transaction(run);"
+    ]
+   }
+  },
+  {
+   "id": "IV-11b",
+   "requirement": "The only non-comment lines added are `const saved = await runInTransaction(this.dataSource, manager, run);` (twice)",
+   "result": "PASS",
+   "observed": {
+    "added_code_lines": [
+     "+    const saved = await runInTransaction(this.dataSource, manager, run);",
+     "+    const saved = await runInTransaction(this.dataSource, manager, run);"
+    ]
+   }
+  },
+  {
+   "id": "IV-11c",
+   "requirement": "T-31 keeps every earlier case id and only adds cases (P4, P5)",
+   "result": "PASS",
+   "observed": {
+    "before": [
+     "P1-",
+     "P2-outer-rollback-leaves-no-payment-ledger-treasury-or-audit-trace",
+     "P3-audit-chain-valid-after-all-payment-probes"
+    ],
+    "after_new": [
+     "P4-",
+     "P5-"
+    ]
+   }
+  },
+  {
+   "id": "IV-12a",
+   "requirement": "Neither wired scheduler calls connections.getDataSource( directly any more (the acquisition happens inside runOperationalAdmitted)",
+   "result": "PASS",
+   "observed": {
+    "closing": 0,
+    "membership": 0
+   }
+  },
+  {
+   "id": "IV-12b",
+   "requirement": "runOperationalAdmitted is used once in the closing-snapshot scheduler and three times (sites 5, 6, 7) in the membership scheduler",
+   "result": "PASS",
+   "observed": {
+    "closing": 1,
+    "membership": 3
+   }
+  },
+  {
+   "id": "IV-12c",
+   "requirement": "The LA-1 commit changes exactly two production files",
+   "result": "PASS",
+   "observed": {
+    "production_files": [
+     "backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts",
+     "backend/src/foundation/company/membership-reconciliation.scheduler.ts"
+    ],
+    "all_files": [
+     "backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts",
+     "backend/src/domains/accounting/application/closing-snapshot-recovery.scheduler.ts",
+     "backend/src/foundation/company/company-membership-provisioning.real-pg.spec.ts",
+     "backend/src/foundation/company/company-users.f2.real-pg.spec.ts",
+     "backend/src/foundation/company/la1-layer2-sites-1-5-6-7.real-pg.spec.ts",
+     "backend/src/foundation/company/membership-reconciliation.scheduler.spec.ts",
+     "backend/src/foundation/company/membership-reconciliation.scheduler.ts",
+     "backend/tools/testing/regression-specs-all.txt"
+    ]
+   }
+  }
+ ]
+}

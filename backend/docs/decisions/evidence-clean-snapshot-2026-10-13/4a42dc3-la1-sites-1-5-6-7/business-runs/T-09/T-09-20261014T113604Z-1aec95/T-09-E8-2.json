@@ -1,0 +1,20 @@
+{
+  "request": {
+    "warehouseId": "ec31956c-1a8f-48e9-a567-08b66811a5b3",
+    "productId": "30d3e7bf-b92b-4bbd-928e-8421af4d0638",
+    "quantity": -1,
+    "movementType": "return"
+  },
+  "user": "f1db93a0-1653-4ae2-b8d6-313f6b11188a",
+  "status": 410,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "REQUEST_ERROR",
+      "message": "Movement type \"return\" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns)."
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

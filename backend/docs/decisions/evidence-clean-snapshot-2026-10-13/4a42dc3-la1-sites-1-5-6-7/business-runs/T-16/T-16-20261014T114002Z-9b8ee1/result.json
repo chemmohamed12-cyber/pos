@@ -1,0 +1,71 @@
+{
+  "testId": "T-16",
+  "runId": "T-16-20261014T114002Z-9b8ee1",
+  "finishedAt": "2026-10-14T11:45:09.781Z",
+  "results": [
+    {
+      "id": "T-16-integrity-oracle",
+      "status": "PASS",
+      "note": "{\"drainedEvents\":13,\"idempotencyProbe\":{\"keys\":15,\"httpOk\":45,\"storedEffects\":15,\"ok\":true},\"companyA\":{\"balErrors\":[],\"payRows\":1864,\"expectedPayments\":1864,\"onHandUnits\":1033,\"expectedReceiptUnits\":1033,\"unpostedEvents\":0,\"unbalancedJournals\":0,\"auditChainValid\":true,\"negativeStockPairs\":0,\"ok\":true},\"companyB\":{\"balErrors\":[],\"payRows\":1392,\"expectedPayments\":1392,\"onHandUnits\":825,\"expectedReceiptUnits\":825,\"unpostedEvents\":0,\"unbalancedJournals\":0,\"auditChainValid\":true,\"negativeStockPairs\":0,\"ok\":true}}"
+    },
+    {
+      "id": "T-16-measurements-recorded",
+      "status": "PASS",
+      "note": "phases=10; capacity NOT classified (targets unapproved)"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-16/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":40,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-16/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-16/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":-1864,\"glArNet\":-1864}"
+    },
+    {
+      "id": "T-10/T-16/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-16/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":8001898,\"declaredNonGlTreasury\":8000000,\"expectedGl\":1898,\"glNet\":1898}"
+    },
+    {
+      "id": "T-10/T-16/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-16/R7",
+      "status": "PASS",
+      "note": "{\"events\":3232,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-16/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-16/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 8 x 1000000.00 opening funding cash-ins are deliberately non-emitting (Company A); Company B verified by the oracle above"
+    },
+    {
+      "id": "T-10/T-16/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

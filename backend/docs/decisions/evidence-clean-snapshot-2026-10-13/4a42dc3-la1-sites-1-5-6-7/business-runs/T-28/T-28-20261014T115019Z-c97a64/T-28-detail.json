@@ -1,0 +1,88 @@
+{
+  "b0": {
+    "rows": 5,
+    "chainValid": true
+  },
+  "b8a": {
+    "ok": true,
+    "setvalStatements": 0,
+    "statements": 6
+  },
+  "b1": {
+    "append": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 6, nextSeq 2); no audit record written; realign the sequence under change control"
+    },
+    "rowsBefore": 6,
+    "rowsAfter": 6,
+    "sequenceBefore": "1/true",
+    "sequenceAfter": "1/true",
+    "chainValid": true,
+    "setvalStatements": 0
+  },
+  "b3": {
+    "allRefused": true,
+    "sequenceBefore": "1/true",
+    "sequenceAfter": "1/true",
+    "rows": 6
+  },
+  "b4": {
+    "refused": 20,
+    "other": [],
+    "rows": 6,
+    "sequenceAfter": "1/true"
+  },
+  "b6": {
+    "outer": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 6, nextSeq 2); no audit record written; realign the sequence under change control"
+    },
+    "rows": 6,
+    "sequenceAfter": "1/true"
+  },
+  "b5": {
+    "ok": 20,
+    "rows": 26,
+    "uniqueSeq": true,
+    "chainValid": true
+  },
+  "b2": {
+    "importedSeq": 126,
+    "chainValidBefore": true,
+    "append": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 126, nextSeq 27); no audit record written; realign the sequence under change control"
+    },
+    "repeatedAllRefused": true,
+    "rowsBefore": 27,
+    "rowsAfter": 27,
+    "importedRowUntouched": true,
+    "sequenceBefore": "26/true",
+    "sequenceAfter": "26/true"
+  },
+  "b5b": {
+    "append": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "newSeq": 127,
+    "chainValid": true
+  },
+  "b7": {
+    "append": {
+      "ok": false,
+      "kind": "AuditSequenceLagError",
+      "message": "AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 127, nextSeq 2); no audit record written; realign the sequence under change control"
+    },
+    "rowsIdentical": true,
+    "stillBroken": true,
+    "sequenceUnchanged": true
+  },
+  "b9": {
+    "inc": 1,
+    "cache": 1
+  }
+}

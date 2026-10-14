@@ -1,0 +1,82 @@
+{
+  "testId": "T-19",
+  "runId": "T-19-20261014T114606Z-40f545",
+  "finishedAt": "2026-10-14T11:46:20.437Z",
+  "results": [
+    {
+      "id": "T-19-customer.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-supplier.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-priceList.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":161,\"d\":161}"
+    },
+    {
+      "id": "T-19-salesRep.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-http-POST-customers",
+      "status": "PASS",
+      "note": "{\"total\":120,\"statuses\":{\"201\":120},\"distinctCodes\":120}"
+    },
+    {
+      "id": "T-19-N02-registerDocumentType-plain",
+      "status": "PASS",
+      "note": "{\"roundsWithErrors\":0,\"errors\":{},\"rows\":10}"
+    },
+    {
+      "id": "T-19-N02-registerDocumentType-transaction",
+      "status": "PASS",
+      "note": "{\"roundsWithErrors\":0,\"errors\":{},\"rows\":10}"
+    }
+  ]
+}

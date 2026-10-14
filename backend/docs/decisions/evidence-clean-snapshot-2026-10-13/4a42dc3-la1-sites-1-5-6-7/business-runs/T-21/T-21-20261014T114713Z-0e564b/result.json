@@ -1,0 +1,72 @@
+{
+  "testId": "T-21",
+  "runId": "T-21-20261014T114713Z-0e564b",
+  "finishedAt": "2026-10-14T11:47:24.650Z",
+  "results": [
+    {
+      "id": "A-plain-concurrent-duplicate-fulfilment",
+      "status": "PASS",
+      "note": "{\"callsOk\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"dispatchMovements\":1,\"onHandDelta\":-3,\"reservationStatus\":\"fulfilled\",\"reservedAfter\":0}"
+    },
+    {
+      "id": "A-transaction-concurrent-duplicate-fulfilment",
+      "status": "PASS",
+      "note": "{\"callsOk\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"dispatchMovements\":1,\"onHandDelta\":-3,\"reservationStatus\":\"fulfilled\",\"reservedAfter\":0}"
+    },
+    {
+      "id": "B-sequential-retries",
+      "status": "PASS",
+      "note": "{\"first\":true,\"retries\":[\"ConflictException:409\",\"ConflictException:409\",\"ConflictException:409\"],\"dispatchMovements\":1,\"onHand\":18}"
+    },
+    {
+      "id": "C-partial-failure-rolls-back-then-retry-once",
+      "status": "PASS",
+      "note": "{\"failedCall\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_movements\\\" violates foreign key constraint \\\"stock_movements_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(37a44073-325d-41d0-836d-e74f8d2955c1) is not present in table \\\"warehouses\\\".\"},\"afterFail\":{\"status\":\"active\",\"dispatchMovements\":0,\"onHand\":20,\"audit\":0},\"retry\":true,\"afterRetry\":{\"status\":\"fulfilled\",\"dispatchMovements\":1,\"onHand\":16}}"
+    },
+    {
+      "id": "D-outer-transaction-rollback",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"mid\":{\"status\":\"active\",\"dispatchMovements\":0,\"onHand\":20,\"reserved\":5},\"again\":true,\"end\":{\"status\":\"fulfilled\",\"dispatchMovements\":1,\"onHand\":15}}"
+    },
+    {
+      "id": "E-order-level-concurrent-fulfilment",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":4},\"dispatchMovementsPerProduct\":[1,1,1],\"onHandDelta\":[-2,-2,-2],\"reservationStatuses\":[{\"status\":\"fulfilled\",\"n\":3}]}"
+    },
+    {
+      "id": "E2-order-level-repeat-is-an-idempotent-noop",
+      "status": "PASS",
+      "note": "{\"first\":true,\"repeat\":true,\"afterFirst\":{\"movements\":1,\"onHand\":18},\"afterRepeat\":{\"movements\":1,\"onHand\":18}}"
+    },
+    {
+      "id": "F-different-reservations-all-succeed",
+      "status": "PASS",
+      "note": "{\"tally\":{\"OK\":6},\"movements\":[1,1,1,1,1,1]}"
+    },
+    {
+      "id": "I-overlapping-orders-no-deadlock",
+      "status": "PASS",
+      "note": "{\"rounds\":6,\"bothOk\":6,\"errors\":{},\"dispatchMovements\":24,\"expectedMovements\":24,\"deadlocks\":0,\"unexpectedErrors\":0}"
+    },
+    {
+      "id": "J-override-warehouse-overlapping-orders-no-deadlock",
+      "status": "PASS",
+      "note": "{\"rounds\":6,\"bothOk\":6,\"errors\":{},\"dispatchMovementsAtCustodyWarehouse\":24,\"expectedMovements\":24,\"deadlocks\":0,\"unexpectedErrors\":0}"
+    },
+    {
+      "id": "G-global-consistency",
+      "status": "PASS",
+      "note": "{\"fulfilledReservations\":63,\"dispatchMovements\":63,\"dispatchAuditRecords\":63,\"activeReservationsLeft\":0,\"negativeStockPairs\":0}"
+    },
+    {
+      "id": "H-audit-chain-valid-after-A-B-C",
+      "status": "PASS",
+      "note": "{\"afterA\":{\"valid\":true,\"brokenAtSeq\":null},\"afterATx\":{\"valid\":true,\"brokenAtSeq\":null},\"afterB\":{\"valid\":true,\"brokenAtSeq\":null},\"afterC\":{\"valid\":true,\"brokenAtSeq\":null}}"
+    },
+    {
+      "id": "H-audit-chain-after-D-rollback (F-AUD-003, not N-02)",
+      "status": "PASS",
+      "note": "{\"afterD\":{\"valid\":true,\"brokenAtSeq\":null},\"afterE\":{\"valid\":true,\"brokenAtSeq\":null}}"
+    }
+  ]
+}
