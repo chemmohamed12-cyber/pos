@@ -1,0 +1,178 @@
+diff --git a/backend/src/domains/inventory-warehouse/application/inventory.service.ts b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+index 5ea1e7f..4727dc5 100644
+--- a/backend/src/domains/inventory-warehouse/application/inventory.service.ts
++++ b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+@@ -726,6 +726,20 @@ export class InventoryService implements InventoryReservationContract, Inventory
+     return { requested: unique.length, assigned: inserted.length, alreadyAssigned: unique.length - inserted.length };
+   }
+ 
++  /**
++   * D1 — every (warehouse, item) default/origin marker, for the Products screen's warehouse column. Read-only. `visibleWarehouseIds`
++   * (F6) limits it to the caller's visible warehouses; omitted = unrestricted.
++   */
++  async listWarehouseItemAssignments(visibleWarehouseIds?: string[], manager?: EntityManager): Promise<Array<{ warehouseId: string; productId: string }>> {
++    const params: unknown[] = [];
++    let where = '';
++    if (visibleWarehouseIds) {
++      params.push(visibleWarehouseIds);
++      where = `WHERE "warehouseId" = ANY($1::uuid[])`;
++    }
++    return (manager ?? this.dataSource).query(`SELECT "warehouseId", "productId" FROM "warehouse_items" ${where} ORDER BY "createdAt"`, params);
++  }
++
+   /**
+    * D1 — remove an item's default/origin marker. Always allowed: it is metadata, not stock. If the item still holds stock here it
+    * simply shows up in this warehouse's grid as "holds stock, not a default" (the ledger is the truth).
+diff --git a/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts b/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
+index 92fc3fa..949f17c 100644
+--- a/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
++++ b/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
+@@ -485,6 +485,15 @@ export class InventoryController {
+     );
+   }
+ 
++  /** D1 — every item's default/origin warehouse markers (Products screen column), limited to the caller's visible warehouses. Read-only. */
++  @WarehouseScopeFiltered('warehouse item markers of the caller\'s visible warehouses only')
++  @Get('warehouse-items')
++  async listWarehouseItemAssignments(@Req() req: CompanyScopedRequest) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const visible = await this.visibleWarehouses(req);
++    return this.inventory.listWarehouseItemAssignments(visible === 'ALL' ? undefined : visible, req.companyContext.dataSource.manager);
++  }
++
+   /** D1 — assign items to a warehouse (master data, bulk, idempotent). Advisory: nothing is blocked by assignment yet. */
+   @UseGuards(PermissionGuard)
+   @RequirePermission('inventory.warehouse.edit', 'editable')
+diff --git a/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts b/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+index 6b63942..9ebf7c0 100644
+--- a/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
++++ b/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+@@ -130,4 +130,17 @@ describe('D1 — Item↔Warehouse assignment (master data, grid scope, backfill)
+     expect(await service.assignItems(ids.whB, [ids.pB], actor, b.manager)).toEqual({ requested: 1, assigned: 1, alreadyAssigned: 0 });
+     expect(await pairs(a, ids.whA)).not.toContain(ids.pB);
+   });
++
++  it('8. LIST (Products screen column): every marker of the Company; the F6 visible-warehouse filter keeps only those warehouses; per Company', async () => {
++    const a = await dsA();
++    const b = await dsB();
++    const key = (r: { warehouseId: string; productId: string }) => `${r.warehouseId}:${r.productId}`;
++    const expected: Array<{ warehouseId: string; productId: string }> = await a.query(`SELECT "warehouseId", "productId" FROM warehouse_items`);
++    expect((await service.listWarehouseItemAssignments(undefined, a.manager)).map(key).sort()).toEqual(expected.map(key).sort());
++    const onlyA2 = await service.listWarehouseItemAssignments([ids.whA2], a.manager);
++    expect(onlyA2.length).toBeGreaterThan(0);
++    expect(onlyA2.every((r) => r.warehouseId === ids.whA2)).toBe(true);
++    expect(await service.listWarehouseItemAssignments([], a.manager)).toEqual([]);
++    expect((await service.listWarehouseItemAssignments(undefined, b.manager)).map(key)).toEqual([`${ids.whB}:${ids.pB}`]);
++  });
+ });
+diff --git a/frontend/src/pages/Products.tsx b/frontend/src/pages/Products.tsx
+index 118a822..a23053d 100644
+--- a/frontend/src/pages/Products.tsx
++++ b/frontend/src/pages/Products.tsx
+@@ -39,6 +39,9 @@ export function Products() {
+   const [editName, setEditName] = useState('');
+   const [editPrice, setEditPrice] = useState('');
+   const [editUnit, setEditUnit] = useState('');
++  // D1 — the item's default/origin warehouses (warehouse_items markers), shown as a column and editable with the item.
++  const [assignments, setAssignments] = useState<Map<string, string[]>>(new Map());
++  const [editWarehouseIds, setEditWarehouseIds] = useState<string[]>([]);
+   const [savingEdit, setSavingEdit] = useState(false);
+ 
+   preload([
+@@ -48,6 +51,7 @@ export function Products() {
+     'field.unit_price',
+     'field.unit',
+     'field.default_warehouse',
++    'field.warehouse',
+     'field.status',
+     'field.actions',
+     'action.create',
+@@ -71,11 +75,29 @@ export function Products() {
+     try {
+       const data = await api.get<Product[]>('/products/all');
+       setProducts(data);
++      await loadAssignments();
+     } catch (err) {
+       setError(err instanceof ApiError ? err.message : 'Failed to load products.');
+     }
+   }
+ 
++  async function loadAssignments() {
++    try {
++      const rows = await api.get<Array<{ warehouseId: string; productId: string }>>('/inventory/warehouse-items');
++      const map = new Map<string, string[]>();
++      for (const r of rows) map.set(r.productId, [...(map.get(r.productId) ?? []), r.warehouseId]);
++      setAssignments(map);
++    } catch {
++      setAssignments(new Map()); // optional column — the catalogue still works without warehouse access
++    }
++  }
++
++  const warehouseLabel = (id: string) => {
++    const w = warehouses.find((x) => x.id === id);
++    return w ? `${w.code} — ${w.name}` : null;
++  };
++  const canEditWarehouses = can('inventory.warehouse.edit', 'editable') && warehouses.length > 0;
++
+   useEffect(() => {
+     load();
+     api
+@@ -115,6 +137,7 @@ export function Products() {
+     setEditName(product.name);
+     setEditPrice(product.unitPrice);
+     setEditUnit(product.unit ?? '');
++    setEditWarehouseIds(assignments.get(product.id) ?? []);
+     setError(null);
+   }
+ 
+@@ -135,6 +158,15 @@ export function Products() {
+       if (editUnit !== (product.unit ?? '')) {
+         await api.post(`/products/${product.id}/unit`, { unit: editUnit });
+       }
++      if (canEditWarehouses) {
++        const before = assignments.get(product.id) ?? [];
++        for (const id of editWarehouseIds.filter((w) => !before.includes(w))) {
++          await api.post(`/inventory/warehouses/${id}/items`, { productIds: [product.id] });
++        }
++        for (const id of before.filter((w) => !editWarehouseIds.includes(w))) {
++          await api.delete(`/inventory/warehouses/${id}/items/${product.id}`);
++        }
++      }
+       setEditingId(null);
+       await load();
+     } catch (err) {
+@@ -230,6 +262,7 @@ export function Products() {
+               <th>{t('field.name')}</th>
+               <th>{t('field.unit_price')}</th>
+               <th>{t('field.unit')}</th>
++              <th>{t('field.warehouse')}</th>
+               <th>{t('field.status')}</th>
+               {can('sales.catalog.edit', 'editable') && <th>{t('field.actions')}</th>}
+             </tr>
+@@ -250,6 +283,26 @@ export function Products() {
+                     )}
+                   </td>
+                   <td>{isEditing ? <input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} /> : (p.unit ?? '—')}</td>
++                  <td>
++                    {isEditing && canEditWarehouses ? (
++                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
++                        {warehouses.map((w) => (
++                          <label key={w.id} style={{ display: 'flex', gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }}>
++                            <input
++                              type="checkbox"
++                              checked={editWarehouseIds.includes(w.id)}
++                              onChange={(e) =>
++                                setEditWarehouseIds((prev) => (e.target.checked ? [...prev, w.id] : prev.filter((x) => x !== w.id)))
++                              }
++                            />
++                            {w.code} — {w.name}
++                          </label>
++                        ))}
++                      </div>
++                    ) : (
++                      (assignments.get(p.id) ?? []).map(warehouseLabel).filter(Boolean).join('، ') || '—'
++                    )}
++                  </td>
+                   <td>
+                     <StatusBadge code={`product_status.${p.status}`} />
+                   </td>
