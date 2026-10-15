@@ -1,0 +1,98 @@
+{
+  "sessionTimeZone": {
+    "TimeZone": "Africa/Cairo"
+  },
+  "dbNow": {
+    "now": "2026-10-15 16:27:24.666943+03",
+    "today": "2026-10-15"
+  },
+  "documentVsLedgerDates": [
+    {
+      "type": "receipt",
+      "document_movement_date": "2026-01-10 11:00:00+02",
+      "movementType": "receipt",
+      "qty": 100,
+      "ledger_created_at": "2026-10-15 16:27:24.721476+03"
+    },
+    {
+      "type": "transfer",
+      "document_movement_date": "2026-10-15 16:27:24.745+03",
+      "movementType": "transfer_out",
+      "qty": -30,
+      "ledger_created_at": "2026-10-15 16:27:24.771318+03"
+    },
+    {
+      "type": "transfer",
+      "document_movement_date": "2026-10-15 16:27:24.745+03",
+      "movementType": "transfer_in",
+      "qty": 30,
+      "ledger_created_at": "2026-10-15 16:27:24.771318+03"
+    },
+    {
+      "type": "issue",
+      "document_movement_date": "2026-10-15 16:27:24.796+03",
+      "movementType": "dispatch",
+      "qty": -5,
+      "ledger_created_at": "2026-10-15 16:27:24.825247+03"
+    }
+  ],
+  "stockMovementsColumns": [
+    "id",
+    "warehouseId",
+    "productId",
+    "quantity",
+    "movementType",
+    "referenceType",
+    "referenceId",
+    "createdByUserId",
+    "createdAt"
+  ],
+  "reportFilter": {
+    "noFilter": 4,
+    "dateFrom_today": 4,
+    "dateTo_today": 0,
+    "dateFrom_today_dateTo_today": 0,
+    "dateTo_documentDate_Jan31": 0,
+    "dateFrom_Jan01_dateTo_Jan31": 0
+  },
+  "runningBalance": {
+    "RAW": {
+      "rows": [
+        {
+          "type": "receipt",
+          "in": 100,
+          "out": 0,
+          "balance": 100
+        },
+        {
+          "type": "transfer_out",
+          "in": 0,
+          "out": 30,
+          "balance": 70
+        },
+        {
+          "type": "dispatch",
+          "in": 0,
+          "out": 5,
+          "balance": 65
+        }
+      ],
+      "closing": 65,
+      "onHand": 65
+    },
+    "PROD": {
+      "rows": [
+        {
+          "type": "transfer_in",
+          "in": 30,
+          "out": 0,
+          "balance": 30
+        }
+      ],
+      "closing": 30,
+      "onHand": 30
+    }
+  },
+  "transferLegsShareCreatedAt": true,
+  "reportOrderBy": "ORDER BY \"createdAt\" DESC (no tie-breaker)"
+}

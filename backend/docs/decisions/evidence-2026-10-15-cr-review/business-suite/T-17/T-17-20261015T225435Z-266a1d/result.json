@@ -1,0 +1,37 @@
+{
+  "testId": "T-17",
+  "runId": "T-17-20261015T225435Z-266a1d",
+  "finishedAt": "2026-10-15T22:54:49.028Z",
+  "results": [
+    {
+      "id": "N-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"roundsWithDuplicates\":0,\"lastNumber\":200,\"expected\":200}"
+    },
+    {
+      "id": "N-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"roundsWithDuplicates\":0,\"lastNumber\":200,\"expected\":200}"
+    },
+    {
+      "id": "P-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"roundsViolating\":0,\"wins\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]}"
+    },
+    {
+      "id": "P-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"roundsViolating\":0,\"wins\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]}"
+    },
+    {
+      "id": "C-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"succeeded\":120,\"of\":120,\"errors\":{}}"
+    },
+    {
+      "id": "C-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"succeeded\":120,\"of\":120,\"errors\":{}}"
+    }
+  ]
+}

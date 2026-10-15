@@ -516,8 +516,17 @@ export class InventoryService implements InventoryReservationContract, Inventory
     }
     if (filters.dateTo) {
       params.push(filters.dateTo);
-      conditions.push(`"createdAt" <= $${params.length}`);
+      // CR-2026-10-15 (M-1) — the screen sends a date-only `YYYY-MM-DD` (an `<input type="date">`). Compared as `<=` it meant midnight at
+      // the START of that day, so the whole selected end day (including "today") was dropped. A date-only value is now inclusive of the
+      // whole day (`< next day`, the same session-time-zone midnight `dateFrom` already uses); a full timestamp keeps its exact `<=`.
+      conditions.push(
+        /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo)
+          ? `"createdAt" < ($${params.length}::date + 1)`
+          : `"createdAt" <= $${params.length}`,
+      );
     }
+    // Dates filter the ledger's posting time (`createdAt`). A warehouse document's own business date (`warehouse_transactions.movementDate`,
+    // settable to a past day) is NOT carried onto the stock ledger — that is the current ledger-date policy (decision D-CR7), not a filter bug.
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     return (manager ?? this.dataSource).query(

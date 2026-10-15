@@ -1,0 +1,19 @@
+{
+  "crounds": 8,
+  "cconc": 15,
+  "expectedPerStyle": 120,
+  "cstats": {
+    "plain": {
+      "ok": 120,
+      "errors": {},
+      "distinctCodes": 120,
+      "rounds": 8
+    },
+    "transaction": {
+      "ok": 120,
+      "errors": {},
+      "distinctCodes": 120,
+      "rounds": 8
+    }
+  }
+}

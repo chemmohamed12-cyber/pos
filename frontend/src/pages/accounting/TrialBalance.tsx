@@ -16,6 +16,9 @@ interface TrialBalance {
   rows: TrialBalanceRow[];
   totalDebitBase: string;
   totalCreditBase: string;
+  /** CR-2026-10-15 — sums of the displayed (net) row figures; the footer shows these so it always equals the columns. */
+  balanceTotalDebitBase: string;
+  balanceTotalCreditBase: string;
   balanced: boolean;
 }
 
@@ -102,8 +105,8 @@ export function TrialBalance() {
             <tfoot>
               <tr style={{ fontWeight: 600 }}>
                 <td colSpan={3}>{t('panel.trial_balance_footer')}</td>
-                <td>{tb.totalDebitBase}</td>
-                <td>{tb.totalCreditBase}</td>
+                <td>{tb.balanceTotalDebitBase}</td>
+                <td>{tb.balanceTotalCreditBase}</td>
               </tr>
             </tfoot>
           </table>

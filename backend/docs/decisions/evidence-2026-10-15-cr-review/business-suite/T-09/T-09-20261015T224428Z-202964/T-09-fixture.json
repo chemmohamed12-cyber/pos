@@ -1,0 +1,4 @@
+{
+  "warehouseWorkerHasMovementCreateByDefaultInFreshCompany": true,
+  "note": "if false, the fixture grants it so the frozen scenario (A1 holds the permission) can run; the default is itself a finding"
+}

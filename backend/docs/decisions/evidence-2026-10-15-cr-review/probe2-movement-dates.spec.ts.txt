@@ -1,0 +1,119 @@
+// TEMPORARY review probe 2 for CR-2026-10-15 — movement dates, report date filters, running balance. Observation only; it lives in
+// evidence-2026-10-15-cr-review/ and is copied into src only for a run (see run-probe.sh there).
+import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import { WarehouseTransactionsService } from '../application/warehouse-transactions.service';
+import { InventoryService } from '../application/inventory.service';
+import { ProductsService } from '../../commerce/application/products.service';
+import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
+import { AuditService } from '../../../foundation/audit/audit.service';
+import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { Role } from '../../../foundation/authorization/role.entity';
+import { UserRole } from '../../../foundation/authorization/user-role.entity';
+import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
+
+const OUT = process.env.CR_PROBE_OUT ?? 'cr-probe2-results.json';
+const obs: Record<string, unknown> = {};
+
+describe('CR-2026-10-15 probe 2 — movement dates (observation only)', () => {
+  jest.setTimeout(600_000);
+  let h: TwoCompanyHarness;
+  let wt: WarehouseTransactionsService;
+  let inv: InventoryService;
+  const maker = randomUUID();
+  const checker = randomUUID();
+  const ids = { raw: randomUUID(), prod: randomUUID(), item: randomUUID() };
+
+  beforeAll(async () => {
+    h = await setUpTwoCompanyHarness({ namePrefix: 'cr_probe2', extraCompanyTags: ['sales', 'inventory'] });
+    const ds = await h.connections.getDataSource(h.companyAId);
+    for (const u of [maker, checker]) await ds.query(`INSERT INTO "users" ("id","fullName","email") VALUES ($1,'Probe2',$2)`, [u, `p2-${u}@test.local`]);
+    await ds.query(`INSERT INTO "roles" ("id","key") VALUES ($1,'admin') ON CONFLICT DO NOTHING`, [randomUUID()]);
+    const role: Array<{ id: string }> = await ds.query(`SELECT id FROM "roles" WHERE "key" = 'admin'`);
+    for (const u of [maker, checker]) await ds.query(`INSERT INTO "user_roles" ("id","userId","roleId") VALUES ($1,$2,$3)`, [randomUUID(), u, role[0].id]);
+    await ds.query(`INSERT INTO "warehouses" ("id","code","name","status","kind") VALUES ($1,'RAW','Raw','active','main'), ($2,'PROD','Production','active','main')`, [ids.raw, ids.prod]);
+    await ds.query(`INSERT INTO "products" ("id","sku","name","unitPrice","status") VALUES ($1,'SKU-P2','Probe item','10.00','active')`, [ids.item]);
+
+    const inert = {} as never;
+    const audit = new AuditService(h.controlPlane);
+    const numbering = new NumberingService(h.controlPlane);
+    const processEngine = new ProcessEngineService(h.controlPlane);
+    const policyRegistry = new InventoryPostingPolicyRegistry();
+    policyRegistry.bind({
+      assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }),
+      listManualReceiptReasons: () => ['FOUND_STOCK'],
+      assertSaleReturnPostable: async () => undefined,
+      assertSupplierInvoicePostable: async () => undefined,
+    });
+    inv = new InventoryService(h.controlPlane, audit, inert, inert, numbering, { publish: async () => undefined } as never, undefined, policyRegistry);
+    wt = new WarehouseTransactionsService(
+      h.controlPlane,
+      numbering,
+      processEngine,
+      new AuthorizationService(ds.getRepository(Role), ds.getRepository(UserRole)),
+      audit,
+      new ProductsService(h.controlPlane, audit, inert),
+      inv,
+      policyRegistry,
+    );
+  });
+
+  afterAll(async () => {
+    fs.writeFileSync(OUT, JSON.stringify(obs, null, 2));
+    await h.teardown();
+  });
+
+  it('records document date vs ledger date, report date filters and running balance', async () => {
+    const ds = await h.connections.getDataSource(h.companyAId);
+    const m = ds.manager;
+    obs.sessionTimeZone = (await ds.query(`SHOW timezone`))[0];
+    obs.dbNow = (await ds.query(`SELECT now()::text AS now, current_date::text AS today`))[0];
+    const today: string = (obs.dbNow as { today: string }).today;
+
+    // Receipt whose DOCUMENT date is backdated to 10 January, posted today.
+    const backdated = new Date(`${today.slice(0, 4)}-01-10T09:00:00Z`);
+    const receipt = await wt.createTransaction('receipt', ids.raw, null, [{ productId: ids.item, quantity: 100, unitCostBase: '2.00' }], null, null, null, maker, backdated, m, 'FOUND_STOCK');
+    await wt.transition(receipt.id, 'submit', maker, m);
+    const transfer = await wt.createTransaction('transfer', ids.raw, ids.prod, [{ productId: ids.item, quantity: 30 }], null, null, null, maker, undefined, m);
+    await wt.transition(transfer.id, 'submit', maker, m);
+    await wt.transition(transfer.id, 'approve', checker, m);
+    const issue = await wt.createTransaction('issue', ids.raw, null, [{ productId: ids.item, quantity: 5 }], null, null, null, maker, undefined, m);
+    await wt.transition(issue.id, 'submit', maker, m);
+    await wt.transition(issue.id, 'approve', checker, m);
+
+    obs.documentVsLedgerDates = await ds.query(
+      `SELECT t.type, t."movementDate"::text AS document_movement_date, sm."movementType", sm.quantity::float AS qty, sm."createdAt"::text AS ledger_created_at
+         FROM warehouse_transactions t JOIN stock_movements sm ON sm."referenceId" = t.id::text ORDER BY sm."createdAt", sm.id`,
+    );
+    obs.stockMovementsColumns = (await ds.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'stock_movements' ORDER BY ordinal_position`)).map(
+      (c: { column_name: string }) => c.column_name,
+    );
+
+    // The report receives the browser's <input type="date"> value: 'YYYY-MM-DD'.
+    const count = async (f: { dateFrom?: string; dateTo?: string; warehouseId?: string }) => (await inv.listMovements({ productId: ids.item, ...f }, m)).length;
+    obs.reportFilter = {
+      noFilter: await count({}),
+      dateFrom_today: await count({ dateFrom: today }),
+      dateTo_today: await count({ dateTo: today }),
+      dateFrom_today_dateTo_today: await count({ dateFrom: today, dateTo: today }),
+      dateTo_documentDate_Jan31: await count({ dateTo: `${today.slice(0, 4)}-01-31` }),
+      dateFrom_Jan01_dateTo_Jan31: await count({ dateFrom: `${today.slice(0, 4)}-01-01`, dateTo: `${today.slice(0, 4)}-01-31` }),
+    };
+
+    // Running balance per warehouse from the report (it returns createdAt DESC), checked against on-hand.
+    const running = async (warehouseId: string) => {
+      const rows = (await inv.listMovements({ warehouseId, productId: ids.item }, m)).reverse();
+      let balance = 0;
+      const out = rows.map((r) => ({ type: r.movementType, in: Math.max(Number(r.quantity), 0), out: Math.max(-Number(r.quantity), 0), balance: (balance += Number(r.quantity)) }));
+      return { rows: out, closing: balance, onHand: await inv.getOnHandQuantityInTransaction(m, warehouseId, ids.item) };
+    };
+    obs.runningBalance = { RAW: await running(ids.raw), PROD: await running(ids.prod) };
+    obs.transferLegsShareCreatedAt = (
+      await ds.query(`SELECT COUNT(DISTINCT "createdAt")::int AS n FROM stock_movements WHERE "referenceId" = $1`, [transfer.id])
+    )[0].n === 1;
+    // Unfiltered, cross-warehouse ordering of the two transfer legs (ties broken by nothing in the report's ORDER BY).
+    obs.reportOrderBy = 'ORDER BY "createdAt" DESC (no tie-breaker)';
+  });
+});

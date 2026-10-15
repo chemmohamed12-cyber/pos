@@ -1,0 +1,73 @@
+// CR-2026-10-15 browser acceptance — seeds the trial-balance scenario into the DISPOSABLE company DB (daii_test_biz_t97_ui_co on 5546):
+// GL accounts + an open fiscal period by SQL (as the real-PG specs do), then creates/submits/posts the journals through the REAL API on :3602.
+// Usage (cwd = backend/): node <this> <bv-out.json>   — DB_PASSWORD must hold the dedicated test role's password.
+const fs = require('fs');
+const { randomUUID } = require('crypto');
+const { Client } = require(process.cwd() + '/node_modules/pg');
+const out = JSON.parse(fs.readFileSync(process.argv[2], 'utf8').trim().split('\n').pop());
+const API = 'http://127.0.0.1:3602/api';
+if (out.co !== 'daii_test_biz_t97_ui_co') throw new Error('refusing: unexpected company DB');
+
+async function call(method, path, token, body) {
+  const r = await fetch(API + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`${method} ${path} -> ${r.status} ${JSON.stringify(j).slice(0, 300)}`);
+  return j.data ?? j;
+}
+
+(async () => {
+  const db = new Client({ host: '127.0.0.1', port: 5546, user: 'daii_biz_test', password: process.env.DB_PASSWORD, database: out.co });
+  await db.connect();
+  const today = (await db.query(`SELECT current_date::text AS d`)).rows[0].d;
+  const year = today.slice(0, 4);
+  const acc = { cash: randomUUID(), payable: randomUUID(), revenue: randomUUID(), expense: randomUUID(), suspense: randomUUID() };
+  await db.query(
+    `INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive") VALUES
+     ($1,'CR-1000','CR Cash','asset','debit',true,true,true), ($2,'CR-2000','CR Payable','liability','credit',true,true,true),
+     ($3,'CR-4000','CR Revenue','revenue','credit',true,true,true), ($4,'CR-5000','CR Expense','expense','debit',true,true,true),
+     ($5,'CR-1999','CR Suspense','asset','debit',true,true,true)`,
+    [acc.cash, acc.payable, acc.revenue, acc.expense, acc.suspense],
+  );
+  const open = (await db.query(
+    `SELECT p.id FROM accounting_fiscal_periods p JOIN process_instances pi ON pi."entityId" = p.id::text AND pi."definitionKey" = 'accounting_fiscal_period'
+      WHERE pi."currentState" = 'open' AND p."startDate" <= $1 AND p."endDate" >= $1`, [today])).rows;
+  if (open.length === 0) {
+    const fy = randomUUID(), fp = randomUUID();
+    await db.query(`INSERT INTO "accounting_fiscal_years" ("id","code","startDate","endDate") VALUES ($1,'FY-CR',$2,$3)`, [fy, `${year}-01-01`, `${year}-12-31`]);
+    await db.query(`INSERT INTO "accounting_fiscal_periods" ("id","fiscalYearId","code","startDate","endDate") VALUES ($1,$2,'P-CR',$3,$4)`, [fp, fy, `${year}-01-01`, `${year}-12-31`]);
+    await db.query(
+      `INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'accounting_fiscal_year','FiscalYear',$2,'active'), ($3,'accounting_fiscal_period','FiscalPeriod',$4,'open')`,
+      [randomUUID(), fy, randomUUID(), fp],
+    );
+  }
+
+  const base = await call('POST', '/auth/login', null, { email: out.email, password: out.password });
+  const scoped = await call('POST', '/auth/select-company', base.accessToken, { companyId: out.companyId });
+  const token = scoped.accessToken;
+  const currency = (await db.query(`SELECT code FROM currencies WHERE "isBase" = true LIMIT 1`).catch(() => ({ rows: [] }))).rows[0]?.code ?? 'EGP';
+  const journals = [
+    [acc.cash, acc.revenue, '100.00'],
+    [acc.expense, acc.cash, '40.00'],
+    [acc.suspense, acc.cash, '25.00'],
+    [acc.cash, acc.suspense, '25.00'],
+    [acc.payable, acc.cash, '10.00'],
+    [acc.cash, acc.payable, '30.00'],
+  ];
+  const ids = [];
+  for (const [dr, cr, amount] of journals) {
+    const je = await call('POST', '/accounting/journals', token, {
+      sourceType: 'MANUAL', businessDate: today, description: 'CR-2026-10-15 browser acceptance', transactionCurrencyCode: currency,
+      lines: [{ accountId: dr, debit: amount }, { accountId: cr, credit: amount }],
+    });
+    await call('POST', `/accounting/journals/${je.id}/submit`, token);
+    await call('POST', `/accounting/journals/${je.id}/post`, token, {});
+    ids.push(je.id);
+  }
+  // J1 moved to 15 January in this disposable DB (manual journals cannot be backdated) so a date window can be checked on screen.
+  await db.query(`UPDATE accounting_journal_entries SET "businessDate" = $2 WHERE id = $1`, [ids[0], `${year}-01-15`]);
+  const tb = await call('GET', '/accounting/trial-balance', token);
+  const tbFeb = await call('GET', `/accounting/trial-balance?from=${year}-02-01`, token);
+  const pick = (t) => ({ rows: t.rows.map((r) => [r.code, r.debitBase, r.creditBase]), balanceTotalDebitBase: t.balanceTotalDebitBase, balanceTotalCreditBase: t.balanceTotalCreditBase, totalDebitBase: t.totalDebitBase, totalCreditBase: t.totalCreditBase, balanced: t.balanced });
+  console.log(JSON.stringify({ today, posted: ids.length, api: { all: pick(tb), fromFeb1: pick(tbFeb) } }, null, 2));
+  await db.end();
+})().catch((e) => { console.error(e.message); process.exit(1); });

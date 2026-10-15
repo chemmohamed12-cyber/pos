@@ -1,0 +1,59 @@
+// Upgrades the experimental dev server (daii_dev on :5433 + its registered company DBs) to the migration set compiled in APP_ROOT/dist.
+// User decision 2026-10-15: daii_dev and its companies are test environments — apply all approved migrations, no backup required.
+// Platform: every tag. Each company: `core` + every tag it already has (the release engine's own fan-out rule, tagsReceivedByCompany).
+// Usage: node devdb-upgrade.js <APP_ROOT backend dir with dist/> <ENV_FILE> [--apply]     (without --apply: dry run, nothing is written)
+const fs = require('fs');
+const path = require('path');
+const [appRoot, envFile] = process.argv.slice(2);
+const apply = process.argv.includes('--apply');
+const env = Object.fromEntries(fs.readFileSync(envFile, 'utf8').split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+if (env.DB_NAME !== 'daii_dev' || String(env.DB_PORT) !== '5433') throw new Error('refusing: this tool only targets daii_dev on :5433');
+const req = (p) => require(path.join(appRoot, p));
+const { createMigrationDataSource, discoverMigrationTags } = req('dist/foundation/release/migration-datasource.js');
+const { migrationNamesByTag, tagsReceivedByCompany } = req('dist/foundation/release/company-fanout.service.js');
+const { Client } = req('node_modules/pg');
+
+const base = { host: env.DB_HOST, port: Number(env.DB_PORT), username: env.DB_USER, password: env.DB_PASSWORD };
+
+async function pendingAndRun(db, tags) {
+  const ds = createMigrationDataSource(appRoot, { ...base, database: db }, tags);
+  await ds.initialize();
+  try {
+    const { MigrationExecutor } = req('node_modules/typeorm');
+    const pending = (await new MigrationExecutor(ds).getPendingMigrations()).map((m) => m.name);
+    let ran = [];
+    if (apply && pending.length) ran = (await ds.runMigrations({ transaction: 'each' })).map((m) => m.name);
+    return { pending, ran };
+  } finally {
+    await ds.destroy();
+  }
+}
+
+(async () => {
+  const allTags = discoverMigrationTags(appRoot);
+  const out = { mode: apply ? 'APPLY' : 'DRY-RUN', appRoot, allTags, platform: null, companies: [] };
+  out.platform = { db: env.DB_NAME, ...(await pendingAndRun(env.DB_NAME, allTags)) };
+
+  const cp = new Client({ host: base.host, port: base.port, user: base.username, password: base.password, database: env.DB_NAME });
+  await cp.connect();
+  const regs = (await cp.query(`SELECT r."databaseName", r.status, c.name FROM database_registries r JOIN companies c ON c.id = r."companyId" ORDER BY c.name`)).rows;
+  await cp.end();
+  const byTag = migrationNamesByTag(appRoot, allTags);
+  for (const r of regs) {
+    const k = new Client({ host: base.host, port: base.port, user: base.username, password: base.password, database: r.databaseName });
+    await k.connect();
+    const executed = new Set((await k.query('SELECT name FROM migrations')).rows.map((x) => x.name));
+    await k.end();
+    const tags = tagsReceivedByCompany(byTag, executed);
+    try {
+      out.companies.push({ name: r.name, db: r.databaseName, status: r.status, tags, ...(await pendingAndRun(r.databaseName, tags)) });
+    } catch (e) {
+      out.companies.push({ name: r.name, db: r.databaseName, tags, error: e.message });
+      if (apply) break; // stop at the first failure
+    }
+  }
+  console.log(JSON.stringify(out, null, 2));
+})().catch((e) => {
+  console.error('ERR', e.message);
+  process.exit(1);
+});

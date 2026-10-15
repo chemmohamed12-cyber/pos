@@ -1,0 +1,114 @@
+{
+  "mode": "DRY-RUN",
+  "appRoot": "D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/.claude/worktrees/f11-verify/backend",
+  "allTags": [
+    "accounting",
+    "attendance",
+    "commission",
+    "core",
+    "finance",
+    "hr",
+    "inventory",
+    "logistics",
+    "manufacturing",
+    "payroll",
+    "procurement",
+    "sales",
+    "targets"
+  ],
+  "platform": {
+    "db": "daii_dev",
+    "pending": [],
+    "ran": []
+  },
+  "companies": [
+    {
+      "name": "Alpha Trading Co",
+      "db": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+      "status": "ACTIVE",
+      "tags": [
+        "accounting",
+        "attendance",
+        "commission",
+        "core",
+        "finance",
+        "hr",
+        "inventory",
+        "logistics",
+        "manufacturing",
+        "payroll",
+        "procurement",
+        "sales",
+        "targets"
+      ],
+      "pending": [],
+      "ran": []
+    },
+    {
+      "name": "Beta Trading Co",
+      "db": "company_0894c2a717f34fceaf6a299530ccf61f",
+      "status": "ACTIVE",
+      "tags": [
+        "accounting",
+        "attendance",
+        "commission",
+        "core",
+        "finance",
+        "hr",
+        "inventory",
+        "logistics",
+        "manufacturing",
+        "payroll",
+        "procurement",
+        "sales",
+        "targets"
+      ],
+      "pending": [],
+      "ran": []
+    },
+    {
+      "name": "Delta Trading Co",
+      "db": "company_dfa1105448b84ad8b8ae8d7bd8719353",
+      "status": "ACTIVE",
+      "tags": [
+        "accounting",
+        "attendance",
+        "commission",
+        "core",
+        "finance",
+        "hr",
+        "inventory",
+        "logistics",
+        "manufacturing",
+        "payroll",
+        "procurement",
+        "sales",
+        "targets"
+      ],
+      "pending": [],
+      "ran": []
+    },
+    {
+      "name": "Gamma Trading Co",
+      "db": "company_98d3391ce5464c63a3e9fab11e55263c",
+      "status": "ACTIVE",
+      "tags": [
+        "accounting",
+        "attendance",
+        "commission",
+        "core",
+        "finance",
+        "hr",
+        "inventory",
+        "logistics",
+        "manufacturing",
+        "payroll",
+        "procurement",
+        "sales",
+        "targets"
+      ],
+      "pending": [],
+      "ran": []
+    }
+  ]
+}

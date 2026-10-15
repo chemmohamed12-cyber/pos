@@ -252,7 +252,8 @@ export class GeneralLedgerController {
   async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
+    // CR-2026-10-15 — same payload plus `balanceTotal*` (the sums of the displayed net rows) for the screen's footer.
+    return this.ledger.getTrialBalanceReport({ from, to, orgUnitId }, manager);
   }
 
   @UseGuards(PermissionGuard)

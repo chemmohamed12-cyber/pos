@@ -40,11 +40,33 @@ export interface TrialBalanceRow {
   creditBase: string;
 }
 
+export interface TrialBalanceQuery {
+  orgUnitId?: string;
+  from?: string;
+  to?: string;
+}
+
 export interface TrialBalance {
   rows: TrialBalanceRow[];
+  /** GROSS posted debit activity in the window (not the sum of the rows' net figures). */
   totalDebitBase: string;
+  /** GROSS posted credit activity in the window. */
   totalCreditBase: string;
   balanced: boolean;
+}
+
+/**
+ * CR-2026-10-15 — the Trial Balance screen payload. TWO DIFFERENT TOTALS, never interchangeable:
+ *  - `totalDebitBase` / `totalCreditBase` (inherited, LOCKED CONTRACT): GROSS posted activity — Σ of every posted line's debit / credit.
+ *    Signed into closing snapshots (`ClosingSnapshotService`) and asserted by the GL specs. Do not change their meaning.
+ *  - `balanceTotalDebitBase` / `balanceTotalCreditBase`: Σ of the displayed rows — each account's NET balance on its debit or credit
+ *    side. These are what the screen's footer shows. They equal the gross totals only when no account has both debit and credit lines.
+ */
+export interface TrialBalanceReport extends TrialBalance {
+  /** Σ over accounts of GREATEST(net, 0) — the sum of the displayed debit column. */
+  balanceTotalDebitBase: string;
+  /** Σ over accounts of GREATEST(-net, 0) — the sum of the displayed credit column. */
+  balanceTotalCreditBase: string;
 }
 
 /**
@@ -150,23 +172,9 @@ export class LedgerService {
   }
 
   /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
-  async getTrialBalance(query: { orgUnitId?: string; from?: string; to?: string } = {}, manager?: EntityManager): Promise<TrialBalance> {
+  async getTrialBalance(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalance> {
     const runner = manager ?? this.dataSource;
-    const params: unknown[] = [];
-    const conds: string[] = [this.postedFilter];
-    if (query.orgUnitId) {
-      params.push(query.orgUnitId);
-      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
-    }
-    if (query.from) {
-      params.push(query.from);
-      conds.push(`e."businessDate" >= $${params.length}`);
-    }
-    if (query.to) {
-      params.push(query.to);
-      conds.push(`e."businessDate" <= $${params.length}`);
-    }
-    const where = conds.join(' AND ');
+    const { where, params } = this.trialBalanceWhere(query);
 
     const rows = (await runner.query(
       `SELECT a.id AS "accountId", a.code, a.name, a."accountType", a."normalBalance",
@@ -200,5 +208,47 @@ export class LedgerService {
       totalCreditBase: tot?.c ?? '0.0000',
       balanced: tot?.balanced ?? true,
     };
+  }
+
+  /**
+   * CR-2026-10-15 — the Trial Balance SCREEN. The rows show each account's NET balance, but `totalDebitBase`/`totalCreditBase` are the
+   * GROSS posted activity (a contract the closing snapshot signs and the GL specs assert), so they did not equal the column sums whenever
+   * an account had both debit and credit lines. This adds `balanceTotalDebitBase`/`balanceTotalCreditBase` — the sums of exactly the
+   * displayed row figures, computed SQL-side over the same per-account aggregate — and leaves every existing field unchanged.
+   */
+  async getTrialBalanceReport(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalanceReport> {
+    const runner = manager ?? this.dataSource;
+    const tb = await this.getTrialBalance(query, manager);
+    const { where, params } = this.trialBalanceWhere(query);
+    const [bal] = (await runner.query(
+      `SELECT COALESCE(SUM(GREATEST(net, 0)),0)::numeric(20,4)  AS d,
+              COALESCE(SUM(GREATEST(-net, 0)),0)::numeric(20,4) AS c
+       FROM (
+         SELECT (COALESCE(SUM(l."debitBase"),0) - COALESCE(SUM(l."creditBase"),0))::numeric(20,4) AS net
+         FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
+         WHERE ${where}
+         GROUP BY l."accountId"
+       ) agg`,
+      params,
+    )) as Array<{ d: string; c: string }>;
+    return { ...tb, balanceTotalDebitBase: bal?.d ?? '0.0000', balanceTotalCreditBase: bal?.c ?? '0.0000' };
+  }
+
+  private trialBalanceWhere(query: TrialBalanceQuery): { where: string; params: unknown[] } {
+    const params: unknown[] = [];
+    const conds: string[] = [this.postedFilter];
+    if (query.orgUnitId) {
+      params.push(query.orgUnitId);
+      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
+    }
+    if (query.from) {
+      params.push(query.from);
+      conds.push(`e."businessDate" >= $${params.length}`);
+    }
+    if (query.to) {
+      params.push(query.to);
+      conds.push(`e."businessDate" <= $${params.length}`);
+    }
+    return { where: conds.join(' AND '), params };
   }
 }
