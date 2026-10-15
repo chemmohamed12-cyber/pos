@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { Type } from 'class-transformer';
@@ -127,6 +127,23 @@ class ReverseJournalEntryDto {
   @IsString()
   @MaxLength(512)
   description?: string;
+}
+
+/**
+ * The Cash Flow Statement requires both ends of its period (its depreciation add-back reads `from`/`to`
+ * as calendar dates). A missing or malformed date is rejected with a 400 (VALIDATION_ERROR) before any
+ * query runs, instead of surfacing as a 500 from inside the read model.
+ */
+function requireReportDateRange(from: unknown, to: unknown): void {
+  for (const [name, value] of [['from', from], ['to', to]] as const) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException(`Query parameter "${name}" is required as a date in YYYY-MM-DD format.`);
+    }
+    const d = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException(`Query parameter "${name}" is not a valid calendar date.`);
+    }
+  }
 }
 
 /**
@@ -353,6 +370,7 @@ export class GeneralLedgerController {
   @Get('reports/cash-flow')
   async getCashFlowStatement(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
+    requireReportDateRange(from, to);
     const manager = req.companyContext.dataSource.manager;
     return this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
   }
@@ -369,6 +387,7 @@ export class GeneralLedgerController {
     @Res() res: Response,
   ) {
     if (!req.companyContext) throw new UnauthorizedException();
+    requireReportDateRange(from, to);
     const manager = req.companyContext.dataSource.manager;
     const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
     const rows = [
