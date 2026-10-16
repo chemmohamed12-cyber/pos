@@ -72,3 +72,8 @@ A "manifest SHA-256" is the SHA-256 of the sorted `sha256sum` listing of the bui
 - Browser acceptance covers Products, Item Details, trial balance, PR 409, Cash Flow 400, the barcode pickers on the Purchase Request and warehouse receipt screens, and the customer and supplier profile screens. **Not clicked through in this session:** the Purchase Order screen, the Inventory filter and the BOM picker with a barcode (the integration session took those browser checks; its result is not recorded here), and an end-to-end receipt → transfer → issue run on the integrated build.
 - Frontend lint warnings are 58 versus 56 at baseline (no errors).
 - `master` was not touched; `daii-backend` on :3501 (master's working tree) was left as it was.
+
+## 7. Update after integration (added by the integration session)
+
+- The pack's gates were run on 00455ce. The final candidate is a later commit; the authoritative identity, source checksum (content-based, replaces the tar checksum of 66c6647), frontend lint (56 warnings = baseline after commit 8eebf41) and test totals are in `LOCAL-RC-2026-10-16.md`. Rebuild the dist hashes above if the dist artifacts are to be handed over: the frontend source changed only by two lint-suppression comments.
+- The browser checks listed as not clicked through in section 6 were completed on the committed integration preview: Purchase Order picker, Inventory filter and BOM picker with a barcode and an SKU, unknown code, manual selection, duplicate barcode (409). 12/12 PASS: `evidence-2026-10-16-rc/browser-verification-rc.md`. The end-to-end receipt, transfer and issue run on the integrated build remains not done in the browser (covered by the business suite T-00..T-31).
