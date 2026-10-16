@@ -557,3 +557,10 @@ tr.clickable-row:hover td {
   flex: 1 1 120px;
   min-width: 0;
 }
+
+/* Scan-or-type item code (master data step 2, 2026-10-16). */
+.combobox-scan-message {
+  margin-block-start: 4px;
+  font-size: 12px;
+  color: #b45309;
+}
