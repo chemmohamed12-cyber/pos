@@ -1,0 +1,11 @@
+{
+  "anonymous GET /products/:id": 401,
+  "GET /products/:id": 200,
+  "GET /inventory/warehouses": 200,
+  "GET /inventory/warehouses/:id/inventory": 200,
+  "GET /inventory/reports/movements": 200,
+  "GET /inventory/valuation/current-cost": 404,
+  "GET /bom/:productId": 200,
+  "POST /products/:id/name (edit)": 404,
+  "POST /warehouse-transactions (create)": 404
+}
