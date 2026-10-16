@@ -66,6 +66,8 @@ export function CustomerProfileTab({ customerId, onChanged }: { customerId: stri
   }, [customerId]);
 
   useEffect(() => {
+    // load() sets state only after the awaited request resolves (not synchronously); the rule cannot see through the callback.
+    // eslint-disable-next-line react/set-state-in-effect
     void load();
   }, [load]);
 
