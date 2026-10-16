@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Supplier, SupplierType } from '../infrastructure/supplier.entity';
 import { SupplierContact } from '../infrastructure/supplier-contact.entity';
