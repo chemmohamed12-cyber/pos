@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { NotFoundException } from '@nestjs/common';
 import { InventoryService } from '../application/inventory.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { ProductsService } from '../../commerce/application/products.service';
 import { CreateWarehouseItems1789940000000 } from '../../../database/migrations/inventory/1789940000000-CreateWarehouseItems';
 import { setUpTwoCompanyHarness, TwoCompanyHarness, assertDataSourceNeverRequestedFor } from '../../../foundation/testing/two-company-real-pg-harness';
 
@@ -26,7 +27,9 @@ describe('D1 — Item↔Warehouse assignment (master data, grid scope, backfill)
   beforeAll(async () => {
     h = await setUpTwoCompanyHarness({ namePrefix: 'd1_assignment', extraCompanyTags: ['sales', 'inventory'] });
     const inert = {} as never;
-    service = new InventoryService(h.controlPlane, new AuditService(h.controlPlane), inert, inert, inert, inert, undefined);
+    // Master data step 1: `unassignItem` now clears a primary default warehouse through the Sales contract, so the real products service is wired (assertions unchanged).
+    const audit = new AuditService(h.controlPlane);
+    service = new InventoryService(h.controlPlane, audit, new ProductsService(h.controlPlane, audit, inert), inert, inert, inert, undefined);
     for (const [ds, wh, wh2] of [[await dsA(), ids.whA, ids.whA2], [await dsB(), ids.whB, null]] as const) {
       await ds.query(`INSERT INTO "warehouses" ("id","code","name","status") VALUES ($1,$2,$2,'active')`, [wh, `WH-${wh.slice(0, 4)}`]);
       if (wh2) await ds.query(`INSERT INTO "warehouses" ("id","code","name","status") VALUES ($1,$2,$2,'active')`, [wh2, `WH-${wh2.slice(0, 4)}`]);

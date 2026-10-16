@@ -52,6 +52,13 @@ export interface SalesProductsContract {
   createDraftProduct(input: { sku: string; name: string; unit?: string | null }, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshotContract>;
   /** D7 — approval of a New Item Request: the catalog's own `draft → active` transition (never a raw table write). */
   activateDraftProduct(productId: string, actorUserId: string, manager?: EntityManager): Promise<ProductSnapshotContract>;
+  /**
+   * Master data step 1 (2026-10-15) — the item's primary default warehouse. Called ONLY by the Inventory domain, after it has
+   * validated that the warehouse exists, is active and is assigned to the item (D1); `null` clears it.
+   */
+  setDefaultWarehouse(productId: string, warehouseId: string | null, actorUserId: string | null, manager?: EntityManager): Promise<void>;
+  /** Clears the default warehouse only when it is `warehouseId` (the item was unassigned from it). Returns whether it was cleared. */
+  clearDefaultWarehouseIfMatches(productId: string, warehouseId: string, actorUserId: string | null, manager?: EntityManager): Promise<boolean>;
 }
 export const SALES_PRODUCTS_CONTRACT = Symbol('SALES_PRODUCTS_CONTRACT');
 

@@ -4,7 +4,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import type { EntityManager } from 'typeorm';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
 import { InventoryService } from '../application/inventory.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -120,6 +120,13 @@ class AssignItemsDto {
   @ArrayMaxSize(500)
   @IsUUID('all', { each: true })
   productIds!: string[];
+}
+
+/** Master data step 1 — `null` clears the item's primary default warehouse. */
+class SetDefaultWarehouseDto {
+  @ValidateIf((_o, v) => v !== null)
+  @IsUUID('all')
+  warehouseId!: string | null;
 }
 
 class AssembleProductDto {
@@ -502,6 +509,16 @@ export class InventoryController {
   async assignItems(@Req() req: CompanyScopedRequest, @Param('warehouseId', ParseUUIDPipe) warehouseId: string, @Body() dto: AssignItemsDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.inventory.assignItems(warehouseId, dto.productIds, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  /** Master data step 1 (2026-10-15) — the item's primary default warehouse: must be active and one of its D1 assignments. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScoped({ body: 'warehouseId' })
+  @Post('items/:productId/default-warehouse')
+  async setDefaultWarehouse(@Req() req: CompanyScopedRequest, @Param('productId', ParseUUIDPipe) productId: string, @Body() dto: SetDefaultWarehouseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.inventory.setDefaultWarehouse(productId, dto.warehouseId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** D1 — remove an item from a warehouse; rejected while it still holds stock/reservations there. */

@@ -536,3 +536,24 @@ tr.clickable-row:hover td {
     margin-block-start: 8px;
   }
 }
+
+/* Item master editing (master data step 1, 2026-10-15). */
+.item-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0 16px;
+}
+.item-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.item-inline-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-start: 6px;
+}
+.item-inline-create input {
+  flex: 1 1 120px;
+  min-width: 0;
+}

@@ -5,6 +5,10 @@ import { PriceList } from './infrastructure/price-list.entity';
 import { PriceListItem } from './infrastructure/price-list-item.entity';
 import { BillOfMaterial } from './infrastructure/bill-of-materials.entity';
 import { BomComponent } from './infrastructure/bom-component.entity';
+import { ProductCategory } from './infrastructure/product-category.entity';
+import { ProductBarcode } from './infrastructure/product-barcode.entity';
+import { ProductMasterDataService } from './application/product-master-data.service';
+import { ProductCategoriesController } from './interface/product-categories.controller';
 import { ProductsService } from './application/products.service';
 import { PriceListsService } from './application/price-lists.service';
 import { BomService } from './application/bom.service';
@@ -24,7 +28,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, PriceList, PriceListItem, BillOfMaterial, BomComponent]),
+    TypeOrmModule.forFeature([Product, PriceList, PriceListItem, BillOfMaterial, BomComponent, ProductCategory, ProductBarcode]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -40,11 +44,12 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [ProductsController, PriceListsController, BomController],
+  controllers: [ProductsController, PriceListsController, BomController, ProductCategoriesController],
   providers: [
     ProductsService,
     PriceListsService,
     BomService,
+    ProductMasterDataService,
     // P4 Tranche-2 (ADR-027) — the `sales` module's public contract for other
     // modules (today: `inventory`). Same concrete service, resolved via a
     // stable token instead of a direct cross-domain class import.

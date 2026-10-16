@@ -5,6 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { ItemBasicPanel } from './item/ItemBasicPanel';
+import { ItemBarcodesPanel } from './item/ItemBarcodesPanel';
+import { ItemBomPanel } from './item/ItemBomPanel';
+import { ITEM_BARCODE_LABELS, ITEM_BASIC_LABELS, ITEM_BOM_LABELS, type Category } from './item/itemMaster';
 
 interface Product {
   id: string;
@@ -14,6 +18,11 @@ interface Product {
   unit: string | null;
   status: string;
   createdAt: string;
+  itemType: string;
+  categoryId: string | null;
+  defaultWarehouseId: string | null;
+  reorderLevel: string | null;
+  description: string | null;
 }
 interface Warehouse {
   id: string;
@@ -41,21 +50,12 @@ interface Movement {
   referenceId: string | null;
   createdAt: string;
 }
-interface BomComponent {
-  componentProductId: string;
-  quantityPerUnit: string | number;
-  sku: string;
-  productName: string;
-}
-interface Bom {
-  status?: string;
-  components?: BomComponent[];
-}
 interface UnitCost {
   unitCostBase?: string;
 }
 
 const TABS = ['basic', 'balances', 'movements', 'units', 'costing', 'bom'] as const;
+const ITEM_TYPES_LABELS = ['finished_good', 'semi_finished', 'raw_material', 'consumable', 'service'].map((v) => `value.item_type.${v}`);
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   basic: 'panel.item_basic_info',
@@ -83,16 +83,16 @@ function previousDay(date: string): string {
 }
 
 /**
- * Item Details (2026-10-15) — the click-through page for one inventory item. Read-only and built entirely on existing, already
- * authorized endpoints (no new calculation, no new endpoint):
+ * Item Details (2026-10-15) — the click-through page for one inventory item, built on existing, already authorized endpoints
+ * (no new calculation):
  *   - the item:              GET /products/:id
  *   - warehouse balances:    GET /inventory/warehouses/:id/inventory (the Inventory grid's own source, per visible warehouse)
  *   - movements:             GET /inventory/reports/movements (date-only `dateTo` covers the whole day — CR-2026-10-15 M-1);
  *                            the opening balance is the same report summed up to the day before `dateFrom`
  *   - cost per warehouse:    GET /inventory/valuation/current-cost (only with `inventory.valuation.view`)
- *   - BOM:                   GET /bom/:productId
- * Fields the reference design shows but the Product model does not hold (item type, category, barcode, reorder level,
- * description, image) are labelled "not defined in the current data model" rather than invented.
+ *   - BOM:                   the Manufacturing BOM facade (`ItemBomPanel`), or `/bom` for read-only users
+ * Master data step 1 (2026-10-15) made the basic information, barcodes and BOM editable (`./item/*`); the image is still a
+ * reserved placeholder (D-MD8).
  */
 /** Route element: remounts the page per item, so following a BOM component link never shows the previous item's state. */
 export function ItemDetailsRoute() {
@@ -123,10 +123,11 @@ function ItemDetails({ productId }: { productId: string }) {
   const [mvError, setMvError] = useState<string | null>(null);
 
   const [costs, setCosts] = useState<Record<string, string | null>>({});
-  const [bom, setBom] = useState<Bom | null | undefined>(undefined);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const canViewCost = can('inventory.valuation.view', 'read-only');
   const canEdit = can('sales.catalog.edit', 'editable');
+  const canEditWarehouse = can('inventory.warehouse.edit', 'editable');
 
   preload([
     'nav.inventory',
@@ -148,12 +149,12 @@ function ItemDetails({ productId }: { productId: string }) {
     'field.name',
     'field.status',
     'field.item_type',
-    'field.category',
+    'field.item_category',
     'field.base_unit',
-    'field.default_warehouse',
+    'field.primary_default_warehouse',
     'field.assigned_warehouses',
     'field.reorder_level',
-    'field.description',
+    'field.item_description',
     'field.item_image',
     'field.barcode',
     'field.unit',
@@ -181,15 +182,25 @@ function ItemDetails({ productId }: { productId: string }) {
     'field.quantity',
     'nav.bom',
     'nav.price_lists',
+    'panel.item_below_reorder',
+    ...ITEM_TYPES_LABELS,
+    ...ITEM_BASIC_LABELS,
+    ...ITEM_BARCODE_LABELS,
+    ...ITEM_BOM_LABELS,
   ]);
 
   // The item, the visible warehouses and each warehouse's row for this item (the Inventory grid's own numbers).
   useEffect(() => {
     (async () => {
       try {
-        const [p, wh] = await Promise.all([api.get<Product>(`/products/${productId}`), api.get<Warehouse[]>('/inventory/warehouses')]);
+        const [p, wh, cats] = await Promise.all([
+          api.get<Product>(`/products/${productId}`),
+          api.get<Warehouse[]>('/inventory/warehouses'),
+          api.get<Category[]>('/product-categories').catch(() => [] as Category[]),
+        ]);
         setProduct(p);
         setWarehouses(wh);
+        setCategories(cats);
         const rows = await Promise.all(
           wh.map(async (w) => {
             const params = new URLSearchParams({ scope: 'all', search: p.sku, page: '1', pageSize: '200' });
@@ -260,14 +271,12 @@ function ItemDetails({ productId }: { productId: string }) {
     })();
   }, [product, balances, canViewCost]);
 
-  // BOM (404 = none defined); the BOM view already names its components.
-  useEffect(() => {
-    if (!product || tab !== 'bom' || bom !== undefined) return;
-    api
-      .get<Bom>(`/bom/${product.id}`)
-      .then(setBom)
-      .catch(() => setBom(null));
-  }, [product, tab, bom]);
+  async function reloadProduct() {
+    setProduct(await api.get<Product>(`/products/${productId}`));
+  }
+  async function reloadCategories() {
+    setCategories(await api.get<Category[]>('/product-categories').catch(() => [] as Category[]));
+  }
 
   const totals = useMemo(
     () =>
@@ -305,8 +314,6 @@ function ItemDetails({ productId }: { productId: string }) {
     setSearchParams(params, { replace: true });
   }
 
-  const notInModel = <span className="item-not-in-model">{t('panel.not_in_data_model')}</span>;
-
   if (loadError) {
     return (
       <div>
@@ -321,6 +328,12 @@ function ItemDetails({ productId }: { productId: string }) {
     );
   }
   if (!product) return <div className="empty-state">Loading…</div>;
+
+  // All six tabs are always shown (the committed Item Details contract); the BOM tab itself explains when an item type has no BOM.
+  const visibleTabs = TABS;
+  const activeTab: Tab = visibleTabs.includes(tab) ? tab : 'basic';
+  const category = categories.find((c) => c.id === product.categoryId);
+  const belowReorder = balances !== null && product.reorderLevel !== null && totals.available <= Number(product.reorderLevel);
 
   return (
     <div className="item-details">
@@ -354,6 +367,14 @@ function ItemDetails({ productId }: { productId: string }) {
           <div className="item-header-meta">
             <StatusBadge code={`product_status.${product.status}`} />
             <span>
+              {t('field.item_type')}: <strong>{t(`value.item_type.${product.itemType}`)}</strong>
+            </span>
+            {category && (
+              <span>
+                {t('field.item_category')}: <strong>{category.name}</strong>
+              </span>
+            )}
+            <span>
               {t('field.base_unit')}: <strong>{product.unit ?? '—'}</strong>
             </span>
             <span>
@@ -362,39 +383,37 @@ function ItemDetails({ productId }: { productId: string }) {
             <span>
               {t('field.available')}: <strong>{balances ? totals.available : '…'}</strong>
             </span>
+            {belowReorder && (
+              <span className="status-badge negative" data-testid="item-below-reorder">
+                {t('panel.item_below_reorder')} ({Number(product.reorderLevel)})
+              </span>
+            )}
           </div>
         </div>
       </div>
 
       <div className="item-tabs" role="tablist">
-        {TABS.map((k, i) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={`item-tab${tab === k ? ' active' : ''}`} onClick={() => selectTab(k)}>
+        {visibleTabs.map((k, i) => (
+          <button key={k} role="tab" aria-selected={activeTab === k} className={`item-tab${activeTab === k ? ' active' : ''}`} onClick={() => selectTab(k)}>
             {i + 1}- {t(TAB_LABEL[k])}
           </button>
         ))}
       </div>
 
       <div className="card item-panel" role="tabpanel">
-        {tab === 'basic' && (
-          <div className="detail-grid">
-            <Field label={t('field.code')} value={product.sku} />
-            <Field label={t('field.name')} value={product.name} />
-            <Field label={t('field.status')} value={<StatusBadge code={`product_status.${product.status}`} />} />
-            <Field label={t('field.base_unit')} value={product.unit ?? '—'} />
-            <Field
-              label={t('field.assigned_warehouses')}
-              value={balances ? balances.filter((b) => b.assigned).map((b) => b.warehouse.code).join('، ') || '—' : '…'}
-            />
-            <Field label={t('field.item_type')} value={notInModel} />
-            <Field label={t('field.category')} value={notInModel} />
-            <Field label={t('field.default_warehouse')} value={notInModel} />
-            <Field label={t('field.reorder_level')} value={notInModel} />
-            <Field label={t('field.description')} value={notInModel} />
-            <Field label={t('field.item_image')} value={notInModel} />
-          </div>
+        {activeTab === 'basic' && (
+          <ItemBasicPanel
+            product={product}
+            categories={categories}
+            assigned={balances ? balances.filter((b) => b.assigned).map((b) => b.warehouse) : null}
+            canEditCatalog={canEdit}
+            canEditWarehouse={canEditWarehouse}
+            onSaved={reloadProduct}
+            onCategoriesChanged={reloadCategories}
+          />
         )}
 
-        {tab === 'balances' &&
+        {activeTab === 'balances' &&
           (balances === null ? (
             <div className="empty-state">Loading…</div>
           ) : balances.length === 0 ? (
@@ -443,7 +462,7 @@ function ItemDetails({ productId }: { productId: string }) {
             </div>
           ))}
 
-        {tab === 'movements' && (
+        {activeTab === 'movements' && (
           <>
             <div className="item-filters">
               <div className="form-field">
@@ -536,14 +555,9 @@ function ItemDetails({ productId }: { productId: string }) {
           </>
         )}
 
-        {tab === 'units' && (
-          <div className="detail-grid">
-            <Field label={t('field.base_unit')} value={product.unit ?? '—'} />
-            <Field label={t('field.barcode')} value={<span className="item-not-in-model">{t('panel.item_no_barcode_model')}</span>} />
-          </div>
-        )}
+        {activeTab === 'units' && <ItemBarcodesPanel productId={product.id} unit={product.unit} canEdit={canEdit} />}
 
-        {tab === 'costing' && (
+        {activeTab === 'costing' && (
           <>
             <div className="detail-grid">
               <Field label={t('field.base_price')} value={product.unitPrice} />
@@ -578,40 +592,7 @@ function ItemDetails({ productId }: { productId: string }) {
           </>
         )}
 
-        {tab === 'bom' &&
-          (bom === undefined ? (
-            <div className="empty-state">Loading…</div>
-          ) : !bom || !bom.components?.length ? (
-            <div className="empty-state">
-              {t('panel.item_no_bom')} — <Link to="/bom">{t('nav.bom')}</Link>
-            </div>
-          ) : (
-            <>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t('field.component')}</th>
-                    <th>{t('field.quantity')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bom.components.map((c) => (
-                    <tr key={c.componentProductId}>
-                      <td>
-                        <Link to={`/inventory/items/${c.componentProductId}${originWarehouseId ? `?warehouseId=${originWarehouseId}` : ''}`}>
-                          {c.sku} — {c.productName}
-                        </Link>
-                      </td>
-                      <td>{String(c.quantityPerUnit)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="item-note">
-                <Link to="/bom">{t('nav.bom')}</Link>
-              </p>
-            </>
-          ))}
+        {activeTab === 'bom' && <ItemBomPanel productId={product.id} originWarehouseId={originWarehouseId} />}
       </div>
     </div>
   );

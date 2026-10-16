@@ -3,6 +3,8 @@ import { PriceList } from './infrastructure/price-list.entity';
 import { PriceListItem } from './infrastructure/price-list-item.entity';
 import { BillOfMaterial } from './infrastructure/bill-of-materials.entity';
 import { BomComponent } from './infrastructure/bom-component.entity';
+import { ProductCategory } from './infrastructure/product-category.entity';
+import { ProductBarcode } from './infrastructure/product-barcode.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Commerce's own
@@ -17,4 +19,4 @@ import { BomComponent } from './infrastructure/bom-component.entity';
  * `bom.controller.ts` itself (Tier 2, not yet retrofitted) still uses its
  * OWN un-scoped methods for everything else on that controller.
  */
-export const COMMERCE_COMPANY_ENTITIES = [Product, PriceList, PriceListItem, BillOfMaterial, BomComponent];
+export const COMMERCE_COMPANY_ENTITIES = [Product, PriceList, PriceListItem, BillOfMaterial, BomComponent, ProductCategory, ProductBarcode];
