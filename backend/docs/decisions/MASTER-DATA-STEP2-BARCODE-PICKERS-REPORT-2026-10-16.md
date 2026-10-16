@@ -21,3 +21,9 @@
 | Warehouse receipt form: scan | adds the line and clears the search (screenshot 02); a second scan of the same item is answered by the form's own duplicate guard |
 
 Not exercised in the browser: the Purchase Order screen, the Inventory filter and the BOM picker use the same component with the same props, but only the Purchase Request and warehouse receipt screens were clicked through.
+
+## 3. After the browser check
+- Real-PG regression on 5546, three specs (product-master-data, products, warehouse-item-assignment): **3 / 3 PASS, 18 tests**. Backend lint 0 errors. The backend change is the data-only migration.
+- Disposable environment torn down: servers on 3611 / 5611 stopped, `daii_test_biz_t97_bc_cp` and `_co` dropped, cluster 5546 holds no test databases.
+- Not covered: a Purchase Order screen click-through (needs a supplier), the Inventory filter and BOM picker. Hosting-only checks stay deferred.
+
