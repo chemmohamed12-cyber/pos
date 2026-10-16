@@ -1,0 +1,8 @@
+{
+  "outcome": {
+    "ok": false,
+    "kind": "ConflictException:409",
+    "message": "Insufficient available stock for product \"49d5ea4e-896b-4180-9af8-bcc286f07516\" in warehouse \"c4b84ace-c902-435d-9cf1-f1515f966d63\": requested 6, available 5."
+  },
+  "fingerprintDiff": []
+}

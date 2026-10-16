@@ -1,0 +1,72 @@
+{
+  "testId": "T-19",
+  "runId": "T-19-20261016T112657Z-c3b3ef",
+  "finishedAt": "2026-10-16T11:27:09.963Z",
+  "results": [
+    {
+      "id": "T-19-customer.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-customer.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-supplier.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-supplier.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "T-19-priceList.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-priceList.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":161,\"d\":161}"
+    },
+    {
+      "id": "T-19-salesRep.create-plain",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-transaction",
+      "status": "PASS",
+      "note": "{\"succeeded\":80,\"expected\":80,\"errors\":{}}"
+    },
+    {
+      "id": "T-19-salesRep.create-codes-distinct",
+      "status": "PASS",
+      "note": "{\"n\":160,\"d\":160}"
+    },
+    {
+      "id": "run-aborted",
+      "status": "STOP",
+      "note": "Nest can't resolve dependencies of the CustomersController (CustomersService, ?, ExcelService). Please make sure that the argument CustomerProfileService at index [1] is available in the RootTestModule context.\n\nPotential solutions:\n- Is RootTestModule a valid NestJS module?\n- If CustomerProfileService is a provider, is it part of the current RootTestModule?\n- If CustomerProfileService is exported from a separate @Module, is that module imported within RootTestModule?\n  @Module({\n    imports: [ "
+    }
+  ]
+}

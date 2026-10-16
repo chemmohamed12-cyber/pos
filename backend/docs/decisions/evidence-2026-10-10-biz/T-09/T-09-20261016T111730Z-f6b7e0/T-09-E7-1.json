@@ -1,0 +1,20 @@
+{
+  "request": {
+    "warehouseId": "b7f689d8-1a9e-4474-8eb3-b09babeb404d",
+    "productId": "ddef8e35-1742-48f3-a574-7fd0cef44625",
+    "quantity": -2,
+    "movementType": "transfer_out"
+  },
+  "user": "16d6d4fa-1a06-4a99-92a0-d39f19a2680d",
+  "status": 410,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "REQUEST_ERROR",
+      "message": "Movement type \"transfer_out\" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns)."
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

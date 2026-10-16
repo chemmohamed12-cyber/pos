@@ -1,0 +1,9 @@
+{
+  "outcome": {
+    "ok": false,
+    "kind": "ConflictException:409",
+    "message": "Insufficient available stock for component \"9ce56307-a516-4eec-a32c-925aafd53f1d\" in warehouse \"96612221-f29e-4132-9f82-6661fc8232b3\": requested 6 (3 x 2), available 5."
+  },
+  "fingerprintDiff": [],
+  "note": "the assembly number is drawn before the transaction (numbering sequence is not in the fingerprint set): a refused assembly may leave a gap in the sequence, not a data effect"
+}

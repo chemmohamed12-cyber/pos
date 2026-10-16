@@ -1,0 +1,186 @@
+{
+  "testId": "T-09",
+  "runId": "T-09-20261016T113115Z-04e3a6",
+  "finishedAt": "2026-10-16T11:31:25.596Z",
+  "results": [
+    {
+      "id": "E1",
+      "status": "PASS",
+      "note": "{\"status\":201}"
+    },
+    {
+      "id": "E2-1",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E2-2",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E2-3",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E2-4",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E3",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E4",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E5",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E6-1",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E6-2",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E6-3",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E7-1",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E7-2",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E8-1",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E8-2",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E9-1",
+      "status": "PASS",
+      "note": "{\"status\":410,\"traceTables\":[]}"
+    },
+    {
+      "id": "E9-2",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E9-3",
+      "status": "PASS",
+      "note": "{\"status\":400,\"traceTables\":[]}"
+    },
+    {
+      "id": "E10-1",
+      "status": "PASS",
+      "note": "{\"status\":404,\"traceTables\":[]}"
+    },
+    {
+      "id": "E10-2",
+      "status": "PASS",
+      "note": "{\"status\":404,\"traceTables\":[]}"
+    },
+    {
+      "id": "E11",
+      "status": "PASS",
+      "note": "{\"status\":404,\"traceTables\":[]}"
+    },
+    {
+      "id": "E12",
+      "status": "PASS",
+      "note": "{\"status\":404,\"traceTables\":[]}"
+    },
+    {
+      "id": "E13",
+      "status": "PASS",
+      "note": "{\"status\":404,\"traceTables\":[]}"
+    },
+    {
+      "id": "E14",
+      "status": "PASS",
+      "note": "{\"status\":201}"
+    },
+    {
+      "id": "observation-negative-stock-after-run",
+      "status": "PASS",
+      "note": "pairs with negative on-hand after the closed-type attempts: 0 (a defect measurement, not a harness fault)"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-09/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":1,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-09/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-09/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":0,\"glArNet\":0}"
+    },
+    {
+      "id": "T-10/T-09/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-09/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":0,\"declaredNonGlTreasury\":0,\"expectedGl\":0,\"glNet\":0}"
+    },
+    {
+      "id": "T-10/T-09/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-09/R7",
+      "status": "PASS",
+      "note": "{\"events\":0,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-09/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-09/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: T-09 against today's code may legitimately leave ledger/valuation divergence created by the defect itself; any R failure here is reported as a finding with the E-case that caused it"
+    },
+    {
+      "id": "T-10/T-09/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}
