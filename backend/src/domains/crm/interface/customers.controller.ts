@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import { IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { CustomersService, CustomerImportRow } from '../application/customers.service';
+import { CustomerProfileService } from '../application/customer-profile.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -123,6 +124,46 @@ class SetFinancialSettingsDto {
   financialStatus?: 'active' | 'on_hold' | 'suspended';
 }
 
+/**
+ * Customer profile (gap matrix §5.3). Every property is optional: `undefined` leaves a field untouched, a blank string/`null` clears it.
+ * Value rules (party type, language, e-mail format, lengths) live in `CustomerProfileService` so the API answers with one clear 400.
+ */
+class UpdateCustomerProfileDto {
+  @IsOptional() @IsString() @MaxLength(255) name?: string;
+  @IsOptional() @IsString() @MaxLength(64) phone?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) whatsappPhone?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) managerName?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) address?: string | null;
+  @IsOptional() @IsString() @MaxLength(128) governorate?: string | null;
+  @IsOptional() @IsString() @MaxLength(16) partyType?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) legalName?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) taxRegistrationNumber?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) vatRegistrationNumber?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) commercialRegistrationNumber?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) email?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) website?: string | null;
+  @IsOptional() @IsString() @MaxLength(8) language?: string | null;
+  @IsOptional() @IsString() @MaxLength(4000) internalNotes?: string | null;
+}
+
+class CustomerContactDto {
+  @IsOptional() @IsString() @MaxLength(255) name?: string;
+  @IsOptional() @IsString() @MaxLength(128) title?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) phone?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) email?: string | null;
+  @IsOptional() @IsBoolean() isPrimary?: boolean;
+}
+
+class CustomerAddressDto {
+  @IsOptional() @IsString() @MaxLength(128) label?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) addressLine?: string;
+  @IsOptional() @IsString() @MaxLength(128) city?: string | null;
+  @IsOptional() @IsString() @MaxLength(128) governorate?: string | null;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+  @IsOptional() @IsBoolean() isBilling?: boolean;
+  @IsOptional() @IsBoolean() isShipping?: boolean;
+}
+
 class SetClassificationDto {
   // empty string clears the classification — same "explicit null-ish clear" convention as SetPriceListDto.
   @IsString()
@@ -197,6 +238,7 @@ const EXPORT_COLUMNS: ColumnSpec[] = [
 export class CustomersController {
   constructor(
     private readonly customers: CustomersService,
+    private readonly profile: CustomerProfileService,
     private readonly excel: ExcelService,
   ) {}
 
@@ -441,6 +483,96 @@ export class CustomersController {
     const manager = req.companyContext.dataSource.manager;
     await this.customers.getCustomer(id, req.user.id, manager);
     return this.customers.setClassification(id, dto.classification || null, req.user.id, manager);
+  }
+
+  // ---- Customer profile (gap matrix §5.3): reads follow the customer read scope; writes need `sales.customer.edit`. ----
+
+  @Get(':id/profile')
+  async getProfile(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager); // the existing row-scope / read-any check
+    return this.profile.getProfile(id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/update') // POST, not PATCH: the shared frontend `api` helper has no PATCH (same convention as suppliers)
+  async updateProfile(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCustomerProfileDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.updateProfile(id, dto, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/contacts')
+  async addContact(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CustomerContactDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.addContact(id, dto, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/contacts/:contactId/update')
+  async updateContact(
+    @Req() req: CompanyScopedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Body() dto: CustomerContactDto,
+  ) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.updateContact(id, contactId, dto, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/contacts/:contactId/remove')
+  async removeContact(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Param('contactId', ParseUUIDPipe) contactId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.removeContact(id, contactId, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/addresses')
+  async addAddress(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CustomerAddressDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.addAddress(id, dto, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/addresses/:addressId/update')
+  async updateAddress(
+    @Req() req: CompanyScopedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('addressId', ParseUUIDPipe) addressId: string,
+    @Body() dto: CustomerAddressDto,
+  ) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.updateAddress(id, addressId, dto, req.user.id, manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('sales.customer.edit', 'editable')
+  @Post(':id/addresses/:addressId/remove')
+  async removeAddress(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Param('addressId', ParseUUIDPipe) addressId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.customers.getCustomer(id, req.user.id, manager);
+    return this.profile.removeAddress(id, addressId, req.user.id, manager);
   }
 
   /** Customer Financial Account / AR (CTO directive §10 — Credit Control) — admin-only, a finance-policy decision. */

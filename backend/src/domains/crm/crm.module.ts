@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Customer } from './infrastructure/customer.entity';
 import { CustomerAssignment } from './infrastructure/customer-assignment.entity';
+import { CustomerAddress } from './infrastructure/customer-address.entity';
+import { CustomerContact } from './infrastructure/customer-contact.entity';
+import { CustomerProfileService } from './application/customer-profile.service';
 import { CustomersService } from './application/customers.service';
 import { CustomersController } from './interface/customers.controller';
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
@@ -18,7 +21,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, CustomerAssignment]),
+    TypeOrmModule.forFeature([Customer, CustomerAssignment, CustomerAddress, CustomerContact]),
     NumberingModule,
     ScopeModule,
     AuditModule,
@@ -35,7 +38,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [CustomersController],
-  providers: [CustomersService, { provide: SALES_CUSTOMERS_CONTRACT, useExisting: CustomersService }],
+  providers: [CustomersService, CustomerProfileService, { provide: SALES_CUSTOMERS_CONTRACT, useExisting: CustomersService }],
   exports: [CustomersService, SALES_CUSTOMERS_CONTRACT],
 })
 export class CrmModule {}
