@@ -8,6 +8,7 @@ src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolatio
 src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
 src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
 src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
 src/domains/accounting/interface/grni.company-isolation.spec.ts
 src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts
 src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
