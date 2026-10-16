@@ -1,0 +1,185 @@
+node: C:/Users/chem_/AppData/Local/Temp/claude/D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new/2459ecb6-c283-4a87-93b2-677ef29fdc92/scratchpad/launcher-test/home/nodevenv/app/20/bin/node (v20.99.0)
+application root: D:/DAII-SIM-1110/deploy/app
+environment source: running application process (pid 4242), 18 variables
+variables (names and presence only): NODE_ENV=set DB_HOST=set DB_PORT=set DB_USER=set DB_NAME=set DB_PASSWORD=set DATABASE_CREDENTIAL_ENCRYPTION_KEY=set JWT_ACCESS_SECRET=MISSING 
+RELEASE_COMPANY_MIGRATIONS=<not set here: engine default is off>
+running: company-migration-catchup.js (mode: catchup)
+[31m[Nest] 3924  - [39m١٧‏/١٠‏/٢٠٢٦، ١:١١:٤٦ ص [31m  ERROR[39m [38;5;3m[PgDumpRunnerService] [39m[31mpg_dump failed for database "daii_test_biz_t98_r630664one"[39m
+Error: spawn C:\Program Files\PostgreSQL8in\pg_dump.exe ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+[31m[Nest] 3924  - [39m١٧‏/١٠‏/٢٠٢٦، ١:١١:٤٦ ص [31m  ERROR[39m [38;5;3m[BackupManagerService] [39m[31mDatabase backup failed for run "006a0990-d8c1-4a0a-8be4-6a97b1435625"[39m
+Error: pg_dump (C:\Program Files\PostgreSQL8in\pg_dump.exe) failed: spawn C:\Program Files\PostgreSQL8in\pg_dump.exe ENOENT
+    at PgDumpRunnerService.dump (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\pg-dump-runner.service.js:70:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async BackupManagerService.runDatabaseArtifact (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\backup-manager.service.js:199:13)
+    at async BackupManagerService.createBackup (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\backup-manager.service.js:81:22)
+    at async CompanyFanoutService.ensureBackups (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\company-fanout.service.js:172:33)
+    at async C:\Users\chem_\AppData\Local\Temp\claude\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\2459ecb6-c283-4a87-93b2-677ef29fdc92\scratchpad\launcher-test\tools\company-migration-catchup.js:167:17
+[31m[Nest] 3924  - [39m١٧‏/١٠‏/٢٠٢٦، ١:١١:٤٦ ص [31m  ERROR[39m [38;5;3m[PgDumpRunnerService] [39m[31mpg_dump failed for database "daii_test_biz_t98_r630664two"[39m
+Error: spawn C:\Program Files\PostgreSQL8in\pg_dump.exe ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+[31m[Nest] 3924  - [39m١٧‏/١٠‏/٢٠٢٦، ١:١١:٤٦ ص [31m  ERROR[39m [38;5;3m[BackupManagerService] [39m[31mDatabase backup failed for run "2ed81c9f-46c0-45b9-bc73-3c8744861805"[39m
+Error: pg_dump (C:\Program Files\PostgreSQL8in\pg_dump.exe) failed: spawn C:\Program Files\PostgreSQL8in\pg_dump.exe ENOENT
+    at PgDumpRunnerService.dump (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\pg-dump-runner.service.js:70:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async BackupManagerService.runDatabaseArtifact (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\backup-manager.service.js:199:13)
+    at async BackupManagerService.createBackup (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\backup-manager.service.js:81:22)
+    at async CompanyFanoutService.ensureBackups (D:\DAII-SIM-1110\deploy\app\dist\foundation\release\company-fanout.service.js:172:33)
+    at async C:\Users\chem_\AppData\Local\Temp\claude\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\2459ecb6-c283-4a87-93b2-677ef29fdc92\scratchpad\launcher-test\tools\company-migration-catchup.js:167:17
+{
+  "mode": "restore points only (no migration)",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "d3d7dcc3-3201-4798-a0da-944d3c79fab2",
+        "name": "r630664one",
+        "database": "daii_test_biz_t98_r630664one",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "8a5b8ecb-cbe0-49aa-98f1-2f8931db3073",
+        "name": "r630664two",
+        "database": "daii_test_biz_t98_r630664two",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [
+    "daii_test_biz_t98_r630664one",
+    "daii_test_biz_t98_r630664two"
+  ],
+  "preflight": [
+    {
+      "check": "P1 active release root",
+      "result": "PASS",
+      "detail": "D:\\DAII-SIM-1110\\deploy\\app runs version 1.1.10"
+    },
+    {
+      "check": "P2 release identity",
+      "result": "PASS",
+      "detail": "release 33e82cda-ac2b-4e27-b828-0d3d522aad0d: version 1.1.10, status succeeded; installed 1.1.10"
+    },
+    {
+      "check": "P3 live release",
+      "result": "PASS",
+      "detail": "last-known-good names release 33e82cda-ac2b-4e27-b828-0d3d522aad0d (1.1.10)"
+    },
+    {
+      "check": "P4 actor identity",
+      "result": "PASS",
+      "detail": "user found, status active"
+    },
+    {
+      "check": "P5 Company database identity",
+      "result": "PASS",
+      "detail": "confirmed [daii_test_biz_t98_r630664one, daii_test_biz_t98_r630664two] vs plan [daii_test_biz_t98_r630664one, daii_test_biz_t98_r630664two]"
+    },
+    {
+      "check": "P6 restore points",
+      "result": "PASS",
+      "detail": "this run takes them"
+    },
+    {
+      "check": "P6b backup policy is create",
+      "result": "PASS",
+      "detail": "RELEASE_COMPANY_BACKUP_POLICY=create (must be create for this stage)"
+    },
+    {
+      "check": "P7 plan has no blockers",
+      "result": "PASS",
+      "detail": "none"
+    },
+    {
+      "check": "P8 something to do",
+      "result": "PASS",
+      "detail": "2 Company database(s) with pending migrations"
+    }
+  ],
+  "status": "REFUSED",
+  "refusedBecause": "Company fan-out blocked: the pre-update backup of Company \"r630664one\" (run 006a0990-d8c1-4a0a-8be4-6a97b1435625) did not verify | the pre-update backup of Company \"r630664two\" (run 2ed81c9f-46c0-45b9-bc73-3c8744861805) did not verify"
+}
+REFUSED (no migration was run, no Company status was changed): a restore point is missing or could not be verified.

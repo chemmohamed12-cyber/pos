@@ -1,0 +1,6 @@
+restore test of the restore point of r458882one:
+  pg_restore --list TOC lines: 1033
+  scratch DB restored: migrations 288 tables 181 (restore point taken at 288 migrations)
+restore test of the restore point of r458882two:
+  pg_restore --list TOC lines: 1033
+  scratch DB restored: migrations 288 tables 181 (restore point taken at 288 migrations)

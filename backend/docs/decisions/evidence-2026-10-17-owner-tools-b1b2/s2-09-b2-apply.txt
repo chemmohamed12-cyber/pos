@@ -1,0 +1,246 @@
+{
+  "mode": "apply",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+        "name": "r458882one",
+        "database": "daii_test_biz_t98_r458882one",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+        "name": "r458882two",
+        "database": "daii_test_biz_t98_r458882two",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [
+    "daii_test_biz_t98_r458882one",
+    "daii_test_biz_t98_r458882two"
+  ],
+  "preflight": [
+    {
+      "check": "P1 active release root",
+      "result": "PASS",
+      "detail": "D:\\DAII-SIM-1110\\deploy\\app runs version 1.1.10"
+    },
+    {
+      "check": "P2 release identity",
+      "result": "PASS",
+      "detail": "release 33e82cda-ac2b-4e27-b828-0d3d522aad0d: version 1.1.10, status succeeded; installed 1.1.10"
+    },
+    {
+      "check": "P3 live release",
+      "result": "PASS",
+      "detail": "last-known-good names release 33e82cda-ac2b-4e27-b828-0d3d522aad0d (1.1.10)"
+    },
+    {
+      "check": "P4 actor identity",
+      "result": "PASS",
+      "detail": "user found, status active"
+    },
+    {
+      "check": "P5 Company database identity",
+      "result": "PASS",
+      "detail": "confirmed [daii_test_biz_t98_r458882one, daii_test_biz_t98_r458882two] vs plan [daii_test_biz_t98_r458882one, daii_test_biz_t98_r458882two]"
+    },
+    {
+      "check": "P6 restore points",
+      "result": "PASS",
+      "detail": "owner flag present; the engine verifies a backup per Company before any migration"
+    },
+    {
+      "check": "P7 plan has no blockers",
+      "result": "PASS",
+      "detail": "none"
+    },
+    {
+      "check": "P8 something to do",
+      "result": "PASS",
+      "detail": "2 Company database(s) with pending migrations"
+    }
+  ],
+  "restorePoints": [
+    {
+      "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+      "backupRunId": "157471d7-d8bf-41e1-a31c-981b72c4f20e",
+      "basis": "recent"
+    },
+    {
+      "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+      "backupRunId": "fb15bc7e-9724-4841-8e62-b7ac353fd661",
+      "basis": "recent"
+    }
+  ],
+  "result": {
+    "ok": true,
+    "migrated": [
+      "r458882one",
+      "r458882two"
+    ],
+    "noop": [],
+    "failed": [],
+    "notAttempted": []
+  },
+  "stillPendingAfterVerify": {},
+  "after": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+        "name": "r458882one",
+        "database": "daii_test_biz_t98_r458882one",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 0,
+        "pending": []
+      },
+      {
+        "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+        "name": "r458882two",
+        "database": "daii_test_biz_t98_r458882two",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 0,
+        "pending": []
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyStatusAfter": [
+    {
+      "company": "r458882one",
+      "status": "READY"
+    },
+    {
+      "company": "r458882two",
+      "status": "READY"
+    }
+  ],
+  "status": "SUCCESS"
+}
+STATUS: SUCCESS

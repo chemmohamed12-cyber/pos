@@ -21,7 +21,7 @@ bash run-owner-tool.sh where     # finds node + environment, prints names only, 
 bash run-owner-tool.sh status    # Stage A (read-only)
 bash run-owner-tool.sh plan      # read-only plan of the repair tool
 ```
-Stage B later: `bash run-owner-tool.sh catchup --apply --actor-email ... --release-id ... --confirm-databases ... --i-confirm-restore-points` (same arguments as below). Everywhere this runbook shows `node company-migration-...js --app-root <ROOT>` you can use the launcher instead.
+Stage B (two steps, B1 then B2, see below) uses `bash run-owner-tool.sh catchup ...`. Everywhere this runbook shows `node company-migration-...js --app-root <ROOT>` you can use the launcher instead.
 If `where` cannot find the environment, export it WITHOUT echoing (values from cPanel -> Setup Node.js App / PostgreSQL Databases), then run it again in the same shell:
 ```
 read -rs -p 'DB_PASSWORD: ' DB_PASSWORD; echo; read -rs -p 'DATABASE_CREDENTIAL_ENCRYPTION_KEY: ' DATABASE_CREDENTIAL_ENCRYPTION_KEY; echo
@@ -52,18 +52,28 @@ Also check the backend log for `QueryFailedError ... does not exist` around the 
 
 STOP and send the output to the team instead of continuing if: a Company is `UNREADABLE`; `platformComplete` is false or the platform has missing migrations; a Company misses migrations other than the 11 above, or has `unknownToThisBuild` entries (use `--json` to see them); a Company is not `READY`; or the log shows a different exception.
 
-## Stage B - repair (only after you reviewed the plan AND have a usable restore point for every affected Company)
-Prerequisites you must confirm yourself: a usable restore point for each Company database listed. With the default policy (`RELEASE_COMPANY_BACKUP_POLICY=create`) the engine takes and verifies one backup per Company before any migration and refuses to start if one fails (needs a working `PG_DUMP_BIN`). If you prefer your own backups use `RELEASE_COMPANY_BACKUP_POLICY=require-recent` (a verified backup newer than `RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS`, default 24 h, must already exist).
+## Stage B - repair in two steps (B1 restore points, B2 migrate). Nothing is migrated in B1.
+Both steps take the same identity arguments. Get the values first: `<uuid>` = the id of the 1.1.10 row (Release Center, DevTools -> Network -> response of `/api/release/releases`, the row with version 1.1.10 and status `succeeded`); `<admin>` = the e-mail of an active platform administrator; `<dbs>` = exactly the `companyDatabasesWithPending` of the plan (comma separated, no spaces), for this host: `xnexdrgr_daii_c01,xnexdrgr_daii_c02`.
+
+### B1 - take and verify the restore points, then STOP (no migration, no Company status change)
 ```
-node company-migration-catchup.js --app-root <ROOT> --apply \
-  --actor-email <platform admin e-mail> \
-  --release-id <uuid of the 1.1.10 row in the Release Center / releases table> \
-  --confirm-databases <db1,db2,...exactly as printed in companyDatabasesWithPending> \
-  --i-confirm-restore-points
+bash run-owner-tool.sh catchup --restore-points-only --actor-email '<admin>' --release-id '<uuid>' --confirm-databases '<dbs>'
 ```
-What it checks before changing anything (each printed as PASS/FAIL under `preflight`; any FAIL = nothing is changed, exit 3): P1 the root is an installed release and its version; P2 the release UUID exists, is `succeeded` and has the installed version; P3 the engine's last-known-good record names the same release; P4 the actor exists and is active; P5 your database list equals exactly the databases with pending migrations; P6 you acknowledged the restore points; P7 the plan has no blockers; P8 there is something to do. Then the engine verifies a restore point per Company, and migrates the Companies one after the other (READY -> MIGRATING -> READY, forward only).
-Expected end: `"status": "SUCCESS"`, `result.migrated` = the Companies, `result.failed` = [], `stillPendingAfterVerify` = {}, every `companyStatusAfter` = READY, last line `STATUS: SUCCESS`, exit 0. Application restart is not needed.
-Running it again prints `STATUS: NOTHING_TO_DO` (exit 0) and changes nothing.
+Runs the same preflight (P1-P5, P6b policy = create, P7, P8), then the engine takes one pg_dump per Company with the host's `pg_dump` and verifies it: the file is non-empty, starts with the custom-format signature `PGDMP`, `pg_restore --list` parses it, and its size and SHA-256 are recorded and re-checked. Expected: `"status": "RESTORE_POINTS_READY"`, one `restorePointDetails` entry per Company with `status: verified`, `sizeBytes`, `sha256` and the absolute `file` path; last line `STATUS: RESTORE_POINTS_READY`, exit 0. If a dump fails: `REFUSED`, exit 3, nothing changed.
+**What "verified" means: a structural check of the archive, NOT a test restore.** Before B2 you can check the files yourself: `pg_restore --list <file> | wc -l` must print a large number (about 1000 for these databases), the size must be plausible, and, if cPanel lets you create a scratch database, restore one file into it (`pg_restore --no-owner --dbname=<scratch db> <file>`) and compare the table count and the `migrations` count (288) with the source. Do not restore into a live Company database.
+
+### B2 - migrate, using exactly those restore points
+```
+RELEASE_COMPANY_BACKUP_POLICY=require-recent bash run-owner-tool.sh catchup --apply --actor-email '<admin>' --release-id '<uuid>' --confirm-databases '<dbs>' --i-confirm-restore-points
+```
+`require-recent` makes the engine refuse (exit 3, nothing changed) unless each Company has a verified backup from the last `RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS` (24 h) - i.e. the ones from B1. A value you export in your shell always wins over the application's own environment. Run B2 within 24 h of B1, or repeat B1.
+Preflight (printed as PASS/FAIL under `preflight`; any FAIL = nothing is changed, exit 3): P1 the root is an installed release and its version; P2 the release UUID exists, is `succeeded` and has the installed version; P3 the engine's last-known-good record names the same release (if it says "not readable", send the output to the team; do not bypass it); P4 the actor exists and is active; P5 your database list equals exactly the databases with pending migrations; P6 you acknowledged the restore points; P7 the plan has no blockers; P8 there is something to do. Then the engine migrates the Companies one after the other (READY -> MIGRATING -> READY, forward only).
+Expected end: `"status": "SUCCESS"`, `result.migrated` = both Companies, `result.failed` = [], `stillPendingAfterVerify` = {}, every `companyStatusAfter` = READY, `restorePoints[].basis` = `recent`, last line `STATUS: SUCCESS`, exit 0. Application restart is not needed. Running it again prints `STATUS: NOTHING_TO_DO` (exit 0) and changes nothing.
+
+### PostgreSQL 10.23 compatibility (what is known)
+- The flags the engine passes to `pg_dump`/`pg_restore --list` (`--host --port --username --no-password --format=custom --file --dbname`) all exist in PostgreSQL 10; the host's `pg_dump` 10.23 matches the 10.23 server (a pg_dump must not be older than the server). Taking a verified backup with this same code already worked on this host for the platform database before the 1.1.10 deploy.
+- The 11 migrations already ran successfully on the host's PostgreSQL 10.23 against the platform database (all 11 shown as applied). The Company databases receive the same SQL. A static scan found no construct newer than PostgreSQL 10 (no generated columns, `INCLUDE` indexes, procedures, partitioning, ...). The three `gen_random_uuid()` defaults rely on the compatibility function that the first core migration (`CreateUsers`) creates in every database, as documented in PRODUCTION_DEPLOYMENT_GUIDE.md.
+- What is NOT proven: a run on a real PostgreSQL 10 server (the team's test server is PostgreSQL 18). The migration of one Company runs in a single transaction, so any failure leaves that Company exactly as it was.
 
 ## Stop conditions and exit codes
 | Exit / last line | Meaning | What to do |

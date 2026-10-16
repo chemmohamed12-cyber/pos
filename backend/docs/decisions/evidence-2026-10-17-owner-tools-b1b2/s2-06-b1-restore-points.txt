@@ -1,0 +1,188 @@
+{
+  "mode": "restore points only (no migration)",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+        "name": "r458882one",
+        "database": "daii_test_biz_t98_r458882one",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+        "name": "r458882two",
+        "database": "daii_test_biz_t98_r458882two",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [
+    "daii_test_biz_t98_r458882one",
+    "daii_test_biz_t98_r458882two"
+  ],
+  "preflight": [
+    {
+      "check": "P1 active release root",
+      "result": "PASS",
+      "detail": "D:\\DAII-SIM-1110\\deploy\\app runs version 1.1.10"
+    },
+    {
+      "check": "P2 release identity",
+      "result": "PASS",
+      "detail": "release 33e82cda-ac2b-4e27-b828-0d3d522aad0d: version 1.1.10, status succeeded; installed 1.1.10"
+    },
+    {
+      "check": "P3 live release",
+      "result": "PASS",
+      "detail": "last-known-good names release 33e82cda-ac2b-4e27-b828-0d3d522aad0d (1.1.10)"
+    },
+    {
+      "check": "P4 actor identity",
+      "result": "PASS",
+      "detail": "user found, status active"
+    },
+    {
+      "check": "P5 Company database identity",
+      "result": "PASS",
+      "detail": "confirmed [daii_test_biz_t98_r458882one, daii_test_biz_t98_r458882two] vs plan [daii_test_biz_t98_r458882one, daii_test_biz_t98_r458882two]"
+    },
+    {
+      "check": "P6 restore points",
+      "result": "PASS",
+      "detail": "this run takes them"
+    },
+    {
+      "check": "P6b backup policy is create",
+      "result": "PASS",
+      "detail": "RELEASE_COMPANY_BACKUP_POLICY=create (must be create for this stage)"
+    },
+    {
+      "check": "P7 plan has no blockers",
+      "result": "PASS",
+      "detail": "none"
+    },
+    {
+      "check": "P8 something to do",
+      "result": "PASS",
+      "detail": "2 Company database(s) with pending migrations"
+    }
+  ],
+  "restorePoints": [
+    {
+      "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+      "backupRunId": "157471d7-d8bf-41e1-a31c-981b72c4f20e",
+      "basis": "created"
+    },
+    {
+      "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+      "backupRunId": "fb15bc7e-9724-4841-8e62-b7ac353fd661",
+      "basis": "created"
+    }
+  ],
+  "restorePointDetails": [
+    {
+      "company": "r458882one",
+      "backupRunId": "157471d7-d8bf-41e1-a31c-981b72c4f20e",
+      "artifact": "database",
+      "status": "verified",
+      "sizeBytes": "558303",
+      "sha256": "98a933de0a014869c1f9fd8a4b789516753f6819a508180eba69d06350d96ce6",
+      "verifiedAt": "2026-10-16T22:08:05.889Z",
+      "file": "D:\\DAII-SIM-1110\\storage\\backups\\db\\157471d7-d8bf-41e1-a31c-981b72c4f20e.dump"
+    },
+    {
+      "company": "r458882two",
+      "backupRunId": "fb15bc7e-9724-4841-8e62-b7ac353fd661",
+      "artifact": "database",
+      "status": "verified",
+      "sizeBytes": "558303",
+      "sha256": "8f5ed485b51dc6ffe6ef9cc82a4b49a18a23d246ac42c58805a2f682c81d69b8",
+      "verifiedAt": "2026-10-16T22:08:06.757Z",
+      "file": "D:\\DAII-SIM-1110\\storage\\backups\\db\\fb15bc7e-9724-4841-8e62-b7ac353fd661.dump"
+    }
+  ],
+  "verificationMeans": "pg_dump custom format; file non-empty; PGDMP magic; pg_restore --list parses it; size and SHA-256 recorded and re-checked. This is a structural check, NOT a test restore.",
+  "next": "Check the files yourself (pg_restore --list <file>), then run Stage B with RELEASE_COMPANY_BACKUP_POLICY=require-recent so it uses exactly these restore points (valid for RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS, default 24).",
+  "status": "RESTORE_POINTS_READY"
+}
+STATUS: RESTORE_POINTS_READY

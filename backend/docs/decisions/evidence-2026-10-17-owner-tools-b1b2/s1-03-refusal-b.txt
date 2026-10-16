@@ -1,0 +1,1 @@
+REFUSED (nothing was changed): --apply needs --i-confirm-restore-points (the owner confirms a usable restore point exists for every affected Company database)

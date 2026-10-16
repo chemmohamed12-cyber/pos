@@ -1,0 +1,182 @@
+{
+  "mode": "apply",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "450954ec-00a7-4732-ac96-567f27df0073",
+        "name": "A-Verify",
+        "database": "daii_test_biz_t98_sim_co",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "bc8d472f-20fd-4caf-80f0-a86f5f13db0d",
+        "name": "B-Fail",
+        "database": "daii_test_biz_t98_sim_co2",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "703aec80-d194-4e19-99d3-7ac76f546aa7",
+        "name": "C-After",
+        "database": "daii_test_biz_t98_sim_co3",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [
+    "daii_test_biz_t98_sim_co",
+    "daii_test_biz_t98_sim_co2",
+    "daii_test_biz_t98_sim_co3"
+  ],
+  "preflight": [
+    {
+      "check": "P1 active release root",
+      "result": "PASS",
+      "detail": "D:\\DAII-SIM-1110\\deploy\\app runs version 1.1.10"
+    },
+    {
+      "check": "P2 release identity",
+      "result": "PASS",
+      "detail": "release 33e82cda-ac2b-4e27-b828-0d3d522aad0d: version 1.1.10, status succeeded; installed 1.1.10"
+    },
+    {
+      "check": "P3 live release",
+      "result": "PASS",
+      "detail": "last-known-good names release 33e82cda-ac2b-4e27-b828-0d3d522aad0d (1.1.10)"
+    },
+    {
+      "check": "P4 actor identity",
+      "result": "FAIL",
+      "detail": "no unique user with that e-mail"
+    },
+    {
+      "check": "P5 Company database identity",
+      "result": "PASS",
+      "detail": "confirmed [daii_test_biz_t98_sim_co, daii_test_biz_t98_sim_co2, daii_test_biz_t98_sim_co3] vs plan [daii_test_biz_t98_sim_co, daii_test_biz_t98_sim_co2, daii_test_biz_t98_sim_co3]"
+    },
+    {
+      "check": "P6 restore points",
+      "result": "PASS",
+      "detail": "owner flag present; the engine verifies a backup per Company before any migration"
+    },
+    {
+      "check": "P7 plan has no blockers",
+      "result": "PASS",
+      "detail": "none"
+    },
+    {
+      "check": "P8 something to do",
+      "result": "PASS",
+      "detail": "3 Company database(s) with pending migrations"
+    }
+  ],
+  "status": "REFUSED"
+}
+REFUSED (nothing was changed): a preflight check failed.

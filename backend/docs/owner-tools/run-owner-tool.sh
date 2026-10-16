@@ -76,6 +76,7 @@ else
     while IFS= read -r -d '' kv; do
       k="${kv%%=*}"
       [[ "$k" =~ $KEYRE ]] || continue
+      [ -n "${!k+x}" ] && continue   # a value you exported yourself in this shell always wins (e.g. RELEASE_COMPANY_BACKUP_POLICY)
       export "$kv"; n=$((n+1))
     done < "$p/environ"
     if [ "$n" -gt 0 ] && [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ]; then SOURCE="running application process (pid ${p##*/}), $n variables"; break; fi

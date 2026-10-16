@@ -1,0 +1,71 @@
+##### SCENARIO 1: default policy (create): refusals, failing run, recovery, no-op  [Companies A-Verify, B-Fail(sabotaged), C-After]
+refusal a exit 3
+refusal b exit 3
+refusal c exit 3
+refusal d exit 3
+refusal e exit 3
+refusal f exit 3
+refusals changed nothing
+failing run exit 2
+STATUS: FAILED
+{"platform":{"audit":124,"backups":21,"migrations":299},"companies":"A-Verify:READY B-Fail:READY C-After:READY","mig_A":299,"mig_B":288,"mig_C":288}
+(fixture: cause removed)
+recovery exit 0
+STATUS: SUCCESS
+second run exit 0
+STATUS: NOTHING_TO_DO
+{"platform":{"audit":133,"backups":23,"migrations":299},"companies":"A-Verify:READY B-Fail:READY C-After:READY","mig_A":299,"mig_B":299,"mig_C":299}
+##### SCENARIO 2: owner flow with REAL restore point verification  [fresh Companies without any backup]
+databases: daii_test_biz_t98_r458882one,daii_test_biz_t98_r458882two
+{"backups":23,"m1":288,"m2":288}
+B2 require-recent without restore points exit 3
+  "status": "REFUSED",
+{"backups":23,"m1":288,"m2":288}
+B1 wrong policy exit 3
+B1 exit 0
+STATUS: RESTORE_POINTS_READY
+{"backups":25,"m1":288,"m2":288}
+r458882one database verified 558303B | r458882two database verified 558303B
+sed: -e expression #1, char 7: unterminated `s' command
+pg_restore: error: could not open input file "": No such file or directory
+restore test r458882one: TOC lines 0
+pg_restore: error: could not open input file "": No such file or directory
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\pg\lib\client.js:694
+          Error.captureStackTrace(err)
+                ^
+
+error: relation "migrations" does not exist
+    at D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\pg\lib\client.js:694:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async [eval]:1:198 {
+  length: 109,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '30',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1501',
+  routine: 'parserOpenTable'
+}
+
+Node.js v20.20.2
+B2 apply exit 0
+STATUS: SUCCESS
+{"backups":25,"m1":299,"m2":299}
+["recent","recent"] {"ok":true,"migrated":["r458882one","r458882two"],"noop":[],"failed":[],"notAttempted":[]}
+second run exit 0
+STATUS: NOTHING_TO_DO
+COMPANY   R273712one [READY/INACTIVE] db=daii_test_biz_t98_r273712one: INCOMPLETE (11 missing), 288 recorded
+COMPANY   R273712two [READY/INACTIVE] db=daii_test_biz_t98_r273712two: INCOMPLETE (11 missing), 288 recorded
+COMPANY   r458882one [READY/ACTIVE] db=daii_test_biz_t98_r458882one: COMPLETE, 299 recorded
+COMPANY   r458882two [READY/ACTIVE] db=daii_test_biz_t98_r458882two: COMPLETE, 299 recorded
+files containing the DB password: 0

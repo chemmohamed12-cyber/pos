@@ -16,6 +16,9 @@
  *   P6 restore points        : --i-confirm-restore-points (the owner has reviewed that a usable restore point is available for every affected Company);
  *                              then the engine itself takes (policy `create`, default) or requires (`require-recent`) a VERIFIED backup per Company BEFORE any
  *                              migration and refuses to start otherwise.
+ * Stage B1 (--restore-points-only, same identity arguments, needs RELEASE_COMPANY_BACKUP_POLICY=create): runs the same preflight, takes and verifies the restore points,
+ * prints their file paths, sizes and SHA-256, and STOPS. It migrates nothing and does not change any Company status. Stage B2 (--apply) can then use them with
+ * RELEASE_COMPANY_BACKUP_POLICY=require-recent.
  * Then, per Company (READY only), sequentially: READY -> MIGRATING -> migrate -> READY. The first failure STOPS the run: later Companies are "not attempted"
  * and untouched; the tool exits 2 and prints STATUS: FAILED. Nothing is ever dropped, reset or rolled back. Each migration is recorded exactly once by TypeORM;
  * a second run finds nothing pending and does nothing.
@@ -55,11 +58,14 @@ const refuse = (m, extra) => {
 
 const APP_ROOT = path.resolve(opt('--app-root') || process.cwd());
 const APPLY = flag('--apply');
+const RP_ONLY = flag('--restore-points-only'); // Stage B1: take and verify the restore points, then STOP (no migration, no Company status change)
 if (!fs.existsSync(path.join(APP_ROOT, 'dist', 'main.js')) || !fs.existsSync(path.join(APP_ROOT, 'node_modules'))) refuse(`${APP_ROOT} is not an installed release root (dist/main.js or node_modules missing); pass --app-root <ACTIVE root>`);
 if (Number(process.versions.node.split('.')[0]) < 20) refuse(`Node.js ${process.versions.node} is too old; the application requires >= 20`);
-if (APPLY) {
-  for (const n of ['--actor-email', '--release-id', '--confirm-databases']) if (opt(n) === undefined) refuse(`--apply needs ${n}`);
-  if (!flag('--i-confirm-restore-points')) refuse('--apply needs --i-confirm-restore-points (the owner confirms a usable restore point exists for every affected Company database)');
+if (APPLY && RP_ONLY) refuse('--apply and --restore-points-only are different stages; use one of them');
+if (APPLY || RP_ONLY) {
+  const what = APPLY ? '--apply' : '--restore-points-only';
+  for (const n of ['--actor-email', '--release-id', '--confirm-databases']) if (opt(n) === undefined) refuse(`${what} needs ${n}`);
+  if (APPLY && !flag('--i-confirm-restore-points')) refuse('--apply needs --i-confirm-restore-points (the owner confirms a usable restore point exists for every affected Company database)');
 }
 
 const nm = (p) => require(path.join(APP_ROOT, 'node_modules', p));
@@ -98,13 +104,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const before = await fanout.plan(APP_ROOT);
     const withPending = before.planned.filter((c) => c.pending.length > 0);
     const report = {
-      mode: APPLY ? 'apply' : 'plan (read-only)',
+      mode: APPLY ? 'apply' : RP_ONLY ? 'restore points only (no migration)' : 'plan (read-only)',
       installedBuild: installedVersion,
       platformDatabase: { name: db.database, migrationsRecorded: platform[0].n, head: platform[0].head },
       before: summarizePlan(before),
       companyDatabasesWithPending: withPending.map((c) => c.databaseName).sort(),
     };
-    if (!APPLY) {
+    if (!APPLY && !RP_ONLY) {
       report.note = 'Nothing was changed. Companies with pendingCount > 0 are on the OLD schema under the NEW code. To repair, review this plan, then run with --apply (see the header).';
       return out(report);
     }
@@ -142,7 +148,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const confirmed = [...new Set(String(opt('--confirm-databases')).split(',').map((s) => s.trim()).filter(Boolean))].sort();
     const expected = [...new Set(withPending.map((c) => c.databaseName))].sort();
     check('P5 Company database identity', JSON.stringify(confirmed) === JSON.stringify(expected), `confirmed [${confirmed.join(', ')}] vs plan [${expected.join(', ')}]`);
-    check('P6 restore points acknowledged', flag('--i-confirm-restore-points'), 'owner flag present; the engine verifies a backup per Company before any migration');
+    check('P6 restore points', RP_ONLY || flag('--i-confirm-restore-points'), RP_ONLY ? 'this run takes them' : 'owner flag present; the engine verifies a backup per Company before any migration');
+    if (RP_ONLY) check('P6b backup policy is create', config.releaseDeploy.companyBackupPolicy === 'create', `RELEASE_COMPANY_BACKUP_POLICY=${config.releaseDeploy.companyBackupPolicy} (must be create for this stage)`);
     check('P7 plan has no blockers', before.blockers.length === 0, before.blockers.length === 0 ? 'none' : before.blockers.join(' | '));
     check('P8 something to do', withPending.length > 0, `${withPending.length} Company database(s) with pending migrations`);
     report.preflight = checks;
@@ -155,8 +162,38 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // ---------------- APPLY ----------------
     const actor = actorRow[0].id;
-    const backups = await fanout.ensureBackups(before, actor); // throws before ANY migration if a Company has no verified restore point
+    let backups;
+    try {
+      backups = await fanout.ensureBackups(before, actor); // throws before ANY migration if a Company has no verified restore point
+    } catch (e) {
+      if (e && e.name === 'CompanyFanoutBlockedError') {
+        report.status = 'REFUSED';
+        report.refusedBecause = redact(e.message);
+        out(report);
+        console.error('REFUSED (no migration was run, no Company status was changed): a restore point is missing or could not be verified.');
+        process.exit(3);
+      }
+      throw e;
+    }
     report.restorePoints = backups;
+    if (RP_ONLY) {
+      const ids = backups.map((x) => x.backupRunId);
+      const rows = await ds.query(
+        `SELECT c.name AS company, r.id AS "backupRunId", r."completedAt", a.type, a.status, a."sizeBytes"::text AS "sizeBytes", a."checksumSha256", a."verifiedAt", a."filePath"
+           FROM backup_runs r JOIN backup_artifacts a ON a."backupRunId" = r.id LEFT JOIN companies c ON c.id = r."companyId" WHERE r.id = ANY($1) ORDER BY c.name, a.type`,
+        [ids],
+      );
+      const root = path.resolve(APP_ROOT, config.releaseBackup.storagePath);
+      report.restorePointDetails = rows.map((r) => ({ company: r.company, backupRunId: r.backupRunId, artifact: r.type, status: r.status, sizeBytes: r.sizeBytes, sha256: r.checksumSha256, verifiedAt: r.verifiedAt, file: path.join(root, r.filePath) }));
+      report.verificationMeans = 'pg_dump custom format; file non-empty; PGDMP magic; pg_restore --list parses it; size and SHA-256 recorded and re-checked. This is a structural check, NOT a test restore.';
+      report.next = 'Check the files yourself (pg_restore --list <file>), then run Stage B with RELEASE_COMPANY_BACKUP_POLICY=require-recent so it uses exactly these restore points (valid for RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS, default 24).';
+      const ok = rows.length >= backups.length && rows.every((r) => r.status === 'verified');
+      report.status = ok ? 'RESTORE_POINTS_READY' : 'FAILED';
+      out(report);
+      console.log(`STATUS: ${report.status}`);
+      process.exitCode = ok ? 0 : 2;
+      return;
+    }
     const result = await fanout.migrate(before, APP_ROOT, actor, releaseId, backups);
     report.result = summarizeResult(result);
     report.stillPendingAfterVerify = await fanout.verify(before, APP_ROOT); // must be empty

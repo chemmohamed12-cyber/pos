@@ -1,0 +1,104 @@
+{
+  "mode": "plan (read-only)",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "ddd41fbb-5cd0-4c88-bb6c-ace472471197",
+        "name": "r458882one",
+        "database": "daii_test_biz_t98_r458882one",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      },
+      {
+        "companyId": "c2ea9803-158a-43f6-8699-7d346c0c3e4d",
+        "name": "r458882two",
+        "database": "daii_test_biz_t98_r458882two",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 11,
+        "pending": [
+          "SeedItemDetailsTerminology1790014000000",
+          "CreateProductCategories1790015000000",
+          "AddProductMasterFields1790015100000",
+          "CreateProductBarcodes1790015200000",
+          "SeedItemMasterTerminology1790015300000",
+          "SeedBarcodeLookupTerminology1790015400000",
+          "AddCustomerProfileFields1790016000000",
+          "CreateCustomerAddressesAndContacts1790016100000",
+          "SeedProfileTerminology1790016200000",
+          "AddSupplierProfileFields1790016300000",
+          "SeedSupplierProfileTerminology1790016400000"
+        ]
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [
+    "daii_test_biz_t98_r458882one",
+    "daii_test_biz_t98_r458882two"
+  ],
+  "note": "Nothing was changed. Companies with pendingCount > 0 are on the OLD schema under the NEW code. To repair, review this plan, then run with --apply (see the header)."
+}
