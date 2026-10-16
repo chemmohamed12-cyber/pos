@@ -1,0 +1,22 @@
+{
+  "testId": "T-26",
+  "runId": "T-26-20261016T170932Z-e20253",
+  "finishedAt": "2026-10-16T17:09:40.592Z",
+  "results": [
+    {
+      "id": "L0-healthy-baseline",
+      "status": "PASS",
+      "note": "{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"65948fe921\"},{\"seq\":2,\"prev10\":\"65948fe921\",\"hash10\":\"67a7c32a62\"},{\"seq\":3,\"prev10\":\"67a7c32a62\",\"hash10\":\"724a6c8bfd\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":3}"
+    },
+    {
+      "id": "L1-sequence-behind-max-seq-refused-chain-valid-sequence-unchanged",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 3, nextSeq 2); no audit record written; realign the sequence under change control\"},\"after\":{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"65948fe921\"},{\"seq\":2,\"prev10\":\"65948fe921\",\"hash10\":\"67a7c32a62\"},{\"seq\":3,\"prev10\":\"67a7c32a62\",\"hash10\":\"724a6c8bfd\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":1}}"
+    },
+    {
+      "id": "L2-explicit-seq-above-sequence-refused-no-out-of-order-row-chain-valid",
+      "status": "PASS",
+      "note": "{\"importedSeq\":103,\"chainValidBeforeAppend\":true,\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 103, nextSeq 4); no audit record written; realign the sequence under change control\"},\"after\":{\"rows\":[{\"seq\":1,\"prev10\":\"0000000000\",\"hash10\":\"65948fe921\"},{\"seq\":2,\"prev10\":\"65948fe921\",\"hash10\":\"67a7c32a62\"},{\"seq\":3,\"prev10\":\"67a7c32a62\",\"hash10\":\"724a6c8bfd\"},{\"seq\":103,\"prev10\":\"724a6c8bfd\",\"hash10\":\"b45083313e\"}],\"chainValid\":true,\"brokenAtSeq\":null,\"sequenceLastValue\":3}}"
+    }
+  ]
+}

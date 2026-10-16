@@ -1,0 +1,199 @@
+{
+  "P1-plain": [
+    {
+      "round": 0,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    },
+    {
+      "round": 1,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "ConflictException:409": 7,
+        "OK": 1
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    },
+    {
+      "round": 2,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "ConflictException:409": 7,
+        "OK": 1
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    }
+  ],
+  "P1-transaction": [
+    {
+      "round": 0,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    },
+    {
+      "round": 1,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "OK": 1,
+        "ConflictException:409": 7
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    },
+    {
+      "round": 2,
+      "calls": 8,
+      "ok": 1,
+      "tally": {
+        "ConflictException:409": 7,
+        "OK": 1
+      },
+      "invoiceTotal": 100,
+      "remainingAfter": 40,
+      "payments": 1,
+      "paidTotal": 60,
+      "ledgerCredits": 1,
+      "treasuryTxns": 1,
+      "auditRows": 1
+    }
+  ],
+  "P2-rollback": {
+    "rolledBack": true,
+    "balanceBefore": "10360.00",
+    "balanceAfter": "10360.00",
+    "payments": 0,
+    "paidTotal": 0,
+    "ledgerCredits": 0,
+    "treasuryTxns": 0,
+    "auditRows": 0
+  },
+  "P2-retry": {
+    "retryOk": true,
+    "payments": 1,
+    "paidTotal": 40,
+    "ledgerCredits": 1,
+    "treasuryTxns": 1,
+    "auditRows": 1
+  },
+  "P4-plain": {
+    "paymentId": "71e3c332-ed06-4f0b-bbe6-b6a595246558",
+    "balanceDelta": 60,
+    "payments": 1,
+    "paidTotal": 60,
+    "ledgerCredits": 1,
+    "treasuryTxns": 1,
+    "auditRows": 1,
+    "secondRefused": true,
+    "remainderAccepted": true,
+    "end": {
+      "payments": 2,
+      "paidTotal": 100,
+      "ledgerCredits": 2,
+      "treasuryTxns": 2,
+      "auditRows": 2
+    }
+  },
+  "P4-transaction": {
+    "paymentId": "b95d8f80-1a0b-49b3-99a0-c8e79b59668a",
+    "balanceDelta": 60,
+    "payments": 1,
+    "paidTotal": 60,
+    "ledgerCredits": 1,
+    "treasuryTxns": 1,
+    "auditRows": 1,
+    "secondRefused": true,
+    "remainderAccepted": true,
+    "end": {
+      "payments": 2,
+      "paidTotal": 100,
+      "ledgerCredits": 2,
+      "treasuryTxns": 2,
+      "auditRows": 2
+    }
+  },
+  "P5-recordPayment-plain": {
+    "method": "recordPayment",
+    "style": "plain",
+    "failed": true,
+    "balanceBefore": "10600.00",
+    "balanceAfter": "10600.00",
+    "paymentRows": 0,
+    "orphanCashIn": 0,
+    "retryOk": true
+  },
+  "P5-recordPayment-transaction": {
+    "method": "recordPayment",
+    "style": "transaction",
+    "failed": true,
+    "balanceBefore": "10650.00",
+    "balanceAfter": "10650.00",
+    "paymentRows": 0,
+    "orphanCashIn": 0,
+    "retryOk": true
+  },
+  "P5-recordOnAccountPayment-plain": {
+    "method": "recordOnAccountPayment",
+    "style": "plain",
+    "failed": true,
+    "balanceBefore": "10700.00",
+    "balanceAfter": "10700.00",
+    "paymentRows": 0,
+    "orphanCashIn": 0,
+    "retryOk": true
+  },
+  "P5-recordOnAccountPayment-transaction": {
+    "method": "recordOnAccountPayment",
+    "style": "transaction",
+    "failed": true,
+    "balanceBefore": "10750.00",
+    "balanceAfter": "10750.00",
+    "paymentRows": 0,
+    "orphanCashIn": 0,
+    "retryOk": true
+  },
+  "P3": {
+    "chainValid": true
+  }
+}

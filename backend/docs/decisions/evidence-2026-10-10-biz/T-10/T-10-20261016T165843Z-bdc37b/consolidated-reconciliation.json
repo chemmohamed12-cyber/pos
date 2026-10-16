@@ -1,0 +1,148 @@
+{
+  "commit": "b99964a88949128d2fe48977214556d5a7e46d46",
+  "runs": {
+    "T-01": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-01\\T-01-20261016T165432Z-030bd5",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-03": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-03\\T-03-20261016T165456Z-aaabdd",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-05": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-05\\T-05-20261016T165543Z-ef39f9",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-06": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-06\\T-06-20261016T165609Z-6f4f5e",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-07": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-07\\T-07-20261016T165634Z-14c5ee",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-08": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-08\\T-08-20261016T165702Z-547992",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-00": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-00\\T-00-20261016T165409Z-9498b8",
+      "checks": null
+    },
+    "T-09": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-09\\T-09-20261016T165730Z-527027",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-11": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-11\\T-11-20261016T165757Z-4d7d17",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    },
+    "T-12": {
+      "dir": "<root>\\backend\\docs\\decisions\\evidence-2026-10-10-biz\\T-12\\T-12-20261016T165821Z-e0ca6a",
+      "checks": [
+        "R1:PASS",
+        "R2:PASS",
+        "R3:PASS",
+        "R4:PASS",
+        "R5:PASS",
+        "R6:PASS",
+        "R7:PASS",
+        "R8:PASS",
+        "R9:PASS",
+        "R10:PASS"
+      ]
+    }
+  },
+  "problems": [],
+  "informational": [
+    "T-06/T-06x-INFO: FAIL-DEFECT (candidate defect, judged by its own case)"
+  ]
+}
