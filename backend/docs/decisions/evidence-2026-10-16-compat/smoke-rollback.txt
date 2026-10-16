@@ -1,0 +1,18 @@
+PASS | health/deep | 200
+PASS | frontend index served | status=200 assets=/assets/index-Dlh-DC93.js,/assets/index-BU4-jLer.css
+PASS | asset /assets/index-Dlh-DC93.js | 200
+PASS | asset /assets/index-BU4-jLer.css | 200
+PASS | login | 201
+PASS | select-company | 201
+PASS | GET /customers | 200 
+PASS | GET /products/all | 200 
+FAIL | GET /products/lookup (new route: unknown code answers 404 NOT_FOUND) | 500
+PASS | GET /inventory/warehouses | 200 
+PASS | GET /procurement/suppliers | 200 
+PASS | GET /procurement/purchase-orders | 200 
+PASS | GET /accounting/trial-balance | 200 
+PASS | POST /customers | 201 {"success":true,"data":{"id":"8e2970f3-64cc-40f3-b2f3-c38ee1fe4291","code":"CUST-000002","name":"Sim Customer","phone":"
+FAIL | GET /customers/:id/profile (new) | 404 {"success":false,"error":{"code":"NOT_FOUND","message":"Cannot GET /api/customers/8e2970f3-64cc-40f3-b2f3-c38ee1fe4291/profile"},"meta":{"correlationId":"5be9f7
+FAIL | POST customer profile update (new fields) | 404 {"success":false,"error":{"code":"NOT_FOUND","message":"Cannot POST /api/customers/8e2970f3-64cc-40f3-b2f3-c38ee1fe4291/
+PASS | POST /procurement/suppliers | 201 {"success":true,"data":{"id":"660e6194-5b6c-429e-8645-9b6dedcfcc19","code":"SUP-000002","legalName":"Sim Supplier","trad
+TOTAL 14 pass 3 fail

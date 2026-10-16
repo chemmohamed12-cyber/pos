@@ -1,0 +1,12 @@
+fresh-1.1.10 vs upgraded-company(1.1.9->1.1.10): objects 3842 3827 onlyFresh 15 onlyUpgraded 0
+   con collections collections_collectorUserId_fkey FOREIGN KEY ("collectorUserId") REFERENCES users(id)
+   con credentials credentials_userId_fkey FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+   con customer_assignments customer_assignments_salesRepUserId_fkey FOREIGN KEY ("salesRepUserId") REFERENCES users(id) ON DELETE CASCADE
+   con delivery_outcomes delivery_outcomes_recordedByUserId_fkey FOREIGN KEY ("recordedByUserId") REFERENCES users(id)
+   con deposits deposits_reviewedByUserId_fkey FOREIGN KEY ("reviewedByUserId") REFERENCES users(id)
+fresh-1.1.10 vs upgraded-platform: onlyFresh 5 onlyUpgraded 0
+   idx customers CREATE INDEX "IDX_customers_createdAt" ON public.customers USING btree ("createdAt")
+   idx sales_orders CREATE INDEX "IDX_sales_orders_createdAt" ON public.sales_orders USING btree ("createdAt")
+   idx shipments CREATE INDEX "IDX_shipments_createdAt" ON public.shipments USING btree ("createdAt")
+   idx treasury_transactions CREATE INDEX "IDX_treasury_transactions_createdAt" ON public.treasury_transactions USING btree ("createdAt")
+   idx warehouse_transactions CREATE INDEX "IDX_warehouse_transactions_createdAt" ON public.warehouse_transactions USING btree ("createdAt")

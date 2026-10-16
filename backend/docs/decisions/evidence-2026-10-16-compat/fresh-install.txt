@@ -1,0 +1,4 @@
+FRESH INSTALL success= true ran= 299 
+SECOND RUN (duplicate-execution protection) success= true ran= 0
+RERUN ON UPGRADED COMPANY DB success= true ran= 0
+fresh migrations table rows= 299

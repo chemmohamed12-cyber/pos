@@ -1,0 +1,18 @@
+PASS | health/deep | 200
+PASS | frontend index served | status=200 assets=/assets/index-mNYeebqj.js,/assets/index-5VYmP2IN.css
+PASS | asset /assets/index-mNYeebqj.js | 200
+PASS | asset /assets/index-5VYmP2IN.css | 200
+PASS | login | 201
+PASS | select-company | 201
+PASS | GET /customers | 200 
+PASS | GET /products/all | 200 
+FAIL | GET /products/lookup (new route, unknown code → 404 expected) | 404 {"success":false,"error":{"code":"NOT_FOUND","message":"No item has the code or barcode \"ZZZ\"."},"meta":{"correlationId":"7ed725ab-b319-434b-8b65-ee7f9812b0dd
+PASS | GET /inventory/warehouses | 200 
+PASS | GET /procurement/suppliers | 200 
+PASS | GET /procurement/purchase-orders | 200 
+PASS | GET /accounting/trial-balance | 200 
+PASS | POST /customers | 201 {"success":true,"data":{"id":"93a36ee8-64fa-4c11-9b66-14fbad4b29e7","code":"CUST-000001","name":"Sim Customer","phone":"
+PASS | GET /customers/:id/profile (new) | 200 
+PASS | POST customer profile update (new fields) | 201 
+PASS | POST /procurement/suppliers | 201 {"success":true,"data":{"id":"6c6a1da1-d910-42a5-8e5e-8b71077f1818","code":"SUP-000001","legalName":"Sim Supplier","trad
+TOTAL 16 pass 1 fail

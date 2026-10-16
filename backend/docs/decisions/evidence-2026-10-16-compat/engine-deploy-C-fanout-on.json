@@ -1,0 +1,117 @@
+[31m[Nest] 15760  - [39m١٦‏/١٠‏/٢٠٢٦، ١١:٣٥:١٦ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31m[DIAG f064242d] scanDeltaMigrations connection=daii_biz_test@127.0.0.1:5546/daii_test_biz_t98_sim_cp migrationsLoaded=299 executedCount=288 pendingCount=11 pendingNames=["SeedItemDetailsTerminology1790014000000","CreateProductCategories1790015000000","AddProductMasterFields1790015100000","CreateProductBarcodes1790015200000","SeedItemMasterTerminology1790015300000","SeedBarcodeLookupTerminology1790015400000","AddCustomerProfileFields1790016000000","CreateCustomerAddressesAndContacts1790016100000","SeedProfileTerminology1790016200000","AddSupplierProfileFields1790016300000","SeedSupplierProfileTerminology1790016400000"][39m
+{
+  "releaseId": "f88b9832-e054-4fa3-98c3-ea9b22548440",
+  "version": "1.1.10",
+  "status": "succeeded",
+  "errorMessage": null,
+  "events": [
+    {
+      "seq": 3,
+      "action": "release.registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.10\", \"packageType\": \"full\"}"
+    },
+    {
+      "seq": 4,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"176d4757-0b8d-4df6-857e-1381209d38a9\"}"
+    },
+    {
+      "seq": 5,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 6,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 7,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app.next-f88b9832-e054-4fa3-98c3-ea9b22548440\\\\dist\\\\main.js + D:\\\\DAII-SIM-1110\\\\deploy\\\\app.next-f88b9832-e054-4fa3-98c3-ea9b22548440\\\\package.json\", \"status\": \"pass\"}, {\"name\": \"dist_syntax\", \"detail\": \"1001 dist .js checked, 0 bad\", \"status\": \"pass\"}, {\"name\": \"frontend_bundle\", \"detail\": \"2 asset ref(s) resolve\", \"status\""
+    },
+    {
+      "seq": 8,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 9,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 10,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"SeedSupplierProfileTerminology1790016400000\", \"current\": \"ReclassifyOrganizationAdministration1790013000000\", \"pending\": [\"SeedItemDetailsTerminology1790014000000\", \"CreateProductCategories1790015000000\", \"AddProductMasterFields1790015100000\", \"CreateProductBarcodes1790015200000\", \"SeedItemMasterTerminology1790015300000\", \"SeedBarcodeLookupTerminology1790015400000\", \"AddCustomerProfile"
+    },
+    {
+      "seq": 11,
+      "action": "release.deploy.company_fanout_plan",
+      "result": "success",
+      "after": "{\"mode\": \"on\", \"scope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"skipped\": [], \"blockers\": [], \"companies\": [{\"name\": \"Verify Co\", \"tags\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales"
+    },
+    {
+      "seq": 14,
+      "action": "release.deploy.company_backups",
+      "result": "success",
+      "after": "{\"policy\": \"create\", \"backups\": [{\"basis\": \"created\", \"companyId\": \"450954ec-00a7-4732-ac96-567f27df0073\", \"backupRunId\": \"eebe2c9d-70d3-4a7d-a48b-460fb0748d6a\"}]}"
+    },
+    {
+      "seq": 15,
+      "action": "release.deploy.company_migration_started",
+      "result": "success",
+      "after": "{\"tags\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"pending\": [\"SeedItemDetailsTerminology1790014000000\", \"CreateProductCategories1790015000000\", \"AddProductMasterFields1790015100000\", \"CreateProductBarcodes1790015200000\", \"SeedItemMasterTerminology1790015300000\", \"SeedBarcodeLookupT"
+    },
+    {
+      "seq": 16,
+      "action": "release.deploy.company_migration_succeeded",
+      "result": "success",
+      "after": "{\"tags\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"executed\": [\"SeedItemDetailsTerminology1790014000000\", \"CreateProductCategories1790015000000\", \"AddProductMasterFields1790015100000\", \"CreateProductBarcodes1790015200000\", \"SeedItemMasterTerminology1790015300000\", \"SeedBarcodeLookup"
+    },
+    {
+      "seq": 17,
+      "action": "release.deploy.company_fanout",
+      "result": "success",
+      "after": "{\"ok\": true, \"mode\": \"on\", \"noop\": [], \"failed\": [], \"migrated\": [\"Verify Co\"], \"notAttempted\": []}"
+    },
+    {
+      "seq": 18,
+      "action": "release.deploy.company_fanout_verified",
+      "result": "success",
+      "after": "{\"companies\": [{\"status\": \"migrated\", \"company\": \"Verify Co\"}]}"
+    },
+    {
+      "seq": 19,
+      "action": "release.deploy.swapped",
+      "result": "success",
+      "after": "{\"activePath\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app\", \"previousPath\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app.prev-f88b9832-e054-4fa3-98c3-ea9b22548440\"}"
+    },
+    {
+      "seq": 20,
+      "action": "release.deploy.restart_triggered",
+      "result": "success",
+      "after": "{\"phase\": \"deploy\", \"restartFile\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app\\\\tmp\\\\restart.txt\"}"
+    },
+    {
+      "seq": 21,
+      "action": "release.deploy.evidence",
+      "result": "success",
+      "after": "{\"layers\": {\"deployment\": \"ok (files swapped, migrations verified, health check ok)\", \"applicationStartup\": {\"reason\": \"RELEASE_READINESS_URL not configured\", \"status\": \"UNVERIFIED\"}, \"functionalReadiness\": {\"detail\": {\"reason\": \"application startup was not verified\"}, \"status\": \"skipped\"}}, \"outcome\": \"DEPLOYED_UNVERIFIED\", \"engineVersion\": \"1.1.9\", \"releaseVersion\": \"1.1.10\"}"
+    },
+    {
+      "seq": 22,
+      "action": "release.deploy.succeeded",
+      "result": "success",
+      "after": "{\"outcome\": \"DEPLOYED_UNVERIFIED\", \"swapped\": true}"
+    }
+  ]
+}

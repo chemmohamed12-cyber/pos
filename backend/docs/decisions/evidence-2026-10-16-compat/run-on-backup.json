@@ -1,0 +1,13 @@
+{
+  "backupRunId": "176d4757-0b8d-4df6-857e-1381209d38a9",
+  "status": "completed",
+  "artifacts": [
+    {
+      "type": "database",
+      "status": "verified",
+      "sizeBytes": "560451",
+      "filePath": "db\\176d4757-0b8d-4df6-857e-1381209d38a9.dump",
+      "checksumSha256": "667700f5fa764238dd57d45388b40fa4e0bd021711a1fa85531362bc139beab1"
+    }
+  ]
+}

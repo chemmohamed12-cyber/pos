@@ -1,0 +1,13 @@
+PASS | create product 1 | 201
+PASS | create product 2 | 201
+PASS | add barcode (new migration table) | 201
+PASS | duplicate barcode on another item is refused (409) | 409 Barcode "622993168697" is already assigned to another item.
+PASS | lookup by barcode resolves the item | 200 matchedBy=barcode
+PASS | lookup by SKU | 200
+PASS | customer contact (new table) | 201
+PASS | customer address (new table) | 201
+PASS | customer profile aggregates contacts+addresses | 200
+PASS | supplier profile update (new columns) | 201
+PASS | PO list filtered by supplier (new param) | 200
+PASS | company isolation: platform-scope token (no company) is refused on a company route | 403
+TOTAL 12 pass 0 fail

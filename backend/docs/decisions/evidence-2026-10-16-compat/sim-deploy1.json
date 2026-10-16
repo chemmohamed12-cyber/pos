@@ -1,0 +1,87 @@
+[31m[Nest] 7176  - [39m١٦‏/١٠‏/٢٠٢٦، ١١:٢٢:٥٥ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31m[DIAG f064242d] scanDeltaMigrations connection=daii_biz_test@127.0.0.1:5546/daii_test_biz_t98_sim_cp migrationsLoaded=299 executedCount=288 pendingCount=11 pendingNames=["SeedItemDetailsTerminology1790014000000","CreateProductCategories1790015000000","AddProductMasterFields1790015100000","CreateProductBarcodes1790015200000","SeedItemMasterTerminology1790015300000","SeedBarcodeLookupTerminology1790015400000","AddCustomerProfileFields1790016000000","CreateCustomerAddressesAndContacts1790016100000","SeedProfileTerminology1790016200000","AddSupplierProfileFields1790016300000","SeedSupplierProfileTerminology1790016400000"][39m
+{
+  "releaseId": "1220d1ee-dea0-45fb-a5fa-bd457e7ea621",
+  "version": "1.1.10",
+  "status": "succeeded",
+  "errorMessage": null,
+  "events": [
+    {
+      "seq": 3,
+      "action": "release.registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.10\", \"packageType\": \"full\"}"
+    },
+    {
+      "seq": 4,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"5283c4c9-fad5-4c79-add9-5bba38a12fd8\"}"
+    },
+    {
+      "seq": 5,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 6,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 7,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app.next-1220d1ee-dea0-45fb-a5fa-bd457e7ea621\\\\dist\\\\main.js + D:\\\\DAII-SIM-1110\\\\deploy\\\\app.next-1220d1ee-dea0-45fb-a5fa-bd457e7ea621\\\\package.json\", \"status\": \"pass\"}, {\"name\": \"dist_syntax\", \"detail\": \"1001 dist .js checked, 0 bad\", \"status\": \"pass\"}, {\"name\": \"frontend_bundle\", \"detail\": \"2 asset ref(s) resolve\", \"status\""
+    },
+    {
+      "seq": 8,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 9,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 10,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"SeedSupplierProfileTerminology1790016400000\", \"current\": \"ReclassifyOrganizationAdministration1790013000000\", \"pending\": [\"SeedItemDetailsTerminology1790014000000\", \"CreateProductCategories1790015000000\", \"AddProductMasterFields1790015100000\", \"CreateProductBarcodes1790015200000\", \"SeedItemMasterTerminology1790015300000\", \"SeedBarcodeLookupTerminology1790015400000\", \"AddCustomerProfile"
+    },
+    {
+      "seq": 11,
+      "action": "release.deploy.company_fanout",
+      "result": "success",
+      "after": "{\"mode\": \"off\", \"note\": \"Company databases are not part of this deployment (RELEASE_COMPANY_MIGRATIONS=off); none was read or written.\"}"
+    },
+    {
+      "seq": 12,
+      "action": "release.deploy.swapped",
+      "result": "success",
+      "after": "{\"activePath\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app\", \"previousPath\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app.prev-1220d1ee-dea0-45fb-a5fa-bd457e7ea621\"}"
+    },
+    {
+      "seq": 13,
+      "action": "release.deploy.restart_triggered",
+      "result": "success",
+      "after": "{\"phase\": \"deploy\", \"restartFile\": \"D:\\\\DAII-SIM-1110\\\\deploy\\\\app\\\\tmp\\\\restart.txt\"}"
+    },
+    {
+      "seq": 14,
+      "action": "release.deploy.evidence",
+      "result": "success",
+      "after": "{\"layers\": {\"deployment\": \"ok (files swapped, migrations verified, health check ok)\", \"applicationStartup\": {\"reason\": \"RELEASE_READINESS_URL not configured\", \"status\": \"UNVERIFIED\"}, \"functionalReadiness\": {\"detail\": {\"reason\": \"application startup was not verified\"}, \"status\": \"skipped\"}}, \"outcome\": \"DEPLOYED_UNVERIFIED\", \"engineVersion\": \"1.1.9\", \"releaseVersion\": \"1.1.10\"}"
+    },
+    {
+      "seq": 15,
+      "action": "release.deploy.succeeded",
+      "result": "success",
+      "after": "{\"outcome\": \"DEPLOYED_UNVERIFIED\", \"swapped\": true}"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+cp migrations 299 | new migrations present once: 11/11 (all n=1: true) | legacy dup timestamps 14 | new columns 15 | new tables customer_addresses,customer_contacts,product_barcodes,product_categories
+co migrations 299 | new migrations present once: 11/11 (all n=1: true) | legacy dup timestamps 14 | new columns 15 | new tables customer_addresses,customer_contacts,product_barcodes,product_categories

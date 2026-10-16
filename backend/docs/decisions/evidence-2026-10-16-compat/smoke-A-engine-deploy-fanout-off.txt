@@ -1,0 +1,16 @@
+PASS | health/deep | 200
+PASS | frontend index served | status=200 assets=/assets/index-mNYeebqj.js,/assets/index-5VYmP2IN.css
+PASS | asset /assets/index-mNYeebqj.js | 200
+PASS | asset /assets/index-5VYmP2IN.css | 200
+PASS | login | 201
+PASS | select-company | 201
+FAIL | GET /customers | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"0aa6f187-bc37-4b19-beda-eccade6ccb41"}}
+FAIL | GET /products/all | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"bdc73083-f944-4e7d-ab71-edea1f13e48b"}}
+FAIL | GET /products/lookup (new route, unknown code → 404 expected) | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"1849d488-5ab8-43fb-91a3-6437a71f95d7"}}
+PASS | GET /inventory/warehouses | 200 
+FAIL | GET /procurement/suppliers | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"9272c1bb-9231-486d-8146-41ab082ecf14"}}
+PASS | GET /procurement/purchase-orders | 200 
+PASS | GET /accounting/trial-balance | 200 
+FAIL | POST /customers | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"9c
+FAIL | POST /procurement/suppliers | 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"An unexpected error occurred."},"meta":{"correlationId":"cf
+TOTAL 9 pass 6 fail
