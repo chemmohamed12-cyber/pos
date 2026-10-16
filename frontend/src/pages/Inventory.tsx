@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -47,6 +47,7 @@ type SortColumn = (typeof SORTABLE_COLUMNS)[number];
 export function Inventory() {
   const { can } = useAuth();
   const { t, preload } = useLanguage();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
@@ -99,6 +100,7 @@ export function Inventory() {
     'field.rejected_rows',
     'field.row',
     'field.errors',
+    'action.open_item_details',
   ]);
 
   useEffect(() => {
@@ -191,6 +193,9 @@ export function Inventory() {
       setSortDir('asc');
     }
   }
+
+  // The originating warehouse travels with the item link so its page can return here.
+  const itemHref = (productId: string) => `/inventory/items/${productId}${warehouseId ? `?warehouseId=${warehouseId}` : ''}`;
 
   const totalPages = useMemo(() => (data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1), [data]);
 
@@ -330,16 +335,33 @@ export function Inventory() {
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.productId}>
-                    <td>{r.sku}</td>
-                    <td>{r.name}</td>
+                  // Item Details click-through: the whole row opens the item; SKU and name are real links (keyboard / new tab).
+                  <tr key={r.productId} className="clickable-row" onClick={() => navigate(itemHref(r.productId))}>
+                    <td>
+                      <Link to={itemHref(r.productId)} onClick={(e) => e.stopPropagation()} title={t('action.open_item_details')}>
+                        {r.sku}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link to={itemHref(r.productId)} onClick={(e) => e.stopPropagation()} title={t('action.open_item_details')}>
+                        {r.name}
+                      </Link>
+                    </td>
                     <td>{r.unit ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {r.assigned ? (
                         <>
                           <span style={{ color: '#166534' }}>{t('value.assigned.yes')}</span>
                           {can('inventory.warehouse.edit', 'editable') && (
-                            <button className="btn btn-secondary" style={{ marginInlineStart: 8 }} title={t('action.remove_from_warehouse')} onClick={() => removeItem(r.productId)}>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ marginInlineStart: 8 }}
+                              title={t('action.remove_from_warehouse')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeItem(r.productId);
+                              }}
+                            >
                               ×
                             </button>
                           )}

@@ -1,0 +1,25 @@
+{
+  "seededCodes": 43,
+  "before": {
+    "mine": 43,
+    "others": {
+      "h": "a4631d3581a8638bf01cde38fbe0f846",
+      "n": 932
+    }
+  },
+  "afterDown": {
+    "mine": 0,
+    "others": {
+      "h": "a4631d3581a8638bf01cde38fbe0f846",
+      "n": 932
+    }
+  },
+  "afterUp": {
+    "mine": 43,
+    "others": {
+      "h": "a4631d3581a8638bf01cde38fbe0f846",
+      "n": 932
+    }
+  },
+  "othersUnchanged": true
+}

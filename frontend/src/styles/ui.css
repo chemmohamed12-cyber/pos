@@ -400,3 +400,139 @@ table.data-table {
   font-size: 0.85rem;
   text-align: center;
 }
+
+/* Inventory grid -> Item Details click-through (2026-10-15). */
+tr.clickable-row {
+  cursor: pointer;
+}
+tr.clickable-row:hover td {
+  background: #f5f8ff;
+}
+
+/* Item Details page — header with a reserved image area, numbered section tabs (as in the product-definition reference), one panel. */
+.item-breadcrumb {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-block-end: 4px;
+}
+.item-header {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-block-end: 16px;
+}
+.item-image {
+  flex: 0 0 112px;
+  height: 112px;
+  border: 1px dashed #c9cfda;
+  border-radius: 8px;
+  background: #f6f7f9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #8a93a3;
+}
+.item-image-initials {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #9aa3b2;
+}
+.item-image-caption {
+  font-size: 0.72rem;
+  text-align: center;
+  padding-inline: 6px;
+}
+.item-header-main {
+  min-width: 0;
+}
+.item-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.item-sku {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #374151;
+  margin-block: 4px 10px;
+}
+.item-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+.item-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 0;
+}
+.item-tab {
+  border: 1px solid #e2e5eb;
+  border-block-end: none;
+  background: #f2f3f5;
+  color: #4b5563;
+  padding: 10px 16px;
+  border-start-start-radius: 8px;
+  border-start-end-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.item-tab.active {
+  background: #fff;
+  color: #2f5fd7;
+  font-weight: 600;
+  box-shadow: inset 0 -3px 0 #2f5fd7;
+}
+.item-panel {
+  border-start-start-radius: 0;
+}
+.item-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.item-filters .form-field {
+  margin-block-end: 0;
+  min-width: 180px;
+}
+.item-note {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-block: 10px;
+}
+.item-not-in-model {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #9aa3b2;
+}
+.item-doc-number {
+  white-space: nowrap;
+}
+.item-ledger-opening td {
+  background: #f9fafb;
+  font-style: italic;
+}
+.item-reconciled {
+  color: #166534;
+  font-size: 0.85rem;
+}
+@media (max-width: 900px) {
+  .item-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .item-tab {
+    flex: 1 1 calc(50% - 8px);
+    border-radius: 6px;
+    border-block-end: 1px solid #e2e5eb;
+  }
+  .item-panel {
+    border-start-start-radius: 8px;
+    margin-block-start: 8px;
+  }
+}

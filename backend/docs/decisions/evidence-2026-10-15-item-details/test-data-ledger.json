@@ -1,0 +1,46 @@
+{
+  "docs": [
+    {
+      "id": "d0ba0aff-8293-4500-aee5-4f70e4093a4a",
+      "type": "transfer",
+      "transactionNumber": "WH-TR-2026-000001",
+      "state": "posted"
+    },
+    {
+      "id": "a12a384d-0786-4e3e-bcfe-b19d88cd4cab",
+      "type": "issue",
+      "transactionNumber": "WH-OUT-2026-000001",
+      "state": "posted"
+    }
+  ],
+  "ledger": [
+    {
+      "code": "WH-RAW",
+      "movementType": "receipt",
+      "q": 100,
+      "referenceType": null,
+      "at": "2026-10-15 20:15:22.638869+03"
+    },
+    {
+      "code": "WH-RAW",
+      "movementType": "transfer_out",
+      "q": -30,
+      "referenceType": "warehouse_transaction",
+      "at": "2026-10-15 20:15:37.646324+03"
+    },
+    {
+      "code": "WH-PROD",
+      "movementType": "transfer_in",
+      "q": 30,
+      "referenceType": "warehouse_transaction",
+      "at": "2026-10-15 20:15:37.646324+03"
+    },
+    {
+      "code": "WH-RAW",
+      "movementType": "dispatch",
+      "q": -5,
+      "referenceType": "warehouse_transaction",
+      "at": "2026-10-15 20:15:37.744322+03"
+    }
+  ]
+}
