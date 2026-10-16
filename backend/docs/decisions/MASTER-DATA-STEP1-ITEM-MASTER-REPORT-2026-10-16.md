@@ -88,7 +88,7 @@
 | Check | Result |
 |---|---|
 | New real-PG spec `product-master-data.company-isolation` (6 tests: DB constraints, categories, item fields, default warehouse, barcodes, lookup, Company isolation) | **6/6 PASS** (`new-spec-run.log`) |
-| Focused real-PG regression, 31 specs: every regression-list spec using products, BOM, inventory, manufacturing or the lifecycle gate, plus scope and permission acceptance | _see §4a_ |
+| Focused real-PG regression, 31 specs: every regression-list spec using products, BOM, inventory, manufacturing or the lifecycle gate, plus scope and permission acceptance | **PASS 36/36** (§4a) |
 | Backend build / lint / structure / unit / db-guard (worktree) | PASS; lint 0 errors / 5 warnings, unit 60 suites / 436 tests, db-guard 50/50 — all equal to the baseline (the unit suite includes the warehouse-scope route-coverage spec, which covers the new inventory route) |
 | Frontend `tsc -b` / build / lint | PASS / PASS / 0 errors, 56 warnings, none in the new files |
 | Every label key used by the page | seeded (checked against all migrations) |
@@ -122,3 +122,11 @@
 - **Tooling:**
   - A local `backend/.env` was copied into the worktree. It is git-ignored and is needed to run `dist/main.js`.
   - `md-backend` / `md-frontend` entries were added to `.claude/launch.json` (developer tooling).
+
+## 4a. Verification after integration onto `integration/local-2026-10-16` (907d47c)
+- Item master step 1 was re-applied onto the integration branch (Item Details, Cash Flow, F11, warehouse column). `ItemDetails.tsx` extends the committed component: **all six tabs and the Edit button stay as committed**. `ui.css` keeps both rule sets. `App.tsx` and `Inventory.tsx` are identical to the integration branch.
+- DB-free gates: backend build + lint 0 errors; frontend build + lint 0 errors; `test:unit` 60 suites / 436 tests; `test:db-guard` 50/50.
+- **Focused real-PG regression on 127.0.0.1:5546:** 36 / 36 specs PASS, 237 tests passed, 0 failed, 1 skipped (`evidence-2026-10-16-item-master/focused-regression.log`, list in `focused-regression-list.txt`).
+- **Coexistence with the customer and supplier profiles** (throwaway merge with integration 682701d, since removed): 7 / 7 specs PASS, 47 tests (`coexistence-with-profiles.log`). The merge was clean; only `regression-specs-all.txt` auto-merged.
+- Not re-run here: the browser acceptance of this step (recorded on the earlier base, screenshots 01-05). It is repeated on the integration preview after the merge.
+
