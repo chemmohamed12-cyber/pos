@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../authentication/jwt-auth.guard';
 import { CompanyContextGuard } from '../company/company-context.guard';
 import { AllExceptionsFilter } from '../error-contract/all-exceptions.filter';
 import { ExcelService } from '../excel/excel.service';
+import { CustomerProfileService } from '../../domains/crm/application/customer-profile.service';
 import { PermissionService } from '../permission/permission.service';
 import { RolePermission } from '../permission/role-permission.entity';
 import { AuthorizationContextService } from '../authorization/authorization-context.service';
@@ -106,6 +107,7 @@ describe('T-19 — concurrent creates through the numbering-based endpoints (pla
           providers: [
             { provide: CustomersService, useValue: customers },
             { provide: ExcelService, useValue: {} },
+            { provide: CustomerProfileService, useValue: {} },
             // the controller's route-level PermissionGuard (other routes) is resolved at module compile time: same real services as T-09/T-16
             { provide: PermissionService, useValue: new PermissionService(e.h.controlPlane.getRepository(RolePermission), authz) },
             { provide: AuthorizationContextService, useValue: new AuthorizationContextService(e.h.controlPlane) },
