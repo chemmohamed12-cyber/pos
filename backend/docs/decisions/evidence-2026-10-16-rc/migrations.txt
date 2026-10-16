@@ -1,0 +1,11 @@
+backend/src/database/migrations/core/1790014000000-SeedItemDetailsTerminology.ts
+backend/src/database/migrations/core/1790015300000-SeedItemMasterTerminology.ts
+backend/src/database/migrations/core/1790015400000-SeedBarcodeLookupTerminology.ts
+backend/src/database/migrations/core/1790016200000-SeedProfileTerminology.ts
+backend/src/database/migrations/core/1790016400000-SeedSupplierProfileTerminology.ts
+backend/src/database/migrations/procurement/1790016300000-AddSupplierProfileFields.ts
+backend/src/database/migrations/sales/1790015000000-CreateProductCategories.ts
+backend/src/database/migrations/sales/1790015100000-AddProductMasterFields.ts
+backend/src/database/migrations/sales/1790015200000-CreateProductBarcodes.ts
+backend/src/database/migrations/sales/1790016000000-AddCustomerProfileFields.ts
+backend/src/database/migrations/sales/1790016100000-CreateCustomerAddressesAndContacts.ts
