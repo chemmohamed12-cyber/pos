@@ -8,9 +8,27 @@ Why: after 1.1.10 the platform database is at 299 migrations, but Company databa
 |---|---|---|
 | `company-migration-status.js` | `35a07d963b7e6ce8032cd16a42bc0a8fc20e9d78020f7e7bd3efbdaa91e35901` | Stage A. Strictly read-only (Company connections are forced read-only). |
 | `company-migration-catchup.js` | `8b09c97d10439b6c98e9b1f5a315b8e4be3d377306305738e2d4bb7d94a8a582` | Plan mode (read-only) and Stage B (`--apply`). |
+| `run-owner-tool.sh` | see `SHA256SUMS` | Launcher for the host (node + environment, no secrets printed). |
 
 Check them before use: put both files and `SHA256SUMS` in one folder and run `sha256sum -c SHA256SUMS` (both lines must say OK). Do not run a file that does not match.
 Both files only use code that is already installed with the application (the Release Engine of the ACTIVE release, TypeORM, pg). They contain no SQL that changes data (only SELECTs). The migrations themselves are run by the engine's own Company fan-out service, with its own restore points, status handling and audit records. They are not part of the 1.1.10 package and change nothing in it.
+
+## Host launcher (use this on the cPanel/CloudLinux host) - `run-owner-tool.sh`
+A bare SSH shell on this host has no `node` (see PRODUCTION_DEPLOYMENT_GUIDE.md "Node runtime note"), and the variables set in Setup Node.js App are not in that shell. `run-owner-tool.sh` (third file, listed in `SHA256SUMS`) finds Node.js >= 20 (`~/nodevenv/<app root>/<20>/bin/node`, then any `~/nodevenv/**/20/bin/node`, then `/opt/alt/alt-nodejs*/root/usr/bin/node`) and takes the application's environment from, in order: variables already exported in your shell, a `.env` in the application root, or the environment of the RUNNING application process of the same user. It prints only NAMES and "set/MISSING", never values; it edits nothing and never adds `--apply`. Default application root: `/home/xnexdrgr/daii.xnexustech.com/release-new/backend` (override with `DAII_APP_ROOT`).
+```
+cd /home/xnexdrgr/daii.xnexustech.com/daii-owner-tools && sha256sum -c SHA256SUMS      # all three OK
+bash run-owner-tool.sh where     # finds node + environment, prints names only, runs nothing
+bash run-owner-tool.sh status    # Stage A (read-only)
+bash run-owner-tool.sh plan      # read-only plan of the repair tool
+```
+Stage B later: `bash run-owner-tool.sh catchup --apply --actor-email ... --release-id ... --confirm-databases ... --i-confirm-restore-points` (same arguments as below). Everywhere this runbook shows `node company-migration-...js --app-root <ROOT>` you can use the launcher instead.
+If `where` cannot find the environment, export it WITHOUT echoing (values from cPanel -> Setup Node.js App / PostgreSQL Databases), then run it again in the same shell:
+```
+read -rs -p 'DB_PASSWORD: ' DB_PASSWORD; echo; read -rs -p 'DATABASE_CREDENTIAL_ENCRYPTION_KEY: ' DATABASE_CREDENTIAL_ENCRYPTION_KEY; echo
+export DB_PASSWORD DATABASE_CREDENTIAL_ENCRYPTION_KEY DB_HOST=127.0.0.1 DB_PORT=5432 DB_USER=<cPanel db user> DB_NAME=<cPanel db name> NODE_ENV=development
+```
+(`NODE_ENV=development` only relaxes the production secret checks for this read-only tool; use the exact production `DATABASE_CREDENTIAL_ENCRYPTION_KEY`, otherwise the Company database credentials cannot be decrypted.) The guide says the application runs under Passenger, not PM2; if it does run under PM2 the launcher still works (it matches the process by its application root).
+If it still reports no Node.js: `ls -d ~/nodevenv/*/*/20 ~/nodevenv/*/*/*/20 ~/nodevenv/*/*/*/*/20 2>/dev/null` and set `DAII_NODE=<that folder>/bin/node`.
 
 ## Requirements
 - Node.js 20 or newer (the application's own requirement; tested with 20.20.2). Use the same Node.js the application runs with.
