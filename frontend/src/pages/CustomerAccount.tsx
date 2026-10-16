@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { CustomerProfileTab } from './CustomerProfileTab';
 
 interface Customer {
   id: string;
@@ -110,7 +111,7 @@ interface TreasuryAccount {
   name: string;
 }
 
-type Tab = 'ledger' | 'invoices' | 'ar_aging';
+type Tab = 'ledger' | 'invoices' | 'ar_aging' | 'profile';
 
 /**
  * Customer Financial Account / Invoice / AR (CTO directive §11 — Customer
@@ -127,6 +128,7 @@ export function CustomerAccount() {
   const { t, preload } = useLanguage();
 
   preload([
+    'panel.customer_profile',
     'field.customer_account',
     'field.credit_limit',
     'field.available_credit',
@@ -541,6 +543,9 @@ export function CustomerAccount() {
         <button className={tab === 'ar_aging' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('ar_aging')}>
           {t('panel.ar_aging')}
         </button>
+        <button className={tab === 'profile' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('profile')}>
+          {t('panel.customer_profile')}
+        </button>
         <button className="btn btn-secondary" onClick={() => navigate('/returns')}>
           {t('nav.returns')}
         </button>
@@ -837,6 +842,8 @@ export function CustomerAccount() {
           )}
         </div>
       )}
+
+      {tab === 'profile' && id && <CustomerProfileTab customerId={id} />}
 
       {tab === 'ar_aging' &&
         (arAging.length === 0 ? (

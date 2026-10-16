@@ -25,6 +25,7 @@ src/domains/commerce/interface/price-lists.company-isolation.spec.ts
 src/domains/commerce/interface/products.company-isolation.spec.ts
 src/domains/commission/interface/commission.company-isolation.spec.ts
 src/domains/crm/interface/customers.company-isolation.spec.ts
+src/domains/crm/interface/customer-profile.company-isolation.spec.ts
 src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts
 src/domains/customer-finance/interface/invoices.company-isolation.spec.ts
 src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts

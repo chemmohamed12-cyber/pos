@@ -1,5 +1,7 @@
 import { Customer } from './infrastructure/customer.entity';
 import { CustomerAssignment } from './infrastructure/customer-assignment.entity';
+import { CustomerAddress } from './infrastructure/customer-address.entity';
+import { CustomerContact } from './infrastructure/customer-contact.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). CRM's own
@@ -10,4 +12,4 @@ import { CustomerAssignment } from './infrastructure/customer-assignment.entity'
  * `getOrderDetailView`'s own retrofit). `CustomerAssignment` included
  * alongside `Customer` — same domain, same completeness-scan finding.
  */
-export const CRM_COMPANY_ENTITIES = [Customer, CustomerAssignment];
+export const CRM_COMPANY_ENTITIES = [Customer, CustomerAssignment, CustomerAddress, CustomerContact];

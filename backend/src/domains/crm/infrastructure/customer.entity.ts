@@ -119,6 +119,37 @@ export class Customer {
   @Column({ type: 'varchar', length: 16, default: 'active' })
   financialStatus!: 'active' | 'on_hold' | 'suspended';
 
+  /**
+   * Customer profile (gap matrix §5.3, migration 1790016000000) — all nullable descriptive fields. They are profile data only: no ledger,
+   * order or snapshot contract reads them, and the legacy `name` / `phone` / `address` / `governorate` keep their meaning (D-MD6).
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  partyType!: 'company' | 'individual' | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  legalName!: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  taxRegistrationNumber!: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  vatRegistrationNumber!: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  commercialRegistrationNumber!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  website!: string | null;
+
+  @Column({ type: 'varchar', length: 8, nullable: true })
+  language!: 'ar' | 'en' | null;
+
+  @Column({ type: 'text', nullable: true })
+  internalNotes!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
