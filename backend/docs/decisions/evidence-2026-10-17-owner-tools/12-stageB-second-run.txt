@@ -1,0 +1,101 @@
+{
+  "mode": "apply",
+  "installedBuild": "1.1.10",
+  "platformDatabase": {
+    "name": "daii_test_biz_t98_sim_cp",
+    "migrationsRecorded": 299,
+    "head": "1790016400000"
+  },
+  "before": {
+    "mode": "off",
+    "companies": [
+      {
+        "companyId": "450954ec-00a7-4732-ac96-567f27df0073",
+        "name": "A-Verify",
+        "database": "daii_test_biz_t98_sim_co",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 0,
+        "pending": []
+      },
+      {
+        "companyId": "bc8d472f-20fd-4caf-80f0-a86f5f13db0d",
+        "name": "B-Fail",
+        "database": "daii_test_biz_t98_sim_co2",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 0,
+        "pending": []
+      },
+      {
+        "companyId": "703aec80-d194-4e19-99d3-7ac76f546aa7",
+        "name": "C-After",
+        "database": "daii_test_biz_t98_sim_co3",
+        "tags": [
+          "accounting",
+          "attendance",
+          "commission",
+          "core",
+          "finance",
+          "hr",
+          "inventory",
+          "logistics",
+          "manufacturing",
+          "payroll",
+          "procurement",
+          "sales",
+          "targets"
+        ],
+        "pendingCount": 0,
+        "pending": []
+      }
+    ],
+    "skipped": [],
+    "blockers": [],
+    "scope": [
+      "accounting",
+      "attendance",
+      "commission",
+      "core",
+      "finance",
+      "hr",
+      "inventory",
+      "logistics",
+      "manufacturing",
+      "payroll",
+      "procurement",
+      "sales",
+      "targets"
+    ]
+  },
+  "companyDatabasesWithPending": [],
+  "status": "NOTHING_TO_DO",
+  "note": "No Company database has pending migrations; nothing was changed."
+}
+STATUS: NOTHING_TO_DO

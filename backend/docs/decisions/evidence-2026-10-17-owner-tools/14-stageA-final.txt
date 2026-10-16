@@ -1,0 +1,6 @@
+Installed build 1.1.10; this build ships 299 migrations.
+PLATFORM  daii_test_biz_t98_sim_cp: 299 recorded, 0 missing
+COMPANY   A-Verify [READY/ACTIVE] db=daii_test_biz_t98_sim_co: COMPLETE, 299 recorded
+COMPANY   B-Fail [READY/ACTIVE] db=daii_test_biz_t98_sim_co2: COMPLETE, 299 recorded
+COMPANY   C-After [READY/ACTIVE] db=daii_test_biz_t98_sim_co3: COMPLETE, 299 recorded
+{"companyDatabases":3,"complete":3,"incomplete":0,"unreadable":0,"platformComplete":true}

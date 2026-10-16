@@ -1,0 +1,2 @@
+8b09c97d10439b6c98e9b1f5a315b8e4be3d377306305738e2d4bb7d94a8a582 *tools/maintenance/company-migration-catchup.js
+35a07d963b7e6ce8032cd16a42bc0a8fc20e9d78020f7e7bd3efbdaa91e35901 *tools/maintenance/company-migration-status.js

@@ -1,0 +1,40 @@
+Installed build 1.1.10; this build ships 299 migrations.
+PLATFORM  daii_test_biz_t98_sim_cp: 299 recorded, 0 missing
+COMPANY   A-Verify [READY/ACTIVE] db=daii_test_biz_t98_sim_co: INCOMPLETE (11 missing), 288 recorded
+            missing: AddCustomerProfileFields1790016000000
+            missing: AddProductMasterFields1790015100000
+            missing: AddSupplierProfileFields1790016300000
+            missing: CreateCustomerAddressesAndContacts1790016100000
+            missing: CreateProductBarcodes1790015200000
+            missing: CreateProductCategories1790015000000
+            missing: SeedBarcodeLookupTerminology1790015400000
+            missing: SeedItemDetailsTerminology1790014000000
+            missing: SeedItemMasterTerminology1790015300000
+            missing: SeedProfileTerminology1790016200000
+            missing: SeedSupplierProfileTerminology1790016400000
+COMPANY   B-Fail [READY/ACTIVE] db=daii_test_biz_t98_sim_co2: INCOMPLETE (11 missing), 288 recorded
+            missing: AddCustomerProfileFields1790016000000
+            missing: AddProductMasterFields1790015100000
+            missing: AddSupplierProfileFields1790016300000
+            missing: CreateCustomerAddressesAndContacts1790016100000
+            missing: CreateProductBarcodes1790015200000
+            missing: CreateProductCategories1790015000000
+            missing: SeedBarcodeLookupTerminology1790015400000
+            missing: SeedItemDetailsTerminology1790014000000
+            missing: SeedItemMasterTerminology1790015300000
+            missing: SeedProfileTerminology1790016200000
+            missing: SeedSupplierProfileTerminology1790016400000
+COMPANY   C-After [READY/ACTIVE] db=daii_test_biz_t98_sim_co3: INCOMPLETE (11 missing), 288 recorded
+            missing: AddCustomerProfileFields1790016000000
+            missing: AddProductMasterFields1790015100000
+            missing: AddSupplierProfileFields1790016300000
+            missing: CreateCustomerAddressesAndContacts1790016100000
+            missing: CreateProductBarcodes1790015200000
+            missing: CreateProductCategories1790015000000
+            missing: SeedBarcodeLookupTerminology1790015400000
+            missing: SeedItemDetailsTerminology1790014000000
+            missing: SeedItemMasterTerminology1790015300000
+            missing: SeedProfileTerminology1790016200000
+            missing: SeedSupplierProfileTerminology1790016400000
+{"companyDatabases":3,"complete":0,"incomplete":3,"unreadable":0,"platformComplete":true}
+exit 5

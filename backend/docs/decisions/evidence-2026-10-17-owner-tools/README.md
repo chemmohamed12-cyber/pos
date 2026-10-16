@@ -1,0 +1,3 @@
+Evidence for the owner repair tools (final tool hashes in 00-tool-hashes.txt). Scenario on the isolated sim (1.1.10 deployed with fan-out off): three Companies A-Verify (good), B-Fail (sabotaged: a conflicting column), C-After (good).
+02 initial state | 03 Stage A status | 04 plan | 05-refusal-a..e preflight refusals (exit 3, state unchanged: 06) | 07 failing Stage B (A migrated, B failed and rolled back, C not attempted, exit 2, STATUS FAILED; state 08) | 09 Stage A after the failure | 10 recovery run (A no-op, B and C migrated, STATUS SUCCESS; state 11) | 12 second run (NOTHING_TO_DO, state identical 13) | 14 final status.
+Credentials: none of these files contains the database password (checked with a literal search).
