@@ -485,6 +485,15 @@ export class InventoryController {
     );
   }
 
+  /** D1 — every item's default/origin warehouse markers (Products screen column), limited to the caller's visible warehouses. Read-only. */
+  @WarehouseScopeFiltered('warehouse item markers of the caller\'s visible warehouses only')
+  @Get('warehouse-items')
+  async listWarehouseItemAssignments(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const visible = await this.visibleWarehouses(req);
+    return this.inventory.listWarehouseItemAssignments(visible === 'ALL' ? undefined : visible, req.companyContext.dataSource.manager);
+  }
+
   /** D1 — assign items to a warehouse (master data, bulk, idempotent). Advisory: nothing is blocked by assignment yet. */
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.edit', 'editable')

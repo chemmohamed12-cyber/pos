@@ -736,6 +736,20 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * D1 — every (warehouse, item) default/origin marker, for the Products screen's warehouse column. Read-only. `visibleWarehouseIds`
+   * (F6) limits it to the caller's visible warehouses; omitted = unrestricted.
+   */
+  async listWarehouseItemAssignments(visibleWarehouseIds?: string[], manager?: EntityManager): Promise<Array<{ warehouseId: string; productId: string }>> {
+    const params: unknown[] = [];
+    let where = '';
+    if (visibleWarehouseIds) {
+      params.push(visibleWarehouseIds);
+      where = `WHERE "warehouseId" = ANY($1::uuid[])`;
+    }
+    return (manager ?? this.dataSource).query(`SELECT "warehouseId", "productId" FROM "warehouse_items" ${where} ORDER BY "createdAt"`, params);
+  }
+
+  /**
    * D1 — remove an item's default/origin marker. Always allowed: it is metadata, not stock. If the item still holds stock here it
    * simply shows up in this warehouse's grid as "holds stock, not a default" (the ledger is the truth).
    */

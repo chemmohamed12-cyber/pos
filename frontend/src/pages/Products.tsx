@@ -39,6 +39,9 @@ export function Products() {
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editUnit, setEditUnit] = useState('');
+  // D1 — the item's default/origin warehouses (warehouse_items markers), shown as a column and editable with the item.
+  const [assignments, setAssignments] = useState<Map<string, string[]>>(new Map());
+  const [editWarehouseIds, setEditWarehouseIds] = useState<string[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
 
   preload([
@@ -48,6 +51,7 @@ export function Products() {
     'field.unit_price',
     'field.unit',
     'field.default_warehouse',
+    'field.warehouse',
     'field.status',
     'field.actions',
     'action.create',
@@ -71,10 +75,28 @@ export function Products() {
     try {
       const data = await api.get<Product[]>('/products/all');
       setProducts(data);
+      await loadAssignments();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load products.');
     }
   }
+
+  async function loadAssignments() {
+    try {
+      const rows = await api.get<Array<{ warehouseId: string; productId: string }>>('/inventory/warehouse-items');
+      const map = new Map<string, string[]>();
+      for (const r of rows) map.set(r.productId, [...(map.get(r.productId) ?? []), r.warehouseId]);
+      setAssignments(map);
+    } catch {
+      setAssignments(new Map()); // optional column — the catalogue still works without warehouse access
+    }
+  }
+
+  const warehouseLabel = (id: string) => {
+    const w = warehouses.find((x) => x.id === id);
+    return w ? `${w.code} — ${w.name}` : null;
+  };
+  const canEditWarehouses = can('inventory.warehouse.edit', 'editable') && warehouses.length > 0;
 
   useEffect(() => {
     load();
@@ -115,6 +137,7 @@ export function Products() {
     setEditName(product.name);
     setEditPrice(product.unitPrice);
     setEditUnit(product.unit ?? '');
+    setEditWarehouseIds(assignments.get(product.id) ?? []);
     setError(null);
   }
 
@@ -134,6 +157,15 @@ export function Products() {
       }
       if (editUnit !== (product.unit ?? '')) {
         await api.post(`/products/${product.id}/unit`, { unit: editUnit });
+      }
+      if (canEditWarehouses) {
+        const before = assignments.get(product.id) ?? [];
+        for (const id of editWarehouseIds.filter((w) => !before.includes(w))) {
+          await api.post(`/inventory/warehouses/${id}/items`, { productIds: [product.id] });
+        }
+        for (const id of before.filter((w) => !editWarehouseIds.includes(w))) {
+          await api.delete(`/inventory/warehouses/${id}/items/${product.id}`);
+        }
       }
       setEditingId(null);
       await load();
@@ -230,6 +262,7 @@ export function Products() {
               <th>{t('field.name')}</th>
               <th>{t('field.unit_price')}</th>
               <th>{t('field.unit')}</th>
+              <th>{t('field.warehouse')}</th>
               <th>{t('field.status')}</th>
               {can('sales.catalog.edit', 'editable') && <th>{t('field.actions')}</th>}
             </tr>
@@ -250,6 +283,26 @@ export function Products() {
                     )}
                   </td>
                   <td>{isEditing ? <input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} /> : (p.unit ?? '—')}</td>
+                  <td>
+                    {isEditing && canEditWarehouses ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {warehouses.map((w) => (
+                          <label key={w.id} style={{ display: 'flex', gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }}>
+                            <input
+                              type="checkbox"
+                              checked={editWarehouseIds.includes(w.id)}
+                              onChange={(e) =>
+                                setEditWarehouseIds((prev) => (e.target.checked ? [...prev, w.id] : prev.filter((x) => x !== w.id)))
+                              }
+                            />
+                            {w.code} — {w.name}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      (assignments.get(p.id) ?? []).map(warehouseLabel).filter(Boolean).join('، ') || '—'
+                    )}
+                  </td>
                   <td>
                     <StatusBadge code={`product_status.${p.status}`} />
                   </td>
