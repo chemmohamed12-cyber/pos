@@ -1,0 +1,11 @@
+src/domains/accounting/interface/accounting.company-isolation.spec.ts
+src/domains/accounting/interface/grni.company-isolation.spec.ts
+src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
+src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+src/domains/procurement/interface/new-item-request.company-isolation.spec.ts
+src/domains/procurement/interface/purchase-request.company-isolation.spec.ts
+src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts
+src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+src/domains/procurement/interface/warehouse-reference.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+src/domains/treasury/interface/treasury.company-isolation.spec.ts

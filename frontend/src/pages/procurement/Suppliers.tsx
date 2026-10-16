@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useNavigate } from 'react-router-dom';
 
 interface Supplier {
   id: string;
@@ -57,6 +58,7 @@ const NEXT_STATUS: Record<'active' | 'inactive', 'active' | 'inactive'> = { acti
 export function Suppliers() {
   const { can } = useAuth();
   const { t, preload } = useLanguage();
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SupplierDetail | null>(null);
@@ -78,6 +80,7 @@ export function Suppliers() {
 
   preload([
     'nav.suppliers',
+    'action.open_supplier_profile',
     'field.supplier_code',
     'field.legal_name',
     'field.trading_name',
@@ -302,7 +305,16 @@ export function Suppliers() {
                     <td>
                       <StatusBadge code={`supplier_status.${s.status}`} />
                     </td>
-                    <td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/suppliers/${s.id}`);
+                        }}
+                      >
+                        {t('action.open_supplier_profile')}
+                      </button>
                       {can('procurement.supplier.edit', 'editable') && (
                         <button
                           className="btn btn-secondary"

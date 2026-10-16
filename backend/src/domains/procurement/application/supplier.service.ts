@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Supplier, SupplierType } from '../infrastructure/supplier.entity';
 import { SupplierContact } from '../infrastructure/supplier-contact.entity';
@@ -8,6 +8,7 @@ import { canTransitionSupplierStatus, SupplierStatus } from '../domain/supplier-
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { PROFILE_LANGUAGES, profileEmail, profileOneOf, profileText, profileWebsite } from '../../../foundation/profile/profile-validation';
 
 const SYSTEM_ACTOR = '00000000-0000-0000-0000-000000000000';
 
@@ -39,6 +40,11 @@ export interface UpdateSupplierInput {
   commercialRegistrationNumber?: string | null;
   paymentTermsDays?: number;
   creditLimitBase?: string | null;
+  // Supplier profile (gap matrix §5.3): nullable descriptive fields; blank clears, undefined leaves untouched.
+  email?: string | null;
+  website?: string | null;
+  language?: string | null;
+  internalNotes?: string | null;
 }
 
 const BANK_ACCOUNT_REQUEST_TYPE = 'procurement.bank_account_change';
@@ -174,15 +180,23 @@ export class SupplierService implements OnModuleInit {
     const repo = this.em(manager).getRepository(Supplier);
     const supplier = await repo.findOne({ where: { id } });
     if (!supplier) throw new NotFoundException(`Supplier "${id}" not found.`);
+    // The four profile fields are validated up front (a clear 400 before anything is written); the existing fields keep their own rules below.
+    const normalized: UpdateSupplierInput = {
+      ...input,
+      email: profileEmail(input.email),
+      website: profileWebsite(input.website),
+      language: profileOneOf('language', input.language, PROFILE_LANGUAGES),
+      internalNotes: profileText('internalNotes', input.internalNotes, 4000),
+    };
     const fields: Array<keyof UpdateSupplierInput> = [
       'legalName', 'tradingName', 'supplierType', 'taxRegistrationNumber', 'vatRegistrationNumber',
-      'commercialRegistrationNumber', 'paymentTermsDays', 'creditLimitBase',
+      'commercialRegistrationNumber', 'paymentTermsDays', 'creditLimitBase', 'email', 'website', 'language', 'internalNotes',
     ];
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
     for (const f of fields) {
-      if (input[f] === undefined) continue;
-      let next: unknown = input[f];
+      if (normalized[f] === undefined) continue;
+      let next: unknown = normalized[f];
       if (typeof next === 'string' && f !== 'creditLimitBase') next = next.trim() === '' ? null : next.trim();
       if (f === 'legalName' && !next) throw new ConflictException('Supplier legal name cannot be empty.');
       if (f === 'supplierType' && !next) continue;
@@ -235,14 +249,24 @@ export class SupplierService implements OnModuleInit {
 
   async addContact(supplierId: string, input: { name: string; title?: string | null; phone?: string | null; email?: string | null; isPrimary?: boolean }, manager?: EntityManager): Promise<SupplierContact> {
     await this.requireSupplier(supplierId, manager);
-    const repo = this.em(manager).getRepository(SupplierContact);
-    return repo.save(repo.create({ supplierId, name: input.name, title: input.title ?? null, phone: input.phone ?? null, email: input.email ?? null, isPrimary: input.isPrimary ?? false }));
+    const em = this.em(manager);
+    const run = async (tx: EntityManager): Promise<SupplierContact> => {
+      const repo = tx.getRepository(SupplierContact);
+      if (input.isPrimary) await repo.update({ supplierId }, { isPrimary: false }); // one primary contact at a time
+      return repo.save(repo.create({ supplierId, name: input.name, title: input.title ?? null, phone: input.phone ?? null, email: input.email ?? null, isPrimary: input.isPrimary ?? false }));
+    };
+    return em.queryRunner?.isTransactionActive ? run(em) : em.transaction(run);
   }
 
   async addAddress(supplierId: string, input: { label?: string | null; addressLine: string; city?: string | null; governorate?: string | null; isDefault?: boolean }, manager?: EntityManager): Promise<SupplierAddress> {
     await this.requireSupplier(supplierId, manager);
-    const repo = this.em(manager).getRepository(SupplierAddress);
-    return repo.save(repo.create({ supplierId, label: input.label ?? null, addressLine: input.addressLine, city: input.city ?? null, governorate: input.governorate ?? null, isDefault: input.isDefault ?? false }));
+    const em = this.em(manager);
+    const run = async (tx: EntityManager): Promise<SupplierAddress> => {
+      const repo = tx.getRepository(SupplierAddress);
+      if (input.isDefault) await repo.update({ supplierId }, { isDefault: false }); // one default address at a time
+      return repo.save(repo.create({ supplierId, label: input.label ?? null, addressLine: input.addressLine, city: input.city ?? null, governorate: input.governorate ?? null, isDefault: input.isDefault ?? false }));
+    };
+    return em.queryRunner?.isTransactionActive ? run(em) : em.transaction(run);
   }
 
   /**

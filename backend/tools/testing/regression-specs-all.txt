@@ -54,6 +54,7 @@ src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts
 src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
 src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts
 src/domains/procurement/interface/supplier-master.company-isolation.spec.ts
+src/domains/procurement/interface/supplier-profile.company-isolation.spec.ts
 src/domains/procurement/interface/supplier-payment.company-isolation.spec.ts
 src/domains/procurement/interface/warehouse-reference.company-isolation.spec.ts
 src/domains/reports/interface/reports.company-isolation.spec.ts
