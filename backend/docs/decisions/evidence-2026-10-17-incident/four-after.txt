@@ -1,0 +1,8 @@
+200 /api/procurement/suppliers/all
+200 /api/procurement/suppliers
+200 /api/products/all
+200 /api/warehouse-transactions/overview
+200 /api/customers
+200 /api/inventory/warehouses
+200 /api/procurement/purchase-orders
+200 /api/accounting/trial-balance

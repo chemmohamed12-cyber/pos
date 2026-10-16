@@ -1,0 +1,4 @@
+const base=process.argv[2];const J={'Content-Type':'application/json'};
+(async()=>{const l=await (await fetch(base+'/api/auth/login',{method:'POST',headers:J,body:JSON.stringify({email:'bv.admin@example.test',password:'BvAdmin#2026'})})).json();
+const sc=await (await fetch(base+'/api/auth/select-company',{method:'POST',headers:{...J,Authorization:'Bearer '+l.data.accessToken},body:JSON.stringify({companyId:process.env.SIM_COMPANY_ID})})).json();const H={Authorization:'Bearer '+sc.data.accessToken};
+for(const p of ['/api/procurement/suppliers/all','/api/procurement/suppliers','/api/products/all','/api/warehouse-transactions/overview','/api/customers','/api/inventory/warehouses','/api/procurement/purchase-orders','/api/accounting/trial-balance']){const r=await fetch(base+p,{headers:H});console.log(r.status,p)}})()
