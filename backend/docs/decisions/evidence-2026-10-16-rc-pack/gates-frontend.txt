@@ -1,0 +1,2 @@
+fe build 0
+fe lint 0 warnings=58
