@@ -1,0 +1,58 @@
+{
+  "viewer": {
+    "GET /products/:id": 200,
+    "GET /products/:id/barcodes": 200,
+    "GET /products/lookup": 200,
+    "GET /product-categories": 200,
+    "POST /products/:id/update": {
+      "status": 404,
+      "msg": "Not Found"
+    },
+    "POST /products/:id/barcodes": {
+      "status": 404,
+      "msg": "Not Found"
+    },
+    "POST /product-categories": {
+      "status": 404,
+      "msg": "Not Found"
+    },
+    "POST /inventory/items/:id/default-warehouse": {
+      "status": 404,
+      "msg": "Not Found"
+    },
+    "POST /manufacturing/boms/:id/status": {
+      "status": 404,
+      "msg": "Not Found"
+    }
+  },
+  "adminValidation": {
+    "default-warehouse inactive+unassigned WH-OLD": {
+      "status": 409,
+      "msg": "Warehouse \"WH-OLD\" is inactive and cannot be a default warehouse."
+    },
+    "default-warehouse not-a-uuid": {
+      "status": 400,
+      "msg": [
+        "warehouseId must be a UUID"
+      ]
+    },
+    "update itemType gadget": {
+      "status": 400,
+      "msg": [
+        "itemType must be one of the following values: finished_good, semi_finished, raw_material, consumable, service"
+      ]
+    },
+    "update reorderLevel -5": {
+      "status": 400,
+      "msg": "Reorder level must be a non-negative number with at most 3 decimals."
+    },
+    "category duplicate code": {
+      "status": 409,
+      "msg": "Category code \"LAMPS-LED\" already exists."
+    },
+    "barcode too short": {
+      "status": 400,
+      "msg": "Barcode must be 4–64 characters: letters, digits, \".\", \"/\" or \"-\"."
+    }
+  }
+}

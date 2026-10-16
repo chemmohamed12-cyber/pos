@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Product } from '../infrastructure/product.entity';
+import { ProductBarcode } from '../infrastructure/product-barcode.entity';
 import { canTransitionProductStatus, ProductStatus } from '../domain/product-status';
 import { ProductSnapshot } from './product-snapshot.dto';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -40,6 +41,10 @@ export class ProductsService implements SalesProductsContract {
     const repo = (manager ?? this.dataSource).getRepository(Product);
     const existing = await repo.findOne({ where: { sku } });
     if (existing) throw new ConflictException(`Product with SKU "${sku}" already exists.`);
+    // Master data step 1 (D-MD11) — SKU and barcode share one lookup namespace, so a new SKU may not equal an existing barcode.
+    if (await (manager ?? this.dataSource).getRepository(ProductBarcode).findOne({ where: { barcode: sku } })) {
+      throw new ConflictException(`"${sku}" is already used as a barcode and cannot be an item code (SKU).`);
+    }
 
     const product = await (manager ?? this.dataSource).transaction(async (txManager) => {
       const saved = await txManager.getRepository(Product).save(txManager.getRepository(Product).create({ sku, name, unitPrice, unit, status: 'draft' }));
@@ -227,6 +232,32 @@ export class ProductsService implements SalesProductsContract {
     await this.events.dispatchPending(undefined, manager);
 
     return saved;
+  }
+
+  /** Published contract (Inventory domain only — it validates the warehouse and the D1 assignment first). */
+  async setDefaultWarehouse(productId: string, warehouseId: string | null, actorUserId: string | null, manager?: EntityManager): Promise<void> {
+    const repo = (manager ?? this.dataSource).getRepository(Product);
+    const product = await repo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException(`Product "${productId}" not found.`);
+    const before = { defaultWarehouseId: product.defaultWarehouseId };
+    await repo.update({ id: productId }, { defaultWarehouseId: warehouseId });
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'commerce.product.default_warehouse_changed', resource: 'product', resourceId: productId, result: 'success', correlationId: null, before, after: { defaultWarehouseId: warehouseId } },
+      manager,
+    );
+  }
+
+  /** Published contract — the item was unassigned from `warehouseId`; a default pointing at it would be stale. */
+  async clearDefaultWarehouseIfMatches(productId: string, warehouseId: string, actorUserId: string | null, manager?: EntityManager): Promise<boolean> {
+    const result = await (manager ?? this.dataSource).getRepository(Product).update({ id: productId, defaultWarehouseId: warehouseId }, { defaultWarehouseId: null });
+    const cleared = (result.affected ?? 0) > 0;
+    if (cleared) {
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'commerce.product.default_warehouse_changed', resource: 'product', resourceId: productId, result: 'success', correlationId: null, before: { defaultWarehouseId: warehouseId }, after: { defaultWarehouseId: null, reason: 'unassigned_from_warehouse' } },
+        manager,
+      );
+    }
+    return cleared;
   }
 
   async getProduct(productId: string, manager?: EntityManager): Promise<Product> {

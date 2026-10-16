@@ -1,5 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { ProductStatus } from '../domain/product-status';
+import { ItemType } from '../domain/item-type';
 
 /**
  * V1-minimal Catalog (blueprint §9): single price per product, no
@@ -35,6 +36,24 @@ export class Product {
 
   @Column({ type: 'varchar', length: 16, default: 'draft' })
   status!: ProductStatus;
+
+  /** Master data step 1 (2026-10-15, D-MD2) — informational classification; drives which item-page sections apply (BOM). */
+  @Column({ type: 'varchar', length: 24, default: 'finished_good' })
+  itemType!: ItemType;
+
+  @Column({ type: 'uuid', nullable: true })
+  categoryId!: string | null;
+
+  /** Set only through the Inventory domain (validated: existing, active, assigned to this item). No FK — same as PR/PO `warehouseId`. */
+  @Column({ type: 'uuid', nullable: true })
+  defaultWarehouseId!: string | null;
+
+  /** In the base unit (no conversion — D-MD3); numeric string, null = no reorder level. */
+  @Column({ type: 'numeric', precision: 18, scale: 3, nullable: true })
+  reorderLevel!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

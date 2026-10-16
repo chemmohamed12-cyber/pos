@@ -765,8 +765,30 @@ export class InventoryService implements InventoryReservationContract, Inventory
         { actorUserId, organizationId: null, action: 'inventory.warehouse_items.unassigned', resource: 'warehouse', resourceId: warehouseId, result: 'success', correlationId: null, after: { productId } },
         manager,
       );
+      // Master data step 1 — a primary default warehouse must stay one of the item's assigned warehouses.
+      await this.products.clearDefaultWarehouseIfMatches(productId, warehouseId, actorUserId, manager);
     }
     return { removed: n > 0 };
+  }
+
+  /**
+   * Master data step 1 (2026-10-15, M2) — the item's PRIMARY default warehouse, chosen among its D1 assignments. The Inventory
+   * domain owns the rule (warehouse exists, is active, and the item is assigned to it) and writes the value through the Sales
+   * contract; `null` clears it. Like D1 itself it is master data: it never restricts where stock may be.
+   */
+  async setDefaultWarehouse(productId: string, warehouseId: string | null, actorUserId: string | null, manager?: EntityManager): Promise<{ productId: string; defaultWarehouseId: string | null }> {
+    if (!(await this.products.getProductSnapshot(productId, manager))) throw new NotFoundException(`Product "${productId}" not found.`);
+    if (warehouseId !== null) {
+      const warehouse = await this.getWarehouse(warehouseId, manager);
+      if (warehouse.status !== 'active') throw new ConflictException(`Warehouse "${warehouse.code}" is inactive and cannot be a default warehouse.`);
+      const [{ n }]: Array<{ n: number }> = await (manager ?? this.dataSource).query(
+        `SELECT count(*)::int AS n FROM "warehouse_items" WHERE "warehouseId" = $1 AND "productId" = $2`,
+        [warehouseId, productId],
+      );
+      if (n === 0) throw new ConflictException(`The item is not assigned to warehouse "${warehouse.code}". Assign it first, then make it the default.`);
+    }
+    await this.products.setDefaultWarehouse(productId, warehouseId, actorUserId, manager);
+    return { productId, defaultWarehouseId: warehouseId };
   }
 
   async getOnHand(warehouseId: string, productId: string, manager?: EntityManager): Promise<number> {

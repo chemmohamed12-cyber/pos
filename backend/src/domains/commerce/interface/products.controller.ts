@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import { IsIn, IsNumberString, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNumberString, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ProductsService } from '../application/products.service';
+import { ProductMasterDataService } from '../application/product-master-data.service';
+import { ITEM_TYPES } from '../domain/item-type';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -51,6 +53,45 @@ class UpdateNameDto {
   name!: string;
 }
 
+/** Master data step 1 — absent = unchanged, `null` = cleared (server-side rules in ProductMasterDataService). */
+class UpdateMasterDataDto {
+  @IsOptional()
+  @IsIn(ITEM_TYPES as unknown as string[])
+  itemType?: string;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  categoryId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null && v !== '')
+  @IsNumberString()
+  reorderLevel?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  @MaxLength(2000)
+  description?: string | null;
+}
+
+class AddBarcodeDto {
+  @IsString()
+  @MaxLength(64)
+  barcode!: string;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null)
+  @IsString()
+  @MaxLength(64)
+  packLabel?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
+
 const IMPORT_COLUMNS: ColumnSpec[] = [
   { key: 'sku', header: 'Product Code', width: 20, example: 'SKU-0001' },
   { key: 'name', header: 'Product Name', width: 30, example: 'Sample Product' },
@@ -88,6 +129,7 @@ export class ProductsController {
   constructor(
     private readonly products: ProductsService,
     private readonly excel: ExcelService,
+    private readonly masterData: ProductMasterDataService,
   ) {}
 
   /**
@@ -184,6 +226,14 @@ export class ProductsController {
     };
   }
 
+  /** Master data step 1 (D-MD11) — resolve a scanned/typed code: exact SKU first, then exact barcode. Same read policy as `/products/all`. Declared before `:id`. */
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
+  @Get('lookup')
+  async lookup(@Req() req: CompanyScopedRequest, @Query('code') code: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.masterData.lookup(code, req.companyContext.dataSource.manager);
+  }
+
   /** Same finding/fix as `list()` above — was unauthenticated, and unlike `list()` this one didn't even filter to `status: 'active'`, so a draft/discontinued product was also disclosable by guessing its id. */
   @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get(':id')
@@ -243,5 +293,41 @@ export class ProductsController {
   async updateName(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateNameDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.products.updateName(id, dto.name, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  /** Master data step 1 — item type, category, reorder level, description (the existing name/unit/price/status routes are unchanged). */
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.edit', 'editable')
+  @Post(':id/update')
+  async updateMasterData(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMasterDataDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.masterData.updateMasterData(id, dto, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
+  @Get(':id/barcodes')
+  async listBarcodes(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.masterData.listBarcodes(id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.edit', 'editable')
+  @Post(':id/barcodes')
+  async addBarcode(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddBarcodeDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.masterData.addBarcode(id, dto, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  /** POST, not DELETE — same convention as `/procurement/suppliers/:id/update`. */
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.edit', 'editable')
+  @Post(':id/barcodes/:barcodeId/remove')
+  async removeBarcode(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Param('barcodeId', ParseUUIDPipe) barcodeId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.masterData.removeBarcode(id, barcodeId, req.user.id, req.companyContext.dataSource.manager);
   }
 }
