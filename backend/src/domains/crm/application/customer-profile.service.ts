@@ -4,6 +4,7 @@ import { Customer } from '../infrastructure/customer.entity';
 import { CustomerAddress } from '../infrastructure/customer-address.entity';
 import { CustomerContact } from '../infrastructure/customer-contact.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { PROFILE_LANGUAGES, profileEmail as email, profileOneOf as oneOf, profileText as text, profileWebsite } from '../../../foundation/profile/profile-validation';
 
 /**
  * Customer profile (master-data gap matrix §5, M4/M5) — the descriptive "who is this customer" data: legal identity, tax numbers, e-mail,
@@ -18,7 +19,6 @@ import { AuditService } from '../../../foundation/audit/audit.service';
  */
 
 export const PARTY_TYPES = ['company', 'individual'] as const;
-export const PROFILE_LANGUAGES = ['ar', 'en'] as const;
 
 export interface UpdateCustomerProfileInput {
   name?: string;
@@ -54,31 +54,6 @@ export interface CustomerAddressInput {
   isDefault?: boolean;
   isBilling?: boolean;
   isShipping?: boolean;
-}
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** undefined → untouched; blank → null; otherwise trimmed and length-checked (a clear 400, never a raw database error). */
-function text(field: string, value: string | null | undefined, max: number): string | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  const trimmed = String(value).trim();
-  if (trimmed === '') return null;
-  if (trimmed.length > max) throw new BadRequestException(`"${field}" is too long (max ${max} characters).`);
-  return trimmed;
-}
-
-function oneOf<T extends string>(field: string, value: string | null | undefined, allowed: readonly T[]): T | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null || String(value).trim() === '') return null;
-  if (!(allowed as readonly string[]).includes(value)) throw new BadRequestException(`"${field}" must be one of: ${allowed.join(', ')}.`);
-  return value as T;
-}
-
-function email(value: string | null | undefined): string | null | undefined {
-  const v = text('email', value, 255);
-  if (v && !EMAIL.test(v)) throw new BadRequestException('"email" is not a valid e-mail address.');
-  return v;
 }
 
 @Injectable()
@@ -135,12 +110,11 @@ export class CustomerProfileService {
       vatRegistrationNumber: text('vatRegistrationNumber', input.vatRegistrationNumber, 64),
       commercialRegistrationNumber: text('commercialRegistrationNumber', input.commercialRegistrationNumber, 64),
       email: email(input.email),
-      website: text('website', input.website, 255),
+      website: profileWebsite(input.website),
       language: oneOf('language', input.language, PROFILE_LANGUAGES),
       internalNotes: text('internalNotes', input.internalNotes, 4000),
     };
     if (input.name !== undefined && next.name === undefined) throw new BadRequestException('"name" cannot be empty.');
-    if (next.website && /\s/.test(next.website)) throw new BadRequestException('"website" must not contain spaces.');
 
     const repo = this.runner(manager).getRepository(Customer);
     const customer = await this.requireCustomer(customerId, manager);

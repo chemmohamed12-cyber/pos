@@ -47,6 +47,19 @@ export class Supplier {
   @Column({ type: 'varchar', length: 64, nullable: true })
   commercialRegistrationNumber!: string | null;
 
+  /** Supplier profile (gap matrix §5.3, migration 1790016300000) — nullable descriptive fields, never read by any ledger or document contract. */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  website!: string | null;
+
+  @Column({ type: 'varchar', length: 8, nullable: true })
+  language!: 'ar' | 'en' | null;
+
+  @Column({ type: 'text', nullable: true })
+  internalNotes!: string | null;
+
   /** Days of credit before a Supplier Invoice is due (0 = due on receipt/cash terms). */
   @Column({ type: 'int', default: 0 })
   paymentTermsDays!: number;

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PurchaseOrderService } from '../application/purchase-order.service';
@@ -68,9 +68,9 @@ export class PurchaseOrderController {
   @RequirePermission('procurement.purchase_order.view', 'read-only')
   @WarehouseScopeFiltered('purchase orders of the caller\'s visible warehouses only')
   @Get()
-  async list(@Req() req: CompanyScopedRequest) {
+  async list(@Req() req: CompanyScopedRequest, @Query('supplierId', new ParseUUIDPipe({ optional: true })) supplierId?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.purchaseOrders.list(req.companyContext.dataSource.manager, await this.visibleOnly(req));
+    return this.purchaseOrders.list(req.companyContext.dataSource.manager, await this.visibleOnly(req), supplierId);
   }
 
   @UseGuards(PermissionGuard)

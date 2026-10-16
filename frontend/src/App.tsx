@@ -21,6 +21,7 @@ import { PriceLists } from './pages/PriceLists';
 import { Bom } from './pages/Bom';
 import { Warehouses } from './pages/Warehouses';
 import { Suppliers } from './pages/procurement/Suppliers';
+import { SupplierProfile } from './pages/procurement/SupplierProfile';
 import { PurchaseOrders } from './pages/procurement/PurchaseOrders';
 import { SupplierInvoices } from './pages/procurement/SupplierInvoices';
 import { ApAging } from './pages/procurement/ApAging';
@@ -210,6 +211,7 @@ function AppRoutes() {
         <Route path="warehouses" element={<Warehouses />} />
         <Route path="procurement" element={<ProcurementCover />} />
         <Route path="suppliers" element={<Suppliers />} />
+        <Route path="suppliers/:id" element={<SupplierProfile />} />
         <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="supplier-invoices" element={<SupplierInvoices />} />
         <Route path="ap-aging" element={<ApAging />} />

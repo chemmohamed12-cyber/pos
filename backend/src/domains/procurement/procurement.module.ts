@@ -19,6 +19,7 @@ import { RfqSupplierInvite } from './infrastructure/rfq-supplier-invite.entity';
 import { SupplierQuotation } from './infrastructure/supplier-quotation.entity';
 import { SupplierQuotationLine } from './infrastructure/supplier-quotation-line.entity';
 import { SupplierService } from './application/supplier.service';
+import { SupplierProfileService } from './application/supplier-profile.service';
 import { PurchaseOrderService } from './application/purchase-order.service';
 import { GoodsReceiptService } from './application/goods-receipt.service';
 import { SupplierLedgerService } from './application/supplier-ledger.service';
@@ -138,6 +139,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
   ],
   providers: [
     SupplierService,
+    SupplierProfileService,
     PurchaseOrderService,
     GoodsReceiptService,
     SupplierLedgerService,

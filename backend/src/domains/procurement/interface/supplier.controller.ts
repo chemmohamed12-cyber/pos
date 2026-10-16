@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsBoolean, IsIn, IsInt, IsNumberString, IsOptional, IsString, Min, MaxLength, MinLength } from 'class-validator';
 import { SupplierService } from '../application/supplier.service';
+import { SupplierProfileService } from '../application/supplier-profile.service';
 import { SupplierLedgerService } from '../application/supplier-ledger.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -94,6 +95,27 @@ class UpdateSupplierDto {
   @IsOptional()
   @IsNumberString()
   creditLimitBase?: string | null;
+
+  // Supplier profile (gap matrix §5.3) — value rules (e-mail format, language) are enforced in `SupplierService.updateSupplier`.
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  website?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  language?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  internalNotes?: string | null;
 }
 
 class SetStatusDto {
@@ -153,6 +175,58 @@ class AddAddressDto {
   isDefault?: boolean;
 }
 
+class UpdateSupplierContactDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  title?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
+
+class UpdateSupplierAddressDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  label?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  governorate?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+}
+
 class AddBankAccountDto {
   @IsString()
   @MinLength(1)
@@ -191,6 +265,7 @@ export class SupplierController {
   constructor(
     private readonly suppliers: SupplierService,
     private readonly ledger: SupplierLedgerService,
+    private readonly profile: SupplierProfileService,
   ) {}
 
   @UseGuards(PermissionGuard)
@@ -249,6 +324,44 @@ export class SupplierController {
   @Post(':id/contacts')
   async addContact(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AddContactDto, @Req() req: CompanyScopedRequest) {
     return this.suppliers.addContact(id, dto, req.companyContext!.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier.edit', 'editable')
+  @Post(':id/contacts/:contactId/update')
+  async updateContact(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Body() dto: UpdateSupplierContactDto,
+    @Req() req: CompanyScopedRequest,
+  ) {
+    return this.profile.updateContact(id, contactId, dto, req.user.id, req.companyContext!.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier.edit', 'editable')
+  @Post(':id/contacts/:contactId/remove')
+  async removeContact(@Param('id', ParseUUIDPipe) id: string, @Param('contactId', ParseUUIDPipe) contactId: string, @Req() req: CompanyScopedRequest) {
+    return this.profile.removeContact(id, contactId, req.user.id, req.companyContext!.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier.edit', 'editable')
+  @Post(':id/addresses/:addressId/update')
+  async updateAddress(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('addressId', ParseUUIDPipe) addressId: string,
+    @Body() dto: UpdateSupplierAddressDto,
+    @Req() req: CompanyScopedRequest,
+  ) {
+    return this.profile.updateAddress(id, addressId, dto, req.user.id, req.companyContext!.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier.edit', 'editable')
+  @Post(':id/addresses/:addressId/remove')
+  async removeAddress(@Param('id', ParseUUIDPipe) id: string, @Param('addressId', ParseUUIDPipe) addressId: string, @Req() req: CompanyScopedRequest) {
+    return this.profile.removeAddress(id, addressId, req.user.id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
