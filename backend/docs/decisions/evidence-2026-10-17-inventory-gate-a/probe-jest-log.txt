@@ -1,0 +1,14 @@
+
+=== REGRESSION: src/foundation/testing/gate-a-probe.biz.real-pg.spec.ts
+PASS src/foundation/testing/gate-a-probe.biz.real-pg.spec.ts (34.629 s)
+  GATE A probe - inventory lifecycle observations
+    √ observes the current inventory -> event -> journal -> ledger -> valuation behaviour (15577 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        34.707 s
+Ran all test suites matching /src\\foundation\\testing\\gate-a-probe.biz.real-pg.spec.ts/i.
+RESULT PASS src/foundation/testing/gate-a-probe.biz.real-pg.spec.ts
+
+REGRESSION DONE: 1/1 passed

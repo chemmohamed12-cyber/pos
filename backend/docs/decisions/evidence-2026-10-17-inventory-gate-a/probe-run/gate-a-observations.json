@@ -1,0 +1,331 @@
+{
+  "O1_opening_stock": {
+    "events": [
+      {
+        "status": "POSTED"
+      }
+    ],
+    "journalLines": [
+      "1120 D 20.00",
+      "3105 C 20.00"
+    ],
+    "journalBusinessDate": {
+      "d": "2026-10-17",
+      "s": "FINANCIAL_EVENT"
+    },
+    "valuation": {
+      "qty": 5,
+      "value": 20
+    },
+    "gl1120": "20.0000"
+  },
+  "O2_opening_rules": {
+    "secondImportSamePair": {
+      "ok": false,
+      "kind": "Error",
+      "message": "Opening stock has already been imported for Warehouse Code \"WH-A1\" / Product SKU \"T-97-P1\" (existing movement cff7ba17-7bc4-4196-bd25-cba4512460d8). Use a future adjustment/receipt path for further ch"
+    },
+    "lateImportNewProductAfterOperations": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "noBatchCutoffOrApprovalConcept": "see report (code evidence)"
+  },
+  "O3_manual_receipt_document": {
+    "movementDateOnDocument": "2026-09-17",
+    "submitOutcome": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "stateAfterSubmit": "posted",
+    "approvalStepRequired": true,
+    "journalsBeforeFlush": 2,
+    "outboxBeforeFlush": [
+      {
+        "status": "dispatched",
+        "n": 5
+      },
+      {
+        "status": "pending",
+        "n": 2
+      }
+    ],
+    "event": [
+      {
+        "status": "POSTED",
+        "reason": null
+      }
+    ],
+    "journalLines": [
+      "1120 D 24.00",
+      "3105 C 24.00"
+    ],
+    "journalBusinessDate": {
+      "d": "2026-10-17",
+      "s": "FINANCIAL_EVENT"
+    },
+    "referenceFieldValidated": false,
+    "today": "2026-10-17"
+  },
+  "O4_overview_vs_valuation_vs_gl": {
+    "overviewTotalAtSellingPrice": "140.00",
+    "valuationTotal": {
+      "qty": 11,
+      "value": 58
+    },
+    "gl1120": "58.0000",
+    "unitPriceOfProduct": "10.00 (late product 25.00)"
+  },
+  "O5_adjustment_increase": {
+    "postOutcome": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "journalsBeforeFlush": 3,
+    "events": [
+      {
+        "status": "POSTED",
+        "reason": null
+      }
+    ],
+    "journalLines": [
+      "1120 D 9.78",
+      "4201 C 9.78"
+    ]
+  },
+  "O6_quantity_without_value": {
+    "onHandQuantity": 3,
+    "financialEvents": [
+      {
+        "status": "REJECTED",
+        "rejectionReason": "no_valuation_source"
+      }
+    ],
+    "valuationValueOfThatProduct": "0"
+  },
+  "O7_transfer_without_source_valuation": {
+    "postOutcome": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "onHandSource": 2,
+    "onHandDestination": 4,
+    "valuationRows": [],
+    "movementsOfDoc": [
+      {
+        "movementType": "receipt",
+        "quantity": 6,
+        "referenceType": "legacy",
+        "has_ref": false
+      },
+      {
+        "movementType": "transfer_out",
+        "quantity": -4,
+        "referenceType": "warehouse_transaction",
+        "has_ref": true
+      },
+      {
+        "movementType": "transfer_in",
+        "quantity": 4,
+        "referenceType": "warehouse_transaction",
+        "has_ref": true
+      }
+    ]
+  },
+  "O8_reconciliation": {
+    "asOfToday": {
+      "status": "drift_found",
+      "subledger": "67.7778",
+      "gl": "67.7800",
+      "drift": "-0.0022"
+    },
+    "asOfYear2000": {
+      "status": "drift_found",
+      "subledger": "67.7778",
+      "gl": "0.0000",
+      "drift": "67.7778"
+    },
+    "driftBreakdownKeys": [
+      "note",
+      "warehouseBreakdown",
+      "glClosingBalanceBase",
+      "glLineCount"
+    ]
+  },
+  "O8b_rounding_evidence": {
+    "valuationRows": [
+      {
+        "productId": "d4620b30-7eb5-4b58-8984-692cc0df3964",
+        "warehouseId": "89287be9-8c3b-4db0-9698-8ef995607cf7",
+        "q": "2",
+        "avg": "7.0000",
+        "v": "14.0000"
+      },
+      {
+        "productId": "81231274-57c6-4eaf-95ff-5f933eee294e",
+        "warehouseId": "89287be9-8c3b-4db0-9698-8ef995607cf7",
+        "q": "11",
+        "avg": "4.8889",
+        "v": "53.7778"
+      }
+    ],
+    "inventoryJournalLines": [
+      {
+        "dr": "20.0000",
+        "cr": "0.0000",
+        "dtx": "20.0000",
+        "ctx": "0.0000"
+      },
+      {
+        "dr": "14.0000",
+        "cr": "0.0000",
+        "dtx": "14.0000",
+        "ctx": "0.0000"
+      },
+      {
+        "dr": "24.0000",
+        "cr": "0.0000",
+        "dtx": "24.0000",
+        "ctx": "0.0000"
+      },
+      {
+        "dr": "9.7800",
+        "cr": "0.0000",
+        "dtx": "9.7778",
+        "ctx": "0.0000"
+      }
+    ],
+    "baseCurrency": [
+      {
+        "code": "EGP",
+        "decimalPlaces": 2
+      }
+    ]
+  },
+  "O9_manual_receipt_without_reference": {
+    "outcome": {
+      "ok": true,
+      "kind": "OK"
+    },
+    "referenceIdStored": {
+      "referenceId": null
+    }
+  },
+  "O10_events_summary": [
+    {
+      "status": "POSTED",
+      "n": 5
+    },
+    {
+      "status": "REJECTED",
+      "n": 1
+    }
+  ],
+  "O10_documents_columns": [
+    "id",
+    "transactionNumber",
+    "type",
+    "warehouseId",
+    "destinationWarehouseId",
+    "reference",
+    "reason",
+    "notes",
+    "reversalOfTransactionId",
+    "createdByUserId",
+    "approvedByUserId",
+    "postedByUserId",
+    "createdAt",
+    "updatedAt",
+    "movementDate",
+    "reasonCode"
+  ],
+  "Q_diagnostic_pack": [
+    {
+      "title": "-- Q1  stock that has no (or a different) valuation row: quantity with",
+      "rows": [
+        {
+          "warehouseId": "1ac7a1e3-f367-4b3f-a4a7-7dfd37e0a8b0",
+          "productId": "e9ca2aaf-157e-460c-bb86-0f1413e1da7c",
+          "on_hand": "4",
+          "valuation_qty": null,
+          "totalValueBase": null
+        },
+        {
+          "warehouseId": "89287be9-8c3b-4db0-9698-8ef995607cf7",
+          "productId": "386d2efd-7c9a-4731-8d87-b818ae950baf",
+          "on_hand": "3",
+          "valuation_qty": null,
+          "totalValueBase": null
+        },
+        {
+          "warehouseId": "89287be9-8c3b-4db0-9698-8ef995607cf7",
+          "productId": "e9ca2aaf-157e-460c-bb86-0f1413e1da7c",
+          "on_hand": "2",
+          "valuation_qty": null,
+          "totalValueBase": null
+        }
+      ]
+    },
+    {
+      "title": "-- Q2  movements that require a financial event but have none (and non",
+      "rows": []
+    },
+    {
+      "title": "-- Q3  financial events by type, status and rejection reason",
+      "rows": [
+        {
+          "eventType": "inventory.movement.recorded",
+          "status": "POSTED",
+          "reason": "",
+          "n": 5
+        },
+        {
+          "eventType": "inventory.movement.recorded",
+          "status": "REJECTED",
+          "reason": "no_valuation_source",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "title": "-- Q4  valuation total vs the posted balance of the inventory control ",
+      "rows": [
+        {
+          "valuation_total": "72.7778",
+          "gl_inventory_posted": "72.7800"
+        }
+      ]
+    },
+    {
+      "title": "-- Q5  outbox rows not yet dispatched (pending / processing / failed)",
+      "rows": [
+        {
+          "topic": "accounting.journal.posted",
+          "status": "pending",
+          "n": 1,
+          "oldest": "2026-10-17T14:13:46.371Z"
+        }
+      ]
+    },
+    {
+      "title": "-- Q6  how stock entered: receipts by reference type",
+      "rows": [
+        {
+          "referenceType": "excel_import",
+          "movements": 2,
+          "quantity": 7
+        },
+        {
+          "referenceType": "legacy",
+          "movements": 1,
+          "quantity": 6
+        },
+        {
+          "referenceType": "manual_receipt",
+          "movements": 2,
+          "quantity": 5
+        }
+      ]
+    }
+  ]
+}
