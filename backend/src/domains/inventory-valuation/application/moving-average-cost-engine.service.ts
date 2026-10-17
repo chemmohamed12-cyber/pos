@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { CostEngine } from '../domain/cost-engine';
+import type { HistoryInconsistency, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { InventoryValuationState } from '../infrastructure/inventory-valuation-state.entity';
 import { InventoryValuationMovement } from '../infrastructure/inventory-valuation-movement.entity';
 
@@ -408,12 +409,88 @@ export class MovingAverageCostEngine implements CostEngine {
 
   /** Read-only. `asOfDate` is accepted for `InventoryValuationContract` shape compatibility — the
    * running state IS always "as of now" (ADR-041 D23: no historical reconstruction in F08 V1). */
-  async getValuedOnHandTotal(_asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
+  /**
+   * C1 (ADR-INV-08): a date that is today (UTC) or later - or no date - reads the running state exactly as before. A PAST date is rebuilt from the dated
+   * history (`inventory_valuation_movements.businessDate <= asOf`), so a historical reconciliation no longer compares "now" with "then".
+   */
+  private isCurrentBasis(asOfDate?: string): boolean {
+    if (!asOfDate) return true;
+    return asOfDate >= new Date().toISOString().slice(0, 10);
+  }
+
+  async getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
     const source = manager ?? this.dataSource;
-    const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
-      `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
-       FROM inventory_valuation_state GROUP BY "warehouseId"`,
+    if (this.isCurrentBasis(asOfDate)) {
+      const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
+        `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
+         FROM inventory_valuation_state GROUP BY "warehouseId"`,
+      );
+      return rows;
+    }
+    return source.query(
+      `SELECT "warehouseId", COALESCE(SUM("valueDeltaBase"), 0)::numeric(20,4) AS "totalValueBase"
+       FROM inventory_valuation_movements WHERE "businessDate" <= $1::date GROUP BY "warehouseId"`,
+      [asOfDate],
     );
-    return rows;
+  }
+
+  async getValuedPositions(asOfDate?: string, filter: ValuedPositionFilter = {}, manager?: EntityManager): Promise<ValuedPosition[]> {
+    const source = manager ?? this.dataSource;
+    const params: unknown[] = [];
+    const conds: string[] = [];
+    if (filter.warehouseIds) {
+      params.push(filter.warehouseIds);
+      conds.push(`"warehouseId" = ANY($${params.length}::uuid[])`);
+    }
+    if (filter.productId) {
+      params.push(filter.productId);
+      conds.push(`"productId" = $${params.length}::uuid`);
+    }
+    const extra = conds.length ? 'AND ' + conds.join(' AND ') : '';
+    type Row = { warehouseId: string; productId: string; quantity: number | string; totalValueBase: string; averageCostBase: string | null };
+    let rows: Row[];
+    if (this.isCurrentBasis(asOfDate)) {
+      rows = await source.query(
+        `SELECT "warehouseId", "productId", "onHandQuantity" AS quantity, "totalValueBase"::numeric(20,4) AS "totalValueBase",
+                CASE WHEN "onHandQuantity" > 0 THEN ("totalValueBase" / "onHandQuantity")::numeric(20,4) ELSE NULL END AS "averageCostBase"
+         FROM inventory_valuation_state
+         WHERE ("onHandQuantity" <> 0 OR "totalValueBase" <> 0) ${extra}
+         ORDER BY "warehouseId", "productId"`,
+        params,
+      );
+    } else {
+      params.push(asOfDate);
+      rows = await source.query(
+        `SELECT "warehouseId", "productId", SUM(quantity)::int AS quantity, SUM("valueDeltaBase")::numeric(20,4) AS "totalValueBase",
+                CASE WHEN SUM(quantity) > 0 THEN (SUM("valueDeltaBase") / SUM(quantity))::numeric(20,4) ELSE NULL END AS "averageCostBase"
+         FROM inventory_valuation_movements
+         WHERE "businessDate" <= $${params.length}::date ${extra}
+         GROUP BY "warehouseId", "productId"
+         HAVING SUM(quantity) <> 0 OR SUM("valueDeltaBase") <> 0
+         ORDER BY "warehouseId", "productId"`,
+        params,
+      );
+    }
+    return rows.map((r) => ({ warehouseId: r.warehouseId, productId: r.productId, quantity: Number(r.quantity), totalValueBase: r.totalValueBase, averageCostBase: r.averageCostBase }));
+  }
+
+  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
+    const source = manager ?? this.dataSource;
+    type Row = { warehouseId: string; productId: string; stateQuantity: number | string; historyQuantity: number | string; stateValueBase: string; historyValueBase: string };
+    const rows: Row[] = await source.query(
+      `WITH h AS (
+         SELECT "warehouseId", "productId", SUM(quantity)::int AS qty, SUM("valueDeltaBase")::numeric(20,4) AS val
+         FROM inventory_valuation_movements GROUP BY 1, 2
+       ), s AS (
+         SELECT "warehouseId", "productId", "onHandQuantity" AS qty, "totalValueBase"::numeric(20,4) AS val FROM inventory_valuation_state
+       )
+       SELECT COALESCE(s."warehouseId", h."warehouseId") AS "warehouseId", COALESCE(s."productId", h."productId") AS "productId",
+              COALESCE(s.qty, 0) AS "stateQuantity", COALESCE(h.qty, 0) AS "historyQuantity",
+              COALESCE(s.val, 0)::numeric(20,4) AS "stateValueBase", COALESCE(h.val, 0)::numeric(20,4) AS "historyValueBase"
+       FROM s FULL OUTER JOIN h ON h."warehouseId" = s."warehouseId" AND h."productId" = s."productId"
+       WHERE COALESCE(s.qty, 0) <> COALESCE(h.qty, 0) OR COALESCE(s.val, 0) <> COALESCE(h.val, 0)
+       ORDER BY 1, 2`,
+    );
+    return rows.map((r) => ({ ...r, stateQuantity: Number(r.stateQuantity), historyQuantity: Number(r.historyQuantity) }));
   }
 }

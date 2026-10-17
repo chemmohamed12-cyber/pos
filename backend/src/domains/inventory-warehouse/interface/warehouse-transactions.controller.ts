@@ -11,6 +11,7 @@ import { AccessScopeService } from '../../../foundation/scope/access-scope.servi
 import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
 import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+import { AuthorizationContextService } from '../../../foundation/authorization/authorization-context.service';
 
 class TransactionLineDto {
   @IsString()
@@ -119,6 +120,7 @@ export class WarehouseTransactionsController {
   constructor(
     private readonly transactions: WarehouseTransactionsService,
     private readonly scopes: AccessScopeService,
+    private readonly contexts: AuthorizationContextService,
   ) {}
 
   /** F6 — the caller's visible warehouses for the list/overview filters (`undefined` = unrestricted). */
@@ -172,7 +174,10 @@ export class WarehouseTransactionsController {
   @Get('overview')
   async overview(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.transactions.getOverview(req.companyContext.dataSource.manager, await this.visibleOnly(req));
+    // C1 (ADR-INV-07): the cost figure is only computed for a caller who holds the valuation view permission; everyone else keeps the quantity KPIs and the
+    // selling-price figure exactly as before (the cost fields are null).
+    const includeCost = (await this.contexts.forRequest(req)).hasAtLeast('inventory.valuation.view', 'read-only');
+    return this.transactions.getOverview(req.companyContext.dataSource.manager, await this.visibleOnly(req), includeCost);
   }
 
   /**

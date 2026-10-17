@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import { InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+import { HistoryInconsistency, InventoryValuationContract, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { COST_ENGINE, CostEngine } from '../domain/cost-engine';
 
 /**
@@ -21,6 +21,14 @@ export class InventoryValuationService implements InventoryValuationContract {
 
   async getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
     return this.costEngine.getValuedOnHandTotal(asOfDate, manager);
+  }
+
+  async getValuedPositions(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]> {
+    return this.costEngine.getValuedPositions(asOfDate, filter, manager);
+  }
+
+  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
+    return this.costEngine.checkHistoryConsistency(manager);
   }
 
   async getUnitCost(productId: string, warehouseId: string, _asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null> {

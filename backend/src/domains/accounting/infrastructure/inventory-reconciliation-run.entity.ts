@@ -49,6 +49,22 @@ export class InventoryReconciliationRun {
   @Column({ type: 'uuid' })
   runByUserId!: string;
 
+  /** Slice C1 (ADR-INV-09) - the part of `driftBase` covered by itemised categories (NULL on runs written before reconciliation v2). */
+  @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
+  explainedBase!: string | null;
+
+  /** The remainder after the itemised categories; NULL on older runs. */
+  @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
+  unexplainedBase!: string | null;
+
+  /** How the valuation side was read: `current` (running state) or `as_of` (rebuilt from the dated history). */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  basis!: 'current' | 'as_of' | null;
+
+  /** `matched` (difference exactly 0) | `explained` (non-zero, fully explained) | `unexplained`. `status` keeps its original values and meaning. */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  classification!: 'matched' | 'explained' | 'unexplained' | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

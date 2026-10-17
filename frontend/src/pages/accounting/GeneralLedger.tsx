@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAutoRefresh } from '../../lib/useAutoRefresh';
+import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
 
 interface GLAccount {
   id: string;
@@ -19,6 +21,11 @@ interface LedgerLineRow {
   debitBase: string;
   creditBase: string;
   runningBalanceBase: string;
+  entryState?: string | null;
+  financialEventId?: string | null;
+  eventType?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
 }
 interface AccountLedger {
   account: { id: string; code: string; name: string; accountType: string; normalBalance: string };
@@ -42,6 +49,8 @@ const PRELOAD = [
   'field.entry_number',
   'field.from_date',
   'field.to_date',
+  'field.gl_source',
+  'field.gl_entry_state',
 ];
 
 /** F03 — General Ledger read model. Account picker + date range, mirrors `TreasuryLedger.tsx`'s own filter shape. */
@@ -51,8 +60,8 @@ export function GeneralLedger() {
   const [searchParams] = useSearchParams();
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
   const [accountId, setAccountId] = useState(searchParams.get('accountId') ?? '');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(searchParams.get('from') ?? '');
+  const [to, setTo] = useState(searchParams.get('to') ?? '');
   const [ledger, setLedger] = useState<AccountLedger | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,22 +73,33 @@ export function GeneralLedger() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!accountId) return;
-    const qs = new URLSearchParams();
-    if (from) qs.set('from', from);
-    if (to) qs.set('to', to);
-    setError(null);
-    api
-      .get<AccountLedger>(`/accounting/ledger/${accountId}${qs.toString() ? `?${qs}` : ''}`)
-      .then(setLedger)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load ledger.'));
-  }, [accountId, from, to]);
+  const refresh = useAutoRefresh(
+    async (isCurrent) => {
+      if (!accountId) return;
+      const qs = new URLSearchParams();
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      try {
+        const data = await api.get<AccountLedger>(`/accounting/ledger/${accountId}${qs.toString() ? `?${qs}` : ''}`);
+        if (!isCurrent()) return;
+        setLedger(data);
+        setError(null);
+      } catch (err) {
+        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load ledger.');
+        throw err;
+      }
+    },
+    [accountId, from, to],
+  );
 
   return (
     <div>
       <div className="page-header">
         <h1>{t('nav.general_ledger')}</h1>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <PostingStatusChip />
+          <RefreshStamp refresh={refresh} />
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -132,6 +152,8 @@ export function GeneralLedger() {
                 <th>{t('field.entry_number')}</th>
                 <th>{t('field.business_date')}</th>
                 <th>{t('field.description')}</th>
+                <th>{t('field.gl_source')}</th>
+                <th>{t('field.gl_entry_state')}</th>
                 <th>{t('field.debit_base')}</th>
                 <th>{t('field.credit_base')}</th>
                 <th>{t('field.closing_balance')}</th>
@@ -143,6 +165,8 @@ export function GeneralLedger() {
                   <td>{l.entryNumber ?? '—'}</td>
                   <td>{l.businessDate}</td>
                   <td>{l.lineDescription ?? l.description ?? '—'}</td>
+                  <td title={l.eventType ?? undefined}>{l.referenceType ? t(`reference_type.${l.referenceType}`) : l.sourceType}</td>
+                  <td>{l.entryState ?? '—'}</td>
                   <td>{Number(l.debitBase) > 0 ? l.debitBase : ''}</td>
                   <td>{Number(l.creditBase) > 0 ? l.creditBase : ''}</td>
                   <td>{l.runningBalanceBase}</td>

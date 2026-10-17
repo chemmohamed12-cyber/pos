@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { InventoryReconciliationRun } from '../infrastructure/inventory-reconciliation-run.entity';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { LedgerService } from './ledger.service';
+import { DifferenceAnalysis, analyzeInventoryDifference } from './inventory-difference-analysis';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { MANUFACTURING_WIP_CONTRACT, ManufacturingWipContract } from '../../../foundation/module-registry/contracts/manufacturing-wip.contract';
@@ -106,7 +107,74 @@ export class InventoryReconciliationService {
     }
 
     // --- Valuation source present (future F08) -------------------------------
-    const rawValued = await this.valuation.getValuedOnHandTotal(asOfDate, manager);
+    const computed = await this.computeWithValuation(this.valuation, inv.id, asOfDate, glBalanceBase, gl.lines.length, manager);
+    const saved = await this.save(repo, {
+      input,
+      asOfDate,
+      subledgerTotalBase: computed.subledgerTotalBase,
+      glBalanceBase,
+      driftBase: computed.driftBase,
+      status: computed.matched ? 'matched' : 'drift_found',
+      driftBreakdown: computed.driftBreakdown,
+      explainedBase: computed.explainedBase,
+      unexplainedBase: computed.unexplainedBase,
+      basis: computed.basis,
+      classification: computed.classification,
+      actorUserId,
+    }, manager);
+    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase: computed.subledgerTotalBase, glBalanceBase, driftBase: computed.driftBase, status: saved.status, classification: computed.classification }, manager);
+    return saved;
+  }
+
+  /**
+   * Slice C1 (ADR-INV-09) - the SAME computation as `reconcile`, but it persists NOTHING (no run row, no audit record): a pure read for the screen.
+   * Returns the numbers, the classification and the itemised categories.
+   */
+  async preview(input: InventoryReconcileInput, manager?: EntityManager): Promise<Record<string, unknown>> {
+    const asOfDate = input.asOfDate ?? utcBusinessDate();
+    const inv = await this.inventoryAccount(manager);
+    const gl = await this.ledger.getAccountLedger(inv.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
+    if (!this.valuation) {
+      return { asOfDate, status: 'no_valuation_source', classification: null, glBalanceBase: gl.closingBalanceBase, subledgerTotalBase: null, driftBase: null };
+    }
+    const c = await this.computeWithValuation(this.valuation, inv.id, asOfDate, gl.closingBalanceBase, gl.lines.length, manager);
+    return {
+      asOfDate,
+      status: c.matched ? 'matched' : 'drift_found',
+      classification: c.classification,
+      basis: c.basis,
+      subledgerTotalBase: c.subledgerTotalBase,
+      glBalanceBase: gl.closingBalanceBase,
+      driftBase: c.driftBase,
+      explainedBase: c.explainedBase,
+      unexplainedBase: c.unexplainedBase,
+      warehouseBreakdown: c.warehouseBreakdown,
+      analysis: c.analysis,
+      historyInconsistencies: c.historyInconsistencies,
+    };
+  }
+
+  private async computeWithValuation(
+    valuation: InventoryValuationContract,
+    inventoryAccountId: string,
+    asOfDate: string,
+    glBalanceBase: string,
+    glLineCount: number,
+    manager?: EntityManager,
+  ): Promise<{
+    matched: boolean;
+    subledgerTotalBase: string;
+    driftBase: string;
+    explainedBase: string | null;
+    unexplainedBase: string | null;
+    basis: 'current' | 'as_of';
+    classification: 'matched' | 'explained' | 'unexplained';
+    driftBreakdown: Record<string, unknown> | null;
+    warehouseBreakdown: Array<{ warehouseId: string; totalValueBase: string }>;
+    analysis: DifferenceAnalysis;
+    historyInconsistencies: number | null;
+  }> {
+    const rawValued = await valuation.getValuedOnHandTotal(asOfDate, manager);
     // Month-End dependency (independent review, Phase 1) — exclude every Manufacturing WIP
     // sub-warehouse from THIS reconciliation's own sum; `WipReconciliationService` covers that
     // slice against the `wip` GL account separately. See the constructor's `manufacturingWip`
@@ -125,6 +193,13 @@ export class InventoryReconciliationService {
     const driftBase = d.drift;
     const matched = Number(driftBase) === 0;
 
+    // C1: itemised, exact attribution (rounding, unposted value, F07, manual journals) - read-only SQL, no tolerance.
+    const analysis = await analyzeInventoryDifference(this.em(manager), this.ledger.postedFilter, inventoryAccountId, asOfDate);
+    const [rem] = (await this.em(manager).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS unexplained`, [driftBase, analysis.explainedBase])) as Array<{ unexplained: string }>;
+    const classification: 'matched' | 'explained' | 'unexplained' = matched ? 'matched' : Number(rem.unexplained) === 0 ? 'explained' : 'unexplained';
+    const basis: 'current' | 'as_of' = asOfDate < utcBusinessDate() ? 'as_of' : 'current';
+    const history = valuation.checkHistoryConsistency ? (await valuation.checkHistoryConsistency(manager)).length : null;
+
     const driftBreakdown: Record<string, unknown> | null = matched
       ? null
       : {
@@ -132,21 +207,31 @@ export class InventoryReconciliationService {
             'The valued on-hand position and the GL `inventory` account differ. Common causes: a dispatch FinancialEvent REJECTED (never posted); a manual journal on the inventory account (blocked — allowManualJournal=false); a movement type not yet mapped to GL.',
           warehouseBreakdown: valued,
           glClosingBalanceBase: glBalanceBase,
-          glLineCount: gl.lines.length,
+          glLineCount,
+          classification,
+          explainedBase: analysis.explainedBase,
+          unexplainedBase: rem.unexplained,
+          categories: analysis.categories,
+          roundingByWarehouse: analysis.roundingByWarehouse,
+          unpostedItems: analysis.unpostedItems,
+          f07Entries: analysis.f07Entries,
+          rejectedWithoutValueEffect: analysis.rejectedWithoutValueEffect,
+          historyInconsistencies: history,
         };
 
-    const saved = await this.save(repo, {
-      input,
-      asOfDate,
+    return {
+      matched,
       subledgerTotalBase,
-      glBalanceBase,
       driftBase,
-      status: matched ? 'matched' : 'drift_found',
+      explainedBase: matched ? null : analysis.explainedBase,
+      unexplainedBase: matched ? null : rem.unexplained,
+      basis,
+      classification,
       driftBreakdown,
-      actorUserId,
-    }, manager);
-    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status }, manager);
-    return saved;
+      warehouseBreakdown: valued,
+      analysis,
+      historyInconsistencies: history,
+    };
   }
 
   async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
@@ -179,6 +264,10 @@ export class InventoryReconciliationService {
       driftBase: string | null;
       status: InventoryReconciliationRun['status'];
       driftBreakdown: Record<string, unknown> | null;
+      explainedBase?: string | null;
+      unexplainedBase?: string | null;
+      basis?: 'current' | 'as_of' | null;
+      classification?: 'matched' | 'explained' | 'unexplained' | null;
       actorUserId: string;
     }, _manager?: EntityManager): Promise<InventoryReconciliationRun> {
     try {
@@ -192,6 +281,10 @@ export class InventoryReconciliationService {
           driftBase: r.driftBase,
           status: r.status,
           driftBreakdown: r.driftBreakdown,
+          explainedBase: r.explainedBase ?? null,
+          unexplainedBase: r.unexplainedBase ?? null,
+          basis: r.basis ?? null,
+          classification: r.classification ?? null,
           runByUserId: r.actorUserId,
           closedAt: null,
         }),

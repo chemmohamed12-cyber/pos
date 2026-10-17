@@ -11,6 +11,7 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { InventoryService } from './inventory.service';
+import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 export interface TransactionLineInput {
@@ -43,6 +44,9 @@ export class WarehouseTransactionsService {
     private readonly inventory: InventoryService,
     // D3-B — the manual-receipt gate bound by accounting; unbound ⇒ receipts are rejected (fail-closed).
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
+    // Slice C1 (ADR-INV-07) - the cost-based inventory value of the overview. `@Optional()` and last: every existing construction site is unaffected, and an
+    // installation without the valuation module simply reports no cost value.
+    @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
   ) {}
 
   async createTransaction(
@@ -247,9 +251,13 @@ export class WarehouseTransactionsService {
    * per-product/warehouse minimum-stock threshold exists to compare
    * against yet.
    */
-  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<{
+  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[], includeCost = false): Promise<{
     totalWarehouses: number;
     totalInventoryValueAtSellingPrice: string;
+    /** C1 (ADR-INV-07) - the valuation (cost) of the visible warehouses; `null` when the caller may not see valuation or no valuation module is bound. */
+    totalInventoryValueAtCost: string | null;
+    /** C1 - when the cost figure was read (server time). */
+    valuationAsOf: string | null;
     todaysMovementsCount: number;
     reservedStockUnits: number;
     pendingApprovalsCount: number;
@@ -270,11 +278,24 @@ export class WarehouseTransactionsService {
     todayStart.setHours(0, 0, 0, 0);
     const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString(), visibleWarehouseIds }, manager);
 
+    // C1 (ADR-INV-07): cost comes from the valuation contract (never a raw table read), summed over the caller's visible warehouses only.
+    let totalInventoryValueAtCost: string | null = null;
+    let valuationAsOf: string | null = null;
+    if (includeCost && this.valuation) {
+      const perWarehouse = await this.valuation.getValuedOnHandTotal(undefined, manager);
+      const visible = visibleWarehouseIds ? new Set(visibleWarehouseIds) : null;
+      const scaled = perWarehouse.filter((w) => !visible || visible.has(w.warehouseId)).reduce((sum, w) => sum + Math.round(Number(w.totalValueBase) * 10000), 0);
+      totalInventoryValueAtCost = (scaled / 10000).toFixed(2);
+      valuationAsOf = new Date().toISOString();
+    }
+
     return {
       totalWarehouses: warehouses.length,
       totalInventoryValueAtSellingPrice: stockReport
         .reduce((sum, row) => sum + row.onHand * (priceById.get(row.productId) ?? 0), 0)
         .toFixed(2),
+      totalInventoryValueAtCost,
+      valuationAsOf,
       todaysMovementsCount: todaysMovements.length,
       reservedStockUnits: stockReport.reduce((sum, row) => sum + row.reserved, 0),
       pendingApprovalsCount: allTransactions.filter((t) => t.state === 'submitted').length,

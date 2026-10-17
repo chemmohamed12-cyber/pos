@@ -98,9 +98,36 @@ export const INVENTORY_ADJUSTMENT_APPROVED_EVENT = 'accounting.inventory.adjustm
  * Valuation — FIFO/moving-average/standard cost) domain binds an
  * implementation to light this up, with zero F07 change.
  */
+export interface ValuedPositionFilter {
+  warehouseIds?: string[];
+  productId?: string;
+}
+
+export interface ValuedPosition {
+  warehouseId: string;
+  productId: string;
+  quantity: number;
+  totalValueBase: string;
+  /** `totalValueBase / quantity` at 4 dp, or NULL when the quantity is not positive. */
+  averageCostBase: string | null;
+}
+
+export interface HistoryInconsistency {
+  warehouseId: string;
+  productId: string;
+  stateQuantity: number;
+  historyQuantity: number;
+  stateValueBase: string;
+  historyValueBase: string;
+}
+
 export interface InventoryValuationContract {
   /** The valued on-hand position per warehouse, as of a date. Read-only. */
   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
+  /** C1 (ADR-INV-08) - OPTIONAL, read-only: the valued position per warehouse and product, current (no date / today) or rebuilt from the dated history. */
+  getValuedPositions?(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
+  /** C1 - OPTIONAL, read-only: every (warehouse, product) whose running state disagrees with the sum of its own dated history. */
+  checkHistoryConsistency?(manager?: EntityManager): Promise<HistoryInconsistency[]>;
   /** PURE — no mutation, ever. The current running unit cost for one product/warehouse, for reference (e.g. an FA-01 maker's read-only lookup — Blueprint D11). */
   getUnitCost(productId: string, warehouseId: string, asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null>;
   /**
