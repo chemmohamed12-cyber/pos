@@ -12,7 +12,7 @@ Evidence folder: `backend/docs/decisions/evidence-2026-10-17-inventory-c1-closur
 | Commit | Content |
 |---|---|
 | `4399f90e6a748435d5adcc1bd0630c349b12f83b` | C1 implementation. 35 source/doc files (list below) plus 248 auto-generated business-suite evidence folders (`evidence-2026-10-10-biz/T-xx/...`, written by the suite runner; no source) |
-| closure commit (this package) | documentation, one new spec, evidence logs only; **no production source change** after `4399f90` |
+| `4ce6269` (this package) | documentation, one new spec, evidence logs only; **no production source change** after `4399f90` |
 
 Changed files in `4399f90` (source and documentation):
 - **Migrations (3):** `backend/src/database/migrations/inventory/1790017000000-AddValuationMovementBusinessDate.ts`, `.../accounting/1790017100000-AddInventoryReconciliationExplanation.ts`, `.../core/1790017200000-SeedInventoryC1Terminology.ts`
