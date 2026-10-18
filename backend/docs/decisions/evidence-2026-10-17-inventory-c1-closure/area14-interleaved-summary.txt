@@ -1,0 +1,13 @@
+round 1 integration: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 1 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 2 integration: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 2 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 3 integration: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 3 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 4 integration: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 4 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 5 integration: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 5 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+round 6 integration: RESULT FAIL tests=[3 passed, 3 total] denial=1
+round 6 inventory-lifecycle: RESULT PASS tests=[3 passed, 3 total] denial=0
+DONE

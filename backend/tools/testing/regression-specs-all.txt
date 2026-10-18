@@ -103,3 +103,4 @@ src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
 src/foundation/scope/access-scope.f6.real-pg.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
