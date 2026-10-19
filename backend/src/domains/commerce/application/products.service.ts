@@ -8,6 +8,13 @@ import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
 
+/**
+ * One item, one code (2026-10-19, owner): the comparison key of an item NAME — spaces trimmed and collapsed, case folded, Arabic
+ * letter variants unified (أ إ آ → ا, ى → ي, ة → ه) and tashkeel / tatweel removed — so two spellings of one name are the same item.
+ * Built in SQL so the lock key, the duplicate search and the rename check can never disagree.
+ */
+const nameKeySql = (expr: string) => `regexp_replace(translate(lower(btrim(${expr})), 'أإآىةًٌٍَُِّْـ', 'ااايه'), '[[:space:]]+', ' ', 'g')`;
+
 @Injectable()
 /** P4 Tranche-2 contract-conformance check (Task 2) — `implements` makes the compiler enforce that this class still satisfies `SalesProductsContract` on every change, instead of the `useExisting` DI binding trusting it silently. */
 export class ProductsService implements SalesProductsContract {
@@ -47,6 +54,7 @@ export class ProductsService implements SalesProductsContract {
     }
 
     const product = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await this.assertItemNameFree(txManager, name, null);
       const saved = await txManager.getRepository(Product).save(txManager.getRepository(Product).create({ sku, name, unitPrice, unit, status: 'draft' }));
       // Outbox write in the SAME transaction as the insert (ADR-012) —
       // External Integrations (CTO handover directive: "Daii <-> QR Store
@@ -76,6 +84,24 @@ export class ProductsService implements SalesProductsContract {
     await this.events.dispatchPending(undefined, manager);
 
     return product;
+  }
+
+  /**
+   * Refuses an item name that already belongs to another item (any code), with a message naming the existing code. Runs inside the
+   * caller's transaction after taking a per-name advisory lock, so two simultaneous registrations of the same item cannot both pass.
+   * Movements and documents identify an item by its code (SKU), never by name — this keeps a name from naming two codes.
+   */
+  private async assertItemNameFree(txManager: EntityManager, name: string, exceptProductId: string | null): Promise<void> {
+    await txManager.query(`SELECT pg_advisory_xact_lock(hashtext(${nameKeySql('$1')}))`, [name]);
+    const rows: Array<{ sku: string; name: string }> = await txManager.query(
+      `SELECT "sku", "name" FROM "products" WHERE ${nameKeySql('"name"')} = ${nameKeySql('$1')} AND ($2::uuid IS NULL OR "id" <> $2::uuid) ORDER BY "createdAt" LIMIT 1`,
+      [name, exceptProductId],
+    );
+    if (rows.length > 0) {
+      throw new ConflictException(
+        `This item is already registered: "${rows[0].name}" has code "${rows[0].sku}". One item cannot have more than one code — use the existing code. / الصنف مضاف سابقاً: "${rows[0].name}" بالكود "${rows[0].sku}". لا يجوز تسجيل الصنف الواحد بأكثر من كود — استخدم الكود الحالي.`,
+      );
+    }
   }
 
   async setStatus(productId: string, newStatus: Product['status'], actorUserId: string | null, manager?: EntityManager): Promise<Product> {
@@ -204,6 +230,9 @@ export class ProductsService implements SalesProductsContract {
     const before = { name: product.name };
 
     const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      // Only a real change of the item's name is checked: re-saving the same name (or only its spacing / case) never fails on a pre-existing duplicate.
+      const [same] = await txManager.query(`SELECT ${nameKeySql('$1')} = ${nameKeySql('$2')} AS "same"`, [name, product.name]);
+      if (!same.same) await this.assertItemNameFree(txManager, name, product.id);
       product.name = name;
       const updated = await txManager.getRepository(Product).save(product);
       await this.events.publish(txManager, 'commerce.product.name_changed', {
