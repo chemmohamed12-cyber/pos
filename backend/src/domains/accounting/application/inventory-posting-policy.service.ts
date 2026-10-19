@@ -1,8 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
-import { InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { FinancialPostingSummary, InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { GLAccount } from '../infrastructure/gl-account.entity';
+import { FiscalPeriodService } from './fiscal-period.service';
+import { PostingStatusService } from './posting-status.service';
 
 export const MANUAL_RECEIPT_REASON_ACCOUNTS_KEY = 'accounting.inventory_manual_receipt_reason_accounts';
 const COGS_ACCOUNT_KEY = 'accounting.inventory_cogs_account_code';
@@ -21,7 +23,21 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
   constructor(
     private readonly config: ConfigurationEngineService,
     private readonly registry: InventoryPostingPolicyRegistry,
+    // C2: optional so a direct construction (older specs) keeps compiling; Nest always provides both.
+    @Optional() private readonly fiscalPeriods?: FiscalPeriodService,
+    @Optional() private readonly postingStatus?: PostingStatusService,
   ) {}
+
+  /** C2 - the explicit business date must fall in an open fiscal period; same gate the journal posting itself applies later (org-unit-less, like the inventory events). */
+  async assertPostingDateOpen(businessDate: string, manager?: EntityManager): Promise<void> {
+    if (!this.fiscalPeriods) return;
+    await this.fiscalPeriods.assertOpenForPosting(null, businessDate, manager);
+  }
+
+  async financialStatusByReference(referenceType: string, referenceId: string, manager?: EntityManager): Promise<FinancialPostingSummary> {
+    if (!this.postingStatus) return 'none';
+    return (await this.postingStatus.getFinancialStatusByReference(referenceType, referenceId, manager)).summary;
+  }
 
   onModuleInit(): void {
     this.registry.bind(this);

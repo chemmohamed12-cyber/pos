@@ -233,6 +233,9 @@ export class InventoryService implements InventoryReservationContract, Inventory
     unitCostBase?: string | null,
     // D3-B — carried on the event of a 'manual_receipt' only (set by `recordManualReceipt`).
     reasonCode?: string | null,
+    // C2 (ADR-INV-02) — the document's EXPLICIT business date (YYYY-MM-DD). Omitted = today (UTC), exactly as before. Validated BEFORE any write
+    // (format, not in the future, open fiscal period) and carried on the event, the valuation history row and therefore the journal.
+    businessDate?: string | null,
   ): Promise<StockMovement> {
     // F07-H1 (ADR-040 D9, CTO Mandatory Condition 4) — when the caller
     // supplies no transaction of its own, open one here so the
@@ -245,9 +248,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // `manager`) keeps that same atomicity unchanged.
     if (!manager) {
       return this.dataSource.transaction((txManager) =>
-        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode),
+        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode, businessDate),
       );
     }
+
+    const explicitDate = businessDate ? businessDate : undefined;
+    const eventDate = await this.resolveBusinessDate(explicitDate, manager); // pre-mutation gate for an explicit date; today otherwise
 
     const repo = manager.getRepository(StockMovement);
     const movement = await repo.save(
@@ -272,7 +278,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // entry, only a valuation-subledger one). Silently a no-op when F08 is not bound or no cost was
     // supplied — zero behavior change from before this field existed.
     if ((movementType === 'receipt' || movementType === 'return_in') && unitCostBase != null && this.valuation) {
-      await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unitCostBase, `inventory-valuation:receipt:${movement.id}`, manager);
+      await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unitCostBase, `inventory-valuation:receipt:${movement.id}`, manager, explicitDate);
     }
 
     // F07-H1 (ADR-040 D2/D3) — publish only the allow-listed movement types (`dispatch`, always a
@@ -286,7 +292,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     if (glKind) {
       await this.events.publish(manager, INVENTORY_EVENT_TOPICS.movementRecorded, {
         idempotencyKey: `inventory:movement:${movement.id}:recorded`,
-        businessDate: new Date().toISOString().slice(0, 10),
+        businessDate: eventDate,
         orgUnitId: null,
         sourceEntityType: 'stock_movement',
         sourceEntityId: movement.id,
@@ -310,6 +316,21 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * C2 (ADR-INV-02) — the business date an inventory posting carries. `undefined` => today (UTC), no gate (today's behaviour, every unchanged caller).
+   * An EXPLICIT date must be a real calendar date, not in the future, and fall in an OPEN fiscal period (accounting's gate, bound through the posting
+   * policy; absent => no GL => no gate). Rejects BEFORE any write; the date is never silently changed. Public so a document can validate once up front.
+   */
+  async resolveBusinessDate(explicit: string | undefined, manager: EntityManager): Promise<string> {
+    const today = new Date().toISOString().slice(0, 10);
+    if (explicit === undefined) return today;
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(explicit) && new Date(`${explicit}T00:00:00Z`).toISOString().slice(0, 10) === explicit;
+    if (!valid) throw new BadRequestException(`Business date "${explicit}" is not a valid calendar date (YYYY-MM-DD).`);
+    if (explicit > today) throw new BadRequestException(`Business date ${explicit} is in the future (today is ${today}); a posting cannot be dated ahead.`);
+    await this.postingPolicy?.get()?.assertPostingDateOpen?.(explicit, manager);
+    return explicit;
+  }
+
+  /**
    * D3-B (2026-10-04, CTO-approved Manual Receipt policy) — the ONLY way a manual receipt enters stock. It needs an
    * explicit positive `unitCostBase` (no moving-average / last-purchase / estimated fallback) and a controlled
    * `reasonCode` whose configured offset GL account is valid. EVERYTHING is validated before the first write, so a
@@ -325,10 +346,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string | null,
     actorUserId: string | null,
     manager?: EntityManager,
+    businessDate?: string | null,
   ): Promise<StockMovement> {
     if (!manager) {
       return this.dataSource.transaction((tx) =>
-        this.recordManualReceipt(warehouseId, productId, quantity, unitCostBase, reasonCode, referenceId, actorUserId, tx),
+        this.recordManualReceipt(warehouseId, productId, quantity, unitCostBase, reasonCode, referenceId, actorUserId, tx, businessDate),
       );
     }
     if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A manual receipt quantity must be a positive number');
@@ -352,6 +374,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
       manager,
       cost.toFixed(4),
       code,
+      businessDate,
     );
   }
 
@@ -394,10 +417,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string,
     actorUserId: string | null,
     manager?: EntityManager,
+    businessDate?: string | null,
   ): Promise<StockMovement> {
     if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A sale-return quantity must be a positive number');
     if (!(Number(unitCostBase) > 0)) throw new BadRequestException('A sale return requires the original unit cost (no fallback cost is used)');
-    return this.recordMovement(warehouseId, productId, quantity, 'return_in', referenceType, referenceId, actorUserId, manager, Number(unitCostBase).toFixed(4));
+    return this.recordMovement(warehouseId, productId, quantity, 'return_in', referenceType, referenceId, actorUserId, manager, Number(unitCostBase).toFixed(4), undefined, businessDate);
   }
 
   /** D3-B — the reason codes that currently have a configured offset account (what a UI may offer). */
@@ -421,13 +445,15 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string | null,
     actorUserId: string | null,
     manager: EntityManager,
+    businessDate?: string | null,
   ): Promise<void> {
-    const out = await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, manager);
-    await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, manager);
+    const explicitDate = businessDate ? businessDate : undefined;
+    const out = await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, manager, undefined, undefined, explicitDate);
+    await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, manager, undefined, undefined, explicitDate);
     if (!this.valuation) return;
-    const consumed = await this.valuation.consumeIssueCost(productId, fromWarehouseId, quantity, `inventory-valuation:transfer-out:${out.id}`, manager);
+    const consumed = await this.valuation.consumeIssueCost(productId, fromWarehouseId, quantity, `inventory-valuation:transfer-out:${out.id}`, manager, explicitDate);
     if (consumed && !('rejected' in consumed)) {
-      await this.valuation.recordReceiptCost(productId, toWarehouseId, quantity, consumed.unitCostBase, `inventory-valuation:transfer-in:${out.id}`, manager);
+      await this.valuation.recordReceiptCost(productId, toWarehouseId, quantity, consumed.unitCostBase, `inventory-valuation:transfer-in:${out.id}`, manager, explicitDate);
     }
   }
 
@@ -1091,6 +1117,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     manager?: EntityManager,
     /** F6 — the caller's visible warehouses (omit / 'ALL' for unrestricted): a row naming any other warehouse is rejected exactly like an unknown code (no enumeration). */
     visibleWarehouseIds?: 'ALL' | string[],
+    /** C2 — the explicit business date (cut-off) of the whole import; omitted = today. A closed period / future date rejects every row with a clear message, nothing written. */
+    businessDate?: string | null,
   ): Promise<{ succeeded: StockMovement[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: StockMovement[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
@@ -1148,6 +1176,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
               actorUserId,
               txManager,
               unitCostText,
+              undefined,
+              businessDate,
             );
           }),
         );

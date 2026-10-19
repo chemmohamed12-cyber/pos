@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsArray, IsDateString, IsIn, IsInt, IsNumberString, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { InventoryPostingDispatchService } from '../application/inventory-posting-dispatch.service';
 import { WarehouseTransactionsService } from '../application/warehouse-transactions.service';
 import { WarehouseTransactionType } from '../domain/warehouse-transaction-type';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -121,6 +122,8 @@ export class WarehouseTransactionsController {
     private readonly transactions: WarehouseTransactionsService,
     private readonly scopes: AccessScopeService,
     private readonly contexts: AuthorizationContextService,
+    // C2: optional so a direct construction keeps compiling; Nest always provides it.
+    @Optional() private readonly dispatch?: InventoryPostingDispatchService,
   ) {}
 
   /** F6 — the caller's visible warehouses for the list/overview filters (`undefined` = unrestricted). */
@@ -227,7 +230,12 @@ export class WarehouseTransactionsController {
   @Post(':id/transition')
   async transition(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: TransitionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    const state = await this.transactions.transition(id, dto.action, req.user.id, req.companyContext.dataSource.manager);
-    return { transactionId: id, state };
+    const manager = req.companyContext.dataSource.manager;
+    const state = await this.transactions.transition(id, dto.action, req.user.id, manager);
+    // C2 (ADR-INV-10): an action that posts the ledger dispatches its events in THIS request (the document transaction has committed). The document stays
+    // `posted` operationally either way; `financialPosting` states the truth about the GL side, so success is never reported while posting is incomplete.
+    if (!this.dispatch || !['submit', 'approve', 'post', 'reverse'].includes(dto.action)) return { transactionId: id, state };
+    const refs = (await this.transactions.financialReferenceIds(id, manager)).map((referenceId) => ({ referenceType: '*', referenceId }));
+    return { transactionId: id, state, financialPosting: await this.dispatch.dispatchAndReport(manager, refs) };
   }
 }

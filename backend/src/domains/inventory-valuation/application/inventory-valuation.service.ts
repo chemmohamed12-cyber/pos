@@ -41,8 +41,9 @@ export class InventoryValuationService implements InventoryValuationContract {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null> {
-    return this.costEngine.applyIssue(productId, warehouseId, quantity, idempotencyKey, manager);
+    return this.costEngine.applyIssue(productId, warehouseId, quantity, idempotencyKey, manager, businessDate);
   }
 
   async getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>> {
@@ -56,8 +57,9 @@ export class InventoryValuationService implements InventoryValuationContract {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void> {
-    return this.costEngine.applyReceipt(productId, warehouseId, quantity, unitCostBase, idempotencyKey, manager);
+    return this.costEngine.applyReceipt(productId, warehouseId, quantity, unitCostBase, idempotencyKey, manager, businessDate);
   }
 
   async consumeManufacturingPooledCost(

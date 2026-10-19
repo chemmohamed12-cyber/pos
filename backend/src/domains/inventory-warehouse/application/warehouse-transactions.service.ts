@@ -75,6 +75,12 @@ export class WarehouseTransactionsService {
     if (type === 'count') {
       throw new BadRequestException('Count transactions are created via startCount(), not createTransaction().');
     }
+    // C2 (ADR-INV-02) - the document's own date is its business date: it must be a real date and not ahead of today (the open-period gate runs at posting).
+    if (movementDate) {
+      if (Number.isNaN(movementDate.getTime())) throw new BadRequestException('The movement date is not a valid date.');
+      const today = new Date().toISOString().slice(0, 10);
+      if (movementDate.toISOString().slice(0, 10) > today) throw new BadRequestException(`The movement date is in the future (today is ${today}); a document cannot be dated ahead.`);
+    }
 
     // Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — an
     // inactive warehouse is taken out of operational use; no new
@@ -367,6 +373,12 @@ export class WarehouseTransactionsService {
    * one click both approves AND posts, while the audit trail still
    * records both events distinctly with their own timestamps.
    */
+  /** C2 - the ids whose inventory events describe this document's financial effect: the document itself and any reversal document created from it. */
+  async financialReferenceIds(transactionId: string, manager?: EntityManager): Promise<string[]> {
+    const rows = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).find({ where: [{ id: transactionId }, { reversalOfTransactionId: transactionId }], select: ['id'] });
+    return rows.map((r) => r.id);
+  }
+
   async transition(transactionId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     // V1 Release Audit HIGH fix — default-deny: an action absent from
     // the map (e.g. 'auto_post', an internal-only transition this
@@ -566,6 +578,11 @@ export class WarehouseTransactionsService {
         return { posted: false };
       }
 
+      // C2 (ADR-INV-02) - the document's business date (UTC date of its movement date) is carried to every movement, valuation row and journal of this
+      // posting. Validated ONCE here, before any write: a closed/missing fiscal period rejects the whole document (409) and nothing is written.
+      const businessDate = txn.movementDate ? new Date(txn.movementDate).toISOString().slice(0, 10) : undefined;
+      if (businessDate) await this.inventory.resolveBusinessDate(businessDate, txManager);
+
       for (const pair of sortedPairs) {
         await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [pair]);
       }
@@ -596,17 +613,17 @@ export class WarehouseTransactionsService {
           if (txn.reversalOfTransactionId) {
             // Reversal of a LEGACY (pre-D3-B, cost-less) receipt — stock only, exactly as before. A D3-B receipt can't be
             // reversed here (rejected in reverseTransaction before any mutation).
-            await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager);
+            await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
           } else {
             // D3-B — explicit cost + controlled reason, re-validated here, inside the posting transaction, before any stock write.
-            await this.inventory.recordManualReceipt(txn.warehouseId, line.productId, line.quantity, line.unitCostBase, txn.reasonCode, txn.id, actorUserId, txManager);
+            await this.inventory.recordManualReceipt(txn.warehouseId, line.productId, line.quantity, line.unitCostBase, txn.reasonCode, txn.id, actorUserId, txManager, businessDate);
           }
         } else if (txn.type === 'issue') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
         } else if (txn.type === 'transfer') {
-          await this.inventory.recordTransfer(txn.warehouseId, txn.destinationWarehouseId!, line.productId, line.quantity, 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordTransfer(txn.warehouseId, txn.destinationWarehouseId!, line.productId, line.quantity, 'warehouse_transaction', txn.id, actorUserId, txManager, businessDate);
         } else if (txn.type === 'adjustment' || txn.type === 'count') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
         }
       }
 

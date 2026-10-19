@@ -32,6 +32,7 @@ export interface CostEngine {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
 
   /** D4 — PURE read: the cost the ORIGINAL issues (by idempotency key) were actually charged; keys without an `issue` row are absent. */
@@ -45,6 +46,7 @@ export interface CostEngine {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void>;
 
   /**

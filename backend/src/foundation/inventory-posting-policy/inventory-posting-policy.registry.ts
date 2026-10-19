@@ -47,7 +47,20 @@ export interface InventoryPostingPolicy {
    * `tax_receivable` account must resolve. Throws (409) BEFORE any ledger/state/outbox write. No fallback account.
    */
   assertSupplierInvoicePostable(input: SupplierInvoicePostableInput, manager?: EntityManager): Promise<void>;
+  /**
+   * C2 (ADR-INV-02) - OPTIONAL pre-mutation gate for an EXPLICIT business date: a fiscal year/period must cover it and be open. Throws (409) BEFORE any
+   * stock / valuation / outbox write; the date is never silently moved into another period. Unbound / absent => no GL => no gate.
+   */
+  assertPostingDateOpen?(businessDate: string, manager?: EntityManager): Promise<void>;
+  /**
+   * C2 (ADR-INV-10) - OPTIONAL read-only financial status of the events that reference an operational record (document, movement): what the response of an
+   * in-request dispatch reports, so a document never claims "posted to GL" while its posting is pending or rejected.
+   */
+  financialStatusByReference?(referenceType: string, referenceId: string, manager?: EntityManager): Promise<FinancialPostingSummary>;
 }
+
+/** `none` = no financial event exists for the reference (e.g. a transfer posts no journal under Model A). */
+export type FinancialPostingSummary = 'none' | 'posted' | 'pending' | 'rejected' | 'mixed';
 
 @Injectable()
 export class InventoryPostingPolicyRegistry {

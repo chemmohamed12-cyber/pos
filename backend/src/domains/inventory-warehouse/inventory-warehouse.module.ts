@@ -7,6 +7,7 @@ import { WarehouseTransaction } from './infrastructure/warehouse-transaction.ent
 import { WarehouseTransactionLine } from './infrastructure/warehouse-transaction-line.entity';
 import { InventoryService } from './application/inventory.service';
 import { WarehouseTransactionsService } from './application/warehouse-transactions.service';
+import { InventoryPostingDispatchService } from './application/inventory-posting-dispatch.service';
 import { InventoryController } from './interface/inventory.controller';
 import { WarehouseTransactionsController } from './interface/warehouse-transactions.controller';
 import { AuditModule } from '../../foundation/audit/audit.module';
@@ -58,6 +59,7 @@ import { WarehouseItem } from './infrastructure/warehouse-item.entity';
   providers: [
     InventoryService,
     WarehouseTransactionsService,
+    InventoryPostingDispatchService,
     { provide: INVENTORY_RESERVATION_CONTRACT, useExisting: InventoryService },
     { provide: INVENTORY_LOGISTICS_CONTRACT, useExisting: InventoryService },
   ],

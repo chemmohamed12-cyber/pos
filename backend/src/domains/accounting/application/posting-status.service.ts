@@ -102,6 +102,8 @@ export class PostingStatusService {
   /**
    * The financial effect of ONE operational document (or any reference): its financial events and the outbox rows still waiting. The reference is what the
    * inventory events already carry in their payload (`referenceType` / `referenceId`), so accounting never reads another module's tables.
+   * Internal callers may pass `'*'` as the type to match a record by its id alone (an id is a UUID; the document's movements carry different reference
+   * types - a manual receipt says `manual_receipt`, a dispatch `warehouse_transaction`). The HTTP route never accepts `'*'` (its type is validated).
    */
   async getFinancialStatusByReference(
     referenceType: string,
@@ -115,6 +117,8 @@ export class PostingStatusService {
          FROM accounting_financial_events fe
         WHERE (fe.payload->>'referenceType' = $1 AND fe.payload->>'referenceId' = $2)
            OR ($1 = 'goods_receipt' AND fe.payload->>'goodsReceiptId' = $2)
+           OR (fe."sourceEntityType" = $1 AND fe."sourceEntityId"::text = $2)
+           OR ($1 = '*' AND fe.payload->>'referenceId' = $2)
         ORDER BY fe."receivedAt" DESC LIMIT 200`,
       [referenceType, referenceId],
     )) as Array<Omit<FinancialStatusItem, 'at'> & { at: Date | null }>;
@@ -123,7 +127,9 @@ export class PostingStatusService {
               NULL AS "journalEntryId", o.payload->>'businessDate' AS "businessDate", o."createdAt" AS at
          FROM event_outbox o
         WHERE o.status IN ('pending','processing','failed')
-          AND ((o.payload->>'referenceType' = $1 AND o.payload->>'referenceId' = $2) OR ($1 = 'goods_receipt' AND o.payload->>'goodsReceiptId' = $2))
+          AND ((o.payload->>'referenceType' = $1 AND o.payload->>'referenceId' = $2) OR ($1 = 'goods_receipt' AND o.payload->>'goodsReceiptId' = $2)
+               OR (o.payload->>'sourceEntityType' = $1 AND o.payload->>'sourceEntityId' = $2)
+               OR ($1 = '*' AND o.payload->>'referenceId' = $2))
         ORDER BY o."createdAt" DESC LIMIT 200`,
       [referenceType, referenceId],
     )) as Array<Omit<FinancialStatusItem, 'at'> & { at: Date | null }>;

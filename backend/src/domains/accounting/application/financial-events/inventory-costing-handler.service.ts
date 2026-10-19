@@ -149,13 +149,13 @@ export class InventoryCostingHandlerService implements OnModuleInit {
           const unit = await this.valuation.getUnitCost(productId, warehouseId, undefined, ctx.manager);
           if (!unit) return { kind: 'rejected', reason: 'no_valuation_source' };
           const total = (quantity * Number(unit.unitCostBase)).toFixed(4);
-          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit.unitCostBase, idempotencyKey, ctx.manager);
+          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit.unitCostBase, idempotencyKey, ctx.manager, event.businessDate);
           return draft([
             { accountId: inventoryAccount, debit: total, description: 'Inventory asset' },
             { accountId: counter.id, credit: total, description: 'Inventory adjustment gain' },
           ]);
         }
-        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager);
+        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
         if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
         if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected };
         return draft([
@@ -171,7 +171,7 @@ export class InventoryCostingHandlerService implements OnModuleInit {
       // ADR-041 D3/D8 — this is the ONLY place a dispatch cost is resolved: never event.payload, never a selling
       // price, never an inference. `consumeIssueCost` mutates atomically with GL posting (ctx.manager) and fails
       // closed (`null`) when no valuation state exists yet.
-      const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager);
+      const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
       if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
       if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected }; // 'negative_on_hand'
 

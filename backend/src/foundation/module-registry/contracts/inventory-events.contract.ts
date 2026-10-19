@@ -142,6 +142,8 @@ export interface InventoryValuationContract {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    /** C2 (ADR-INV-02) - the accounting-facing date of the history row it writes (YYYY-MM-DD); omitted = the processing date (today, UTC), exactly as before. */
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
   /**
    * D4 (2026-10-05) — PURE read. The cost an ORIGINAL issue (dispatch) was actually charged, looked up by the idempotency
@@ -164,6 +166,8 @@ export interface InventoryValuationContract {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    /** C2 (ADR-INV-02) - the accounting-facing date of the history row (YYYY-MM-DD); omitted = the processing date (today, UTC), exactly as before. */
+    businessDate?: string,
   ): Promise<void>;
   /**
    * ADR-061 (Manufacturing) — NARROWLY SCOPED to Manufacturing Finished

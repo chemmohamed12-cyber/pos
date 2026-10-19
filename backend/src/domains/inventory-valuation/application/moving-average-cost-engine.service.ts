@@ -71,6 +71,7 @@ export class MovingAverageCostEngine implements CostEngine {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null> {
     return this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
@@ -116,6 +117,7 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: afterAvg,
           idempotencyKey,
+          ...(businessDate ? { businessDate } : {}), // C2: the document's business date; otherwise the column default (processing date, UTC)
         }),
       );
 
@@ -198,6 +200,7 @@ export class MovingAverageCostEngine implements CostEngine {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void> {
     await this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
@@ -249,6 +252,7 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: row.after_avg,
           idempotencyKey,
+          ...(businessDate ? { businessDate } : {}), // C2: the document's business date; otherwise the column default (processing date, UTC)
         }),
       );
     });
