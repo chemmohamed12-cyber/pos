@@ -89,6 +89,16 @@ export interface CostEngine {
   /** MUTATING — reversal-not-edit (ADR-041 D14): reapplies the ORIGINAL movement's own recorded cost, inverted, as a NEW history row — never edits history, never recalculates. */
   applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null>;
 
+  /** C6 - value-only change of a position (see `InventoryValuationContract.applyRevaluation`). */
+  applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }>;
+
   /** Read-only — the valued on-hand position per warehouse, for F07's reconciliation (D19). With a PAST `asOfDate` it is rebuilt from the dated history (C1, ADR-INV-08). */
   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
 

@@ -132,6 +132,19 @@ export interface InventoryValuationContract {
    * not exist (nothing is invented).
    */
   reverseReceiptCost?(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null>;
+  /**
+   * C6 (ADR-INV-05 2.1) - OPTIONAL, MUTATING, idempotent on `idempotencyKey`: a VALUE-ONLY change of one (warehouse, product) position - quantity unchanged, `valueDelta` (signed
+   * decimal string; negative = write-down) added to the total value, the average recomputed. Appends a `revaluation` history row and nothing else. Fails closed with NO mutation when
+   * the position has no state / no quantity, or when the result would be negative. Called only by F07's handler inside the posting transaction (`ctx.manager`), after its accounts resolved.
+   */
+  applyRevaluation?(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }>;
   /** C1 - OPTIONAL, read-only: every (warehouse, product) whose running state disagrees with the sum of its own dated history. */
   checkHistoryConsistency?(manager?: EntityManager): Promise<HistoryInconsistency[]>;
   /** PURE — no mutation, ever. The current running unit cost for one product/warehouse, for reference (e.g. an FA-01 maker's read-only lookup — Blueprint D11). */

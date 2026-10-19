@@ -25,7 +25,7 @@ export class InventoryValuationMovement {
   warehouseId!: string;
 
   @Column({ type: 'varchar', length: 32 })
-  kind!: 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'reversal';
+  kind!: 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'reversal' | 'revaluation';
 
   /** The `inventory-warehouse` `StockMovement` row this costed, when one exists (not every kind has one — e.g. a pure reversal). */
   @Column({ type: 'uuid', nullable: true })

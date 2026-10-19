@@ -1,6 +1,7 @@
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { HandlerContext, HandlerResult, JournalDraftLine } from './handler-registry';
 import { InventoryAdjustmentKind } from '../../domain/inventory';
+import { InventoryValuationContract } from '../../../../foundation/module-registry/contracts/inventory-events.contract';
 
 /**
  * F07 — Inventory Accounting (ADR-040 D7/D12). The mirror of
@@ -27,7 +28,12 @@ function amt(v: unknown): string | null {
   return s && /^\d+(\.\d+)?$/.test(s) && Number(s) > 0 ? s : null;
 }
 
-export async function handleInventoryAdjustmentApproved(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
+/** C6 - what the handler needs to ALSO move the valuation (absent = the pre-C6 GL-only behaviour, exactly). */
+export interface InventoryAdjustmentHandlerDeps {
+  valuation?: InventoryValuationContract;
+}
+
+export async function handleInventoryAdjustmentApproved(event: FinancialEvent, ctx: HandlerContext, deps?: InventoryAdjustmentHandlerDeps): Promise<HandlerResult> {
   const p = event.payload;
   const kind = str(p.kind) as InventoryAdjustmentKind | null;
   const amount = amt(p.amount);
@@ -57,6 +63,17 @@ export async function handleInventoryAdjustmentApproved(event: FinancialEvent, c
           { accountId: counter, debit: amount, description: 'Counter' },
           { accountId: inventoryAccount, credit: amount, description: 'Inventory asset' },
         ];
+
+  // C6 (ADR-INV-05 2.1): a value-only write-down / write-up that was submitted with a valuation effect moves the valuation of its (warehouse, product) position in the SAME transaction
+  // as the journal (the handler-through-posting span is one transaction: a rejected posting rolls the revaluation back). Every account above resolved BEFORE this mutation.
+  if (p.valuationEffect === true || p.valuationEffect === 'true') {
+    const productId = str(p.productId);
+    const warehouseId = str(p.warehouseId);
+    if (!productId || !warehouseId) return { kind: 'rejected', reason: `inventory ${kind}: a valuation-affecting adjustment needs productId and warehouseId` };
+    if (!deps?.valuation?.applyRevaluation) return { kind: 'rejected', reason: `inventory ${kind}: the valuation engine is not available - the adjustment cannot move the valuation` };
+    const revalued = await deps.valuation.applyRevaluation(productId, warehouseId, direction === 'debit' ? amount : `-${amount}`, event.idempotencyKey, ctx.manager, event.businessDate);
+    if ('rejected' in revalued) return { kind: 'rejected', reason: `inventory ${kind}: valuation not changed (${revalued.rejected})` };
+  }
 
   return {
     kind: 'draft',

@@ -350,6 +350,61 @@ export class MovingAverageCostEngine implements CostEngine {
     });
   }
 
+  /**
+   * C6 (ADR-INV-05 2.1) - a VALUE-ONLY revaluation of one position: the quantity is untouched, `valueDelta` is added to the total value and the average is recomputed from it.
+   * Idempotent on `idempotencyKey` (a replay returns the recorded delta and changes nothing). Fails closed, with NO mutation, when there is no state, no quantity, or the result
+   * would be negative. History is append-only: one `revaluation` row.
+   */
+  async applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }> {
+    return this.run(manager, async (m) => {
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
+      const histRepo = m.getRepository(InventoryValuationMovement);
+      const replay = await histRepo.findOne({ where: { idempotencyKey } });
+      if (replay) return { valueBase: replay.valueDeltaBase };
+
+      const stateRepo = m.getRepository(InventoryValuationState);
+      const state = await stateRepo.findOne({ where: { productId, warehouseId } });
+      if (!state) return { rejected: 'no_valuation_source' as const };
+      if (state.onHandQuantity <= 0) return { rejected: 'zero_quantity' as const };
+
+      const beforeValue = state.totalValueBase;
+      const [row]: Array<{ delta: string; after_value: string; after_avg: string }> = await m.query(
+        `SELECT $2::numeric(20,4) AS delta,
+                ($1::numeric(20,4) + $2::numeric(20,4))::numeric(20,4) AS after_value,
+                (($1::numeric(20,4) + $2::numeric(20,4)) / $3::int)::numeric(20,4) AS after_avg`,
+        [beforeValue, valueDelta, state.onHandQuantity],
+      );
+      if (Number(row.after_value) < 0) return { rejected: 'value_below_zero' as const };
+
+      state.totalValueBase = row.after_value;
+      state.averageCostBase = row.after_avg;
+      await stateRepo.save(state);
+      await histRepo.save(
+        histRepo.create({
+          productId,
+          warehouseId,
+          kind: 'revaluation',
+          stockMovementId: null,
+          quantity: 0,
+          quantityBeforeValueBase: beforeValue,
+          valueDeltaBase: row.delta,
+          quantityAfterValueBase: row.after_value,
+          averageCostAfterBase: row.after_avg,
+          idempotencyKey,
+          ...(businessDate ? { businessDate } : {}),
+        }),
+      );
+      return { valueBase: row.delta };
+    });
+  }
+
   async applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null> {
     return this.run(manager, async (m) => {
       const histRepo = m.getRepository(InventoryValuationMovement);

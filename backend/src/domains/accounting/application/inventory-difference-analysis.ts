@@ -68,7 +68,7 @@ export async function analyzeInventoryDifference(
     `WITH inv AS (
        SELECT l."debitTransaction" AS dt, l."creditTransaction" AS ct, l."debitBase" AS db, l."creditBase" AS cb,
               e."sourceType" AS st, e."transactionCurrencyCode" AS tcur, e."functionalCurrencyCode" AS fcur,
-              COALESCE(fe."eventType", ofe."eventType") AS event_type
+              CASE WHEN fe."eventType" = '${F07_EVENT}' AND fe.payload->>'valuationEffect' = 'true' THEN 'f07_with_valuation_effect' ELSE COALESCE(fe."eventType", ofe."eventType") END AS event_type
          FROM accounting_journal_lines l
          JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
          LEFT JOIN accounting_financial_events fe ON fe.id = e."financialEventId"
@@ -154,7 +154,7 @@ export async function analyzeInventoryDifference(
        FROM accounting_journal_lines l
        JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
        JOIN accounting_financial_events fe ON fe.id = e."financialEventId"
-      WHERE l."accountId" = $1 AND ${postedEntryFilter} AND e."businessDate" <= $2::date AND fe."eventType" = '${F07_EVENT}'
+      WHERE l."accountId" = $1 AND ${postedEntryFilter} AND e."businessDate" <= $2::date AND fe."eventType" = '${F07_EVENT}' AND COALESCE(fe.payload->>'valuationEffect', 'false') <> 'true'
       GROUP BY e.id, e."businessDate", e."financialEventId" ORDER BY e."businessDate" DESC LIMIT 200`,
     [inventoryAccountId, asOfDate],
   )) as DifferenceAnalysis['f07Entries'];
@@ -179,7 +179,7 @@ export async function analyzeInventoryDifference(
     categories: [
       { code: 'rounding', amountBase: lines.rounding, count: lines.rounding_n, note: 'The base-currency scale rounded away part of the 4-decimal transaction amount the valuation carries (exact, line by line; no tolerance).' },
       { code: 'unposted_value', amountBase: sums.unposted_value, count: unposted.ev_n + unposted.ob_n, note: 'Valuation applied at movement time whose journal is not posted yet: events REJECTED/RECEIVED/MAPPED and outbox rows not dispatched.' },
-      { code: 'f07_without_valuation_effect', amountBase: sums.f07_effect, count: lines.f07_n, note: 'Approved F07 inventory adjustments post to the GL only; the valuation is not changed by them (slice C6 aligns this).' },
+      { code: 'f07_without_valuation_effect', amountBase: sums.f07_effect, count: lines.f07_n, note: 'Approved F07 inventory adjustments approved BEFORE slice C6 (or submitted with the valuation flag off) post to the GL only; the valuation is not changed by them. Entries submitted with a valuation effect are excluded: they move both sides.' },
       { code: 'manual_or_opening_journals', amountBase: sums.manual_effect, count: lines.manual_n, note: 'Manual/opening journal lines on the inventory control account (blocked by policy; reported if present).' },
     ],
     explainedBase: sums.explained,

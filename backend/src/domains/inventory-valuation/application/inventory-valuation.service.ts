@@ -50,6 +50,18 @@ export class InventoryValuationService implements InventoryValuationContract {
     return this.costEngine.getIssueCostsByKeys(idempotencyKeys, manager);
   }
 
+  /** C6 - a value-only change of one position (F07 write-down / write-up); see the contract. */
+  async applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }> {
+    return this.costEngine.applyRevaluation(productId, warehouseId, valueDelta, idempotencyKey, manager, businessDate);
+  }
+
   /** C4 - the offsetting history row of a recorded receipt (see the contract); returns the value that was reversed. */
   async reverseReceiptCost(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null> {
     return this.costEngine.applyReversal(originalIdempotencyKey, reversalIdempotencyKey, manager, businessDate);

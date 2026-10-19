@@ -490,6 +490,11 @@ export const accountingManifest: ModuleManifest = {
     { key: 'accounting.inventory_opening_balance_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     // C4 (ADR-INV-01, decision O-1): the EQUITY-side account an approved correction of an opening balance AFTER stock has moved posts against, so a wrong opening never distorts profit and loss.
     { key: 'accounting.inventory_opening_correction_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // C6 (ADR-INV-05): an approved F07 `valuation_write_down` ALSO moves the valuation of its (warehouse, product) position, atomically with its journal. Off (default) = the pre-C6 GL-only posting.
+    { key: 'accounting.inventory_f07_updates_valuation', type: 'bool', default: false, scope_levels: ['platform', 'edition', 'installation'] },
+    // C6 (ADR-INV-05): the retirement of the free-typed `physical_count_variance` (quantity changes belong to count / adjustment documents). allowed = today; warn = accepted and audited as
+    // deprecated; refused = 409 with a pointer to the documents. Switch only after the replacement path has been verified (it is, by the C6 spec) and the owner has reviewed (C5).
+    { key: 'accounting.inventory_physical_count_variance', type: 'enum', allowed: ['allowed', 'warn', 'refused'], default: 'allowed', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_gain_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_loss_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     // D3-B (2026-10-04) — manual-receipt Reason Code → Offset GL account, as a JSON map `{ "<reasonCode>": "<glAccountCode>" }`.
