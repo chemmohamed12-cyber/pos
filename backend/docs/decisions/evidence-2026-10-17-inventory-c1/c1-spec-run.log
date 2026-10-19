@@ -1,0 +1,27 @@
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts (28.753 s)
+  Inventory lifecycle C1 - valuation as-of, reconciliation v2, posting status, GL/TB read models - real-Postgres, A/B
+    √ 1. a clean ledger reconciles to MATCHED exactly; the run records basis/classification and the existing status values are unchanged (169 ms)
+    √ 2. rounding is attributed EXACTLY (no tolerance): a fractional average posts 9.7778 -> 9.78, the run is drift_found but EXPLAINED with zero unexplained (152 ms)
+    √ 3. a REJECTED event is itemised as unposted value with its reason, and the posting status turns to attention; re-drive clears both (122 ms)
+    √ 4. a pending outbox row is itemised as unposted value and shows as pending; after the flush it posts once (127 ms)
+    √ 5. an approved F07 entry (GL only) is itemised as "without valuation effect"; the identity explained + unexplained = difference holds (64 ms)
+    √ 6. a valuation-only change with no event and no journal is NOT explained: classification unexplained with the exact remainder (the control still raises the alarm) (43 ms)
+    √ 7. PREVIEW persists nothing; RECONCILE writes only its own run row and audit records - no journal, event, outbox, stock or valuation row (98 ms)
+    √ 8. valuation AS OF a date is rebuilt from the dated history; a past-date reconciliation compares THEN with THEN; history consistency holds (41 ms)
+    √ 9. GL lines carry ADDITIVE traceability (event, reference, entry state) and keep every existing field (13 ms)
+    √ 10. the PERIODIC trial balance: opening + period = closing per account and in total, roll-up from the chart, three independent balance tests; the default payload is unchanged (29 ms)
+    √ 11. the financial status of ONE document, by reference: none / pending / posted - from the events themselves (60 ms)
+    √ 12. the overview COST KPI: valuation of the visible warehouses only, null without the permission, selling price unchanged (127 ms)
+    √ 13. no duplicate journal on any retry or repeated read, and the identity still holds at the end (105 ms)
+    √ 14. ISOLATION: Company B is untouched by every new read, has its own empty answers, and the Platform DataSource was never requested (74 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       14 passed, 14 total
+Snapshots:   0 total
+Time:        28.827 s, estimated 31 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c1.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+
+REGRESSION DONE: 1/1 passed

@@ -1,0 +1,15 @@
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts (25.277 s)
+  Inventory lifecycle C1 migrations - up/down/up on a real Company database
+    √ valuation movement businessDate: up is idempotent, backfills only NULLs from the UTC createdAt date, defaults to today, down removes it (498 ms)
+    √ reconciliation explanation columns: up/down/up, CHECK constraints enforce the vocabulary, existing status values untouched (148 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        25.343 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c1.migrations.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+
+REGRESSION DONE: 1/1 passed

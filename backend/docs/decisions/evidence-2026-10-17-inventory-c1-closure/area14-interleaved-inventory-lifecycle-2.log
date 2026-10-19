@@ -1,0 +1,16 @@
+
+=== REGRESSION: src/foundation/audit/area14-company-audit.real-pg.spec.ts
+PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts (42.393 s)
+  Area 14 — Company-scoped audit trail, real Postgres isolation + chain proof (2026-09-25)
+    √ items 1-3: a Company A grant lands in Company A audit, in Platform audit, and NOT in Company B audit (1692 ms)
+    √ item 4: verifyCompanyChain() reports a valid chain for Company A, and correctly detects a deliberately corrupted one (8 ms)
+    √ Company B has its own, fully independent chain — corrupting Company A never affects it (51 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        42.611 s
+Ran all test suites matching /src\\foundation\\audit\\area14-company-audit.real-pg.spec.ts/i.
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+
+REGRESSION DONE: 1/1 passed

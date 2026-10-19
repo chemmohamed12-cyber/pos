@@ -1,0 +1,1 @@
+The run logs in this folder are stored with an additional .txt suffix (for example unit-tests.log.txt) because the repository ignores *.log files. The .txt files are byte-for-byte copies of the original logs named in the reports.

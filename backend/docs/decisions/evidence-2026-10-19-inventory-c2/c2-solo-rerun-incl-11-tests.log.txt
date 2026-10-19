@@ -1,0 +1,74 @@
+
+=== REGRESSION: src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+PASS src/foundation/database-registry/company-datasource-registry-isolation.spec.ts (26.621 s)
+  ADR-074 Gate D — Area 21 cross-company isolation, unaffected by COMPANY_ENTITY_REGISTRY (2026-09-25)
+    √ Company A connection resolves Company A grant, and does NOT see Company B's user at all (980 ms)
+    √ Company B connection resolves Company B grant, and does NOT see Company A's user at all (895 ms)
+    √ CompanyConnectionManagerService returns genuinely distinct, separately-cached DataSource objects for A and B (7 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        26.692 s
+Ran all test suites matching /src\\foundation\\database-registry\\company-datasource-registry-isolation.spec.ts/i.
+RESULT PASS src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+
+=== REGRESSION: src/foundation/release-orchestration/company-migration-runner.spec.ts
+PASS src/foundation/release-orchestration/company-migration-runner.spec.ts (18.177 s)
+  runMigrationsForDatabase (Area 16, real disposable Postgres databases)
+    √ runs the existing core migration pipeline, unmodified, against a fresh disposable database (1934 ms)
+    √ the migrated database actually has the expected tables (not a no-op success) (92 ms)
+    √ migrating Company B never touches Company A — no cross-company selection (proof point 4) (1649 ms)
+    √ re-running against an already-migrated database is a safe no-op (retry semantics) (135 ms)
+    √ reports failure (not a thrown crash escaping the function) for an unreachable database (72 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        18.263 s
+Ran all test suites matching /src\\foundation\\release-orchestration\\company-migration-runner.spec.ts/i.
+RESULT PASS src/foundation/release-orchestration/company-migration-runner.spec.ts
+
+=== REGRESSION: src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+[31m[Nest] 23408  - [39m١٩‏/١٠‏/٢٠٢٦، ١:١٥:٣٨ م [31m  ERROR[39m [38;5;3m[RestoreManagerService] [39m[31mRestore failed for operation "8d7fa589-3fc5-4ed0-a63f-59ab0a34e9bb"[39m
+Error: Restored Company audit chain is broken at seq 2 — restore rejected.
+    at RestoreManagerService.confirmAndRestore (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\foundation\release\restore-manager.service.ts:223:21)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\foundation\release\restore-manager-audit-chain.real-pg.spec.ts:180:5)
+PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts (20.917 s)
+  Area 14 — RestoreManagerService audit-chain branch, real Postgres (2026-09-25)
+    √ zero audit rows (pre-Area-14 backup) — restore succeeds, chain never checked (167 ms)
+    √ audit rows present + valid chain — restore succeeds (145 ms)
+    √ audit rows present + broken chain — restore rejected (181 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        21 s
+Ran all test suites matching /src\\foundation\\release\\restore-manager-audit-chain.real-pg.spec.ts/i.
+RESULT PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+[33m[Nest] 2924  - [39m١٩‏/١٠‏/٢٠٢٦، ١:١٦:١٣ م [33m   WARN[39m [38;5;3m[InventoryPostingDispatchService] [39m[33mIn-request inventory dispatch failed (events stay queued for the sweep): simulated dispatch outage[39m
+PASS src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts (35.488 s)
+  Inventory lifecycle C2 - in-request posting dispatch and explicit business-date propagation - real-Postgres, A/B
+    √ 1. DOCUMENT dated today-3 posts IN THE REQUEST (no sweep): response says posted; journal, event and valuation row carry today-3, the stock row keeps its record time (221 ms)
+    √ 2. HISTORICAL as-of valuation, GL and reconciliation follow the business date: nothing before it, 5 u / 20.0000 from it, then-with-then MATCHED (74 ms)
+    √ 3. an ISSUE dated today-1 (approval flow): the cost is applied at ingest with the EVENT date - valuation row, COGS journal and as-of figures all say today-1 (196 ms)
+    √ 4. a TRANSFER dated today-2 carries its date on the valuation rows (Model A: no journal); an explicit-date manual receipt and an opening import do too; an omitted date is today (320 ms)
+    √ 5. VALIDATION before any write: a future date, a CLOSED period and a date outside every fiscal year are rejected with zero rows written; reopening the period lets the same document post (345 ms)
+    √ 6. POSTING FAILURE is reported truthfully and recovers safely: switch off -> "pending"; the period closes before the sweep -> event REJECTED, response "rejected"; redrive after reopening -> posted once (211 ms)
+    √ 7. if the DISPATCH ITSELF throws the document stays committed, the response never says "posted", the events stay queued, and the next dispatch posts them once (102 ms)
+    √ 8. DUPLICATE / OVERLAPPING dispatch is safe: parallel dispatchers and repeated calls neither double-post nor lose an event; the same idempotency key is deduped (372 ms)
+    √ 9. CONSISTENCY across layers and COMPANY ISOLATION: stock = valuation quantity, valuation = GL at every date, journals balanced, Company B untouched (86 ms)
+    √ 11. the HTTP manual-receipt endpoint: explicit businessDate, in-request dispatch with a truthful report, closed period refused with nothing written (180 ms)
+    √ 10. the dispatch service without accounting reports "not_applicable" and never claims a posting (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        35.571 s, estimated 47 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c2.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+
+REGRESSION DONE: 4/4 passed
