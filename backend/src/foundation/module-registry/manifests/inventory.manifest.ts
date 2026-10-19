@@ -105,6 +105,24 @@ export const inventoryManifest: ModuleManifest = {
       default: false,
       scope_levels: ['platform', 'edition', 'installation'],
     },
+    // C3 (ADR-INV-03) - segregation of duties on warehouse documents with a financial effect: `off` = no check (pre-C3), `warn` = allow and audit
+    // `warehouse_transaction.sod_violation`, `on` = refuse the creator approving / posting their own document. Staged: C3 ships `warn`; the switch to `on` is C5.
+    {
+      key: 'inventory.document_sod_enforced',
+      type: 'enum',
+      allowed: ['off', 'warn', 'on'],
+      default: 'warn',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // C3 (ADR-INV-03) - a manual receipt (a receipt document with a reason code, i.e. with a financial effect) waits for approval instead of auto-posting on
+    // submit. `off` (default) keeps today's straight-through behaviour; `on` makes it draft -> submitted -> approved -> posted. Reversal documents are unaffected.
+    {
+      key: 'inventory.receipt_approval_required',
+      type: 'enum',
+      allowed: ['off', 'on'],
+      default: 'off',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
     {
       key: 'inventory.reservation_hold_minutes',
       type: 'int',

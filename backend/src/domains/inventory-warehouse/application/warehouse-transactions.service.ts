@@ -9,6 +9,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { InventoryService } from './inventory.service';
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
@@ -47,7 +48,56 @@ export class WarehouseTransactionsService {
     // Slice C1 (ADR-INV-07) - the cost-based inventory value of the overview. `@Optional()` and last: every existing construction site is unaffected, and an
     // installation without the valuation module simply reports no cost value.
     @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
+    // C3 (ADR-INV-03) - the two staged flags. `@Optional()` and last: a construction without it (older specs) behaves exactly as before C3 (`off`).
+    @Optional() private readonly config?: ConfigurationEngineService,
   ) {}
+
+  /** C3 - a flag value; an engine that is absent or has no value for the key means "pre-C3 behaviour" (`off`). */
+  private flag(key: string): string {
+    const v = this.config?.get<unknown>(key);
+    return typeof v === 'string' ? v : 'off';
+  }
+
+  /** C3 - a receipt that creates a financial effect (every manual receipt carries a reason code) waits for approval when the flag is `on`; reversal documents never do. */
+  private receiptNeedsApproval(txn: WarehouseTransaction): boolean {
+    return txn.type === 'receipt' && !!txn.reasonCode && !txn.reversalOfTransactionId && this.flag('inventory.receipt_approval_required') === 'on';
+  }
+
+  /** C3 - does posting this document change money? receipt (reasoned) and issue always; adjustment/count only with a non-zero line; transfer never (Model A). */
+  private async hasFinancialEffect(txn: WarehouseTransaction, manager?: EntityManager): Promise<boolean> {
+    if (txn.type === 'receipt') return !!txn.reasonCode;
+    if (txn.type === 'issue') return true;
+    if (txn.type === 'adjustment' || txn.type === 'count') return (await this.getLines(txn.id, manager)).some((l) => l.quantity !== 0);
+    return false;
+  }
+
+  /**
+   * C3 (ADR-INV-03 section 2.2) - segregation of duties, enforced HERE at the service boundary (not in the UI) BEFORE any mutation: the user who created a document
+   * with a financial effect may not `approve` or `post` it. `off` -> nothing; `warn` -> allowed, an audit record `warehouse_transaction.sod_violation` is written
+   * (so real data can be measured before enforcing); `on` -> 403. Reversal documents are exempt (they undo a posted document and need their own role).
+   */
+  private async enforceSeparationOfDuties(txn: WarehouseTransaction, action: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const mode = this.flag('inventory.document_sod_enforced');
+    if (mode === 'off' || txn.reversalOfTransactionId || !txn.createdByUserId || txn.createdByUserId !== actorUserId) return;
+    if (!(await this.hasFinancialEffect(txn, manager))) return;
+    if (mode === 'warn') {
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'warehouse_transaction.sod_violation',
+          resource: 'warehouse_transaction',
+          resourceId: txn.id,
+          result: 'success',
+          correlationId: null,
+          after: { mode: 'warn', attemptedAction: action, transactionNumber: txn.transactionNumber, type: txn.type },
+        },
+        manager,
+      );
+      return;
+    }
+    throw new ForbiddenException(`Separation of duties: ${txn.transactionNumber} was created by you, so another authorised user must ${action} it.`);
+  }
 
   async createTransaction(
     type: WarehouseTransactionType,
@@ -398,6 +448,9 @@ export class WarehouseTransactionsService {
     const txn = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
     if (!txn) throw new NotFoundException(`Warehouse transaction "${transactionId}" not found.`);
 
+    // C3: refused (or audited, in warn mode) BEFORE any state change or write.
+    if (action === 'approve' || action === 'post') await this.enforceSeparationOfDuties(txn, action, actorUserId, manager);
+
     if (action === 'submit' && txn.type === 'count') {
       const lines = await this.getLines(transactionId, manager);
       if (lines.some((l) => l.physicalQuantity === null)) {
@@ -429,7 +482,7 @@ export class WarehouseTransactionsService {
     // document at its prior state so a supervisor can fix the stock
     // situation and retry, never mislabeled "posted" with no movements
     // actually written.
-    if (action === 'submit' && NO_APPROVAL_REQUIRED.has(txn.type)) {
+    if (action === 'submit' && NO_APPROVAL_REQUIRED.has(txn.type) && !this.receiptNeedsApproval(txn)) {
       await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'submit', actorUserId, manager);
       await this.postTransaction(txn, actorUserId, null, 'auto_post', manager);
     } else if (action === 'approve') {
