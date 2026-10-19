@@ -1,0 +1,78 @@
+{
+ "res": {
+  "platform": {
+   "migrationsCount": 302,
+   "last": [
+    "AddInventoryReconciliationExplanation1790017100000",
+    "SeedInventoryC1Terminology1790017200000"
+   ],
+   "hasOpeningBatches": false,
+   "hasRefCols": 0,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 0,
+   "whTxnRows": 0
+  },
+  "Alpha Trading Co": {
+   "migrationsCount": 302,
+   "last": [
+    "AddInventoryReconciliationExplanation1790017100000",
+    "SeedInventoryC1Terminology1790017200000"
+   ],
+   "hasOpeningBatches": false,
+   "hasRefCols": 0,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 0,
+   "whTxnRows": 0
+  },
+  "Beta Trading Co": {
+   "migrationsCount": 302,
+   "last": [
+    "AddInventoryReconciliationExplanation1790017100000",
+    "SeedInventoryC1Terminology1790017200000"
+   ],
+   "hasOpeningBatches": false,
+   "hasRefCols": 0,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 0,
+   "whTxnRows": 0
+  },
+  "Delta Trading Co": {
+   "migrationsCount": 302,
+   "last": [
+    "AddInventoryReconciliationExplanation1790017100000",
+    "SeedInventoryC1Terminology1790017200000"
+   ],
+   "hasOpeningBatches": false,
+   "hasRefCols": 0,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 0,
+   "whTxnRows": 0
+  },
+  "Gamma Trading Co": {
+   "migrationsCount": 302,
+   "last": [
+    "AddInventoryReconciliationExplanation1790017100000",
+    "SeedInventoryC1Terminology1790017200000"
+   ],
+   "hasOpeningBatches": false,
+   "hasRefCols": 0,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 0,
+   "whTxnRows": 0
+  }
+ },
+ "equivalenceGroups": {
+  "[302,[\"AddInventoryReconciliationExplanation1790017100000\",\"SeedInventoryC1Terminology1790017200000\"],\"CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying])::text[])))\"]": [
+   "platform",
+   "Alpha Trading Co",
+   "Beta Trading Co",
+   "Delta Trading Co",
+   "Gamma Trading Co"
+  ]
+ }
+}
