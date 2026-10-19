@@ -101,6 +101,30 @@ export class InventoryCostingHandlerService implements OnModuleInit {
         );
       }
 
+      // ---- movement_reversal (slice R): the reversal of ONE original stock movement of a reversed warehouse document. The valuation row of the original is inverted at its RECORDED cost (an issue
+      //      therefore restores its original issued cost - it never consumes again) and the journal is the MIRROR of the original journal (same accounts, same amounts, debit and credit swapped).
+      //      The original posting must be POSTED; the mutation comes last, after every read that can reject. ----
+      if (glKind === 'movement_reversal') {
+        const originalMovementId = str(p.originalMovementId);
+        if (!originalMovementId) return { kind: 'rejected', reason: 'movement reversal: missing originalMovementId' };
+        const m = ctx.manager;
+        if (!m) return { kind: 'rejected', reason: 'movement reversal: no database context' };
+        const originalEvent = (await m.query(`SELECT status, "journalEntryId" FROM accounting_financial_events WHERE "idempotencyKey" = $1`, [`inventory:movement:${originalMovementId}:recorded`])) as Array<{ status: string; journalEntryId: string | null }>;
+        if (!originalEvent[0] || originalEvent[0].status !== 'POSTED' || !originalEvent[0].journalEntryId) {
+          return { kind: 'rejected', reason: 'movement reversal: the original posting is not POSTED - nothing to mirror' };
+        }
+        const originalLines = (await m.query(`SELECT "accountId", "debitTransaction" AS dt, "creditTransaction" AS ct FROM accounting_journal_lines WHERE "journalEntryId" = $1 ORDER BY "lineNumber"`, [originalEvent[0].journalEntryId])) as Array<{ accountId: string; dt: string; ct: string }>;
+        if (originalLines.length === 0) return { kind: 'rejected', reason: 'movement reversal: the original journal has no lines' };
+        const reverse = this.valuation.reverseReceiptCost;
+        if (!reverse) return { kind: 'rejected', reason: 'movement reversal: the valuation engine cannot reverse a recorded cost' };
+        const reversed = (await reverse.call(this.valuation, `inventory:movement:${originalMovementId}:recorded`, idempotencyKey, ctx.manager, event.businessDate)) ?? (await reverse.call(this.valuation, `inventory-valuation:receipt:${originalMovementId}`, idempotencyKey, ctx.manager, event.businessDate));
+        if (!reversed) return { kind: 'rejected', reason: 'movement reversal: the original valuation row was not found - nothing to reverse' };
+        return draft(
+          originalLines.map((l) => (Number(l.dt) > 0 ? { accountId: l.accountId, credit: l.dt, description: 'Reversal (mirror of the original posting)' } : { accountId: l.accountId, debit: l.ct, description: 'Reversal (mirror of the original posting)' })),
+          `Reversal of movement ${originalMovementId} (${str(p.referenceId) ?? event.sourceEntityId})`,
+        );
+      }
+
       // ---- opening_reversal (C4, ADR-INV-01 2.3): the exceptional correction of an UNTOUCHED opening line. The valuation engine appends the offsetting row at the ORIGINAL recorded
       //      cost (never recalculated) and the journal reverses the original value: Dr configured opening-balance account / Cr Inventory. Accounts resolved BEFORE the mutation. ----
       if (glKind === 'opening_reversal') {

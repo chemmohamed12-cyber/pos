@@ -429,7 +429,11 @@ export class MovingAverageCostEngine implements CostEngine {
         [original.valueDeltaBase, beforeValue],
       );
       const afterQty = beforeQty + reverseQuantity;
-      const afterAvg = afterQty > 0 ? (state?.averageCostBase ?? null) : null;
+      // slice R: the average follows the reversed totals (it used to be carried over unchanged, which went stale once a reversal crossed other movements)
+      const afterAvg =
+        afterQty > 0
+          ? ((await m.query(`SELECT (($1::numeric(20,4)) / $2::int)::numeric(20,4) AS avg`, [row.after_value, afterQty])) as Array<{ avg: string }>)[0].avg
+          : null;
 
       if (state) {
         state.onHandQuantity = afterQty;

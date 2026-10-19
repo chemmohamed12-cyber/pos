@@ -640,8 +640,14 @@ export class WarehouseTransactionsService {
         await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [pair]);
       }
 
+      // Document reversal (slice R): a reversal of a receipt / issue / adjustment / count reverses each ORIGINAL stock movement exactly (valuation row inverted at the recorded cost,
+      // journal mirrored) instead of re-posting negated lines; a transfer is reversed by a forward transfer back (generic path, swapped warehouses).
+      const reversalByMovement = !!txn.reversalOfTransactionId && txn.type !== 'transfer';
+      if (reversalByMovement) await this.postReversalMovements(txn, actorUserId, txManager, businessDate);
+      const effectiveLines = reversalByMovement ? [] : lines;
+
       const shortages: Array<{ line: WarehouseTransactionLine; required: number; available: number }> = [];
-      for (const line of lines) {
+      for (const line of effectiveLines) {
         const required = this.requiredCheckQuantity(txn, line);
         if (required === null) continue;
         const available = await this.inventory.getAvailableInTransaction(txManager, txn.warehouseId, line.productId);
@@ -661,11 +667,10 @@ export class WarehouseTransactionsService {
         );
       }
 
-      for (const line of lines) {
+      for (const line of effectiveLines) {
         if (txn.type === 'receipt') {
           if (txn.reversalOfTransactionId) {
-            // Reversal of a LEGACY (pre-D3-B, cost-less) receipt — stock only, exactly as before. A D3-B receipt can't be
-            // reversed here (rejected in reverseTransaction before any mutation).
+            // (unreachable since slice R: a receipt reversal goes through `postReversalMovements`)
             await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
           } else {
             // D3-B — explicit cost + controlled reason, re-validated here, inside the posting transaction, before any stock write.
@@ -702,72 +707,118 @@ export class WarehouseTransactionsService {
    * Engine history is untouched — both the original and its reversal
    * remain permanently in the ledger and in `process_transition_records`.
    */
+  /**
+   * Document reversal (slice R, CTO 2026-10-19) - one atomic, idempotent unit under a lock on the original document: the reversal document, ITS posting and the original's move to
+   * `reversed` all commit together or not at all (the old order moved the original to `reversed` first and could strand it without a reversal). Semantics by type:
+   *  - receipt (D3-B, with cost + reason) / issue / adjustment / count: each ORIGINAL stock movement is reversed exactly - the valuation history row is inverted at its recorded cost (never
+   *    recalculated) and the journal is the MIRROR of the original journal (same accounts, same amounts). An issue therefore restores the ORIGINAL issued cost and never consumes valuation again.
+   *    Taking receipted stock back out needs that quantity on hand (checked, nothing written otherwise); the original posting must be POSTED to the ledger first.
+   *  - transfer: a forward transfer back (destination -> source), valued at the moving average like any transfer; needs the stock at the destination; Model A: no journal.
+   *  - a legacy receipt (no cost, no financial event): stock only, as before.
+   *  - a reversal document cannot itself be reversed; a document is reversed at most once.
+   * The reversal is dated now (its movement date and business date), never the original's.
+   */
   private async reverseTransaction(original: WarehouseTransaction, actorUserId: string, manager?: EntityManager): Promise<WarehouseTransaction> {
-    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, manager);
-    if (state !== 'posted') throw new ConflictException(`Cannot reverse a transaction in state "${state}" — only posted transactions can be reversed.`);
-    // D3-B — a cost-bearing manual receipt posted Dr Inventory / Cr its reason account at the supplied cost. A document
-    // reversal cannot exactly unwind that valuation (the moving average may have moved since), so it is rejected BEFORE
-    // any mutation; the approved way to take the stock out is an Adjustment decrease (Dr Loss / Cr Inventory).
-    if (original.type === 'receipt' && original.reasonCode) {
-      throw new ConflictException(
-        'A manual receipt that carries a unit cost and reason code cannot be reversed as a document — post an Adjustment (decrease) instead.',
-      );
-    }
+    return (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`warehouse_transaction_reverse:${original.id}`]);
+      const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, tx);
+      if (state !== 'posted') throw new ConflictException(`Cannot reverse a transaction in state "${state}" — only posted transactions can be reversed.`);
+      if (original.reversalOfTransactionId) throw new ConflictException('A reversal document cannot itself be reversed - post a new document instead.');
+      const policy = this.postingPolicy?.get();
+      if (policy?.financialStatusByReference) {
+        const fin = await policy.financialStatusByReference('*', original.id, tx);
+        if (fin !== 'posted' && fin !== 'none') {
+          throw new ConflictException(`Cannot reverse ${original.transactionNumber}: its GL posting is "${fin}" - wait until it is posted (or re-drive it) so the reversal can mirror it.`);
+        }
+      }
 
-    const originalLines = await this.getLines(original.id, manager);
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type], manager);
-
-    // Move the ORIGINAL transaction's own lifecycle to 'reversed' first —
-    // this is the state check that must hold even if the reversal-document
-    // creation below were to fail.
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId, manager);
-
-    const reversal = await (manager ?? this.dataSource).transaction(async (txManager) => {
-      const txnRepo = txManager.getRepository(WarehouseTransaction);
-      const lineRepo = txManager.getRepository(WarehouseTransactionLine);
-      const saved = await txnRepo.save(
+      const originalLines = await this.getLines(original.id, tx);
+      const isTransfer = original.type === 'transfer';
+      const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type], tx);
+      const txnRepo = tx.getRepository(WarehouseTransaction);
+      const lineRepo = tx.getRepository(WarehouseTransactionLine);
+      const reversal = await txnRepo.save(
         txnRepo.create({
           transactionNumber,
           type: original.type,
-          warehouseId: original.warehouseId,
-          destinationWarehouseId: original.destinationWarehouseId,
+          warehouseId: isTransfer ? original.destinationWarehouseId! : original.warehouseId,
+          destinationWarehouseId: isTransfer ? original.warehouseId : original.destinationWarehouseId,
           reference: original.transactionNumber,
           reason: `Reversal of ${original.transactionNumber}`,
           reversalOfTransactionId: original.id,
           createdByUserId: actorUserId,
+          movementDate: new Date(),
         }),
       );
-      const lineEntities = originalLines.map((l) =>
-        lineRepo.create({ warehouseTransactionId: saved.id, productId: l.productId, quantity: -l.quantity }),
+      await lineRepo.save(originalLines.map((l) => lineRepo.create({ warehouseTransactionId: reversal.id, productId: l.productId, quantity: isTransfer ? l.quantity : -l.quantity })));
+
+      await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, tx);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId, tx);
+      await this.postTransaction(reversal, actorUserId, null, 'auto_post', tx);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId, tx);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'warehouse_transaction.reversed',
+          resource: 'warehouse_transaction',
+          resourceId: original.id,
+          result: 'success',
+          correlationId: null,
+          after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
+        },
+        tx,
       );
-      await lineRepo.save(lineEntities);
-      return saved;
+      return reversal;
     });
+  }
 
-    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, manager);
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId, manager);
-    // Post THEN mark posted — same ordering fix as transition() above. `postTransaction` now
-    // performs the 'auto_post' state transition itself, inside its own document-locked
-    // transaction (Inventory Integrity concurrency fix, 2026-09-13) — no separate call needed here.
-    await this.postTransaction(reversal, actorUserId, null, 'auto_post', manager);
+  /**
+   * Slice R - posts the movements of a (non-transfer) reversal document: one reversing movement per ORIGINAL stock movement of the reversed document. A movement that has a financial
+   * event is reversed through the `movement_reversal` kind (the handler inverts its valuation row and mirrors its journal); a legacy receipt movement without any event is reversed as a
+   * plain stock movement. Everything is validated before the first write: stock that has to leave must be on hand, and no original posting may be pending or rejected.
+   */
+  private async postReversalMovements(txn: WarehouseTransaction, actorUserId: string, tx: EntityManager, businessDate: string | undefined): Promise<void> {
+    const original = await tx.getRepository(WarehouseTransaction).findOneOrFail({ where: { id: txn.reversalOfTransactionId! } });
+    const movements = (await tx.query(
+      `SELECT id, "warehouseId", "productId", quantity, "movementType" FROM stock_movements WHERE "referenceId" = $1 AND "referenceType" IN ('warehouse_transaction','manual_receipt') ORDER BY "createdAt", id`,
+      [original.id],
+    )) as Array<{ id: string; warehouseId: string; productId: string; quantity: number; movementType: string }>;
+    if (movements.length === 0) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: it has no stock movements to reverse.`);
 
-    // The original transaction stays 'posted' in its own process instance;
-    // marking that IT was reversed lives in the audit trail + the reversal
-    // row's own `reversalOfTransactionId` pointer, not a mutation of the original.
-    await this.audit.record(
-      {
-        actorUserId,
-        organizationId: null,
-        action: 'warehouse_transaction.reversed',
-        resource: 'warehouse_transaction',
-        resourceId: original.id,
-        result: 'success',
-        correlationId: null,
-        after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
-      },
-      manager,
-    );
+    const policy = this.postingPolicy?.get();
+    const plan: Array<{ m: (typeof movements)[number]; viaEvent: boolean }> = [];
+    for (const m of movements) {
+      const fin = policy?.financialStatusByReference ? await policy.financialStatusByReference('stock_movement', m.id, tx) : 'none';
+      if (fin === 'none') {
+        // only a LEGACY receipt (no cost, no reason code: it never had a financial event) may be reversed as plain stock; anything that should have a posting but shows none is refused
+        if (m.movementType !== 'receipt' || original.reasonCode) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: a movement has no financial posting to mirror.`);
+        plan.push({ m, viaEvent: false }); // a legacy receipt: stock only
+      } else if (fin === 'posted') {
+        plan.push({ m, viaEvent: true });
+      } else {
+        throw new ConflictException(`Cannot reverse ${original.transactionNumber}: a movement's GL posting is "${fin}" - wait until it is posted (or re-drive it).`);
+      }
+    }
 
-    return reversal;
+    // stock that has to leave (the reversal of an increase) must be available - nothing is written otherwise
+    const needed = new Map<string, number>();
+    for (const { m } of plan) if (m.quantity > 0) needed.set(`${m.warehouseId}:${m.productId}`, (needed.get(`${m.warehouseId}:${m.productId}`) ?? 0) + m.quantity);
+    for (const [key, qty] of needed) {
+      const [warehouseId, productId] = key.split(':');
+      const available = await this.inventory.getAvailableInTransaction(tx, warehouseId, productId);
+      if (available < qty) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: ${qty} unit(s) of product ${productId} must leave but only ${available} are available (later movements used them) - nothing was reversed.`);
+    }
+
+    for (const { m, viaEvent } of plan) {
+      if (viaEvent) {
+        await this.inventory.recordMovement(m.warehouseId, m.productId, -m.quantity, 'adjustment', 'warehouse_transaction_reversal', txn.id, actorUserId, tx, undefined, undefined, businessDate, {
+          originalMovementId: m.id,
+          originalDocumentId: original.id,
+        });
+      } else {
+        await this.inventory.recordMovement(m.warehouseId, m.productId, -m.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, tx, undefined, undefined, businessDate);
+      }
+    }
   }
 }

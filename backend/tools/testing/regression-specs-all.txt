@@ -110,3 +110,4 @@ src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.t
 src/domains/accounting/interface/inventory-lifecycle-c4.migrations.company-isolation.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c6.migrations.company-isolation.spec.ts
+src/domains/accounting/interface/document-reversal.company-isolation.spec.ts

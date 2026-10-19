@@ -9,6 +9,8 @@ import { FinancialEventService } from '../application/financial-events/financial
 import { FinancialEventHandlerRegistry } from '../application/financial-events/handler-registry';
 import { InventoryCostingHandlerService } from '../application/financial-events/inventory-costing-handler.service';
 import { InventoryPostingPolicyService } from '../application/inventory-posting-policy.service';
+import { LedgerService } from '../application/ledger.service';
+import { PostingStatusService } from '../application/posting-status.service';
 import { GLAccountService } from '../application/gl-account.service';
 import { FiscalPeriodService } from '../application/fiscal-period.service';
 import { CurrencyService } from '../application/currency.service';
@@ -107,7 +109,7 @@ describe('D3-B — manual receipt policy (explicit cost + controlled reason → 
 
     // accounting binds ITS policy into the foundation holder, exactly as AccountingModule does at init.
     const policyRegistry = new InventoryPostingPolicyRegistry();
-    new InventoryPostingPolicyService(cfg, policyRegistry).onModuleInit();
+    new InventoryPostingPolicyService(cfg, policyRegistry, fiscalPeriods, new PostingStatusService(h.controlPlane, new LedgerService(h.controlPlane))).onModuleInit();
 
     const products = new ProductsService(h.controlPlane, audit, events);
     inventory = new InventoryService(h.controlPlane, audit, products as never, inert, numbering, events, valuation as never, policyRegistry);
@@ -273,16 +275,22 @@ describe('D3-B — manual receipt policy (explicit cost + controlled reason → 
     expect((await financialEvents.redrive(rejected.id, dsA.manager)).status).toBe('POSTED');
   });
 
-  it('5d. a posted cost-bearing manual receipt is NOT reversible as a document (rejected before mutation) — Adjustment decrease is the approved route', async () => {
+  let reversedReceiptValue = 0;
+  it('5d. a posted cost-bearing manual receipt IS reversible as a document (CTO 2026-10-19, document-reversal slice): the mirror journal and the inverted valuation row keep valuation = GL', async () => {
     const dsA = await dsOf('A');
     const [posted] = (await warehouseTxns.listTransactions({}, dsA.manager)).filter((t) => t.state === 'posted' && t.type === 'receipt');
-    await expectNoMutation('A', () => warehouseTxns.transition(posted.id, 'reverse', actor, dsA.manager), /cannot be reversed as a document/i);
+    const before = await totalValuation('A');
+    expect(await warehouseTxns.transition(posted.id, 'reverse', actor, dsA.manager)).toBe('reversed');
+    await flush('A');
+    reversedReceiptValue = before - (await totalValuation('A'));
+    expect(reversedReceiptValue).toBeGreaterThan(0);
+    expect(await totalValuation('A')).toBeCloseTo(await glInventoryBalance('A'), 4);
   });
 
   it('6/9/10. RECONCILIATION: Σ inventory valuation = GL Inventory 1120 after the whole scenario, and every journal is balanced', async () => {
     await flush('A');
     expect(await totalValuation('A')).toBeCloseTo(await glInventoryBalance('A'), 4);
-    expect(await glInventoryBalance('A')).toBeCloseTo(35 + 10 + 10, 4); // 10×3.50 + 4×2.50 + 2×5.00
+    expect(await glInventoryBalance('A')).toBeCloseTo(35 + 10 + 10 - reversedReceiptValue, 4); // 10×3.50 + 4×2.50 + 2×5.00
     const unbalanced = await (await dsOf('A')).query(
       `SELECT je.id FROM "accounting_journal_entries" je JOIN "accounting_journal_lines" jl ON jl."journalEntryId" = je.id GROUP BY je.id HAVING sum(jl."debitBase") <> sum(jl."creditBase")`,
     );

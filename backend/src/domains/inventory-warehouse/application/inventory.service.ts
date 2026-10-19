@@ -39,6 +39,7 @@ export const MANUAL_RECEIPT_REFERENCE_TYPE = 'manual_receipt';
 function glKindFor(movementType: MovementType, referenceType: string | null, unitCostBase: string | null | undefined): InventoryGlKind | null {
   if (movementType === 'dispatch') return 'dispatch';
   // C4 (ADR-INV-01): the reversal and the post-movement correction of an opening batch have their own kinds (checked before the generic adjustment).
+  if (movementType === 'adjustment' && referenceType === 'warehouse_transaction_reversal') return 'movement_reversal';
   if (movementType === 'adjustment' && referenceType === 'opening_batch_reversal') return 'opening_reversal';
   if (movementType === 'adjustment' && referenceType === 'opening_batch_correction') return 'opening_correction';
   if (movementType === 'adjustment') return 'adjustment';

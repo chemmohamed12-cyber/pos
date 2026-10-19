@@ -1,0 +1,20 @@
+
+=== REGRESSION: src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts (46.298 s)
+  Document reversal (slice R) - every original movement reversed exactly: issue restores its original cost, receipts/adjustments/counts mirror their journal, transfers go back; atomic, idempotent - real-Postgres, A/B
+    √ 1. ISSUE reversal after later movements restores the ORIGINAL issued cost (no second consumption): valuation = GL, journal = mirror, document reversed (711 ms)
+    √ 2. RECEIPT reversal (D3-B, with cost and reason) after later movements: mirror Dr reason account / Cr Inventory at the original value; the average follows the totals; needs the stock on hand (831 ms)
+    √ 3. TRANSFER reversal is a forward transfer back (Model A, no journal); it needs the stock at the destination (544 ms)
+    √ 4. COUNT / ADJUSTMENT reversal restores the original value through the mirror of the loss / gain journal (673 ms)
+    √ 5. IDEMPOTENT and SAFE: a second reversal is refused, parallel reversals produce one effect, a reversal of a reversal and of a non-posted document are refused, pending / closed-period reversals write nothing and leave the original `posted` (1042 ms)
+    √ 6. ATOMIC: a failure half-way through a multi-line reversal rolls EVERYTHING back (no reversal document, original still posted); the retry reverses once (406 ms)
+    √ 7. CONSISTENCY and COMPANY ISOLATION: every event POSTED, journals balanced, valuation = GL, history consistent; Company B untouched (107 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        46.381 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\document-reversal.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+
+REGRESSION DONE: 1/1 passed

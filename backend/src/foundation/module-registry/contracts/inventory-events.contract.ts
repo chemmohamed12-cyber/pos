@@ -45,7 +45,7 @@ export interface InventoryEventBase {
  * inference). See `D3-INVENTORY-POSTING-POLICY-2026-10-04.md`. `'dispatch'` is also the meaning of an event with no
  * `glKind` (events published before D3).
  */
-export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in' | 'opening_reversal' | 'opening_correction';
+export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in' | 'opening_reversal' | 'opening_correction' | 'movement_reversal';
 
 /**
  * `inventory.movement.recorded` — one allow-listed stock movement (ADR-040 D2, extended by D3 to opening stock,
