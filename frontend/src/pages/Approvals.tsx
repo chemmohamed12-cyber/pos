@@ -71,6 +71,36 @@ function resourceLink(r: ApprovalRequest): string | null {
   return null;
 }
 
+/** Plain-language names for the approval permissions shown on this page: who is allowed to approve. [Arabic, English] */
+const NODE_LABELS: Record<string, [string, string]> = {
+  'accounting.ap.approve': ['اعتماد الذمم الدائنة (الموردين)', 'Approve payables (suppliers)'],
+  'accounting.ar.approve': ['اعتماد الذمم المدينة (العملاء)', 'Approve receivables (customers)'],
+  'accounting.cash.approve': ['اعتماد حركات النقدية والبنوك', 'Approve cash and bank entries'],
+  'accounting.fiscal_period.approve': ['اعتماد إغلاق وفتح الفترات المالية', 'Approve closing / reopening fiscal periods'],
+  'accounting.fiscal_year.approve': ['اعتماد إغلاق السنة المالية', 'Approve closing the fiscal year'],
+  'accounting.fixed_asset.approve': ['اعتماد الأصول الثابتة', 'Approve fixed assets'],
+  'accounting.inventory.approve': ['اعتماد تسويات المخزون المحاسبية', 'Approve inventory accounting adjustments'],
+  'attendance.approval.approve': ['اعتماد الحضور والانصراف', 'Approve attendance'],
+  'commission.batch.approve': ['اعتماد العمولات', 'Approve commissions'],
+  'hr.leave_request.approve': ['اعتماد الإجازات', 'Approve leave requests'],
+  'inventory.opening_batch.approve': ['اعتماد الأرصدة الافتتاحية للمخزون', 'Approve opening stock balances'],
+  'inventory.opening_batch.correct': ['تصحيح أو عكس الأرصدة الافتتاحية', 'Correct or reverse opening balances'],
+  'payroll.run.approve': ['اعتماد مسيرات الرواتب', 'Approve payroll runs'],
+  'procurement.bank_account.edit': ['تعديل الحسابات البنكية للموردين', 'Edit supplier bank accounts'],
+  'sales.catalog.edit': ['إدارة الأصناف والأسعار', 'Manage items and prices'],
+  'targets.target.approve': ['اعتماد المستهدفات', 'Approve targets'],
+};
+const ACTION_LABELS: Record<string, [string, string]> = {
+  activate: ['تفعيل', 'Activate'],
+  add: ['إضافة', 'Add'],
+  approve: ['اعتماد', 'Approve'],
+  award: ['ترسية', 'Award'],
+  close: ['إغلاق', 'Close'],
+  dispose: ['استبعاد', 'Dispose'],
+  reopen: ['إعادة فتح', 'Reopen'],
+  do: ['تنفيذ', 'Perform'],
+};
+
 const PRELOAD = [
   'nav.approvals',
   'field.request_type',
@@ -110,9 +140,15 @@ const PRELOAD = [
  * gate them, and a global pending queue with decide/withdraw/escalate.
  */
 export function Approvals() {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   const { user } = useAuth();
   preload(PRELOAD);
+  const ar = lang === 'ar';
+  const L = (a: string, e: string) => (ar ? a : e);
+  const nodeLabel = (node: string) => (NODE_LABELS[node] ? NODE_LABELS[node][ar ? 0 : 1] : node);
+  const actionLabel = (a: string) => (ACTION_LABELS[a] ? ACTION_LABELS[a][ar ? 0 : 1] : a);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const personName = (id: string) => userNames[id] ?? id.slice(0, 8);
   const [supplierNames, setSupplierNames] = useState<Record<string, string>>({});
   const supplierName = (id: string) => supplierNames[id] ?? id.slice(0, 8);
 
@@ -159,6 +195,11 @@ export function Approvals() {
     api
       .get<Array<{ id: string; legalName: string }>>('/procurement/suppliers/all')
       .then((list) => setSupplierNames(Object.fromEntries(list.map((s) => [s.id, s.legalName]))))
+      .catch(() => undefined);
+    // names of the people who submitted requests — best-effort (needs the admin view); without it the short id is shown
+    api
+      .get<Array<{ id: string; fullName: string }>>('/admin/users')
+      .then((list) => setUserNames(Object.fromEntries(list.map((u) => [u.id, u.fullName]))))
       .catch(() => undefined);
   }, []);
 
@@ -229,33 +270,55 @@ export function Approvals() {
       <div className="page-header">
         <h1>{t('nav.approvals')}</h1>
       </div>
+      <p style={{ marginTop: 0, opacity: 0.8 }}>
+        {L(
+          'هذه الصفحة تحدد من يملك حق الاعتماد لكل نوع طلب، وتعرض الطلبات التي تنتظر قرارًا الآن. لا يجوز لمقدّم الطلب أن يعتمد طلبه بنفسه.',
+          'This page defines who may approve each kind of request and lists the requests waiting for a decision. A requester cannot approve their own request.',
+        )}
+      </p>
 
       {error && <div className="error-text">{error}</div>}
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginTop: 0 }}>{t('action.approval_matrix_add')}</h3>
+        <h3 style={{ marginTop: 0 }}>{L('قواعد الاعتماد', 'Approval rules')}</h3>
+        <p style={{ marginTop: 0, opacity: 0.8, fontSize: '0.9rem' }}>
+          {L('لكل نوع طلب: من يعتمد، وكم معتمدًا مطلوبًا، ومن أي مبلغ تُطبَّق القاعدة.', 'For each kind of request: who approves, how many approvers are needed, and from which amount the rule applies.')}
+        </p>
         <form onSubmit={upsertRule} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
-            <label>{t('field.request_type')}</label>
+            <label>{L('نوع الطلب', 'Request type')}</label>
             <select value={ruleRequestType} onChange={(e) => setRuleRequestType(e.target.value)} required>
               <option value="">—</option>
               {(requestTypes ?? []).map((rt) => (
                 <option key={rt.requestTypeCode} value={rt.requestTypeCode}>
-                  {t(rt.titleCode)} ({rt.requestTypeCode})
+                  {t(rt.titleCode)}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.min_approvers')}</label>
+            <label>{L('عدد المعتمدين المطلوب', 'Approvers needed')}</label>
             <input type="number" min="1" step="1" value={ruleMinApprovers} onChange={(e) => setRuleMinApprovers(e.target.value)} style={{ width: 80 }} required />
           </div>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
-            <label>{t('field.required_permission_node')}</label>
-            <input value={ruleRequiredNode} onChange={(e) => setRuleRequiredNode(e.target.value)} placeholder="e.g. accounting.ar.approve" required />
+            <label>{L('صلاحية المعتمد', 'Approver permission')}</label>
+            <input
+              list="approval-permission-nodes"
+              value={ruleRequiredNode}
+              onChange={(e) => setRuleRequiredNode(e.target.value)}
+              placeholder={L('اختر من القائمة', 'Pick from the list')}
+              required
+            />
+            <datalist id="approval-permission-nodes">
+              {Object.keys(NODE_LABELS).map((n) => (
+                <option key={n} value={n}>
+                  {nodeLabel(n)}
+                </option>
+              ))}
+            </datalist>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.value_threshold')}</label>
+            <label>{L('تُطبَّق من مبلغ (اختياري)', 'Applies from amount (optional)')}</label>
             <input type="number" min="0" step="0.01" value={ruleValueThreshold} onChange={(e) => setRuleValueThreshold(e.target.value)} style={{ width: 120 }} />
           </div>
           <button className="btn btn-primary" type="submit" disabled={busy === 'rule'}>
@@ -271,30 +334,39 @@ export function Approvals() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('field.request_type_code')}</th>
-                <th>{t('field.min_approvers')}</th>
-                <th>{t('field.required_permission_node')}</th>
-                <th>{t('field.value_threshold')}</th>
-                <th>{t('field.status')}</th>
+                <th>{L('نوع الطلب', 'Request type')}</th>
+                <th>{L('من يعتمد', 'Who approves')}</th>
+                <th>{L('عدد المعتمدين', 'Approvers needed')}</th>
+                <th>{L('تُطبَّق من مبلغ', 'Applies from amount')}</th>
+                <th>{L('مفعّلة', 'Active')}</th>
               </tr>
             </thead>
             <tbody>
-              {rules.map((r) => (
-                <tr key={r.id} style={{ opacity: r.isActive ? 1 : 0.5 }}>
-                  <td style={{ fontFamily: 'monospace' }}>{r.requestTypeCode}</td>
-                  <td>{r.minApprovers}</td>
-                  <td style={{ fontFamily: 'monospace' }}>{r.requiredPermissionNode}</td>
-                  <td>{r.valueThreshold ?? '—'}</td>
-                  <td>{r.isActive ? '✓' : '✗'}</td>
-                </tr>
-              ))}
+              {rules.map((r) => {
+                const rt = (requestTypes ?? []).find((x) => x.requestTypeCode === r.requestTypeCode);
+                return (
+                  <tr key={r.id} style={{ opacity: r.isActive ? 1 : 0.5 }}>
+                    <td>
+                      <div>{rt ? t(rt.titleCode) : r.requestTypeCode}</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.55, fontFamily: 'monospace' }}>{r.requestTypeCode}</div>
+                    </td>
+                    <td>
+                      <div>{nodeLabel(r.requiredPermissionNode)}</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.55, fontFamily: 'monospace' }}>{r.requiredPermissionNode}</div>
+                    </td>
+                    <td>{r.minApprovers}</td>
+                    <td>{r.valueThreshold ?? L('أي مبلغ', 'Any amount')}</td>
+                    <td>{r.isActive ? L('نعم', 'Yes') : L('لا', 'No')}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>{t('nav.approvals')}</h3>
+        <h3 style={{ marginTop: 0 }}>{L('الطلبات بانتظار الاعتماد', 'Requests waiting for approval')}</h3>
         {requests === null ? (
           <div className="empty-state">Loading…</div>
         ) : requests.length === 0 ? (
@@ -303,12 +375,12 @@ export function Approvals() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('field.request_type')}</th>
+                <th>{L('الطلب', 'Request')}</th>
                 <th></th>
-                <th>{t('field.submitted_by')}</th>
-                <th>{t('field.required_permission_node')}</th>
-                <th>{t('field.reason')}</th>
-                <th></th>
+                <th>{L('مقدّم الطلب', 'Requested by')}</th>
+                <th>{L('من يعتمد', 'Who approves')}</th>
+                <th>{L('السبب / ملاحظة', 'Reason / note')}</th>
+                <th>{L('الإجراء', 'Action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -316,20 +388,25 @@ export function Approvals() {
                 <tr key={r.id}>
                   <td>
                     <div>{(() => { const rt = (requestTypes ?? []).find((x) => x.requestTypeCode === r.requestTypeCode); return rt ? t(rt.titleCode) : r.requestTypeCode; })()}</div>
-                    <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', opacity: 0.7 }}>{r.requestTypeCode} · {r.requestedAction}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.75 }}>{L('الإجراء المطلوب', 'Requested action')}: {actionLabel(r.requestedAction)}</div>
                     <div style={{ fontSize: '0.8rem' }}>{requestSummary(r, supplierName)}</div>
                   </td>
                   <td>
                     {resourceLink(r) && <Link to={resourceLink(r)!}>{t('action.open_resource')}</Link>}
-                    <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', opacity: 0.6 }}>{r.id.slice(0, 8)}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', opacity: 0.5 }} title={r.id}>
+                      #{r.id.slice(0, 8)}
+                    </div>
                   </td>
-                  <td>{user && r.makerUserId === user.id ? t('field.you') : r.makerUserId.slice(0, 8)}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                    {r.resolvedRequiredNode ?? '—'} × {r.resolvedMinApprovers ?? 1}
+                  <td>{user && r.makerUserId === user.id ? t('field.you') : personName(r.makerUserId)}</td>
+                  <td>
+                    <div>{r.resolvedRequiredNode ? nodeLabel(r.resolvedRequiredNode) : '—'}</div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.65 }}>
+                      {L('عدد المعتمدين المطلوب', 'Approvers needed')}: {r.resolvedMinApprovers ?? 1}
+                    </div>
                   </td>
                   <td>
                     <input
-                      placeholder={t('field.reason')}
+                      placeholder={L('السبب', 'Reason')}
                       value={notes[r.id] ?? ''}
                       onChange={(e) => setNotes((prev) => ({ ...prev, [r.id]: e.target.value }))}
                       style={{ width: 140 }}
