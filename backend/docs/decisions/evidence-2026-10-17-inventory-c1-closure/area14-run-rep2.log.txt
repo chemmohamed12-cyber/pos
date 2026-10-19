@@ -1,0 +1,24 @@
+
+=== REGRESSION: src/foundation/audit/area14-company-audit.real-pg.spec.ts
+FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts (23.707 s)
+
+
+  ● Test suite failed to run
+
+    QueryFailedError: permission denied to terminate process
+
+      at PostgresQueryRunner.query (../../../integration/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../integration/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/audit/area14-company-audit.real-pg.spec.ts:60:5
+      at withAdminConnection (foundation/audit/area14-company-audit.real-pg.spec.ts:45:12)
+      at dropDatabase (foundation/audit/area14-company-audit.real-pg.spec.ts:59:3)
+      at Object.<anonymous> (foundation/audit/area14-company-audit.real-pg.spec.ts:133:5)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        23.793 s, estimated 25 s
+Ran all test suites matching /src\\foundation\\audit\\area14-company-audit.real-pg.spec.ts/i.
+RESULT FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts
+
+REGRESSION DONE: 0/1 passed

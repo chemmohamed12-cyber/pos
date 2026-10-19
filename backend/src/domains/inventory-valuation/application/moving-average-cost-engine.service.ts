@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { CostEngine } from '../domain/cost-engine';
+import type { HistoryInconsistency, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { InventoryValuationState } from '../infrastructure/inventory-valuation-state.entity';
 import { InventoryValuationMovement } from '../infrastructure/inventory-valuation-movement.entity';
 
@@ -70,6 +71,7 @@ export class MovingAverageCostEngine implements CostEngine {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null> {
     return this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
@@ -115,6 +117,7 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: afterAvg,
           idempotencyKey,
+          ...(businessDate ? { businessDate } : {}), // C2: the document's business date; otherwise the column default (processing date, UTC)
         }),
       );
 
@@ -197,6 +200,7 @@ export class MovingAverageCostEngine implements CostEngine {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void> {
     await this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
@@ -248,6 +252,7 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: row.after_avg,
           idempotencyKey,
+          ...(businessDate ? { businessDate } : {}), // C2: the document's business date; otherwise the column default (processing date, UTC)
         }),
       );
     });
@@ -345,11 +350,66 @@ export class MovingAverageCostEngine implements CostEngine {
     });
   }
 
-  async applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager): Promise<void> {
-    await this.run(manager, async (m) => {
+  /**
+   * C6 (ADR-INV-05 2.1) - a VALUE-ONLY revaluation of one position: the quantity is untouched, `valueDelta` is added to the total value and the average is recomputed from it.
+   * Idempotent on `idempotencyKey` (a replay returns the recorded delta and changes nothing). Fails closed, with NO mutation, when there is no state, no quantity, or the result
+   * would be negative. History is append-only: one `revaluation` row.
+   */
+  async applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }> {
+    return this.run(manager, async (m) => {
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(warehouseId, productId)]);
+      const histRepo = m.getRepository(InventoryValuationMovement);
+      const replay = await histRepo.findOne({ where: { idempotencyKey } });
+      if (replay) return { valueBase: replay.valueDeltaBase };
+
+      const stateRepo = m.getRepository(InventoryValuationState);
+      const state = await stateRepo.findOne({ where: { productId, warehouseId } });
+      if (!state) return { rejected: 'no_valuation_source' as const };
+      if (state.onHandQuantity <= 0) return { rejected: 'zero_quantity' as const };
+
+      const beforeValue = state.totalValueBase;
+      const [row]: Array<{ delta: string; after_value: string; after_avg: string }> = await m.query(
+        `SELECT $2::numeric(20,4) AS delta,
+                ($1::numeric(20,4) + $2::numeric(20,4))::numeric(20,4) AS after_value,
+                (($1::numeric(20,4) + $2::numeric(20,4)) / $3::int)::numeric(20,4) AS after_avg`,
+        [beforeValue, valueDelta, state.onHandQuantity],
+      );
+      if (Number(row.after_value) < 0) return { rejected: 'value_below_zero' as const };
+
+      state.totalValueBase = row.after_value;
+      state.averageCostBase = row.after_avg;
+      await stateRepo.save(state);
+      await histRepo.save(
+        histRepo.create({
+          productId,
+          warehouseId,
+          kind: 'revaluation',
+          stockMovementId: null,
+          quantity: 0,
+          quantityBeforeValueBase: beforeValue,
+          valueDeltaBase: row.delta,
+          quantityAfterValueBase: row.after_value,
+          averageCostAfterBase: row.after_avg,
+          idempotencyKey,
+          ...(businessDate ? { businessDate } : {}),
+        }),
+      );
+      return { valueBase: row.delta };
+    });
+  }
+
+  async applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null> {
+    return this.run(manager, async (m) => {
       const histRepo = m.getRepository(InventoryValuationMovement);
       const original = await histRepo.findOne({ where: { idempotencyKey: originalIdempotencyKey } });
-      if (!original) return; // nothing to reverse — disclosed, not invented
+      if (!original) return null; // nothing to reverse — disclosed, not invented
 
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(original.warehouseId, original.productId)]);
 
@@ -369,7 +429,11 @@ export class MovingAverageCostEngine implements CostEngine {
         [original.valueDeltaBase, beforeValue],
       );
       const afterQty = beforeQty + reverseQuantity;
-      const afterAvg = afterQty > 0 ? (state?.averageCostBase ?? null) : null;
+      // slice R: the average follows the reversed totals (it used to be carried over unchanged, which went stale once a reversal crossed other movements)
+      const afterAvg =
+        afterQty > 0
+          ? ((await m.query(`SELECT (($1::numeric(20,4)) / $2::int)::numeric(20,4) AS avg`, [row.after_value, afterQty])) as Array<{ avg: string }>)[0].avg
+          : null;
 
       if (state) {
         state.onHandQuantity = afterQty;
@@ -401,19 +465,97 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: afterAvg,
           idempotencyKey: reversalIdempotencyKey,
+          ...(businessDate ? { businessDate } : {}),
         }),
       );
+      return { valueBase: original.valueDeltaBase };
     });
   }
 
   /** Read-only. `asOfDate` is accepted for `InventoryValuationContract` shape compatibility — the
    * running state IS always "as of now" (ADR-041 D23: no historical reconstruction in F08 V1). */
-  async getValuedOnHandTotal(_asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
+  /**
+   * C1 (ADR-INV-08): a date that is today (UTC) or later - or no date - reads the running state exactly as before. A PAST date is rebuilt from the dated
+   * history (`inventory_valuation_movements.businessDate <= asOf`), so a historical reconciliation no longer compares "now" with "then".
+   */
+  private isCurrentBasis(asOfDate?: string): boolean {
+    if (!asOfDate) return true;
+    return asOfDate >= new Date().toISOString().slice(0, 10);
+  }
+
+  async getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
     const source = manager ?? this.dataSource;
-    const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
-      `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
-       FROM inventory_valuation_state GROUP BY "warehouseId"`,
+    if (this.isCurrentBasis(asOfDate)) {
+      const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
+        `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
+         FROM inventory_valuation_state GROUP BY "warehouseId"`,
+      );
+      return rows;
+    }
+    return source.query(
+      `SELECT "warehouseId", COALESCE(SUM("valueDeltaBase"), 0)::numeric(20,4) AS "totalValueBase"
+       FROM inventory_valuation_movements WHERE "businessDate" <= $1::date GROUP BY "warehouseId"`,
+      [asOfDate],
     );
-    return rows;
+  }
+
+  async getValuedPositions(asOfDate?: string, filter: ValuedPositionFilter = {}, manager?: EntityManager): Promise<ValuedPosition[]> {
+    const source = manager ?? this.dataSource;
+    const params: unknown[] = [];
+    const conds: string[] = [];
+    if (filter.warehouseIds) {
+      params.push(filter.warehouseIds);
+      conds.push(`"warehouseId" = ANY($${params.length}::uuid[])`);
+    }
+    if (filter.productId) {
+      params.push(filter.productId);
+      conds.push(`"productId" = $${params.length}::uuid`);
+    }
+    const extra = conds.length ? 'AND ' + conds.join(' AND ') : '';
+    type Row = { warehouseId: string; productId: string; quantity: number | string; totalValueBase: string; averageCostBase: string | null };
+    let rows: Row[];
+    if (this.isCurrentBasis(asOfDate)) {
+      rows = await source.query(
+        `SELECT "warehouseId", "productId", "onHandQuantity" AS quantity, "totalValueBase"::numeric(20,4) AS "totalValueBase",
+                CASE WHEN "onHandQuantity" > 0 THEN ("totalValueBase" / "onHandQuantity")::numeric(20,4) ELSE NULL END AS "averageCostBase"
+         FROM inventory_valuation_state
+         WHERE ("onHandQuantity" <> 0 OR "totalValueBase" <> 0) ${extra}
+         ORDER BY "warehouseId", "productId"`,
+        params,
+      );
+    } else {
+      params.push(asOfDate);
+      rows = await source.query(
+        `SELECT "warehouseId", "productId", SUM(quantity)::int AS quantity, SUM("valueDeltaBase")::numeric(20,4) AS "totalValueBase",
+                CASE WHEN SUM(quantity) > 0 THEN (SUM("valueDeltaBase") / SUM(quantity))::numeric(20,4) ELSE NULL END AS "averageCostBase"
+         FROM inventory_valuation_movements
+         WHERE "businessDate" <= $${params.length}::date ${extra}
+         GROUP BY "warehouseId", "productId"
+         HAVING SUM(quantity) <> 0 OR SUM("valueDeltaBase") <> 0
+         ORDER BY "warehouseId", "productId"`,
+        params,
+      );
+    }
+    return rows.map((r) => ({ warehouseId: r.warehouseId, productId: r.productId, quantity: Number(r.quantity), totalValueBase: r.totalValueBase, averageCostBase: r.averageCostBase }));
+  }
+
+  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
+    const source = manager ?? this.dataSource;
+    type Row = { warehouseId: string; productId: string; stateQuantity: number | string; historyQuantity: number | string; stateValueBase: string; historyValueBase: string };
+    const rows: Row[] = await source.query(
+      `WITH h AS (
+         SELECT "warehouseId", "productId", SUM(quantity)::int AS qty, SUM("valueDeltaBase")::numeric(20,4) AS val
+         FROM inventory_valuation_movements GROUP BY 1, 2
+       ), s AS (
+         SELECT "warehouseId", "productId", "onHandQuantity" AS qty, "totalValueBase"::numeric(20,4) AS val FROM inventory_valuation_state
+       )
+       SELECT COALESCE(s."warehouseId", h."warehouseId") AS "warehouseId", COALESCE(s."productId", h."productId") AS "productId",
+              COALESCE(s.qty, 0) AS "stateQuantity", COALESCE(h.qty, 0) AS "historyQuantity",
+              COALESCE(s.val, 0)::numeric(20,4) AS "stateValueBase", COALESCE(h.val, 0)::numeric(20,4) AS "historyValueBase"
+       FROM s FULL OUTER JOIN h ON h."warehouseId" = s."warehouseId" AND h."productId" = s."productId"
+       WHERE COALESCE(s.qty, 0) <> COALESCE(h.qty, 0) OR COALESCE(s.val, 0) <> COALESCE(h.val, 0)
+       ORDER BY 1, 2`,
+    );
+    return rows.map((r) => ({ ...r, stateQuantity: Number(r.stateQuantity), historyQuantity: Number(r.historyQuantity) }));
   }
 }

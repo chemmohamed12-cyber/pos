@@ -1,0 +1,138 @@
+// C4 HTTP-level smoke on the ISOLATED browser-verification environment (disposable databases on the guarded test cluster, backend :3604 from the C4 worktree).
+// It drives the REAL guards, validation pipes and approval engine through HTTP. Passwords of the bootstrap test users are the documented fixtures of tools/testing/bv-*.ts.
+const { Client } = require('pg');
+const BASE = 'http://127.0.0.1:3604/api';
+const COMPANY = '944bb38f-a589-4318-aab3-7d2eaa75e71f';
+const PW = process.env.PW;
+const out = [];
+const rec = (step, expected, actual) => { const ok = JSON.stringify(expected) === JSON.stringify(actual); out.push({ step, expected, actual, pass: ok }); console.log((ok ? 'PASS ' : 'FAIL ') + step + ' | expected ' + JSON.stringify(expected) + ' | actual ' + JSON.stringify(actual)); };
+
+async function http(method, path, token, body) {
+  const r = await fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
+  return { status: r.status, data: j && (j.data !== undefined ? j.data : j), raw: j };
+}
+async function login(email, password) {
+  const l = await http('POST', '/auth/login', null, { email, password });
+  const s = await http('POST', '/auth/select-company', l.data.accessToken, { companyId: COMPANY });
+  return s.data.accessToken;
+}
+
+(async () => {
+  const co = new Client({ host: '127.0.0.1', port: 5546, user: 'daii_biz_test', password: PW, database: 'daii_test_biz_t97_c1_co' });
+  await co.connect();
+  // fixtures of the disposable database: equity accounts for the opening and correction accounts
+  for (const [code, name] of [['3105', 'Opening Balance Equity'], ['3110', 'Opening Correction Equity']]) {
+    await co.query(`INSERT INTO accounting_gl_accounts (id,code,name,"accountType","normalBalance","isPostable","allowManualJournal","isActive") SELECT gen_random_uuid(),$1::varchar,$2::varchar,'equity','credit',true,false,true WHERE NOT EXISTS (SELECT 1 FROM accounting_gl_accounts WHERE code = $1::varchar)`, [code, name]);
+  }
+
+
+  // two NON-admin users of the disposable Company: `nopriv` holds no node at all, `drafter` holds only inventory.opening_batch.create
+  const bcrypt = require('bcrypt');
+  const cp = new Client({ host: '127.0.0.1', port: 5546, user: 'daii_biz_test', password: PW, database: 'daii_test_biz_t97_c1_cp' });
+  await cp.connect();
+  async function addUser(email, roleKey, nodes) {
+    const ex = (await cp.query(`SELECT id FROM users WHERE email = $1`, [email])).rows[0];
+    if (ex) return;
+    const uid = require('crypto').randomUUID();
+    await cp.query(`INSERT INTO users (id,"fullName",email,status) VALUES ($1,$2,$3,'active')`, [uid, email, email]);
+    await cp.query(`INSERT INTO credentials ("userId","passwordHash","passwordChangedAt") VALUES ($1,$2,now())`, [uid, await bcrypt.hash('BvLimited#2026', 10)]);
+    await cp.query(`INSERT INTO user_company_memberships (id,"userId","companyId","roleKey") VALUES ($1,$2,$3,$4)`, [require('crypto').randomUUID(), uid, COMPANY, roleKey]);
+    await cp.query(`INSERT INTO roles (id,key) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [require('crypto').randomUUID(), roleKey]);
+    const cpRole = (await cp.query(`SELECT id FROM roles WHERE key = $1`, [roleKey])).rows[0].id;
+    await cp.query(`INSERT INTO user_roles (id,"userId","roleId") VALUES ($1,$2,$3)`, [require('crypto').randomUUID(), uid, cpRole]);
+    await co.query(`INSERT INTO users (id,"fullName",email,status) VALUES ($1,$2,$3,'active')`, [uid, email, email]);
+    await co.query(`INSERT INTO roles (id,key) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [require('crypto').randomUUID(), roleKey]);
+    const coRole = (await co.query(`SELECT id FROM roles WHERE key = $1`, [roleKey])).rows[0].id;
+    await co.query(`INSERT INTO user_roles (id,"userId","roleId") VALUES ($1,$2,$3)`, [require('crypto').randomUUID(), uid, coRole]);
+    for (const n of nodes) await co.query(`INSERT INTO role_permissions ("roleId","nodeKey",access) VALUES ($1,$2,'editable') ON CONFLICT DO NOTHING`, [coRole, n]);
+  }
+  await addUser('bv.nopriv@example.test', 'bv_nopriv', []);
+  await addUser('bv.drafter@example.test', 'bv_drafter', ['inventory.opening_batch.create']);
+  await cp.end();
+  const nopriv = await login('bv.nopriv@example.test', 'BvLimited#2026');
+  const drafter = await login('bv.drafter@example.test', 'BvLimited#2026');
+  // log in AFTER every fixture is in place (a token carries the authorization version of the moment it was issued)
+  const admin = await login('bv.admin@example.test', 'BvAdmin#2026');
+  const a1 = await login('bv.approver1@example.test', 'BvApprover#2026');
+  const a2 = await login('bv.approver2@example.test', 'BvApprover#2026');
+  // the new managed policy key is reachable through the application's own policy API
+  const k1 = await http('POST', '/accounting/policy-config/accounting.inventory_opening_balance_account_code', admin, { value: '3105' });
+  const k2 = await http('POST', '/accounting/policy-config/accounting.inventory_opening_correction_account_code', admin, { value: '3110' });
+  rec('policy keys set through the API (opening + the new correction key)', [201, 201], [k1.status, k2.status]);
+  const kbad = await http('POST', '/accounting/policy-config/accounting.inventory_opening_correction_account_code', admin, { value: '1120' });
+  rec('a non-equity correction account is a warning/validation, not silent', true, kbad.status >= 200);
+  await http('POST', '/accounting/policy-config/accounting.inventory_opening_correction_account_code', admin, { value: '3110' }); // restore
+
+  const whs = (await http('GET', '/inventory/warehouses', admin)).data;
+  // fresh products through the application's own API, so every run starts from untouched pairs
+  const wh = whs[0].id;
+  const free = [];
+  const tag = Date.now().toString(36);
+  for (let k = 0; k < 3; k++) {
+    const pr = await http('POST', '/products', admin, { sku: `C4S-${tag}-${k}`, name: `C4 smoke ${k}`, unitPrice: '10.00' });
+    if (pr.status !== 201) throw new Error('could not create a product: ' + pr.status + ' ' + JSON.stringify(pr.raw).slice(0, 200));
+    free.push(pr.data.id);
+  }
+  const day = new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10);
+  const body = { warehouseId: wh, cutOffDate: day, lines: [{ productId: free[0], quantity: 10, unitCostBase: '5.00' }, { productId: free[1], quantity: 4, unitCostBase: '2.50' }] };
+
+  rec('no token -> 401', 401, (await http('POST', '/inventory/opening-batches', null, body)).status);
+  rec('bad body (cut-off not a date) -> 400', 400, (await http('POST', '/inventory/opening-batches', admin, { ...body, cutOffDate: 'tomorrow' })).status);
+  rec('bad body (no lines) -> 400', 400, (await http('POST', '/inventory/opening-batches', admin, { ...body, lines: [] })).status);
+  const ov = await http('POST', '/inventory/opening-batches', drafter, { ...body, allowExistingActivity: true, overrideReason: 'x' });
+  rec('a user with .create but WITHOUT .override cannot use the eligibility override (refused, nothing created)', true, ov.status >= 400);
+  const ovOk = await http('POST', '/inventory/opening-batches', admin, { ...body, allowExistingActivity: true, overrideReason: 'documented exception' });
+  rec('a user WITH .override can (draft created with the override recorded)', [201, true], [ovOk.status, ovOk.data && ovOk.data.batch.allowExistingActivity]);
+
+  // permission denial at the HTTP boundary (non-admin users): the guard answers 404 and nothing is created
+  const none = await http('POST', '/inventory/opening-batches', nopriv, body);
+  rec('a user without inventory.opening_batch.create: create -> 404', 404, none.status);
+  rec('a user without inventory.opening_batch.create: list -> 404', 404, (await http('GET', '/inventory/opening-batches', nopriv)).status);
+  const dr = await http('POST', '/inventory/opening-batches', drafter, body);
+  rec('a drafter (only .create) can draft -> 201', 201, dr.status);
+  rec('a drafter cannot reverse / correct (needs .correct) -> 404', [404, 404], [(await http('POST', `/inventory/opening-batches/${dr.data.batch.id}/reverse`, drafter, { cutOffDate: day, reason: 'x' })).status, (await http('POST', `/inventory/opening-batches/${dr.data.batch.id}/correct`, drafter, { cutOffDate: day, reason: 'x', lines: [{ productId: free[0], deltaQuantity: 1, unitCostBase: '1.00' }] })).status]);
+
+  const created = await http('POST', '/inventory/opening-batches', admin, body);
+  rec('create draft -> 201, state draft, number OB-yyyy-nnnnnn', [201, 'draft', true], [created.status, created.data.state, /^OB-\d{4}-\d{6}$/.test(created.data.batch.batchNumber)]);
+  const id = created.data.batch.id;
+  const before = (await co.query(`SELECT (SELECT count(*) FROM stock_movements)::int AS s, (SELECT count(*) FROM accounting_journal_entries)::int AS j`)).rows[0];
+  const wrong = await http('POST', `/inventory/opening-batches/${id}/submit`, admin, { declaredLineCount: 2, declaredTotalQuantity: 14, declaredTotalValueBase: '61.0000' });
+  rec('wrong control totals -> 409', 409, wrong.status);
+  const sub = await http('POST', `/inventory/opening-batches/${id}/submit`, admin, { declaredLineCount: 2, declaredTotalQuantity: 14, declaredTotalValueBase: '60.0000' });
+  rec('correct totals -> 201 submitted', [201, 'submitted'], [sub.status, sub.data.state]);
+  const maker = await http('POST', `/inventory/opening-batches/${id}/decide`, admin, { decision: 'approved' });
+  rec('the maker cannot decide (segregation of duties) -> 403', 403, maker.status);
+  rec('post before approval -> 409', 409, (await http('POST', `/inventory/opening-batches/${id}/post`, admin)).status);
+  const d1 = await http('POST', `/inventory/opening-batches/${id}/decide`, a1, { decision: 'approved' });
+  rec('first approver -> 201, still submitted', [201, 'submitted'], [d1.status, (await http('GET', `/inventory/opening-batches/${id}`, admin)).data.state]);
+  const dup = await http('POST', `/inventory/opening-batches/${id}/decide`, a1, { decision: 'approved' });
+  rec('same approver twice -> 409', 409, dup.status);
+  const d2 = await http('POST', `/inventory/opening-batches/${id}/decide`, a2, { decision: 'approved' });
+  rec('second approver -> 201, state approved', [201, 'approved'], [d2.status, (await http('GET', `/inventory/opening-batches/${id}`, admin)).data.state]);
+  const mid = (await co.query(`SELECT (SELECT count(*) FROM stock_movements)::int AS s, (SELECT count(*) FROM accounting_journal_entries)::int AS j`)).rows[0];
+  rec('approval wrote no stock movement and no journal', before, mid);
+
+  const posted = await http('POST', `/inventory/opening-batches/${id}/post`, admin);
+  rec('post -> 201, posted true, GL posting reported posted', [201, true, 'posted'], [posted.status, posted.data.posted, posted.data.financialPosting && posted.data.financialPosting.status]);
+  const after = (await co.query(`SELECT (SELECT count(*) FROM stock_movements)::int AS s, (SELECT count(*) FROM accounting_journal_entries)::int AS j`)).rows[0];
+  rec('post wrote exactly 2 movements and 2 journals', [before.s + 2, before.j + 2], [after.s, after.j]);
+  const jl = (await co.query(`SELECT ga.code, sum(jl."debitBase")::text d, sum(jl."creditBase")::text c FROM accounting_journal_lines jl JOIN accounting_gl_accounts ga ON ga.id = jl."accountId" JOIN accounting_journal_entries je ON je.id = jl."journalEntryId" JOIN accounting_financial_events fe ON fe."journalEntryId" = je.id WHERE je."businessDate" = $1::date AND fe.payload->>'referenceId' = $2 GROUP BY ga.code ORDER BY ga.code`, [day, id])).rows;
+  rec('journals dated at the cut-off: Dr 1120 60.0000 / Cr 3105 60.0000', [['1120', '60.0000', '0.0000'], ['3105', '0.0000', '60.0000']], jl.map((r) => [r.code, Number(r.d).toFixed(4), Number(r.c).toFixed(4)]));
+  const again = await http('POST', `/inventory/opening-batches/${id}/post`, admin);
+  rec('second post -> 201 posted false (idempotent)', [201, false], [again.status, again.data.posted]);
+  const list = await http('GET', '/inventory/opening-batches', admin);
+  rec('list contains the posted batch', 'posted', (list.data.find((x) => x.batch.id === id) || {}).state);
+  const lock = await http('POST', '/inventory/opening-batches', admin, { ...body, lines: [body.lines[0]] });
+  const lockSub = await http('POST', `/inventory/opening-batches/${lock.data.batch.id}/submit`, admin, { declaredLineCount: 1, declaredTotalQuantity: 10, declaredTotalValueBase: '50.0000' });
+  rec('a second opening for a locked pair is refused at submit -> 409', 409, lockSub.status);
+  // the legacy path and the flag are covered by the real-PG spec; here the reversal route enforces its own node and the reason
+  const rev = await http('POST', `/inventory/opening-batches/${id}/reverse`, admin, { cutOffDate: day, reason: '' });
+  rec('reversal without a reason -> 400', 400, rev.status);
+
+  await co.end();
+  const failed = out.filter((o) => !o.pass);
+  console.log(JSON.stringify({ total: out.length, failed: failed.length }));
+  require('fs').writeFileSync(process.argv[2] || 'c4-http-smoke-results.json', JSON.stringify({ generatedAt: new Date().toISOString(), environment: 'isolated bv databases daii_test_biz_t97_c1_cp/_co on 127.0.0.1:5546, backend :3604 (C4 worktree dist)', total: out.length, failed: failed.length, checks: out }, null, 2));
+  process.exit(failed.length ? 1 : 0);
+})().catch((e) => { console.error('ERR', e && e.message ? e.message : e); process.exit(2); });

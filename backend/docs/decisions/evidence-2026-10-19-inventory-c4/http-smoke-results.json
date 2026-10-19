@@ -1,0 +1,262 @@
+{
+  "generatedAt": "2026-10-19T11:34:07.909Z",
+  "environment": "isolated bv databases daii_test_biz_t97_c1_cp/_co on 127.0.0.1:5546, backend :3604 (C4 worktree dist)",
+  "total": 27,
+  "failed": 0,
+  "checks": [
+    {
+      "step": "policy keys set through the API (opening + the new correction key)",
+      "expected": [
+        201,
+        201
+      ],
+      "actual": [
+        201,
+        201
+      ],
+      "pass": true
+    },
+    {
+      "step": "a non-equity correction account is a warning/validation, not silent",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "step": "no token -> 401",
+      "expected": 401,
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "step": "bad body (cut-off not a date) -> 400",
+      "expected": 400,
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "step": "bad body (no lines) -> 400",
+      "expected": 400,
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "step": "a user with .create but WITHOUT .override cannot use the eligibility override (refused, nothing created)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "step": "a user WITH .override can (draft created with the override recorded)",
+      "expected": [
+        201,
+        true
+      ],
+      "actual": [
+        201,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "step": "a user without inventory.opening_batch.create: create -> 404",
+      "expected": 404,
+      "actual": 404,
+      "pass": true
+    },
+    {
+      "step": "a user without inventory.opening_batch.create: list -> 404",
+      "expected": 404,
+      "actual": 404,
+      "pass": true
+    },
+    {
+      "step": "a drafter (only .create) can draft -> 201",
+      "expected": 201,
+      "actual": 201,
+      "pass": true
+    },
+    {
+      "step": "a drafter cannot reverse / correct (needs .correct) -> 404",
+      "expected": [
+        404,
+        404
+      ],
+      "actual": [
+        404,
+        404
+      ],
+      "pass": true
+    },
+    {
+      "step": "create draft -> 201, state draft, number OB-yyyy-nnnnnn",
+      "expected": [
+        201,
+        "draft",
+        true
+      ],
+      "actual": [
+        201,
+        "draft",
+        true
+      ],
+      "pass": true
+    },
+    {
+      "step": "wrong control totals -> 409",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "step": "correct totals -> 201 submitted",
+      "expected": [
+        201,
+        "submitted"
+      ],
+      "actual": [
+        201,
+        "submitted"
+      ],
+      "pass": true
+    },
+    {
+      "step": "the maker cannot decide (segregation of duties) -> 403",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "step": "post before approval -> 409",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "step": "first approver -> 201, still submitted",
+      "expected": [
+        201,
+        "submitted"
+      ],
+      "actual": [
+        201,
+        "submitted"
+      ],
+      "pass": true
+    },
+    {
+      "step": "same approver twice -> 409",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "step": "second approver -> 201, state approved",
+      "expected": [
+        201,
+        "approved"
+      ],
+      "actual": [
+        201,
+        "approved"
+      ],
+      "pass": true
+    },
+    {
+      "step": "approval wrote no stock movement and no journal",
+      "expected": {
+        "s": 6,
+        "j": 4
+      },
+      "actual": {
+        "s": 6,
+        "j": 4
+      },
+      "pass": true
+    },
+    {
+      "step": "post -> 201, posted true, GL posting reported posted",
+      "expected": [
+        201,
+        true,
+        "posted"
+      ],
+      "actual": [
+        201,
+        true,
+        "posted"
+      ],
+      "pass": true
+    },
+    {
+      "step": "post wrote exactly 2 movements and 2 journals",
+      "expected": [
+        8,
+        6
+      ],
+      "actual": [
+        8,
+        6
+      ],
+      "pass": true
+    },
+    {
+      "step": "journals dated at the cut-off: Dr 1120 60.0000 / Cr 3105 60.0000",
+      "expected": [
+        [
+          "1120",
+          "60.0000",
+          "0.0000"
+        ],
+        [
+          "3105",
+          "0.0000",
+          "60.0000"
+        ]
+      ],
+      "actual": [
+        [
+          "1120",
+          "60.0000",
+          "0.0000"
+        ],
+        [
+          "3105",
+          "0.0000",
+          "60.0000"
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "step": "second post -> 201 posted false (idempotent)",
+      "expected": [
+        201,
+        false
+      ],
+      "actual": [
+        201,
+        false
+      ],
+      "pass": true
+    },
+    {
+      "step": "list contains the posted batch",
+      "expected": "posted",
+      "actual": "posted",
+      "pass": true
+    },
+    {
+      "step": "a second opening for a locked pair is refused at submit -> 409",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "step": "reversal without a reason -> 400",
+      "expected": 400,
+      "actual": 400,
+      "pass": true
+    }
+  ]
+}

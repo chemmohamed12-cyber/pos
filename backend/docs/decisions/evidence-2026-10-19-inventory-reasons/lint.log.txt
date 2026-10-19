@@ -1,0 +1,6 @@
+D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\foundation\testing\t10-reconciliation.biz.real-pg.spec.ts
+  4:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-var-requires')
+
+✖ 5 problems (0 errors, 5 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.
+

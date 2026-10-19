@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, GoneException, Inject, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, GoneException, Inject, Optional, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import type { EntityManager } from 'typeorm';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Matches, Min, ValidateIf } from 'class-validator';
+import { InventoryPostingDispatchService } from '../application/inventory-posting-dispatch.service';
 import { InventoryService } from '../application/inventory.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -45,7 +46,7 @@ const WAREHOUSE_EXPORT_COLUMNS: ColumnSpec[] = [
   { key: 'code', header: 'Warehouse Code', width: 18 },
   { key: 'name', header: 'Warehouse Name', width: 30 },
 ];
-const OPENING_STOCK_IMPORT_COLUMNS: ColumnSpec[] = [
+export const OPENING_STOCK_IMPORT_COLUMNS: ColumnSpec[] = [
   { key: 'warehouseCode', header: 'Warehouse Code', width: 18, example: 'WH-01' },
   { key: 'productSku', header: 'Product SKU', width: 20, example: 'SKU-0001' },
   { key: 'quantity', header: 'Quantity', width: 14, example: 100 },
@@ -112,6 +113,11 @@ class RecordMovementDto {
   @IsOptional()
   @IsString()
   reasonCode?: string;
+
+  /** C2 (ADR-INV-02) - the explicit business date of the receipt (YYYY-MM-DD); omitted = today. Not in the future; its fiscal period must be open. */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'businessDate must be a date (YYYY-MM-DD).' })
+  businessDate?: string;
 }
 
 class AssignItemsDto {
@@ -181,6 +187,8 @@ export class InventoryController {
     private readonly excel: ExcelService,
     @Inject(SALES_PRODUCTS_CONTRACT) private readonly products: SalesProductsContract,
     private readonly scopes: AccessScopeService,
+    // C2: optional so a direct construction keeps compiling; Nest always provides it.
+    @Optional() private readonly dispatch?: InventoryPostingDispatchService,
   ) {}
 
   /** F6 — the warehouses the caller may see: `'ALL'` (unrestricted) or the list; lists, reports and exports filter by it BEFORE returning/aggregating. */
@@ -319,7 +327,7 @@ export class InventoryController {
   @WarehouseScopeFiltered('import rows naming a warehouse outside the caller\'s scope are rejected like an unknown code')
   @Post('opening-stock/import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
-  async openingStockImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
+  async openingStockImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File, @Query('businessDate') businessDate?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const { rows, headerErrors } = await this.excel.parseWorkbook(file.buffer, OPENING_STOCK_IMPORT_COLUMNS);
     if (headerErrors.length > 0) return { totalRows: 0, succeededCount: 0, rejected: [], headerErrors };
@@ -328,8 +336,12 @@ export class InventoryController {
       req.user.id,
       req.companyContext.dataSource.manager,
       await this.visibleWarehouses(req),
+      businessDate,
     );
-    return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [] };
+    const financialPosting = this.dispatch && succeeded.length > 0
+      ? await this.dispatch.dispatchAndReport(req.companyContext.dataSource.manager, succeeded.map((m) => ({ referenceType: 'stock_movement', referenceId: m.id })))
+      : undefined;
+    return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [], ...(financialPosting ? { financialPosting } : {}) };
   }
 
   @WarehouseScoped({ query: 'warehouseId' })
@@ -364,10 +376,15 @@ export class InventoryController {
     if (dto.movementType !== 'receipt') {
       throw new GoneException({ statusCode: 410, error: 'Gone', code: 'INVENTORY_MOVEMENT_TYPE_CLOSED', message: `Movement type "${dto.movementType}" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns).` });
     }
+    // CTO 2026-10-19: with receipt approval required this endpoint must not bypass the workflow - refused before anything is read or written.
+    this.inventory.assertDirectManualReceiptAllowed();
     // D3-B — a receipt through this endpoint IS a manual receipt: explicit cost + controlled reason, validated before any write.
     const manager = req.companyContext.dataSource.manager;
     await this.inventory.assertMovementTargetsExist(dto.warehouseId, dto.productId, manager);
-    return this.inventory.recordManualReceipt(dto.warehouseId, dto.productId, dto.quantity, dto.unitCostBase, dto.reasonCode, null, req.user.id, manager);
+    const movement = await this.inventory.recordManualReceipt(dto.warehouseId, dto.productId, dto.quantity, dto.unitCostBase, dto.reasonCode, null, req.user.id, manager, dto.businessDate);
+    // C2 (ADR-INV-10): the receipt's journal is dispatched in this request; the response says whether it actually posted.
+    if (!this.dispatch) return movement;
+    return { ...movement, financialPosting: await this.dispatch.dispatchAndReport(manager, [{ referenceType: 'stock_movement', referenceId: movement.id }]) };
   }
 
   /**

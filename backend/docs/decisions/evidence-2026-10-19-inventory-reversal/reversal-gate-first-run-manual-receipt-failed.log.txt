@@ -1,0 +1,197 @@
+
+=== REGRESSION: src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts (36.532 s)
+  Document reversal (slice R) - every original movement reversed exactly: issue restores its original cost, receipts/adjustments/counts mirror their journal, transfers go back; atomic, idempotent - real-Postgres, A/B
+    √ 1. ISSUE reversal after later movements restores the ORIGINAL issued cost (no second consumption): valuation = GL, journal = mirror, document reversed (706 ms)
+    √ 2. RECEIPT reversal (D3-B, with cost and reason) after later movements: mirror Dr reason account / Cr Inventory at the original value; the average follows the totals; needs the stock on hand (832 ms)
+    √ 3. TRANSFER reversal is a forward transfer back (Model A, no journal); it needs the stock at the destination (513 ms)
+    √ 4. COUNT / ADJUSTMENT reversal restores the original value through the mirror of the loss / gain journal (698 ms)
+    √ 5. IDEMPOTENT and SAFE: a second reversal is refused, parallel reversals produce one effect, a reversal of a reversal and of a non-posted document are refused, pending / closed-period reversals write nothing and leave the original `posted` (1004 ms)
+    √ 6. ATOMIC: a failure half-way through a multi-line reversal rolls EVERYTHING back (no reversal document, original still posted); the retry reverses once (460 ms)
+    √ 7. CONSISTENCY and COMPANY ISOLATION: every event POSTED, journals balanced, valuation = GL, history consistent; Company B untouched (106 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        36.614 s, estimated 47 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\document-reversal.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+FAIL src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts (45.53 s)
+  D3-B — manual receipt policy (explicit cost + controlled reason → configured offset) — real-Postgres, A/B
+    √ 1. VALID cost + VALID reason → posted: stock +10, valuation 10 @ 3.50, GL Dr 1120 35.00 / Cr the reason-configured account (4201) (227 ms)
+    √ 1b. a DIFFERENT valid reason selects ITS OWN offset account (DONATION → 3105) — no shared/generic account; the movement endpoint path behaves the same (92 ms)
+    √ 2. MISSING / non-positive cost → rejected BEFORE mutation (no stock, document, valuation, outbox or journal change) — both entry paths (424 ms)
+    √ 3. MISSING reason code → rejected BEFORE mutation — both entry paths (free-text `reason` alone is not accepted) (111 ms)
+    √ 4. reason WITHOUT a configured GL account → rejected BEFORE mutation, no fallback account is ever used (78 ms)
+    √ 5. WRONG GL mapping → rejected BEFORE mutation: account not in the chart (GHOST→9999) and a control account (CTRL→1120) (105 ms)
+    √ 5b. config changes AFTER the draft was created → the post re-validates inside its transaction: rejected, document NOT posted, NOTHING mutated (93 ms)
+    √ 5c. EVENT-TIME fail-closed: mapping removed between movement and GL event → REJECTED (reason + config key named), no journal, no fallback; restored → redrive POSTS (153 ms)
+    × 5d. a posted cost-bearing manual receipt IS reversible as a document (CTO 2026-10-19, document-reversal slice): the mirror journal and the inverted valuation row keep valuation = GL (280 ms)
+    √ 6/9/10. RECONCILIATION: Σ inventory valuation = GL Inventory 1120 after the whole scenario, and every journal is balanced (43 ms)
+    √ 7/8. ISOLATION: everything stayed in Company A; Company B is untouched; the Platform/control-plane DB holds no outbox/stock/journal rows (44 ms)
+    √ 7b. Company B can run its OWN manual receipt (its own chart/valuation) and it posts only in B — A stays unchanged (239 ms)
+
+  ● D3-B — manual receipt policy (explicit cost + controlled reason → configured offset) — real-Postgres, A/B › 5d. a posted cost-bearing manual receipt IS reversible as a document (CTO 2026-10-19, document-reversal slice): the mirror journal and the inverted valuation row keep valuation = GL
+
+    expect(received).toBeGreaterThan(expected)
+
+    Expected: > 0
+    Received:   0
+
+    [0m [90m 282 |[39m     [36mawait[39m flush([32m'A'[39m)[33m;[39m
+     [90m 283 |[39m     reversedReceiptValue [33m=[39m before [33m-[39m ([36mawait[39m totalValuation([32m'A'[39m))[33m;[39m
+    [31m[1m>[22m[39m[90m 284 |[39m     expect(reversedReceiptValue)[33m.[39mtoBeGreaterThan([35m0[39m)[33m;[39m
+     [90m     |[39m                                  [31m[1m^[22m[39m
+     [90m 285 |[39m     expect([36mawait[39m totalValuation([32m'A'[39m))[33m.[39mtoBeCloseTo([36mawait[39m glInventoryBalance([32m'A'[39m)[33m,[39m [35m4[39m)[33m;[39m
+     [90m 286 |[39m   })[33m;[39m
+     [90m 287 |[39m[0m
+
+      at Object.<anonymous> (domains/accounting/interface/manual-receipt.company-isolation.spec.ts:284:34)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 11 passed, 12 total
+Snapshots:   0 total
+Time:        45.626 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\manual-receipt.company-isolation.spec.ts/i.
+RESULT FAIL src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+PASS src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts (35.764 s)
+  WarehouseTransactionsController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ createTransaction (receipt) for Company A writes its document + lines inside Company A's own database (50 ms)
+    √ createTransaction (receipt) for Company B writes independently in Company B's own database (43 ms)
+    √ transition('submit') for Company A auto-posts the receipt and writes the stock movement only into Company A's ledger (55 ms)
+    √ listTransactions via Company A resolves only Company A's own document, and via Company B only Company B's (10 ms)
+    √ startCount for Company B creates the count document only in Company B, capturing its own on-hand (19 ms)
+    √ getOverview via Company A reports Company A's own figures (1 warehouse, 7 units on hand at 10.00) (133 ms)
+    √ Test F — resolving Company A's warehouse transactions never even requests Company B's DataSource (23 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        35.856 s
+Ran all test suites matching /src\\domains\\inventory-warehouse\\interface\\warehouse-transactions.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts (38.61 s)
+  D3 — inventory movement posting (Model A) — real-Postgres, A/B
+    √ 1. OPENING STOCK → GL: Dr Inventory / Cr the CONFIGURED opening-balance account for qty × supplied cost; valuation bootstrapped (208 ms)
+    √ 2. PURCHASE RECEIPT (GR) is NOT re-published by D3 — its own GRNI event posts it (Dr Inventory / Cr GRNI), valuation +60 (106 ms)
+    √ 3. ADJUSTMENT INCREASE → GL at the warehouse moving-average cost: Dr Inventory / Cr configured Gain; valuation increased at that cost (111 ms)
+    √ 4. ADJUSTMENT DECREASE → GL: Dr configured Loss / Cr Inventory at the consumed average cost; valuation decreased (107 ms)
+    √ 5. TRANSFER A→B → NO GL; valuation carried at the source average; TOTAL valuation unchanged (42 ms)
+    √ 6. RETURN-IN → a financial event EXISTS and is REJECTED with the explicit D4 reason (no invented account, no journal, valuation untouched) (36 ms)
+    √ 7. RECONCILIATION: Σ inventory valuation = GL Inventory control account, and every journal balances (18 ms)
+    √ 8. FAIL-CLOSED: unset adjustment-gain config ⇒ REJECTED with the config reason, NO fallback account, valuation NOT mutated; after configuring, redrive posts it and the reconciliation still holds (103 ms)
+    √ 9. ISOLATION: Company B is untouched (no stock, valuation, events or journals) and the Platform/control-plane DB was never used (24 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        38.701 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-posting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts (40.554 s)
+  Inventory lifecycle C3 - receipt approval and segregation of duties at the service/API boundary - real-Postgres, A/B
+    √ 1. flags OFF = the pre-C3 behaviour, untouched: a receipt auto-posts on submit and a creator approving their own issue is allowed with no audit (453 ms)
+    √ 2. receipt APPROVAL ON: submit leaves the document submitted with NOTHING written; nobody-without-a-role and the creator are refused; a different supervisor posts it exactly once (529 ms)
+    √ 3. DUPLICATE and PARALLEL requests: a repeated approval changes nothing, a repeated post is a no-op, two simultaneous approvals post exactly one document effect (344 ms)
+    √ 4. WARN mode: the creator approving their own document is ALLOWED and audited (once, with the attempted action); the document posts once (133 ms)
+    √ 5. SoD ON for every document with a financial effect (issue, adjustment) but NOT for a transfer (no financial effect, Model A) (343 ms)
+    √ 6. FAILED POSTING after approval is recoverable and still segregated: a closed period refuses the post with the document left approved and nothing written; the creator still cannot post it; the supervisor posts it once after the period reopens (192 ms)
+    √ 7. CONSISTENCY and COMPANY ISOLATION: valuation = GL = matched after every path above; every posted document has exactly one POSTED event; Company B untouched (98 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        40.642 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c3.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts (47.73 s)
+  Inventory lifecycle C4 - the Opening Balance Batch (draft, control totals, two-approver gate, explicit post, lock, reversal, post-movement correction) - real-Postgres, A/B
+    √ 1. DRAFT validation: bad cut-off, bad lines and bad warehouses are refused; a good draft writes NOTHING to stock, valuation, outbox, events or journals (143 ms)
+    √ 2. SUBMIT controls: wrong / missing control totals, a closed period, a missing account and an already-moved pair are refused with nothing written and no approval request (249 ms)
+    √ 3. APPROVAL: two DISTINCT approvers are required (maker, no-role user and a second vote by the same approver are refused); nothing is posted at approval; `post` is separate, explicit and dated at the cut-off (715 ms)
+    √ 4. IDEMPOTENT and LOCKED: a second post is a no-op, parallel posts write one effect, the database refuses a second ACTIVE opening for a pair, and a new opening for a locked pair is refused (390 ms)
+    √ 5. REJECTION: a rejected batch returns to draft and posts nothing (116 ms)
+    √ 6. POST FAILURE is atomic and recoverable: a closed period, activity that appeared after approval, and a failure half-way through leave NOTHING written; the retry posts once (685 ms)
+    √ 7. REVERSAL of an UNTOUCHED opening (WH2): same two-approver gate, Dr opening / Cr inventory at the ORIGINAL values, the original is reversed and its pairs are eligible again; a MOVED pair cannot be reversed (974 ms)
+    √ 8. CORRECTION AFTER STOCK HAS MOVED (O-1): an approved, traceable batch posts to the EQUITY correction account and never touches profit and loss; unsafe corrections are refused (402 ms)
+    √ 9. The CUT-OVER FLAG: off = the legacy import and the `opening_balance` reason keep working; on = the legacy import is refused and the reason is reserved for batches (205 ms)
+    √ 10. ROW / EXCEL import into a DRAFT: valid rows form the draft, invalid rows are returned with row numbers and are not in it; no valid row = no batch; scope hides other warehouses (44 ms)
+    √ 11. The HTTP controller: the maker cannot decide, the override needs its own permission, a post reports the GL truth; reads are scope-filtered (246 ms)
+    √ 12. CONSISTENCY and COMPANY ISOLATION: valuation = GL at every checkpoint, every event POSTED, journals balanced, history consistent, Company B untouched, Platform DataSource not needed for it (125 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        47.82 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c4.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+[33m[Nest] 6984  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٢٨:٥٥ م [33m   WARN[39m [38;5;3m[InventoryPostingDispatchService] [39m[33mIn-request inventory dispatch failed (events stay queued for the sweep): simulated dispatch outage[39m
+PASS src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts (42.624 s)
+  Inventory lifecycle C2 - in-request posting dispatch and explicit business-date propagation - real-Postgres, A/B
+    √ 1. DOCUMENT dated today-3 posts IN THE REQUEST (no sweep): response says posted; journal, event and valuation row carry today-3, the stock row keeps its record time (233 ms)
+    √ 2. HISTORICAL as-of valuation, GL and reconciliation follow the business date: nothing before it, 5 u / 20.0000 from it, then-with-then MATCHED (85 ms)
+    √ 3. an ISSUE dated today-1 (approval flow): the cost is applied at ingest with the EVENT date - valuation row, COGS journal and as-of figures all say today-1 (235 ms)
+    √ 4. a TRANSFER dated today-2 carries its date on the valuation rows (Model A: no journal); an explicit-date manual receipt and an opening import do too; an omitted date is today (327 ms)
+    √ 5. VALIDATION before any write: a future date, a CLOSED period and a date outside every fiscal year are rejected with zero rows written; reopening the period lets the same document post (283 ms)
+    √ 6. POSTING FAILURE is reported truthfully and recovers safely: switch off -> "pending"; the period closes before the sweep -> event REJECTED, response "rejected"; redrive after reopening -> posted once (206 ms)
+    √ 7. if the DISPATCH ITSELF throws the document stays committed, the response never says "posted", the events stay queued, and the next dispatch posts them once (116 ms)
+    √ 8. DUPLICATE / OVERLAPPING dispatch is safe: parallel dispatchers and repeated calls neither double-post nor lose an event; the same idempotency key is deduped (390 ms)
+    √ 9. CONSISTENCY across layers and COMPANY ISOLATION: stock = valuation quantity, valuation = GL at every date, journals balanced, Company B untouched (100 ms)
+    √ 11. the HTTP manual-receipt endpoint: explicit businessDate, in-request dispatch with a truthful report, closed period refused with nothing written (242 ms)
+    √ 10. the dispatch service without accounting reports "not_applicable" and never claims a posting (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        42.712 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c2.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
+[33m[Nest] 22724  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٢٩:٣٨ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mEvent handler for "approval.request.approved" failed in Company 9995c38a-d200-47df-99fa-9c67a1b668c8: Inventory valuation_write_down GL posting was rejected — see financial event 58f79cf3-afc5-4afe-8bdd-8be97f83e617.[39m
+PASS src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts (43.342 s)
+  Inventory lifecycle C6 - F07 / D3 coexistence: value-only adjustments move the valuation atomically, quantity changes stay with D3 documents, physical_count_variance retirement - real-Postgres, A/B
+    √ 0. SETUP: 10 units received at 5.00 -> valuation 50.0000 = GL 50.00 (157 ms)
+    √ 1. flag OFF = the pre-C6 behaviour: an approved write-down posts to the GL only; reconciliation itemises it as "F07 without valuation effect" (explained, unexplained 0) (192 ms)
+    √ 2. flag ON: a write-down moves the valuation AND the ledger in ONE posting - valuation 44.0000 / GL 40.00, the legacy difference stays exactly 4.00, the new entry is NOT counted as "without valuation effect" (183 ms)
+    √ 3. a write-up is allowed; submissions that cannot be priced are refused BEFORE any FA-01 request (no product/warehouse, no stock, a write-down above the value) (548 ms)
+    √ 4. ATOMIC and fail-closed: a closed period rolls the revaluation back with the refused posting (event REJECTED, valuation and GL unchanged); after reopening, the re-drive posts it exactly once; re-drives and replays add nothing (393 ms)
+    √ 5. QUANTITY-only change goes through a D3 document (stock + valuation + ledger together); COMBINED with a value-only F07 write-down on the same position the books stay equal and the legacy difference stays 4.00 (928 ms)
+    √ 6. RETIREMENT of the free-typed physical_count_variance (flag): allowed = today, warn = accepted + audited, refused = 409 pointing to the documents with nothing created; history is untouched (269 ms)
+    √ 7. CONSISTENCY and COMPANY ISOLATION: every F07 event POSTED or the one deliberate rejection re-driven, journals balanced, history consistent, difference = the legacy 4.00 only; Company B untouched (178 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        43.44 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c6.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+PASS src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts (35.451 s)
+  InventoryValuationController Area 21 retrofit — real-Postgres Company isolation (2026-09-27)
+    √ getUnitCost for Company A's own product/warehouse resolves Company A's own average cost (7 ms)
+    √ getUnitCost for Company B's own product/warehouse resolves Company B's own average cost — never Company A's (3 ms)
+    √ getUnitCost for Company A's product/warehouse via Company B's manager resolves null — the row genuinely does not exist in Company B's own database (2 ms)
+    √ Test F — resolving Company A's valuation state never even requests Company B's DataSource (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        35.541 s
+Ran all test suites matching /src\\domains\\inventory-valuation\\interface\\inventory-valuation.company-isolation.spec.ts/i.
+RESULT PASS src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+
+REGRESSION DONE: 8/9 passed

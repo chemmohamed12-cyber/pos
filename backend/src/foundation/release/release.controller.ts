@@ -1,7 +1,5 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
 import { IsIn, IsObject, IsUUID } from 'class-validator';
 import { DataRepairService } from './data-repair.service';
 import { DataRepairRun } from './data-repair-run.entity';
@@ -9,13 +7,12 @@ import { DataRepairKind } from './data-repair-status';
 import { DeployPreflightService } from './deploy-preflight.service';
 import { DataSource } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
-import { tmpdir } from 'os';
 import { rm } from 'fs/promises';
 import { BackupManagerService } from './backup-manager.service';
 import { RestoreManagerService } from './restore-manager.service';
 import { ReleaseManagerService } from './release-manager.service';
 import { ReleaseExecutionService } from './release-execution.service';
+import { ReleaseUploadInterceptor } from './release-upload.interceptor';
 import { BackupRun } from './backup-run.entity';
 import { BackupArtifact } from './backup-artifact.entity';
 import { RestoreOperation } from './restore-operation.entity';
@@ -286,12 +283,7 @@ export class ReleaseController {
   /** The real ZIP-upload entry point — validates, stages, and registers the release in one call. `registerRelease` (JSON-only, above) stays for tooling/tests that don't need a real zip. */
   @RequirePlatform('platform.release.deploy', 'editable')
   @Post('releases/upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({ destination: tmpdir(), filename: (_req, _file, cb) => cb(null, `release-upload-${randomUUID()}.zip`) }),
-      limits: { fileSize: 200 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(ReleaseUploadInterceptor)
   async uploadRelease(@UploadedFile() file: Express.Multer.File, @Body('packageType') packageType: string, @Req() req: AuthenticatedRequest) {
     if (!file) throw new BadRequestException('No file uploaded — expected a multipart "file" field containing the release ZIP.');
     if (packageType !== 'full' && packageType !== 'delta') {

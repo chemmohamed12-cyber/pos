@@ -63,10 +63,18 @@ export class WarehouseTransaction {
   /**
    * D3-B (2026-10-04) — the CONTROLLED reason code of a manual receipt (a key of
    * `accounting.inventory_manual_receipt_reason_accounts`); it — never the free-text `reason` above — selects the
-   * offset GL account. Null on every non-receipt document and on legacy receipts.
+   * offset GL account. ADR-INV-04 (2026-10-19): every document type may now carry a catalog reason code (null on legacy documents).
    */
   @Column({ type: 'varchar', length: 64, nullable: true })
   reasonCode!: string | null;
+
+  /** ADR-INV-04 - the record that justifies this document (see `movement-reason-catalog.ts`); both null on legacy documents. */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  referenceType!: string | null;
+
+  @Index('IDX_wh_txn_reference', ['referenceType', 'referenceId'])
+  @Column({ type: 'uuid', nullable: true })
+  referenceId!: string | null;
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;

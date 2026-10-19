@@ -1,0 +1,12 @@
+{
+  "testId": "T-97",
+  "runId": "T-97-20261017T141333Z-a07da4",
+  "finishedAt": "2026-10-17T14:13:46.466Z",
+  "results": [
+    {
+      "id": "GA-PROBE",
+      "status": "PASS",
+      "note": "observations recorded (no assertions: investigation only)"
+    }
+  ]
+}

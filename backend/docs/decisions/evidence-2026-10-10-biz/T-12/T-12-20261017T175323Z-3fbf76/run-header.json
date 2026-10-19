@@ -1,0 +1,62 @@
+{
+  "testId": "T-12",
+  "runId": "T-12-20261017T175323Z-3fbf76",
+  "startedAt": "2026-10-17T17:53:23.108Z",
+  "commit": "85bf8253c9f8a843ec78630059733756844fea3d",
+  "branch": "feature/inventory-lifecycle",
+  "dirtyPaths": [
+    "M backend/src/domains/accounting/accounting.module.ts",
+    " M backend/src/domains/accounting/application/inventory-reconciliation.service.ts",
+    " M backend/src/domains/accounting/application/ledger.service.ts",
+    " M backend/src/domains/accounting/infrastructure/inventory-reconciliation-run.entity.ts",
+    " M backend/src/domains/accounting/interface/general-ledger.controller.ts",
+    " M backend/src/domains/accounting/interface/inventory-accounting.controller.ts",
+    " M backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts",
+    " M backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts",
+    " M backend/src/domains/inventory-valuation/domain/cost-engine.ts",
+    " M backend/src/domains/inventory-valuation/infrastructure/inventory-valuation-movement.entity.ts",
+    " M backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts",
+    " M backend/src/domains/inventory-valuation/inventory-valuation.module.ts",
+    " M backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts",
+    " M backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts",
+    " M backend/src/foundation/module-registry/contracts/inventory-events.contract.ts",
+    " M backend/src/foundation/navigation/navigation-registry.ts",
+    " M backend/tools/testing/regression-specs-all.txt",
+    "?? backend/src/database/migrations/accounting/1790017100000-AddInventoryReconciliationExplanation.ts",
+    "?? backend/src/database/migrations/core/1790017200000-SeedInventoryC1Terminology.ts",
+    "?? backend/src/database/migrations/inventory/1790017000000-AddValuationMovementBusinessDate.ts",
+    "?? backend/src/domains/accounting/application/inventory-difference-analysis.ts",
+    "?? backend/src/domains/accounting/application/posting-status.service.ts",
+    "?? backend/src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts",
+    "?? backend/src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts"
+  ],
+  "applicationVersion": "1.1.10",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\inventory-lifecycle",
+  "systemIdentifier": "7695619915229547252",
+  "databases": [
+    "daii_test_biz_t12_control_plane",
+    "daii_test_biz_t12_company_a",
+    "daii_test_biz_t12_company_b"
+  ],
+  "prefix": "biz_t12",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

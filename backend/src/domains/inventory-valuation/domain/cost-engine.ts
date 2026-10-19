@@ -1,4 +1,5 @@
 import { EntityManager } from 'typeorm';
+import type { HistoryInconsistency, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 
 /**
  * F08 — Inventory Valuation (ADR-041 D25). F08-internal only — never
@@ -31,6 +32,7 @@ export interface CostEngine {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
 
   /** D4 — PURE read: the cost the ORIGINAL issues (by idempotency key) were actually charged; keys without an `issue` row are absent. */
@@ -44,6 +46,7 @@ export interface CostEngine {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void>;
 
   /**
@@ -84,10 +87,26 @@ export interface CostEngine {
   ): Promise<void | { rejected: 'negative_on_hand' }>;
 
   /** MUTATING — reversal-not-edit (ADR-041 D14): reapplies the ORIGINAL movement's own recorded cost, inverted, as a NEW history row — never edits history, never recalculates. */
-  applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager): Promise<void>;
+  applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null>;
 
-  /** Read-only — the valued on-hand position per warehouse, for F07's reconciliation (D19). */
+  /** C6 - value-only change of a position (see `InventoryValuationContract.applyRevaluation`). */
+  applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }>;
+
+  /** Read-only — the valued on-hand position per warehouse, for F07's reconciliation (D19). With a PAST `asOfDate` it is rebuilt from the dated history (C1, ADR-INV-08). */
   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
+
+  /** C1 (ADR-INV-08) - read-only: the valued position per warehouse AND product, current or as of a date. */
+  getValuedPositions(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
+
+  /** C1 - read-only consistency check of the running state against the sum of its own dated history (every pair that disagrees). */
+  checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]>;
 }
 
 export const COST_ENGINE = Symbol('COST_ENGINE');

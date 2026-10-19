@@ -1,0 +1,78 @@
+{
+ "res": {
+  "platform": {
+   "migrationsCount": 307,
+   "last": [
+    "AddWarehouseTransactionReference1790018300000",
+    "SeedMovementReasonTerminology1790018400000"
+   ],
+   "hasOpeningBatches": true,
+   "hasRefCols": 2,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 17,
+   "whTxnRows": 0
+  },
+  "Alpha Trading Co": {
+   "migrationsCount": 307,
+   "last": [
+    "AddWarehouseTransactionReference1790018300000",
+    "SeedMovementReasonTerminology1790018400000"
+   ],
+   "hasOpeningBatches": true,
+   "hasRefCols": 2,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 17,
+   "whTxnRows": 0
+  },
+  "Beta Trading Co": {
+   "migrationsCount": 307,
+   "last": [
+    "AddWarehouseTransactionReference1790018300000",
+    "SeedMovementReasonTerminology1790018400000"
+   ],
+   "hasOpeningBatches": true,
+   "hasRefCols": 2,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 17,
+   "whTxnRows": 0
+  },
+  "Delta Trading Co": {
+   "migrationsCount": 307,
+   "last": [
+    "AddWarehouseTransactionReference1790018300000",
+    "SeedMovementReasonTerminology1790018400000"
+   ],
+   "hasOpeningBatches": true,
+   "hasRefCols": 2,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 17,
+   "whTxnRows": 0
+  },
+  "Gamma Trading Co": {
+   "migrationsCount": 307,
+   "last": [
+    "AddWarehouseTransactionReference1790018300000",
+    "SeedMovementReasonTerminology1790018400000"
+   ],
+   "hasOpeningBatches": true,
+   "hasRefCols": 2,
+   "kindCheck": "CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))",
+   "revaluationRows": 0,
+   "newTermRows": 17,
+   "whTxnRows": 0
+  }
+ },
+ "equivalenceGroups": {
+  "[307,[\"AddWarehouseTransactionReference1790018300000\",\"SeedMovementReasonTerminology1790018400000\"],\"CHECK (((kind)::text = ANY ((ARRAY['receipt'::character varying, 'issue'::character varying, 'transfer_out'::character varying, 'transfer_in'::character varying, 'reversal'::character varying, 'revaluation'::character varying])::text[])))\"]": [
+   "platform",
+   "Alpha Trading Co",
+   "Beta Trading Co",
+   "Delta Trading Co",
+   "Gamma Trading Co"
+  ]
+ }
+}

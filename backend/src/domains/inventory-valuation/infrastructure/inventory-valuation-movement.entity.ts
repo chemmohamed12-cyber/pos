@@ -25,7 +25,7 @@ export class InventoryValuationMovement {
   warehouseId!: string;
 
   @Column({ type: 'varchar', length: 32 })
-  kind!: 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'reversal';
+  kind!: 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'reversal' | 'revaluation';
 
   /** The `inventory-warehouse` `StockMovement` row this costed, when one exists (not every kind has one — e.g. a pure reversal). */
   @Column({ type: 'uuid', nullable: true })
@@ -54,4 +54,13 @@ export class InventoryValuationMovement {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  /**
+   * Slice C1 (ADR-INV-08) - the accounting-facing (business) date of this valuation movement, so the valuation can be rebuilt AS OF a date.
+   * Defaults in the database to the UTC date at insert time (the date the inventory events carry today); rows written before the column existed
+   * were backfilled with the UTC date of `createdAt` (their PROCESSING date).
+   */
+  @Index('IDX_inventory_valuation_movements_businessDate')
+  @Column({ type: 'date', nullable: true, default: () => `((now() AT TIME ZONE 'UTC')::date)` })
+  businessDate!: string | null;
 }

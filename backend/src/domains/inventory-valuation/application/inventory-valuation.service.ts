@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import { InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+import { HistoryInconsistency, InventoryValuationContract, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { COST_ENGINE, CostEngine } from '../domain/cost-engine';
 
 /**
@@ -23,6 +23,14 @@ export class InventoryValuationService implements InventoryValuationContract {
     return this.costEngine.getValuedOnHandTotal(asOfDate, manager);
   }
 
+  async getValuedPositions(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]> {
+    return this.costEngine.getValuedPositions(asOfDate, filter, manager);
+  }
+
+  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
+    return this.costEngine.checkHistoryConsistency(manager);
+  }
+
   async getUnitCost(productId: string, warehouseId: string, _asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null> {
     return this.costEngine.resolveIssueCost(productId, warehouseId, manager);
   }
@@ -33,12 +41,30 @@ export class InventoryValuationService implements InventoryValuationContract {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null> {
-    return this.costEngine.applyIssue(productId, warehouseId, quantity, idempotencyKey, manager);
+    return this.costEngine.applyIssue(productId, warehouseId, quantity, idempotencyKey, manager, businessDate);
   }
 
   async getIssueCostsByKeys(idempotencyKeys: string[], manager?: EntityManager): Promise<Array<{ idempotencyKey: string; quantity: number; valueBase: string }>> {
     return this.costEngine.getIssueCostsByKeys(idempotencyKeys, manager);
+  }
+
+  /** C6 - a value-only change of one position (F07 write-down / write-up); see the contract. */
+  async applyRevaluation(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }> {
+    return this.costEngine.applyRevaluation(productId, warehouseId, valueDelta, idempotencyKey, manager, businessDate);
+  }
+
+  /** C4 - the offsetting history row of a recorded receipt (see the contract); returns the value that was reversed. */
+  async reverseReceiptCost(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null> {
+    return this.costEngine.applyReversal(originalIdempotencyKey, reversalIdempotencyKey, manager, businessDate);
   }
 
   async recordReceiptCost(
@@ -48,8 +74,9 @@ export class InventoryValuationService implements InventoryValuationContract {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    businessDate?: string,
   ): Promise<void> {
-    return this.costEngine.applyReceipt(productId, warehouseId, quantity, unitCostBase, idempotencyKey, manager);
+    return this.costEngine.applyReceipt(productId, warehouseId, quantity, unitCostBase, idempotencyKey, manager, businessDate);
   }
 
   async consumeManufacturingPooledCost(

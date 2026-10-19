@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { ErrorState } from '../../components/ErrorState';
+import { useAutoRefresh } from '../../lib/useAutoRefresh';
+import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
 
 interface Overview {
   totalWarehouses: number;
   totalInventoryValueAtSellingPrice: string;
+  /** C1: the moving-average valuation (the figure the GL inventory account equals); null without `inventory.valuation.view`. */
+  totalInventoryValueAtCost?: string | null;
+  valuationAsOf?: string | null;
   todaysMovementsCount: number;
   reservedStockUnits: number;
   pendingApprovalsCount: number;
@@ -49,6 +54,7 @@ export function WarehouseOverview() {
     'nav.stock_count',
     'field.total_inventory_value',
     'field.at_selling_price',
+    'field.at_cost',
     'field.total_warehouses',
     'field.todays_movements',
     'field.reserved_stock',
@@ -65,30 +71,28 @@ export function WarehouseOverview() {
     'field.on_hand',
   ]);
 
-  function load() {
-    setLoadError(null);
-    setOverview(null);
-    (async () => {
-      try {
-        const [ov, wh, prod] = await Promise.all([
-          api.get<Overview>('/warehouse-transactions/overview'),
-          api.get<Warehouse[]>('/inventory/warehouses'),
-          api.get<Product[]>('/products/all'),
-        ]);
-        setOverview(ov);
-        setWarehouses(wh);
-        setProducts(prod);
-      } catch (err) {
-        // Foundation fix: this load had no error handling — a failure left
-        // the page stuck on "Loading…" forever with no explanation.
-        setLoadError(err);
-      }
-    })();
-  }
+  // C1 (ADR-INV-10): the screen refreshes itself (focus / visibility / every 30 s while visible); a failed refresh keeps the last good numbers on screen.
+  const refresh = useAutoRefresh(async (isCurrent) => {
+    try {
+      const [ov, wh, prod] = await Promise.all([
+        api.get<Overview>('/warehouse-transactions/overview'),
+        api.get<Warehouse[]>('/inventory/warehouses'),
+        api.get<Product[]>('/products/all'),
+      ]);
+      if (!isCurrent()) return;
+      setOverview(ov);
+      setWarehouses(wh);
+      setProducts(prod);
+      setLoadError(null);
+    } catch (err) {
+      // Foundation fix: this load had no error handling — a failure left the page stuck on "Loading…" forever with no explanation.
+      if (isCurrent()) setLoadError((prev: unknown) => prev ?? err);
+      throw err;
+    }
+  }, []);
+  const load = refresh.refresh;
 
-  useEffect(load, []);
-
-  if (loadError) {
+  if (loadError && !overview) {
     return (
       <div>
         <div className="page-header">
@@ -113,6 +117,10 @@ export function WarehouseOverview() {
     <div>
       <div className="page-header">
         <h1>{t('nav.warehouse_overview')}</h1>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <PostingStatusChip />
+          <RefreshStamp refresh={refresh} />
+        </div>
       </div>
 
       {/* CTO directive ("Section Cover / Main Dashboard System") — the shortcut row every section's Cover shares. */}
@@ -128,9 +136,15 @@ export function WarehouseOverview() {
           <div className="label">{t('field.total_warehouses')}</div>
           <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalWarehouses}</div>
         </div>
+        {overview.totalInventoryValueAtCost != null && (
+          <Link to="/inventory/valuation-report" className="card detail-field" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="label">{t('field.total_inventory_value')} <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({t('field.at_cost')})</span></div>
+            <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalInventoryValueAtCost}</div>
+          </Link>
+        )}
         <div className="card detail-field">
           <div className="label">{t('field.total_inventory_value')} <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({t('field.at_selling_price')})</span></div>
-          <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalInventoryValueAtSellingPrice}</div>
+          <div className="value" style={{ fontSize: overview.totalInventoryValueAtCost != null ? '1.1rem' : '1.6rem' }}>{overview.totalInventoryValueAtSellingPrice}</div>
         </div>
         <div className="card detail-field">
           <div className="label">{t('field.todays_movements')}</div>

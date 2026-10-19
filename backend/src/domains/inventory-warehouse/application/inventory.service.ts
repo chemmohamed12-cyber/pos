@@ -16,6 +16,7 @@ import {
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { InventoryReservationContract, InventoryLogisticsContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
+import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { INVENTORY_EVENT_TOPICS, INVENTORY_VALUATION_CONTRACT, InventoryGlKind, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 
@@ -37,9 +38,14 @@ export const MANUAL_RECEIPT_REFERENCE_TYPE = 'manual_receipt';
 
 function glKindFor(movementType: MovementType, referenceType: string | null, unitCostBase: string | null | undefined): InventoryGlKind | null {
   if (movementType === 'dispatch') return 'dispatch';
+  // C4 (ADR-INV-01): the reversal and the post-movement correction of an opening batch have their own kinds (checked before the generic adjustment).
+  if (movementType === 'adjustment' && referenceType === 'warehouse_transaction_reversal') return 'movement_reversal';
+  if (movementType === 'adjustment' && referenceType === 'opening_batch_reversal') return 'opening_reversal';
+  if (movementType === 'adjustment' && referenceType === 'opening_batch_correction') return 'opening_correction';
   if (movementType === 'adjustment') return 'adjustment';
   if (movementType === 'return_in') return 'return_in';
-  if (movementType === 'receipt' && referenceType === 'excel_import' && unitCostBase != null && unitCostBase !== '') return 'opening_stock';
+  // C4 (ADR-INV-01): a posted Opening Balance Batch is an opening exactly like the legacy import; its reversal and its post-movement correction have their own kinds.
+  if (movementType === 'receipt' && (referenceType === 'excel_import' || referenceType === 'opening_batch') && unitCostBase != null && unitCostBase !== '') return 'opening_stock';
   if (movementType === 'receipt' && referenceType === MANUAL_RECEIPT_REFERENCE_TYPE && unitCostBase != null && unitCostBase !== '') return 'manual_receipt';
   return null;
 }
@@ -75,6 +81,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // D3-B — the manual-receipt pre-mutation gate, bound by `accounting` (foundation holder; no module cycle).
     // Unbound ⇒ no accounting installed ⇒ a manual receipt cannot be validated and is rejected (fail-closed).
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
+    // C4 - the cut-over flag `inventory.opening_batch_required`; absent engine = flag off (pre-C4 behaviour).
+    @Optional() private readonly config?: ConfigurationEngineService,
   ) {}
 
   /**
@@ -233,6 +241,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
     unitCostBase?: string | null,
     // D3-B — carried on the event of a 'manual_receipt' only (set by `recordManualReceipt`).
     reasonCode?: string | null,
+    // C2 (ADR-INV-02) — the document's EXPLICIT business date (YYYY-MM-DD). Omitted = today (UTC), exactly as before. Validated BEFORE any write
+    // (format, not in the future, open fiscal period) and carried on the event, the valuation history row and therefore the journal.
+    businessDate?: string | null,
+    // C4 — additive fields merged into the event payload (batch id, original movement, reason ...); never overrides a standard field.
+    eventExtras?: Record<string, unknown>,
   ): Promise<StockMovement> {
     // F07-H1 (ADR-040 D9, CTO Mandatory Condition 4) — when the caller
     // supplies no transaction of its own, open one here so the
@@ -245,9 +258,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // `manager`) keeps that same atomicity unchanged.
     if (!manager) {
       return this.dataSource.transaction((txManager) =>
-        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode),
+        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode, businessDate, eventExtras),
       );
     }
+
+    const explicitDate = businessDate ? businessDate : undefined;
+    const eventDate = await this.resolveBusinessDate(explicitDate, manager); // pre-mutation gate for an explicit date; today otherwise
 
     const repo = manager.getRepository(StockMovement);
     const movement = await repo.save(
@@ -272,7 +288,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // entry, only a valuation-subledger one). Silently a no-op when F08 is not bound or no cost was
     // supplied — zero behavior change from before this field existed.
     if ((movementType === 'receipt' || movementType === 'return_in') && unitCostBase != null && this.valuation) {
-      await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unitCostBase, `inventory-valuation:receipt:${movement.id}`, manager);
+      await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unitCostBase, `inventory-valuation:receipt:${movement.id}`, manager, explicitDate);
     }
 
     // F07-H1 (ADR-040 D2/D3) — publish only the allow-listed movement types (`dispatch`, always a
@@ -282,11 +298,12 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // at ingest time, never from this payload; fail-closed (`no_valuation_source`) when unavailable.
     const glKind = glKindFor(movementType, referenceType, unitCostBase);
     // The kinds whose COST is an input resolved BEFORE the movement (every other kind resolves cost from the valuation engine at ingest).
-    const carriesCost = glKind === 'opening_stock' || glKind === 'manual_receipt' || (glKind === 'return_in' && unitCostBase != null && unitCostBase !== '');
+    const carriesCost = glKind === 'opening_stock' || glKind === 'manual_receipt' || ((glKind === 'return_in' || glKind === 'opening_correction') && unitCostBase != null && unitCostBase !== '');
     if (glKind) {
       await this.events.publish(manager, INVENTORY_EVENT_TOPICS.movementRecorded, {
+        ...(eventExtras ?? {}),
         idempotencyKey: `inventory:movement:${movement.id}:recorded`,
-        businessDate: new Date().toISOString().slice(0, 10),
+        businessDate: eventDate,
         orgUnitId: null,
         sourceEntityType: 'stock_movement',
         sourceEntityId: movement.id,
@@ -310,6 +327,31 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * ADR-INV-04 / CTO 2026-10-19 - the direct `POST /inventory/movements` receipt path must not bypass the approval workflow: when `inventory.receipt_approval_required` is `on`, a manual receipt
+   * has to be a receipt DOCUMENT that is submitted and approved. Called FIRST by the route (before any read or write), so a refusal changes nothing. `off` = today's behaviour.
+   */
+  assertDirectManualReceiptAllowed(): void {
+    if (this.config?.get<unknown>('inventory.receipt_approval_required') === 'on') {
+      throw new ConflictException('A manual receipt requires approval: create a receipt document (Movement Center), submit it, and have it approved - the direct movement endpoint cannot be used while receipt approval is required.');
+    }
+  }
+
+  /**
+   * C2 (ADR-INV-02) — the business date an inventory posting carries. `undefined` => today (UTC), no gate (today's behaviour, every unchanged caller).
+   * An EXPLICIT date must be a real calendar date, not in the future, and fall in an OPEN fiscal period (accounting's gate, bound through the posting
+   * policy; absent => no GL => no gate). Rejects BEFORE any write; the date is never silently changed. Public so a document can validate once up front.
+   */
+  async resolveBusinessDate(explicit: string | undefined, manager: EntityManager): Promise<string> {
+    const today = new Date().toISOString().slice(0, 10);
+    if (explicit === undefined) return today;
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(explicit) && new Date(`${explicit}T00:00:00Z`).toISOString().slice(0, 10) === explicit;
+    if (!valid) throw new BadRequestException(`Business date "${explicit}" is not a valid calendar date (YYYY-MM-DD).`);
+    if (explicit > today) throw new BadRequestException(`Business date ${explicit} is in the future (today is ${today}); a posting cannot be dated ahead.`);
+    await this.postingPolicy?.get()?.assertPostingDateOpen?.(explicit, manager);
+    return explicit;
+  }
+
+  /**
    * D3-B (2026-10-04, CTO-approved Manual Receipt policy) — the ONLY way a manual receipt enters stock. It needs an
    * explicit positive `unitCostBase` (no moving-average / last-purchase / estimated fallback) and a controlled
    * `reasonCode` whose configured offset GL account is valid. EVERYTHING is validated before the first write, so a
@@ -325,10 +367,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string | null,
     actorUserId: string | null,
     manager?: EntityManager,
+    businessDate?: string | null,
   ): Promise<StockMovement> {
     if (!manager) {
       return this.dataSource.transaction((tx) =>
-        this.recordManualReceipt(warehouseId, productId, quantity, unitCostBase, reasonCode, referenceId, actorUserId, tx),
+        this.recordManualReceipt(warehouseId, productId, quantity, unitCostBase, reasonCode, referenceId, actorUserId, tx, businessDate),
       );
     }
     if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A manual receipt quantity must be a positive number');
@@ -352,6 +395,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
       manager,
       cost.toFixed(4),
       code,
+      businessDate,
     );
   }
 
@@ -394,10 +438,11 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string,
     actorUserId: string | null,
     manager?: EntityManager,
+    businessDate?: string | null,
   ): Promise<StockMovement> {
     if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException('A sale-return quantity must be a positive number');
     if (!(Number(unitCostBase) > 0)) throw new BadRequestException('A sale return requires the original unit cost (no fallback cost is used)');
-    return this.recordMovement(warehouseId, productId, quantity, 'return_in', referenceType, referenceId, actorUserId, manager, Number(unitCostBase).toFixed(4));
+    return this.recordMovement(warehouseId, productId, quantity, 'return_in', referenceType, referenceId, actorUserId, manager, Number(unitCostBase).toFixed(4), undefined, businessDate);
   }
 
   /** D3-B — the reason codes that currently have a configured offset account (what a UI may offer). */
@@ -421,13 +466,15 @@ export class InventoryService implements InventoryReservationContract, Inventory
     referenceId: string | null,
     actorUserId: string | null,
     manager: EntityManager,
+    businessDate?: string | null,
   ): Promise<void> {
-    const out = await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, manager);
-    await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, manager);
+    const explicitDate = businessDate ? businessDate : undefined;
+    const out = await this.recordMovement(fromWarehouseId, productId, -quantity, 'transfer_out', referenceType, referenceId, actorUserId, manager, undefined, undefined, explicitDate);
+    await this.recordMovement(toWarehouseId, productId, quantity, 'transfer_in', referenceType, referenceId, actorUserId, manager, undefined, undefined, explicitDate);
     if (!this.valuation) return;
-    const consumed = await this.valuation.consumeIssueCost(productId, fromWarehouseId, quantity, `inventory-valuation:transfer-out:${out.id}`, manager);
+    const consumed = await this.valuation.consumeIssueCost(productId, fromWarehouseId, quantity, `inventory-valuation:transfer-out:${out.id}`, manager, explicitDate);
     if (consumed && !('rejected' in consumed)) {
-      await this.valuation.recordReceiptCost(productId, toWarehouseId, quantity, consumed.unitCostBase, `inventory-valuation:transfer-in:${out.id}`, manager);
+      await this.valuation.recordReceiptCost(productId, toWarehouseId, quantity, consumed.unitCostBase, `inventory-valuation:transfer-in:${out.id}`, manager, explicitDate);
     }
   }
 
@@ -1091,7 +1138,13 @@ export class InventoryService implements InventoryReservationContract, Inventory
     manager?: EntityManager,
     /** F6 — the caller's visible warehouses (omit / 'ALL' for unrestricted): a row naming any other warehouse is rejected exactly like an unknown code (no enumeration). */
     visibleWarehouseIds?: 'ALL' | string[],
+    /** C2 — the explicit business date (cut-off) of the whole import; omitted = today. A closed period / future date rejects every row with a clear message, nothing written. */
+    businessDate?: string | null,
   ): Promise<{ succeeded: StockMovement[]; rejected: Array<{ row: number; errors: string[] }> }> {
+    // C4 (ADR-INV-01 section 2.2.8): once the cut-over flag is on, the legacy direct import is closed - openings come in only through an Opening Balance Batch.
+    if (this.config?.get<unknown>('inventory.opening_batch_required') === true) {
+      throw new ConflictException('The direct opening-stock import is closed: create an Opening Balance Batch (draft, control totals, approval, post) instead.');
+    }
     const succeeded: StockMovement[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     const allWarehouses = await (manager ?? this.dataSource).getRepository(Warehouse).find();
@@ -1148,6 +1201,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
               actorUserId,
               txManager,
               unitCostText,
+              undefined,
+              businessDate,
             );
           }),
         );

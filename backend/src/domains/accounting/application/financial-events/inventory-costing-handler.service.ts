@@ -4,6 +4,7 @@ import { INVENTORY_VALUATION_CONTRACT, InventoryGlKind, InventoryValuationContra
 
 const COGS_ACCOUNT_CONFIG_KEY = 'accounting.inventory_cogs_account_code';
 const OPENING_BALANCE_ACCOUNT_CONFIG_KEY = 'accounting.inventory_opening_balance_account_code';
+const OPENING_CORRECTION_ACCOUNT_CONFIG_KEY = 'accounting.inventory_opening_correction_account_code';
 const ADJUSTMENT_GAIN_ACCOUNT_CONFIG_KEY = 'accounting.inventory_adjustment_gain_account_code';
 const ADJUSTMENT_LOSS_ACCOUNT_CONFIG_KEY = 'accounting.inventory_adjustment_loss_account_code';
 const MANUAL_RECEIPT_REASON_ACCOUNTS_CONFIG_KEY = 'accounting.inventory_manual_receipt_reason_accounts';
@@ -100,6 +101,79 @@ export class InventoryCostingHandlerService implements OnModuleInit {
         );
       }
 
+      // ---- movement_reversal (slice R): the reversal of ONE original stock movement of a reversed warehouse document. The valuation row of the original is inverted at its RECORDED cost (an issue
+      //      therefore restores its original issued cost - it never consumes again) and the journal is the MIRROR of the original journal (same accounts, same amounts, debit and credit swapped).
+      //      The original posting must be POSTED; the mutation comes last, after every read that can reject. ----
+      if (glKind === 'movement_reversal') {
+        const originalMovementId = str(p.originalMovementId);
+        if (!originalMovementId) return { kind: 'rejected', reason: 'movement reversal: missing originalMovementId' };
+        const m = ctx.manager;
+        if (!m) return { kind: 'rejected', reason: 'movement reversal: no database context' };
+        const originalEvent = (await m.query(`SELECT status, "journalEntryId" FROM accounting_financial_events WHERE "idempotencyKey" = $1`, [`inventory:movement:${originalMovementId}:recorded`])) as Array<{ status: string; journalEntryId: string | null }>;
+        if (!originalEvent[0] || originalEvent[0].status !== 'POSTED' || !originalEvent[0].journalEntryId) {
+          return { kind: 'rejected', reason: 'movement reversal: the original posting is not POSTED - nothing to mirror' };
+        }
+        const originalLines = (await m.query(`SELECT "accountId", "debitTransaction" AS dt, "creditTransaction" AS ct FROM accounting_journal_lines WHERE "journalEntryId" = $1 ORDER BY "lineNumber"`, [originalEvent[0].journalEntryId])) as Array<{ accountId: string; dt: string; ct: string }>;
+        if (originalLines.length === 0) return { kind: 'rejected', reason: 'movement reversal: the original journal has no lines' };
+        const reverse = this.valuation.reverseReceiptCost;
+        if (!reverse) return { kind: 'rejected', reason: 'movement reversal: the valuation engine cannot reverse a recorded cost' };
+        const reversed = (await reverse.call(this.valuation, `inventory:movement:${originalMovementId}:recorded`, idempotencyKey, ctx.manager, event.businessDate)) ?? (await reverse.call(this.valuation, `inventory-valuation:receipt:${originalMovementId}`, idempotencyKey, ctx.manager, event.businessDate));
+        if (!reversed) return { kind: 'rejected', reason: 'movement reversal: the original valuation row was not found - nothing to reverse' };
+        return draft(
+          originalLines.map((l) => (Number(l.dt) > 0 ? { accountId: l.accountId, credit: l.dt, description: 'Reversal (mirror of the original posting)' } : { accountId: l.accountId, debit: l.ct, description: 'Reversal (mirror of the original posting)' })),
+          `Reversal of movement ${originalMovementId} (${str(p.referenceId) ?? event.sourceEntityId})`,
+        );
+      }
+
+      // ---- opening_reversal (C4, ADR-INV-01 2.3): the exceptional correction of an UNTOUCHED opening line. The valuation engine appends the offsetting row at the ORIGINAL recorded
+      //      cost (never recalculated) and the journal reverses the original value: Dr configured opening-balance account / Cr Inventory. Accounts resolved BEFORE the mutation. ----
+      if (glKind === 'opening_reversal') {
+        const originalMovementId = str(p.originalMovementId);
+        if (!originalMovementId) return { kind: 'rejected', reason: 'opening reversal: missing originalMovementId' };
+        const opening = await ctx.resolveConfiguredPostableAccount(OPENING_BALANCE_ACCOUNT_CONFIG_KEY);
+        if (!opening.ok) return configReason('opening-balance', OPENING_BALANCE_ACCOUNT_CONFIG_KEY, opening);
+        const reversed = this.valuation.reverseReceiptCost ? await this.valuation.reverseReceiptCost(`inventory-valuation:receipt:${originalMovementId}`, idempotencyKey, ctx.manager, event.businessDate) : null;
+        if (!reversed || !(Number(reversed.valueBase) > 0)) return { kind: 'rejected', reason: 'opening reversal: the original valuation row was not found - nothing to reverse' };
+        return draft(
+          [
+            { accountId: opening.id, debit: reversed.valueBase, description: 'Opening balance (reversal)' },
+            { accountId: inventoryAccount, credit: reversed.valueBase, description: 'Inventory asset (opening reversed)' },
+          ],
+          `Opening reversal ${str(p.referenceId) ?? event.sourceEntityId}`,
+        );
+      }
+
+      // ---- opening_correction (C4, O-1): an approved, traceable correction of an opening AFTER stock has moved. The counter account is the configured EQUITY-side correction
+      //      account - never profit and loss. Increase: valuation at the supplied unit cost, Dr Inventory / Cr correction; decrease: consumed at the moving average, Dr correction / Cr Inventory. ----
+      if (glKind === 'opening_correction') {
+        const correction = await ctx.resolveConfiguredPostableAccount(OPENING_CORRECTION_ACCOUNT_CONFIG_KEY);
+        if (!correction.ok) return configReason('opening-correction', OPENING_CORRECTION_ACCOUNT_CONFIG_KEY, correction);
+        const label = `Opening correction ${str(p.referenceId) ?? event.sourceEntityId}`;
+        if (quantity > 0) {
+          const unit = str(p.unitCostBase);
+          if (!unit || !(Number(unit) > 0)) return { kind: 'rejected', reason: 'opening correction (increase): missing/invalid unitCostBase' };
+          const total = (quantity * Number(unit)).toFixed(4);
+          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit, idempotencyKey, ctx.manager, event.businessDate);
+          return draft(
+            [
+              { accountId: inventoryAccount, debit: total, description: 'Inventory asset (opening correction, increase)' },
+              { accountId: correction.id, credit: total, description: 'Opening correction' },
+            ],
+            label,
+          );
+        }
+        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
+        if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
+        if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected };
+        return draft(
+          [
+            { accountId: correction.id, debit: consumed.totalCostBase, description: 'Opening correction' },
+            { accountId: inventoryAccount, credit: consumed.totalCostBase, description: 'Inventory asset (opening correction, decrease)' },
+          ],
+          label,
+        );
+      }
+
       // ---- return_in (D4): valuation was restored at movement time at the ORIGINAL cost carried in the payload — GL only.
       //      Dr Inventory / Cr COGS (configured). ----
       if (glKind === 'return_in') {
@@ -149,13 +223,13 @@ export class InventoryCostingHandlerService implements OnModuleInit {
           const unit = await this.valuation.getUnitCost(productId, warehouseId, undefined, ctx.manager);
           if (!unit) return { kind: 'rejected', reason: 'no_valuation_source' };
           const total = (quantity * Number(unit.unitCostBase)).toFixed(4);
-          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit.unitCostBase, idempotencyKey, ctx.manager);
+          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit.unitCostBase, idempotencyKey, ctx.manager, event.businessDate);
           return draft([
             { accountId: inventoryAccount, debit: total, description: 'Inventory asset' },
             { accountId: counter.id, credit: total, description: 'Inventory adjustment gain' },
           ]);
         }
-        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager);
+        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
         if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
         if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected };
         return draft([
@@ -171,7 +245,7 @@ export class InventoryCostingHandlerService implements OnModuleInit {
       // ADR-041 D3/D8 — this is the ONLY place a dispatch cost is resolved: never event.payload, never a selling
       // price, never an inference. `consumeIssueCost` mutates atomically with GL posting (ctx.manager) and fails
       // closed (`null`) when no valuation state exists yet.
-      const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager);
+      const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
       if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
       if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected }; // 'negative_on_hand'
 

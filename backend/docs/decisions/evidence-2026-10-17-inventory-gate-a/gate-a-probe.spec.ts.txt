@@ -1,0 +1,158 @@
+import { abortBiz, approvedDoc, attempt, finishBiz, record, result } from './biz-support';
+import { InvGlEnv, eventsOfKind, journalCount, journalLines, setUpInventoryGl, valuationOf } from './biz-inventory-gl-support';
+import { InventoryReconciliationService } from '../../domains/accounting/application/inventory-reconciliation.service';
+import { LedgerService } from '../../domains/accounting/application/ledger.service';
+import { InventoryValuationService } from '../../domains/inventory-valuation/application/inventory-valuation.service';
+import { MovingAverageCostEngine } from '../../domains/inventory-valuation/application/moving-average-cost-engine.service';
+import { InventoryService } from '../../domains/inventory-warehouse/application/inventory.service';
+import { WarehouseTransactionsService } from '../../domains/inventory-warehouse/application/warehouse-transactions.service';
+import { InventoryPostingPolicyRegistry } from '../inventory-posting-policy/inventory-posting-policy.registry';
+import { NumberingService } from '../numbering/numbering.service';
+import { AuthorizationService } from '../authorization/authorization.service';
+import { Role } from '../authorization/role.entity';
+import { UserRole } from '../authorization/user-role.entity';
+import { WAREHOUSE_TRANSACTION_PROCESS } from '../../domains/inventory-warehouse/domain/warehouse-transaction-process';
+
+/**
+ * GATE A PROBE (read-only investigation, 2026-10-17; NOT a product test, never part of the regression list). It drives the REAL services on a
+ * disposable two-Company database to observe the CURRENT behaviour of the inventory lifecycle (opening balances, manual receipts, adjustments,
+ * transfers, event delivery, valuation vs GL vs overview, reconciliation). Every observation is recorded as evidence; nothing is asserted as a
+ * defect here - the report interprets them. No product code is changed.
+ */
+describe('GATE A probe - inventory lifecycle observations', () => {
+  jest.setTimeout(900_000);
+  let env: InvGlEnv | undefined;
+  let failure: unknown;
+  afterAll(async () => {
+    if (env) await abortBiz(env, failure);
+  });
+
+  it('observes the current inventory -> event -> journal -> ledger -> valuation behaviour', async () => {
+    try {
+      env = await setUpInventoryGl('T-97', 'biz_t97', 5, '4.00'); // opening 5 @ 4.00 through the opening-stock import (excel_import)
+      const e = env;
+      const W = e.warehouseId;
+      const P = e.productId;
+      const cfg = e.cfg as unknown as Record<string, unknown>;
+      cfg['accounting.inventory_manual_receipt_reason_accounts'] = { FOUND_STOCK: '3105', opening_balance: '3105' };
+      const obs: Record<string, unknown> = {};
+      const gl1120 = async () => (await e.dsA.query(`SELECT coalesce(sum(jl."debitBase" - jl."creditBase"),0)::text AS bal FROM accounting_journal_lines jl JOIN accounting_gl_accounts a ON a.id = jl."accountId" WHERE a.code = '1120'`))[0].bal;
+      const today = new Date().toISOString().slice(0, 10);
+
+      // ---- O1: the opening stock imported in setUp: event, journal date, valuation ----
+      const open = await eventsOfKind(e, 'opening_stock');
+      obs.O1_opening_stock = { events: open.map((x) => ({ status: x.status, lines: undefined })), journalLines: open[0]?.journalEntryId ? await journalLines(e, open[0].journalEntryId) : null,
+        journalBusinessDate: open[0]?.journalEntryId ? (await e.dsA.query(`SELECT "businessDate"::text d, "sourceType" s FROM accounting_journal_entries WHERE id = $1`, [open[0].journalEntryId]))[0] : null, valuation: await valuationOf(e), gl1120: await gl1120() };
+
+      // ---- O2: a SECOND opening import for the same (warehouse, product) is refused; a NEW product may still be imported after operations ----
+      const second = await attempt(() => e.inventory.importOpeningStockRows([{ warehouseCode: 'WH-A1', productSku: e.sku, quantity: '3', unitCost: '4.00' }], e.actor, e.manager).then((r) => { if (r.rejected.length) throw new Error(r.rejected[0].errors.join('|')); }));
+      const p2 = (await e.products.createProduct(`${e.sku}-LATE`.replace(/[^A-Za-z0-9-]/g, ''), 'Late opening product', '25.00', e.actor, null, e.manager)).id;
+      const lateSku = `${e.sku}-LATE`.replace(/[^A-Za-z0-9-]/g, '');
+      const late = await attempt(() => e.inventory.importOpeningStockRows([{ warehouseCode: 'WH-A1', productSku: lateSku, quantity: '2', unitCost: '7.00' }], e.actor, e.manager).then((r) => { if (r.rejected.length) throw new Error(r.rejected[0].errors.join('|')); }));
+      await e.flush();
+      obs.O2_opening_rules = { secondImportSamePair: second, lateImportNewProductAfterOperations: late, noBatchCutoffOrApprovalConcept: 'see report (code evidence)' };
+
+      // the shared harness builds InventoryService WITHOUT the manual-receipt policy; build the production-shaped pair here (policy bound, same stubs as the harness)
+      const policyRegistry = new InventoryPostingPolicyRegistry();
+      policyRegistry.bind({ assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }), listManualReceiptReasons: () => ['FOUND_STOCK', 'opening_balance'], assertSaleReturnPostable: async () => undefined, assertSupplierInvoicePostable: async () => undefined });
+      const numberingP = new NumberingService(e.h.controlPlane);
+      const valuationP = new InventoryValuationService(new MovingAverageCostEngine(e.h.controlPlane));
+      const inv2 = new InventoryService(e.h.controlPlane, e.audit, e.products as never, {} as never, numberingP, e.events, valuationP as never, policyRegistry);
+      const wh2 = new WarehouseTransactionsService(e.h.controlPlane, numberingP, e.processEngine, new AuthorizationService(e.dsA.getRepository(Role), e.dsA.getRepository(UserRole)), e.audit, e.products, inv2, policyRegistry);
+
+      // ---- O3: a manual receipt DOCUMENT with a past movementDate: approval needed? journal date? event delivery before/after flush ----
+      const past = new Date(Date.now() - 30 * 86_400_000);
+      const doc = await wh2.createTransaction('receipt', W, null, [{ productId: P, quantity: 4, unitCostBase: '6.00' }], 'REF-FREE-TEXT', 'opening balance (free text)', null, e.actor, past, e.manager, 'opening_balance');
+      const submitOutcome = await attempt(() => wh2.transition(doc.id, 'submit', e.actor, e.manager));
+      const stateAfterSubmit = await e.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, 'warehouse_transaction', doc.id, e.manager);
+      const journalsBeforeFlush = await journalCount(e);
+      const eventsBeforeFlush = await e.dsA.query(`SELECT status, count(*)::int n FROM event_outbox GROUP BY 1`);
+      await e.flush();
+      const mr = await eventsOfKind(e, 'manual_receipt');
+      obs.O3_manual_receipt_document = {
+        movementDateOnDocument: past.toISOString().slice(0, 10), submitOutcome, stateAfterSubmit, approvalStepRequired: stateAfterSubmit !== 'submitted',
+        journalsBeforeFlush, outboxBeforeFlush: eventsBeforeFlush, event: mr.map((x) => ({ status: x.status, reason: x.rejectionReason })),
+        journalLines: mr[0]?.journalEntryId ? await journalLines(e, mr[0].journalEntryId) : null,
+        journalBusinessDate: mr[0]?.journalEntryId ? (await e.dsA.query(`SELECT "businessDate"::text d, "sourceType" s FROM accounting_journal_entries WHERE id = $1`, [mr[0].journalEntryId]))[0] : null,
+        referenceFieldValidated: false, today,
+      };
+
+      // ---- O4: overview value (selling price) vs valuation vs GL ----
+      const ov = await e.whTx.getOverview(e.manager);
+      const val = await valuationOf(e);
+      obs.O4_overview_vs_valuation_vs_gl = { overviewTotalAtSellingPrice: ov.totalInventoryValueAtSellingPrice, valuationTotal: val, gl1120: await gl1120(), unitPriceOfProduct: '10.00 (late product 25.00)' };
+
+      // ---- O5: a stock adjustment document: +/- lines, approval, GL, delivery ----
+      const adj = await approvedDoc(e, 'adjustment', W, [{ productId: P, quantity: 2 }]);
+      const adjPost = await attempt(() => e.whTx.transition(adj, 'post', e.actor, e.manager));
+      const journalsBeforeAdjFlush = await journalCount(e);
+      await e.flush();
+      const adjEv = await eventsOfKind(e, 'adjustment');
+      obs.O5_adjustment_increase = { postOutcome: adjPost, journalsBeforeFlush: journalsBeforeAdjFlush, events: adjEv.map((x) => ({ status: x.status, reason: x.rejectionReason })), journalLines: adjEv[0]?.journalEntryId ? await journalLines(e, adjEv[0].journalEntryId) : null };
+
+      // ---- O6: quantity without value: an adjustment increase for a product that has NO valuation state ----
+      const p3 = (await e.products.createProduct(`${e.sku}-NOVAL`.replace(/[^A-Za-z0-9-]/g, ''), 'No valuation product', '9.00', e.actor, null, e.manager)).id;
+      const adj3 = await approvedDoc(e, 'adjustment', W, [{ productId: p3, quantity: 3 }]);
+      await attempt(() => e.whTx.transition(adj3, 'post', e.actor, e.manager));
+      await e.flush();
+      const onHand3 = await e.inventory.getOnHand(W, p3, e.manager);
+      const ev3 = (await e.dsA.query(`SELECT status, "rejectionReason" FROM accounting_financial_events WHERE payload->>'productId' = $1`, [p3]));
+      const val3 = await e.dsA.query(`SELECT coalesce(sum("totalValueBase"),0)::text v FROM inventory_valuation_state WHERE "productId" = $1`, [p3]);
+      obs.O6_quantity_without_value = { onHandQuantity: onHand3, financialEvents: ev3, valuationValueOfThatProduct: val3[0].v };
+
+      // ---- O7: transfer where the source has stock but no valuation (a receipt recorded without cost, as legacy/raw paths can) ----
+      const p4 = (await e.products.createProduct(`${e.sku}-RAW`.replace(/[^A-Za-z0-9-]/g, ''), 'Raw receipt product', '12.00', e.actor, null, e.manager)).id;
+      await e.inventory.recordMovement(W, p4, 6, 'receipt', 'legacy', null, e.actor, e.manager);
+      const w2 = await e.inventory.createWarehouse('WH-A2', 'Second', 'x', null, null, 'main', e.manager);
+      const tr = await approvedDoc(e, 'transfer', W, [{ productId: p4, quantity: 4 }], w2.id);
+      const trPost = await attempt(() => e.whTx.transition(tr, 'post', e.actor, e.manager));
+      await e.flush();
+      obs.O7_transfer_without_source_valuation = { postOutcome: trPost, onHandSource: await e.inventory.getOnHand(W, p4, e.manager), onHandDestination: await e.inventory.getOnHand(w2.id, p4, e.manager),
+        valuationRows: await e.dsA.query(`SELECT "warehouseId", "onHandQuantity"::text q, "totalValueBase"::text v FROM inventory_valuation_state WHERE "productId" = $1`, [p4]),
+        movementsOfDoc: await e.dsA.query(`SELECT "movementType", quantity, "referenceType", "referenceId" IS NOT NULL AS has_ref FROM stock_movements WHERE "productId" = $1 ORDER BY "createdAt"`, [p4]) };
+
+      // ---- O8: the reconciliation: as-of today vs as-of a past date (valuation side ignores asOfDate) ----
+      const recon = new InventoryReconciliationService(e.h.controlPlane, new LedgerService(e.h.controlPlane), e.audit, new InventoryValuationService(new MovingAverageCostEngine(e.h.controlPlane)));
+      const rToday = await recon.reconcile({ asOfDate: today }, e.actor, e.manager);
+      await recon.closeRun(rToday.id, e.actor, e.manager);
+      const rPast = await recon.reconcile({ asOfDate: '2000-01-01' }, e.actor, e.manager);
+      obs.O8_reconciliation = {
+        asOfToday: { status: rToday.status, subledger: rToday.subledgerTotalBase, gl: rToday.glBalanceBase, drift: rToday.driftBase },
+        asOfYear2000: { status: rPast.status, subledger: rPast.subledgerTotalBase, gl: rPast.glBalanceBase, drift: rPast.driftBase },
+        driftBreakdownKeys: Object.keys((rToday.driftBreakdown ?? rPast.driftBreakdown ?? {}) as object),
+      };
+
+      obs.O8b_rounding_evidence = {
+        valuationRows: await e.dsA.query(`SELECT "productId", "warehouseId", "onHandQuantity"::text q, "averageCostBase"::text avg, "totalValueBase"::text v FROM inventory_valuation_state ORDER BY v`),
+        inventoryJournalLines: await e.dsA.query(`SELECT jl."debitBase"::text dr, jl."creditBase"::text cr, jl."debitTransaction"::text dtx, jl."creditTransaction"::text ctx FROM accounting_journal_lines jl JOIN accounting_gl_accounts a ON a.id = jl."accountId" WHERE a.code = '1120' ORDER BY jl."createdAt"`),
+        baseCurrency: await e.dsA.query(`SELECT code, "decimalPlaces" FROM accounting_currencies LIMIT 3`).catch(() => 'n/a'),
+      };
+
+      // ---- O9: the raw movements endpoint contract: manual receipt without any reference document ----
+      const raw = await attempt(() => inv2.recordManualReceipt(W, P, 1, '5.00', 'opening_balance', null, e.actor, e.manager));
+      await e.flush();
+      obs.O9_manual_receipt_without_reference = { outcome: raw, referenceIdStored: (await e.dsA.query(`SELECT "referenceId" FROM stock_movements WHERE "referenceType" = 'manual_receipt' ORDER BY "createdAt" DESC LIMIT 1`))[0] };
+
+      // ---- O10: financial-event surface for the documents (is there a per-document financial status?) ----
+      obs.O10_events_summary = await e.dsA.query(`SELECT status, count(*)::int n FROM accounting_financial_events GROUP BY 1`);
+      obs.O10_documents_columns = (await e.dsA.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'warehouse_transactions' ORDER BY ordinal_position`)).map((r: { column_name: string }) => r.column_name);
+
+      // ---- Q: the read-only diagnostic SQL pack, executed against this populated test database (proves the pack finds what the probe created) ----
+      const sqlText = require('fs').readFileSync(process.env.GATEA_SQL as string, 'utf8') as string;
+      const NL = String.fromCharCode(10);
+      const queries = sqlText.split(';' + NL).map((s: string) => s.trim()).filter(Boolean);
+      obs.Q_diagnostic_pack = [];
+      for (const q of queries) {
+        const sql = q.split(NL).filter((l: string) => !l.startsWith('--')).join(NL).replace(';', '');
+        (obs.Q_diagnostic_pack as unknown[]).push({ title: q.split(NL)[0].slice(0, 70), rows: await e.dsA.query(sql) });
+      }
+
+      record(e, 'gate-a-observations.json', obs);
+      result(e, 'GA-PROBE', 'PASS', 'observations recorded (no assertions: investigation only)');
+      await finishBiz(e);
+    } catch (err) {
+      failure = err;
+      throw err;
+    }
+  });
+});

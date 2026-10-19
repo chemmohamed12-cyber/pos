@@ -23,6 +23,7 @@ export interface PolicyKeyDef {
  */
 export const ACCOUNTING_POLICY_KEYS: readonly PolicyKeyDef[] = [
   { key: 'accounting.inventory_opening_balance_account_code', group: 'inventory', kind: 'account', expectedTypes: ['equity'] },
+  { key: 'accounting.inventory_opening_correction_account_code', group: 'inventory', kind: 'account', expectedTypes: ['equity'] }, // C4 (O-1)
   { key: 'accounting.inventory_adjustment_gain_account_code', group: 'inventory', kind: 'account', expectedTypes: ['revenue'] },
   { key: 'accounting.inventory_adjustment_loss_account_code', group: 'inventory', kind: 'account', expectedTypes: ['expense'] },
   { key: 'accounting.inventory_cogs_account_code', group: 'inventory', kind: 'account', expectedTypes: ['expense'] },

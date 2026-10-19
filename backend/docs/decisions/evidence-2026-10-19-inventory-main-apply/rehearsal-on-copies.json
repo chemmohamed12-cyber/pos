@@ -1,0 +1,41 @@
+[
+ {
+  "target": "Alpha Trading Co",
+  "copy": "company_f3ea8a2e75814dd4b3f708e606a434f9_rehearsal_20261019",
+  "pendingBefore": [
+   "CreateInventoryOpeningBatches1790018000000",
+   "SeedOpeningBatchTerminology1790018100000",
+   "AllowRevaluationValuationKind1790018200000",
+   "AddWarehouseTransactionReference1790018300000",
+   "SeedMovementReasonTerminology1790018400000"
+  ],
+  "ran": [
+   "CreateInventoryOpeningBatches1790018000000",
+   "SeedOpeningBatchTerminology1790018100000",
+   "AllowRevaluationValuationKind1790018200000",
+   "AddWarehouseTransactionReference1790018300000",
+   "SeedMovementReasonTerminology1790018400000"
+  ],
+  "pendingAfter": [],
+  "revertedCount": 5,
+  "pendingAfterDown": [
+   "CreateInventoryOpeningBatches1790018000000",
+   "SeedOpeningBatchTerminology1790018100000",
+   "AllowRevaluationValuationKind1790018200000",
+   "AddWarehouseTransactionReference1790018300000",
+   "SeedMovementReasonTerminology1790018400000"
+  ],
+  "reran": [
+   "CreateInventoryOpeningBatches1790018000000",
+   "SeedOpeningBatchTerminology1790018100000",
+   "AllowRevaluationValuationKind1790018200000",
+   "AddWarehouseTransactionReference1790018300000",
+   "SeedMovementReasonTerminology1790018400000"
+  ],
+  "pendingFinal": [],
+  "ok": true
+ },
+ {
+  "error": "source database \"company_0894c2a717f34fceaf6a299530ccf61f\" is being accessed by other users"
+ }
+]

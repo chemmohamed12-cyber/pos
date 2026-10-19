@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, NotFoundException, Optional, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { Type } from 'class-transformer';
@@ -7,6 +7,7 @@ import { JournalEntryService } from '../application/journal-entry.service';
 import { LedgerService } from '../application/ledger.service';
 import { FinancialReportingService, SectionAccountRow } from '../application/financial-reporting.service';
 import { FinancialEventService } from '../application/financial-events/financial-event.service';
+import { PostingStatusService } from '../application/posting-status.service';
 import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
 import { JOURNAL_SOURCE_TYPES } from '../domain/journal';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -169,6 +170,8 @@ export class GeneralLedgerController {
     private readonly reporting: FinancialReportingService,
     private readonly financialEvents: FinancialEventService,
     private readonly excel: ExcelService,
+    // C1: optional so older direct constructions (specs) keep compiling; Nest always provides it.
+    @Optional() private readonly postingStatus?: PostingStatusService,
   ) {}
 
   // ---- Journals ----
@@ -266,9 +269,17 @@ export class GeneralLedgerController {
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.ledger.view', 'read-only')
   @Get('trial-balance')
-  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string, @Query('mode') mode?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
+    // C1 (ADR-INV-11): `mode=periodic` is an additive read model (opening / period debit / period credit / closing); without it the payload is exactly what it has always been.
+    if (mode === 'periodic') {
+      for (const [name, value] of [['from', from], ['to', to]] as Array<[string, string | undefined]>) {
+        if (value !== undefined && !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) throw new BadRequestException(`Query parameter "${name}" must be a date in YYYY-MM-DD format.`);
+      }
+      return this.ledger.getPeriodicTrialBalance({ from, to, orgUnitId }, manager);
+    }
+    if (mode !== undefined) throw new BadRequestException('mode must be "periodic" or omitted.');
     // CR-2026-10-15 — same payload plus `balanceTotal*` (the sums of the displayed net rows) for the screen's footer.
     return this.ledger.getTrialBalanceReport({ from, to, orgUnitId }, manager);
   }
@@ -427,6 +438,30 @@ export class GeneralLedgerController {
 
   private reportRow(section: string, r: SectionAccountRow): { section: string; code: string; name: string; balance: string } {
     return { section, code: r.code, name: r.nameAr ?? r.name, balance: r.balance };
+  }
+
+  // ---- Posting visibility (slice C1, ADR-INV-10): READ-ONLY. Nothing here writes, retries or re-drives. ----
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('accounting.financial_event.view', 'read-only')
+  @Get('posting-status')
+  async getPostingStatus(@Req() req: CompanyScopedRequest, @Query('domain') domain?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    if (domain !== undefined && domain !== 'inventory') throw new BadRequestException('domain must be "inventory".');
+    if (!this.postingStatus) throw new NotFoundException();
+    return this.postingStatus.getInventoryStatus(req.companyContext.dataSource.manager);
+  }
+
+  /** The financial effect of one operational document: declared BEFORE `financial-events/:id` so "by-reference" is never parsed as an id. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('accounting.financial_event.view', 'read-only')
+  @Get('financial-events/by-reference')
+  async getFinancialStatusByReference(@Req() req: CompanyScopedRequest, @Query('referenceType') referenceType?: string, @Query('referenceId') referenceId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    if (!referenceType || !/^[a-z_]{1,64}$/.test(referenceType)) throw new BadRequestException('referenceType is required (lower-case letters and underscores).');
+    if (!referenceId || !/^[0-9a-f-]{36}$/i.test(referenceId)) throw new BadRequestException('referenceId must be a UUID.');
+    if (!this.postingStatus) throw new NotFoundException();
+    return this.postingStatus.getFinancialStatusByReference(referenceType, referenceId, req.companyContext.dataSource.manager);
   }
 
   // ---- Financial Events ----

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { InventoryReconciliationService } from '../application/inventory-reconciliation.service';
 import { InventoryAdjustmentService } from '../application/inventory-adjustment.service';
@@ -98,6 +98,15 @@ export class InventoryAccountingController {
   @Get('reconciliations/:id')
   async getReconciliation(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
     return this.reconciliation.getRun(id, req.companyContext!.dataSource.manager);
+  }
+
+  /** C1 (ADR-INV-09) - a pure read of the same computation `POST reconciliations` records: persists NOTHING (no run row, no audit record, no event). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('accounting.inventory.view', 'read-only')
+  @Get('reconciliation-preview')
+  async previewReconciliation(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate?: string, @Query('orgUnitId') orgUnitId?: string) {
+    if (asOfDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) throw new BadRequestException('asOfDate must be a date (YYYY-MM-DD).');
+    return this.reconciliation.preview({ asOfDate, orgUnitId }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

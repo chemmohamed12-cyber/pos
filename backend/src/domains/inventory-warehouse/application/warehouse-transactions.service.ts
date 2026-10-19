@@ -5,12 +5,15 @@ import { WarehouseTransactionLine } from '../infrastructure/warehouse-transactio
 import { WarehouseTransactionType, NUMBERING_SERIES_BY_TYPE, NO_APPROVAL_REQUIRED } from '../domain/warehouse-transaction-type';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../domain/warehouse-transaction-process';
 import { WAREHOUSE_TRANSACTION_ACTION_ROLES, WAREHOUSE_TRANSACTION_ACTION_RULES } from '../domain/warehouse-transaction-action-roles';
+import { MovementReasonEntry, parseMovementReasonCatalog, ReferenceRecord, REFERENCE_TABLES, validateReasonAndReference } from '../domain/movement-reason-catalog';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { InventoryService } from './inventory.service';
+import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 export interface TransactionLineInput {
@@ -43,7 +46,59 @@ export class WarehouseTransactionsService {
     private readonly inventory: InventoryService,
     // D3-B — the manual-receipt gate bound by accounting; unbound ⇒ receipts are rejected (fail-closed).
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
+    // Slice C1 (ADR-INV-07) - the cost-based inventory value of the overview. `@Optional()` and last: every existing construction site is unaffected, and an
+    // installation without the valuation module simply reports no cost value.
+    @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
+    // C3 (ADR-INV-03) - the two staged flags. `@Optional()` and last: a construction without it (older specs) behaves exactly as before C3 (`off`).
+    @Optional() private readonly config?: ConfigurationEngineService,
   ) {}
+
+  /** C3 - a flag value; an engine that is absent or has no value for the key means "pre-C3 behaviour" (`off`). */
+  private flag(key: string): string {
+    const v = this.config?.get<unknown>(key);
+    return typeof v === 'string' ? v : 'off';
+  }
+
+  /** C3 - a receipt that creates a financial effect (every manual receipt carries a reason code) waits for approval when the flag is `on`; reversal documents never do. */
+  private receiptNeedsApproval(txn: WarehouseTransaction): boolean {
+    return txn.type === 'receipt' && !!txn.reasonCode && !txn.reversalOfTransactionId && this.flag('inventory.receipt_approval_required') === 'on';
+  }
+
+  /** C3 - does posting this document change money? receipt (reasoned) and issue always; adjustment/count only with a non-zero line; transfer never (Model A). */
+  private async hasFinancialEffect(txn: WarehouseTransaction, manager?: EntityManager): Promise<boolean> {
+    if (txn.type === 'receipt') return !!txn.reasonCode;
+    if (txn.type === 'issue') return true;
+    if (txn.type === 'adjustment' || txn.type === 'count') return (await this.getLines(txn.id, manager)).some((l) => l.quantity !== 0);
+    return false;
+  }
+
+  /**
+   * C3 (ADR-INV-03 section 2.2) - segregation of duties, enforced HERE at the service boundary (not in the UI) BEFORE any mutation: the user who created a document
+   * with a financial effect may not `approve` or `post` it. `off` -> nothing; `warn` -> allowed, an audit record `warehouse_transaction.sod_violation` is written
+   * (so real data can be measured before enforcing); `on` -> 403. Reversal documents are exempt (they undo a posted document and need their own role).
+   */
+  private async enforceSeparationOfDuties(txn: WarehouseTransaction, action: string, actorUserId: string, manager?: EntityManager): Promise<void> {
+    const mode = this.flag('inventory.document_sod_enforced');
+    if (mode === 'off' || txn.reversalOfTransactionId || !txn.createdByUserId || txn.createdByUserId !== actorUserId) return;
+    if (!(await this.hasFinancialEffect(txn, manager))) return;
+    if (mode === 'warn') {
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'warehouse_transaction.sod_violation',
+          resource: 'warehouse_transaction',
+          resourceId: txn.id,
+          result: 'success',
+          correlationId: null,
+          after: { mode: 'warn', attemptedAction: action, transactionNumber: txn.transactionNumber, type: txn.type },
+        },
+        manager,
+      );
+      return;
+    }
+    throw new ForbiddenException(`Separation of duties: ${txn.transactionNumber} was created by you, so another authorised user must ${action} it.`);
+  }
 
   async createTransaction(
     type: WarehouseTransactionType,
@@ -56,8 +111,11 @@ export class WarehouseTransactionsService {
     actorUserId: string,
     movementDate?: Date,
     manager?: EntityManager,
-    // D3-B — controlled reason code; mandatory for `receipt`, ignored for every other type.
+    // D3-B — controlled reason code; mandatory for `receipt`. ADR-INV-04: every type may carry a catalog reason, validated per `inventory.reference_enforcement`.
     reasonCode?: string | null,
+    // ADR-INV-04 - the record that justifies the document (type + id); validated against the reason's reference kind.
+    referenceType?: string | null,
+    referenceId?: string | null,
   ): Promise<WarehouseTransaction> {
     if (lines.length === 0) {
       throw new BadRequestException('A warehouse transaction must have at least one line.');
@@ -70,6 +128,12 @@ export class WarehouseTransactionsService {
     }
     if (type === 'count') {
       throw new BadRequestException('Count transactions are created via startCount(), not createTransaction().');
+    }
+    // C2 (ADR-INV-02) - the document's own date is its business date: it must be a real date and not ahead of today (the open-period gate runs at posting).
+    if (movementDate) {
+      if (Number.isNaN(movementDate.getTime())) throw new BadRequestException('The movement date is not a valid date.');
+      const today = new Date().toISOString().slice(0, 10);
+      if (movementDate.toISOString().slice(0, 10) > today) throw new BadRequestException(`The movement date is in the future (today is ${today}); a document cannot be dated ahead.`);
     }
 
     // Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — an
@@ -84,6 +148,12 @@ export class WarehouseTransactionsService {
       if (line.quantity <= 0) throw new BadRequestException('Every line quantity must be a positive whole number.');
       const snapshot = await this.products.getProductSnapshot(line.productId, manager);
       if (!snapshot) throw new BadRequestException(`Product "${line.productId}" was not found.`);
+    }
+
+    // ADR-INV-04: reason + reference matrix. `enforce` refuses HERE, before any number is issued or row written; `warn` lets the document through and audits the problems after it is saved.
+    const reasonCheck = await this.checkReasonAndReference(type, reasonCode ?? null, referenceType ?? null, referenceId ?? null, notes ?? reason, manager ?? this.dataSource.manager);
+    if (reasonCheck.mode === 'enforce' && reasonCheck.problems.length > 0) {
+      throw new BadRequestException(`The reason / reference of this ${type} document is not acceptable: ${reasonCheck.problems.join('; ')}.`);
     }
 
     // D3-B (CTO-approved Manual Receipt policy) — a receipt needs an explicit unit cost on EVERY line and a controlled
@@ -116,7 +186,9 @@ export class WarehouseTransactionsService {
           destinationWarehouseId,
           reference,
           reason,
-          reasonCode: type === 'receipt' ? receiptReasonCode : null,
+          reasonCode: type === 'receipt' ? receiptReasonCode : (reasonCode ?? '').trim() || null,
+          referenceType: referenceType ?? null,
+          referenceId: referenceId ?? null,
           notes,
           createdByUserId: actorUserId,
           movementDate: movementDate ?? new Date(),
@@ -145,12 +217,57 @@ export class WarehouseTransactionsService {
         resourceId: transaction.id,
         result: 'success',
         correlationId: null,
-        after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length },
+        after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length, reasonCode: transaction.reasonCode, referenceType: transaction.referenceType, referenceId: transaction.referenceId },
       },
       manager,
     );
+    if (reasonCheck.mode === 'warn' && reasonCheck.problems.length > 0) await this.auditReasonWarning(transaction.id, actorUserId, 'create', reasonCheck.problems, manager);
 
     return transaction;
+  }
+
+  /** ADR-INV-04 - the enforcement mode (`off` | `warn` | `enforce`; absent engine = off) and the problems of a reason / reference, read on the Company's own connection. */
+  private async checkReasonAndReference(
+    type: string,
+    reasonCode: string | null,
+    referenceType: string | null,
+    referenceId: string | null,
+    note: string | null,
+    m: EntityManager,
+  ): Promise<{ mode: string; problems: string[] }> {
+    const mode = this.flag('inventory.reference_enforcement');
+    if (mode === 'off' || type === 'count') return { mode: 'off', problems: [] };
+    const catalog: MovementReasonEntry[] = parseMovementReasonCatalog(this.config?.get<unknown>('inventory.movement_reason_catalog'));
+    const problems = await validateReasonAndReference({ type, reasonCode, referenceType, referenceId, note }, catalog, (t, id) => this.lookupReference(t, id, m));
+    return { mode, problems };
+  }
+
+  private async auditReasonWarning(documentId: string, actorUserId: string, stage: string, problems: string[], manager?: EntityManager): Promise<void> {
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'warehouse_transaction.reference_warning', resource: 'warehouse_transaction', resourceId: documentId, result: 'success', correlationId: null, after: { stage, mode: 'warn', problems } },
+      manager,
+    );
+  }
+
+  private async lookupReference(referenceType: string, referenceId: string, m: EntityManager): Promise<ReferenceRecord> {
+    const table = REFERENCE_TABLES[referenceType]; // fixed allow-list: never a user-supplied identifier
+    if (!table) return { exists: false };
+    if (referenceType === 'warehouse_transaction') {
+      const [row] = (await m.query(
+        `SELECT t.type AS "docType", (SELECT pi."currentState" FROM process_instances pi WHERE pi."definitionKey" = 'warehouse_transaction' AND pi."entityId" = t.id::text LIMIT 1) AS state FROM warehouse_transactions t WHERE t.id = $1`,
+        [referenceId],
+      )) as Array<{ docType: string; state: string | null }>;
+      return row ? { exists: true, docType: row.docType, state: row.state ?? undefined } : { exists: false };
+    }
+    if (referenceType === 'opening_batch') {
+      const [row] = (await m.query(
+        `SELECT (SELECT pi."currentState" FROM process_instances pi WHERE pi."definitionKey" = 'inventory_opening_batch' AND pi."entityId" = b.id::text LIMIT 1) AS state FROM inventory_opening_batches b WHERE b.id = $1`,
+        [referenceId],
+      )) as Array<{ state: string | null }>;
+      return row ? { exists: true, state: row.state ?? undefined } : { exists: false };
+    }
+    const rows = (await m.query(`SELECT 1 FROM "${table}" WHERE id = $1`, [referenceId])) as unknown[];
+    return { exists: rows.length > 0 };
   }
 
   /**
@@ -247,9 +364,13 @@ export class WarehouseTransactionsService {
    * per-product/warehouse minimum-stock threshold exists to compare
    * against yet.
    */
-  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<{
+  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[], includeCost = false): Promise<{
     totalWarehouses: number;
     totalInventoryValueAtSellingPrice: string;
+    /** C1 (ADR-INV-07) - the valuation (cost) of the visible warehouses; `null` when the caller may not see valuation or no valuation module is bound. */
+    totalInventoryValueAtCost: string | null;
+    /** C1 - when the cost figure was read (server time). */
+    valuationAsOf: string | null;
     todaysMovementsCount: number;
     reservedStockUnits: number;
     pendingApprovalsCount: number;
@@ -270,11 +391,24 @@ export class WarehouseTransactionsService {
     todayStart.setHours(0, 0, 0, 0);
     const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString(), visibleWarehouseIds }, manager);
 
+    // C1 (ADR-INV-07): cost comes from the valuation contract (never a raw table read), summed over the caller's visible warehouses only.
+    let totalInventoryValueAtCost: string | null = null;
+    let valuationAsOf: string | null = null;
+    if (includeCost && this.valuation) {
+      const perWarehouse = await this.valuation.getValuedOnHandTotal(undefined, manager);
+      const visible = visibleWarehouseIds ? new Set(visibleWarehouseIds) : null;
+      const scaled = perWarehouse.filter((w) => !visible || visible.has(w.warehouseId)).reduce((sum, w) => sum + Math.round(Number(w.totalValueBase) * 10000), 0);
+      totalInventoryValueAtCost = (scaled / 10000).toFixed(2);
+      valuationAsOf = new Date().toISOString();
+    }
+
     return {
       totalWarehouses: warehouses.length,
       totalInventoryValueAtSellingPrice: stockReport
         .reduce((sum, row) => sum + row.onHand * (priceById.get(row.productId) ?? 0), 0)
         .toFixed(2),
+      totalInventoryValueAtCost,
+      valuationAsOf,
       todaysMovementsCount: todaysMovements.length,
       reservedStockUnits: stockReport.reduce((sum, row) => sum + row.reserved, 0),
       pendingApprovalsCount: allTransactions.filter((t) => t.state === 'submitted').length,
@@ -346,6 +480,12 @@ export class WarehouseTransactionsService {
    * one click both approves AND posts, while the audit trail still
    * records both events distinctly with their own timestamps.
    */
+  /** C2 - the ids whose inventory events describe this document's financial effect: the document itself and any reversal document created from it. */
+  async financialReferenceIds(transactionId: string, manager?: EntityManager): Promise<string[]> {
+    const rows = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).find({ where: [{ id: transactionId }, { reversalOfTransactionId: transactionId }], select: ['id'] });
+    return rows.map((r) => r.id);
+  }
+
   async transition(transactionId: string, action: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     // V1 Release Audit HIGH fix — default-deny: an action absent from
     // the map (e.g. 'auto_post', an internal-only transition this
@@ -364,6 +504,15 @@ export class WarehouseTransactionsService {
 
     const txn = await (manager ?? this.dataSource).getRepository(WarehouseTransaction).findOne({ where: { id: transactionId } });
     if (!txn) throw new NotFoundException(`Warehouse transaction "${transactionId}" not found.`);
+
+    // C3: refused (or audited, in warn mode) BEFORE any state change or write.
+    if (action === 'approve' || action === 'post') await this.enforceSeparationOfDuties(txn, action, actorUserId, manager);
+
+    if (action === 'submit' && txn.type !== 'count') {
+      const check = await this.checkReasonAndReference(txn.type, txn.reasonCode, txn.referenceType, txn.referenceId, txn.notes ?? txn.reason, manager ?? this.dataSource.manager);
+      if (check.mode === 'enforce' && check.problems.length > 0) throw new BadRequestException(`The reason / reference of ${txn.transactionNumber} is not acceptable: ${check.problems.join('; ')}.`);
+      if (check.mode === 'warn' && check.problems.length > 0) await this.auditReasonWarning(txn.id, actorUserId, 'submit', check.problems, manager);
+    }
 
     if (action === 'submit' && txn.type === 'count') {
       const lines = await this.getLines(transactionId, manager);
@@ -396,7 +545,7 @@ export class WarehouseTransactionsService {
     // document at its prior state so a supervisor can fix the stock
     // situation and retry, never mislabeled "posted" with no movements
     // actually written.
-    if (action === 'submit' && NO_APPROVAL_REQUIRED.has(txn.type)) {
+    if (action === 'submit' && NO_APPROVAL_REQUIRED.has(txn.type) && !this.receiptNeedsApproval(txn)) {
       await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, transactionId, 'submit', actorUserId, manager);
       await this.postTransaction(txn, actorUserId, null, 'auto_post', manager);
     } else if (action === 'approve') {
@@ -545,12 +694,23 @@ export class WarehouseTransactionsService {
         return { posted: false };
       }
 
+      // C2 (ADR-INV-02) - the document's business date (UTC date of its movement date) is carried to every movement, valuation row and journal of this
+      // posting. Validated ONCE here, before any write: a closed/missing fiscal period rejects the whole document (409) and nothing is written.
+      const businessDate = txn.movementDate ? new Date(txn.movementDate).toISOString().slice(0, 10) : undefined;
+      if (businessDate) await this.inventory.resolveBusinessDate(businessDate, txManager);
+
       for (const pair of sortedPairs) {
         await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [pair]);
       }
 
+      // Document reversal (slice R): a reversal of a receipt / issue / adjustment / count reverses each ORIGINAL stock movement exactly (valuation row inverted at the recorded cost,
+      // journal mirrored) instead of re-posting negated lines; a transfer is reversed by a forward transfer back (generic path, swapped warehouses).
+      const reversalByMovement = !!txn.reversalOfTransactionId && txn.type !== 'transfer';
+      if (reversalByMovement) await this.postReversalMovements(txn, actorUserId, txManager, businessDate);
+      const effectiveLines = reversalByMovement ? [] : lines;
+
       const shortages: Array<{ line: WarehouseTransactionLine; required: number; available: number }> = [];
-      for (const line of lines) {
+      for (const line of effectiveLines) {
         const required = this.requiredCheckQuantity(txn, line);
         if (required === null) continue;
         const available = await this.inventory.getAvailableInTransaction(txManager, txn.warehouseId, line.productId);
@@ -570,22 +730,21 @@ export class WarehouseTransactionsService {
         );
       }
 
-      for (const line of lines) {
+      for (const line of effectiveLines) {
         if (txn.type === 'receipt') {
           if (txn.reversalOfTransactionId) {
-            // Reversal of a LEGACY (pre-D3-B, cost-less) receipt — stock only, exactly as before. A D3-B receipt can't be
-            // reversed here (rejected in reverseTransaction before any mutation).
-            await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager);
+            // (unreachable since slice R: a receipt reversal goes through `postReversalMovements`)
+            await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
           } else {
             // D3-B — explicit cost + controlled reason, re-validated here, inside the posting transaction, before any stock write.
-            await this.inventory.recordManualReceipt(txn.warehouseId, line.productId, line.quantity, line.unitCostBase, txn.reasonCode, txn.id, actorUserId, txManager);
+            await this.inventory.recordManualReceipt(txn.warehouseId, line.productId, line.quantity, line.unitCostBase, txn.reasonCode, txn.id, actorUserId, txManager, businessDate);
           }
         } else if (txn.type === 'issue') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, -line.quantity, 'dispatch', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
         } else if (txn.type === 'transfer') {
-          await this.inventory.recordTransfer(txn.warehouseId, txn.destinationWarehouseId!, line.productId, line.quantity, 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordTransfer(txn.warehouseId, txn.destinationWarehouseId!, line.productId, line.quantity, 'warehouse_transaction', txn.id, actorUserId, txManager, businessDate);
         } else if (txn.type === 'adjustment' || txn.type === 'count') {
-          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, txManager);
+          await this.inventory.recordMovement(txn.warehouseId, line.productId, line.quantity, 'adjustment', 'warehouse_transaction', txn.id, actorUserId, txManager, undefined, undefined, businessDate);
         }
       }
 
@@ -611,72 +770,118 @@ export class WarehouseTransactionsService {
    * Engine history is untouched — both the original and its reversal
    * remain permanently in the ledger and in `process_transition_records`.
    */
+  /**
+   * Document reversal (slice R, CTO 2026-10-19) - one atomic, idempotent unit under a lock on the original document: the reversal document, ITS posting and the original's move to
+   * `reversed` all commit together or not at all (the old order moved the original to `reversed` first and could strand it without a reversal). Semantics by type:
+   *  - receipt (D3-B, with cost + reason) / issue / adjustment / count: each ORIGINAL stock movement is reversed exactly - the valuation history row is inverted at its recorded cost (never
+   *    recalculated) and the journal is the MIRROR of the original journal (same accounts, same amounts). An issue therefore restores the ORIGINAL issued cost and never consumes valuation again.
+   *    Taking receipted stock back out needs that quantity on hand (checked, nothing written otherwise); the original posting must be POSTED to the ledger first.
+   *  - transfer: a forward transfer back (destination -> source), valued at the moving average like any transfer; needs the stock at the destination; Model A: no journal.
+   *  - a legacy receipt (no cost, no financial event): stock only, as before.
+   *  - a reversal document cannot itself be reversed; a document is reversed at most once.
+   * The reversal is dated now (its movement date and business date), never the original's.
+   */
   private async reverseTransaction(original: WarehouseTransaction, actorUserId: string, manager?: EntityManager): Promise<WarehouseTransaction> {
-    const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, manager);
-    if (state !== 'posted') throw new ConflictException(`Cannot reverse a transaction in state "${state}" — only posted transactions can be reversed.`);
-    // D3-B — a cost-bearing manual receipt posted Dr Inventory / Cr its reason account at the supplied cost. A document
-    // reversal cannot exactly unwind that valuation (the moving average may have moved since), so it is rejected BEFORE
-    // any mutation; the approved way to take the stock out is an Adjustment decrease (Dr Loss / Cr Inventory).
-    if (original.type === 'receipt' && original.reasonCode) {
-      throw new ConflictException(
-        'A manual receipt that carries a unit cost and reason code cannot be reversed as a document — post an Adjustment (decrease) instead.',
-      );
-    }
+    return (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`warehouse_transaction_reverse:${original.id}`]);
+      const state = await this.processEngine.getState(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, tx);
+      if (state !== 'posted') throw new ConflictException(`Cannot reverse a transaction in state "${state}" — only posted transactions can be reversed.`);
+      if (original.reversalOfTransactionId) throw new ConflictException('A reversal document cannot itself be reversed - post a new document instead.');
+      const policy = this.postingPolicy?.get();
+      if (policy?.financialStatusByReference) {
+        const fin = await policy.financialStatusByReference('*', original.id, tx);
+        if (fin !== 'posted' && fin !== 'none') {
+          throw new ConflictException(`Cannot reverse ${original.transactionNumber}: its GL posting is "${fin}" - wait until it is posted (or re-drive it) so the reversal can mirror it.`);
+        }
+      }
 
-    const originalLines = await this.getLines(original.id, manager);
-    const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type], manager);
-
-    // Move the ORIGINAL transaction's own lifecycle to 'reversed' first —
-    // this is the state check that must hold even if the reversal-document
-    // creation below were to fail.
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId, manager);
-
-    const reversal = await (manager ?? this.dataSource).transaction(async (txManager) => {
-      const txnRepo = txManager.getRepository(WarehouseTransaction);
-      const lineRepo = txManager.getRepository(WarehouseTransactionLine);
-      const saved = await txnRepo.save(
+      const originalLines = await this.getLines(original.id, tx);
+      const isTransfer = original.type === 'transfer';
+      const transactionNumber = await this.numbering.getNextNumber(NUMBERING_SERIES_BY_TYPE[original.type], tx);
+      const txnRepo = tx.getRepository(WarehouseTransaction);
+      const lineRepo = tx.getRepository(WarehouseTransactionLine);
+      const reversal = await txnRepo.save(
         txnRepo.create({
           transactionNumber,
           type: original.type,
-          warehouseId: original.warehouseId,
-          destinationWarehouseId: original.destinationWarehouseId,
+          warehouseId: isTransfer ? original.destinationWarehouseId! : original.warehouseId,
+          destinationWarehouseId: isTransfer ? original.warehouseId : original.destinationWarehouseId,
           reference: original.transactionNumber,
           reason: `Reversal of ${original.transactionNumber}`,
           reversalOfTransactionId: original.id,
           createdByUserId: actorUserId,
+          movementDate: new Date(),
         }),
       );
-      const lineEntities = originalLines.map((l) =>
-        lineRepo.create({ warehouseTransactionId: saved.id, productId: l.productId, quantity: -l.quantity }),
+      await lineRepo.save(originalLines.map((l) => lineRepo.create({ warehouseTransactionId: reversal.id, productId: l.productId, quantity: isTransfer ? l.quantity : -l.quantity })));
+
+      await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, tx);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId, tx);
+      await this.postTransaction(reversal, actorUserId, null, 'auto_post', tx);
+      await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, original.id, 'reverse', actorUserId, tx);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'warehouse_transaction.reversed',
+          resource: 'warehouse_transaction',
+          resourceId: original.id,
+          result: 'success',
+          correlationId: null,
+          after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
+        },
+        tx,
       );
-      await lineRepo.save(lineEntities);
-      return saved;
+      return reversal;
     });
+  }
 
-    await this.processEngine.start(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, manager);
-    await this.processEngine.transition(WAREHOUSE_TRANSACTION_PROCESS, ENTITY_TYPE, reversal.id, 'submit', actorUserId, manager);
-    // Post THEN mark posted — same ordering fix as transition() above. `postTransaction` now
-    // performs the 'auto_post' state transition itself, inside its own document-locked
-    // transaction (Inventory Integrity concurrency fix, 2026-09-13) — no separate call needed here.
-    await this.postTransaction(reversal, actorUserId, null, 'auto_post', manager);
+  /**
+   * Slice R - posts the movements of a (non-transfer) reversal document: one reversing movement per ORIGINAL stock movement of the reversed document. A movement that has a financial
+   * event is reversed through the `movement_reversal` kind (the handler inverts its valuation row and mirrors its journal); a legacy receipt movement without any event is reversed as a
+   * plain stock movement. Everything is validated before the first write: stock that has to leave must be on hand, and no original posting may be pending or rejected.
+   */
+  private async postReversalMovements(txn: WarehouseTransaction, actorUserId: string, tx: EntityManager, businessDate: string | undefined): Promise<void> {
+    const original = await tx.getRepository(WarehouseTransaction).findOneOrFail({ where: { id: txn.reversalOfTransactionId! } });
+    const movements = (await tx.query(
+      `SELECT id, "warehouseId", "productId", quantity, "movementType" FROM stock_movements WHERE "referenceId" = $1 AND "referenceType" IN ('warehouse_transaction','manual_receipt') ORDER BY "createdAt", id`,
+      [original.id],
+    )) as Array<{ id: string; warehouseId: string; productId: string; quantity: number; movementType: string }>;
+    if (movements.length === 0) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: it has no stock movements to reverse.`);
 
-    // The original transaction stays 'posted' in its own process instance;
-    // marking that IT was reversed lives in the audit trail + the reversal
-    // row's own `reversalOfTransactionId` pointer, not a mutation of the original.
-    await this.audit.record(
-      {
-        actorUserId,
-        organizationId: null,
-        action: 'warehouse_transaction.reversed',
-        resource: 'warehouse_transaction',
-        resourceId: original.id,
-        result: 'success',
-        correlationId: null,
-        after: { reversalTransactionId: reversal.id, reversalTransactionNumber: transactionNumber },
-      },
-      manager,
-    );
+    const policy = this.postingPolicy?.get();
+    const plan: Array<{ m: (typeof movements)[number]; viaEvent: boolean }> = [];
+    for (const m of movements) {
+      const fin = policy?.financialStatusByReference ? await policy.financialStatusByReference('stock_movement', m.id, tx) : 'none';
+      if (fin === 'none') {
+        // only a LEGACY receipt (no cost, no reason code: it never had a financial event) may be reversed as plain stock; anything that should have a posting but shows none is refused
+        if (m.movementType !== 'receipt' || original.reasonCode) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: a movement has no financial posting to mirror.`);
+        plan.push({ m, viaEvent: false }); // a legacy receipt: stock only
+      } else if (fin === 'posted') {
+        plan.push({ m, viaEvent: true });
+      } else {
+        throw new ConflictException(`Cannot reverse ${original.transactionNumber}: a movement's GL posting is "${fin}" - wait until it is posted (or re-drive it).`);
+      }
+    }
 
-    return reversal;
+    // stock that has to leave (the reversal of an increase) must be available - nothing is written otherwise
+    const needed = new Map<string, number>();
+    for (const { m } of plan) if (m.quantity > 0) needed.set(`${m.warehouseId}:${m.productId}`, (needed.get(`${m.warehouseId}:${m.productId}`) ?? 0) + m.quantity);
+    for (const [key, qty] of needed) {
+      const [warehouseId, productId] = key.split(':');
+      const available = await this.inventory.getAvailableInTransaction(tx, warehouseId, productId);
+      if (available < qty) throw new ConflictException(`Cannot reverse ${original.transactionNumber}: ${qty} unit(s) of product ${productId} must leave but only ${available} are available (later movements used them) - nothing was reversed.`);
+    }
+
+    for (const { m, viaEvent } of plan) {
+      if (viaEvent) {
+        await this.inventory.recordMovement(m.warehouseId, m.productId, -m.quantity, 'adjustment', 'warehouse_transaction_reversal', txn.id, actorUserId, tx, undefined, undefined, businessDate, {
+          originalMovementId: m.id,
+          originalDocumentId: original.id,
+        });
+      } else {
+        await this.inventory.recordMovement(m.warehouseId, m.productId, -m.quantity, 'receipt', 'warehouse_transaction', txn.id, actorUserId, tx, undefined, undefined, businessDate);
+      }
+    }
   }
 }

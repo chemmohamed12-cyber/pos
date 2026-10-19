@@ -9,6 +9,7 @@ export const WAREHOUSE_KEYED_TABLES = {
   warehouses: { table: 'warehouses', columns: ['id'] }, // the id IS the warehouse
   warehouse_transactions: { table: 'warehouse_transactions', columns: ['warehouseId', 'destinationWarehouseId'] }, // a transfer needs BOTH sides in scope
   stock_movements: { table: 'stock_movements', columns: ['warehouseId'] },
+  inventory_opening_batches: { table: 'inventory_opening_batches', columns: ['warehouseId'] }, // C4
   stock_reservations: { table: 'stock_reservations', columns: ['warehouseId'] },
   purchase_requests: { table: 'purchase_requests', columns: ['warehouseId'] },
   purchase_orders: { table: 'purchase_orders', columns: ['warehouseId'] },

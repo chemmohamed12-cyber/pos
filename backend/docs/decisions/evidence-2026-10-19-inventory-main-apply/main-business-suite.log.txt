@@ -1,0 +1,324 @@
+
+=== T-00: src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\backend\tools\testing\biz-evidence.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+PASS src/foundation/testing/biz-harness-smoke.biz.real-pg.spec.ts (45.539 s)
+  T-00 harness smoke — fresh disposable databases from the current migration set
+    √ creates fresh databases, migrates to the current set, preserves evidence, then removes exactly those databases (14587 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        45.731 s
+Ran all test suites matching /src\\foundation\\testing\\biz-harness-smoke.biz.real-pg.spec.ts/i.
+
+=== T-01+T-02: src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts
+PASS src/foundation/testing/t01-t02-oversell.biz.real-pg.spec.ts (36.554 s)
+  T-01 / T-02 — over-issue, over-transfer and over-reservation are refused with no partial effect
+    √ T-01 + T-02 (14113 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.681 s, estimated 46 s
+Ran all test suites matching /src\\foundation\\testing\\t01-t02-oversell.biz.real-pg.spec.ts/i.
+
+=== T-03+T-04: src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t03-t04-concurrency.biz.real-pg.spec.ts (84.392 s)
+  T-03 / T-04 — concurrent reservations and issue postings never exceed the available stock
+    √ T-03 + T-04 + T-04b (62984 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        84.485 s
+Ran all test suites matching /src\\foundation\\testing\\t03-t04-concurrency.biz.real-pg.spec.ts/i.
+
+=== T-05: src/foundation/testing/t05-treasury.biz.real-pg.spec.ts
+PASS src/foundation/testing/t05-treasury.biz.real-pg.spec.ts (41.863 s)
+  T-05 — concurrent treasury withdrawals never exceed the balance
+    √ 10 x 30.00 from 100.00 (19401 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        41.968 s, estimated 54 s
+Ran all test suites matching /src\\foundation\\testing\\t05-treasury.biz.real-pg.spec.ts/i.
+
+=== T-06: src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t06-collection-idempotency.biz.real-pg.spec.ts (57.881 s)
+  T-06 — a replayed collection request has exactly one financial effect
+    √ same key replayed: one effect; different key: a second effect (28039 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        58.115 s, estimated 68 s
+Ran all test suites matching /src\\foundation\\testing\\t06-collection-idempotency.biz.real-pg.spec.ts/i.
+
+=== T-07: src/foundation/testing/t07-returns.biz.real-pg.spec.ts
+PASS src/foundation/testing/t07-returns.biz.real-pg.spec.ts (53.022 s)
+  T-07 — concurrent sales returns never exceed the returnable quantity
+    √ two concurrent returns of 4 against 6 remaining (19827 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        53.185 s
+Ran all test suites matching /src\\foundation\\testing\\t07-returns.biz.real-pg.spec.ts/i.
+
+=== T-08: src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts
+PASS src/foundation/testing/t08-payment-apply.biz.real-pg.spec.ts (43.069 s)
+  T-08 — concurrent applications of one payment never exceed its unapplied amount
+    √ 300 + 300 against 500 unapplied (18495 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        43.165 s, estimated 69 s
+Ran all test suites matching /src\\foundation\\testing\\t08-payment-apply.biz.real-pg.spec.ts/i.
+
+=== T-09: src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts
+PASS src/foundation/testing/t09-inventory-movements-http.biz.real-pg.spec.ts (46.972 s)
+  T-09 — POST /api/inventory/movements: frozen contract (F-INV-001)
+    √ E1–E14 (18734 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        47.077 s, estimated 70 s
+Ran all test suites matching /src\\foundation\\testing\\t09-inventory-movements-http.biz.real-pg.spec.ts/i.
+
+=== T-11: src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts
+PASS src/foundation/testing/t11-failure-recovery.biz.real-pg.spec.ts (40.482 s)
+  T-11 — a failed accounting event is visible, re-drivable and never duplicates its effect
+    √ issue -> rejected event -> restore configuration -> re-drive (x3) (17491 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        40.575 s, estimated 54 s
+Ran all test suites matching /src\\foundation\\testing\\t11-failure-recovery.biz.real-pg.spec.ts/i.
+
+=== T-12: src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts
+PASS src/foundation/testing/t12-connection-loss.biz.real-pg.spec.ts (41.991 s)
+  T-12 — a connection killed in the middle of a posting leaves no partial effect, and the retry posts exactly once
+    √ kill the posting backend while it waits inside its transaction (17561 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        42.134 s, estimated 55 s
+Ran all test suites matching /src\\foundation\\testing\\t12-connection-loss.biz.real-pg.spec.ts/i.
+
+=== T-10: src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts
+PASS src/foundation/testing/t10-reconciliation.biz.real-pg.spec.ts (31.923 s)
+  T-10 — consolidated reconciliation R1…R10 over the preserved evidence of every business run
+    √ every reconciling run has all ten R checks PASS (or explained); one consistent commit; nothing unexplained (351 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        32.059 s
+Ran all test suites matching /src\\foundation\\testing\\t10-reconciliation.biz.real-pg.spec.ts/i.
+
+=== F-AUD-002: src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-aud-reproducer.biz.real-pg.spec.ts (64.561 s)
+  F-AUD-002 reproducer — audit chain under concurrency, plain manager vs transaction manager
+    √ records the observed behaviour of both calling styles (25648 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        64.721 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-reproducer.biz.real-pg.spec.ts/i.
+
+=== F-TRS-001: src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-trs-reproducer.biz.real-pg.spec.ts (49.166 s)
+  F-TRS-001 reproducer — concurrent withdrawals, plain manager vs transaction manager
+    √ records overdraft occurrences for both calling styles (16009 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        49.304 s, estimated 54 s
+Ran all test suites matching /src\\foundation\\testing\\f-trs-reproducer.biz.real-pg.spec.ts/i.
+
+=== T-15: src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts
+PASS src/foundation/testing/t15-capacity-baseline.biz.real-pg.spec.ts (76.149 s)
+  T-15 — local capacity baseline with correctness invariants under rising concurrency
+    √ 1/5/10/25/50 in-flight operations on four write paths (51299 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        76.263 s
+Ran all test suites matching /src\\foundation\\testing\\t15-capacity-baseline.biz.real-pg.spec.ts/i.
+
+=== T-16: src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts
+PASS src/foundation/testing/t16-capacity-http.biz.real-pg.spec.ts (342.669 s)
+  T-16 — HTTP capacity benchmark (measurements + integrity oracle)
+    √ ramp, hot-spot, sustained, peak, recovery over HTTP (314297 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        342.762 s, estimated 347 s
+Ran all test suites matching /src\\foundation\\testing\\t16-capacity-http.biz.real-pg.spec.ts/i.
+
+=== T-17: src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-plain-probes.biz.real-pg.spec.ts (30.748 s)
+  Plain-manager probes — numbering and process-engine
+    √ records the behaviour of both primitives under concurrency (14503 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.825 s, estimated 93 s
+Ran all test suites matching /src\\foundation\\testing\\f-plain-probes.biz.real-pg.spec.ts/i.
+
+=== T-19: src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts
+PASS src/foundation/testing/t19-n01-endpoint-concurrency.biz.real-pg.spec.ts (38.443 s)
+  T-19 — concurrent creates through the numbering-based endpoints (plain manager, as controllers call them)
+    √ every concurrent create succeeds with a distinct code (18587 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        38.536 s, estimated 77 s
+Ran all test suites matching /src\\foundation\\testing\\t19-n01-endpoint-concurrency.biz.real-pg.spec.ts/i.
+
+=== T-20: src/foundation/testing/n02-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/n02-probes.biz.real-pg.spec.ts (29.227 s)
+  N-02 probes — plain-manager hypotheses for the remaining primitives
+    √ records the observed behaviour of both calling styles for H1-H4 (13150 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        29.302 s, estimated 31 s
+Ran all test suites matching /src\\foundation\\testing\\n02-probes.biz.real-pg.spec.ts/i.
+
+=== T-21: src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts
+PASS src/foundation/testing/t21-n02-fulfil-reservation.biz.real-pg.spec.ts (36.267 s)
+  T-21 — a reservation is fulfilled exactly once (N-02 fulfillReservation)
+    √ duplicate, retried, partially failed and rolled-back fulfilments never create a second movement (14871 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        36.354 s
+Ran all test suites matching /src\\foundation\\testing\\t21-n02-fulfil-reservation.biz.real-pg.spec.ts/i.
+
+=== T-22: src/foundation/testing/f-aud-rollback-reproducer.biz.real-pg.spec.ts
+PASS src/foundation/testing/f-aud-rollback-reproducer.biz.real-pg.spec.ts (27.217 s)
+  F-AUD-003 reproducer — audit chain after a rolled-back transaction that wrote an audit record
+    √ records the behaviour (10754 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        27.291 s, estimated 39 s
+Ran all test suites matching /src\\foundation\\testing\\f-aud-rollback-reproducer.biz.real-pg.spec.ts/i.
+
+=== T-23: src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts
+PASS src/foundation/testing/t23-audit-seq-hash.biz.real-pg.spec.ts (30.261 s)
+  T-23 — audit hash commits to the stored seq (F-AUD-003)
+    √ chain stays verifiable after rollbacks and concurrency; history is never rewritten (13766 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.344 s, estimated 37 s
+Ran all test suites matching /src\\foundation\\testing\\t23-audit-seq-hash.biz.real-pg.spec.ts/i.
+
+=== T-24: src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts
+PASS src/foundation/testing/t24-n02-remaining.biz.real-pg.spec.ts (29.737 s)
+  T-24 — limit engine, reservation release and process start are race-free (N-02 remaining findings)
+    √ H1, H2, H4: concurrency, rollback, retries, integrity (13323 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        29.875 s, estimated 31 s
+Ran all test suites matching /src\\foundation\\testing\\t24-n02-remaining.biz.real-pg.spec.ts/i.
+
+=== T-25: src/foundation/testing/t25-h5-shipment-transitions.biz.real-pg.spec.ts
+PASS src/foundation/testing/t25-h5-shipment-transitions.biz.real-pg.spec.ts (30.154 s)
+  T-25 — H5 shipment transitions (measurement, not a fix)
+    √ measures concurrent / failing / rolled-back shipment transitions without changing product behaviour (14719 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.23 s, estimated 49 s
+Ran all test suites matching /src\\foundation\\testing\\t25-h5-shipment-transitions.biz.real-pg.spec.ts/i.
+
+=== T-26: src/foundation/testing/t26-audit-seq-lag-baseline.biz.real-pg.spec.ts
+PASS src/foundation/testing/t26-audit-seq-lag-baseline.biz.real-pg.spec.ts (27.797 s)
+  T-26 — audit sequence lag baseline (PA-33 input)
+    √ records how the current writer behaves when the sequence is behind the stored data (11434 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        27.871 s, estimated 47 s
+Ran all test suites matching /src\\foundation\\testing\\t26-audit-seq-lag-baseline.biz.real-pg.spec.ts/i.
+
+=== T-28: src/foundation/testing/t28-audit-seq-lag-fail-closed.biz.real-pg.spec.ts
+PASS src/foundation/testing/t28-audit-seq-lag-fail-closed.biz.real-pg.spec.ts (28.116 s)
+  T-28 — audit sequence lag fails closed (WP-AUD-08, Option B)
+    √ refuses, never realigns, never touches history (12287 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        28.187 s
+Ran all test suites matching /src\\foundation\\testing\\t28-audit-seq-lag-fail-closed.biz.real-pg.spec.ts/i.
+
+=== T-29: src/foundation/testing/t29-pa43-uuid-repair-audit-impact.biz.real-pg.spec.ts
+PASS src/foundation/testing/t29-pa43-uuid-repair-audit-impact.biz.real-pg.spec.ts (29.009 s)
+  T-29 — PA-43 pilot: audit-row exposure to the UUID repair (read-only, simulated)
+    √ measures exposure with counts only and shows the hash effect in memory (11014 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        29.101 s
+Ran all test suites matching /src\\foundation\\testing\\t29-pa43-uuid-repair-audit-impact.biz.real-pg.spec.ts/i.
+
+=== T-30: src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/t30-n02-sibling-probes.biz.real-pg.spec.ts (31.51 s)
+  T-30 — N-02 sibling probes (WP-INV-09): relocation, reference release, whole-reservation release, limit-gated creation
+    √ S1-S4: concurrency, rollback, partial failure, integrity — both calling styles (14084 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        31.636 s, estimated 38 s
+Ran all test suites matching /src\\foundation\\testing\\t30-n02-sibling-probes.biz.real-pg.spec.ts/i.
+
+=== T-31: src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts
+PASS src/foundation/testing/t31-latent-idiom-probes.biz.real-pg.spec.ts (30.653 s)
+  T-31 — latent plain-manager probe: concurrent customer payments never exceed the invoice remaining
+    √ P1 recordPayment in both calling styles, P2 rollback, P3 audit chain (13521 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.737 s, estimated 46 s
+Ran all test suites matching /src\\foundation\\testing\\t31-latent-idiom-probes.biz.real-pg.spec.ts/i.
+
+=== T-18: src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts
+PASS src/foundation/testing/test03-schema-drift.biz.real-pg.spec.ts (30.869 s)
+  TEST-03 — entity metadata vs migrated Company schema
+    √ reports drift in both directions (14501 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        30.952 s
+Ran all test suites matching /src\\foundation\\testing\\test03-schema-drift.biz.real-pg.spec.ts/i.
+
+ALL REQUESTED STEPS PASSED

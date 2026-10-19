@@ -1,0 +1,21 @@
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts (40.257 s)
+  Inventory lifecycle C1 - CONTROLLED scenario: known movements, hand-computed valuation and GL, reconciliation, isolation - real-Postgres, A/B
+    √ A. S1 + S2 opening stock: valuation 60.0000 = GL 60.00, reconciliation MATCHED with zero drift (351 ms)
+    √ B. S3 + S4 receipt then adjustment: P1 = 12 units, value 72.0000; valuation 82.0000 = GL 82.00, MATCHED (247 ms)
+    √ C. S5 + S6 fractional average: difference +0.0014 is exactly one posting rounding, EXPLAINED, unexplained 0 (no tolerance involved) (347 ms)
+    √ D. valuation report: by warehouse and by item, totals, history consistency (9 ms)
+    √ D2. the HTTP controller of the valuation report on the same data: grouping, totals, filters, F6 warehouse scope (25 ms)
+    √ E. valuation AS OF a past date compares then with then (fixture: S1 and S2 dated 10 days ago, valuation and journals alike) (61 ms)
+    √ F. NEGATIVE CONTROL (a fault injected on purpose into the isolated database): a valuation change with no event and no journal is NOT hidden (34 ms)
+    √ G. isolation and integrity: Company B untouched, Platform DataSource never requested, no unbalanced journal, retries create no journal (142 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        40.399 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
+
+REGRESSION DONE: 1/1 passed

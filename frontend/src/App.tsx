@@ -115,6 +115,7 @@ import { CustomerPrint } from './pages/print/CustomerPrint';
 import { ProductListPrint } from './pages/print/ProductListPrint';
 import { PriceListPrint } from './pages/print/PriceListPrint';
 import { WarehouseOverview } from './pages/warehouse/WarehouseOverview';
+import { ValuationReport } from './pages/warehouse/ValuationReport';
 import { MovementCenter } from './pages/warehouse/MovementCenter';
 import { WarehouseTransactionForm } from './pages/warehouse/WarehouseTransactionForm';
 import { WarehouseTransactionDetail } from './pages/warehouse/WarehouseTransactionDetail';
@@ -283,6 +284,7 @@ function AppRoutes() {
         <Route path="accounting/journals/:id" element={<JournalDetail />} />
         <Route path="accounting/ledger" element={<GeneralLedger />} />
         <Route path="accounting/trial-balance" element={<TrialBalance />} />
+        <Route path="inventory/valuation-report" element={<ValuationReport />} />
         <Route path="accounting/financial-events" element={<FinancialEvents />} />
         <Route path="accounting/ar" element={<ArReconciliation />} />
         <Route path="accounting/ap" element={<ApReconciliation />} />

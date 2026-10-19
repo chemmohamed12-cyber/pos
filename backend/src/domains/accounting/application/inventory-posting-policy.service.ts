@@ -1,11 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
-import { InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { FinancialPostingSummary, InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { GLAccount } from '../infrastructure/gl-account.entity';
+import { FiscalPeriodService } from './fiscal-period.service';
+import { PostingStatusService } from './posting-status.service';
 
 export const MANUAL_RECEIPT_REASON_ACCOUNTS_KEY = 'accounting.inventory_manual_receipt_reason_accounts';
 const COGS_ACCOUNT_KEY = 'accounting.inventory_cogs_account_code';
+const OPENING_BALANCE_ACCOUNT_KEY = 'accounting.inventory_opening_balance_account_code';
+const OPENING_CORRECTION_ACCOUNT_KEY = 'accounting.inventory_opening_correction_account_code';
 const SALES_RETURNS_ACCOUNT_KEY = 'accounting.sales_returns_account_code';
 const PPV_ACCOUNT_KEY = 'accounting.purchase_price_variance_account_code';
 
@@ -21,7 +25,38 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
   constructor(
     private readonly config: ConfigurationEngineService,
     private readonly registry: InventoryPostingPolicyRegistry,
+    // C2: optional so a direct construction (older specs) keeps compiling; Nest always provides both.
+    @Optional() private readonly fiscalPeriods?: FiscalPeriodService,
+    @Optional() private readonly postingStatus?: PostingStatusService,
   ) {}
+
+  /** C4 - see the registry: the accounts an opening batch of this kind will post to must resolve, fail-closed, before anything is written. */
+  async assertOpeningBatchPostable(kind: 'opening' | 'reversal' | 'correction', manager?: EntityManager): Promise<void> {
+    if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to validate opening-batch accounts');
+    const accounts = manager.getRepository(GLAccount);
+    const inventory = await accounts.findOne({ where: { controlFunction: 'inventory', isActive: true, isPostable: true } });
+    if (!inventory) throw new ConflictException('An opening batch cannot post: no active postable account has the "inventory" control function');
+    const key = kind === 'correction' ? OPENING_CORRECTION_ACCOUNT_KEY : OPENING_BALANCE_ACCOUNT_KEY;
+    const code = String(this.config.get<unknown>(key) ?? '').trim();
+    if (!code) throw new ConflictException(`An opening batch (${kind}) cannot post: the account is not configured - set ${key}`);
+    const acc = await accounts.findOne({ where: { code } });
+    const problem = this.accountProblem(acc);
+    if (problem) throw new ConflictException(`An opening batch (${kind}) cannot post: the configured account ${code} (${key}) ${problem}`);
+    if (kind === 'correction' && acc!.accountType !== 'equity') {
+      throw new ConflictException(`An opening correction cannot post: the configured account ${code} (${key}) is "${acc!.accountType}", not equity - a correction must never go through profit and loss`);
+    }
+  }
+
+  /** C2 - the explicit business date must fall in an open fiscal period; same gate the journal posting itself applies later (org-unit-less, like the inventory events). */
+  async assertPostingDateOpen(businessDate: string, manager?: EntityManager): Promise<void> {
+    if (!this.fiscalPeriods) return;
+    await this.fiscalPeriods.assertOpenForPosting(null, businessDate, manager);
+  }
+
+  async financialStatusByReference(referenceType: string, referenceId: string, manager?: EntityManager): Promise<FinancialPostingSummary> {
+    if (!this.postingStatus) return 'none';
+    return (await this.postingStatus.getFinancialStatusByReference(referenceType, referenceId, manager)).summary;
+  }
 
   onModuleInit(): void {
     this.registry.bind(this);
@@ -133,6 +168,10 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
   async assertManualReceiptReason(reasonCode: string, manager?: EntityManager): Promise<{ glAccountCode: string }> {
     const code = (reasonCode ?? '').trim();
     if (!code) throw new BadRequestException('A manual receipt requires a reason code');
+    // C4 (ADR-INV-01 section 2.2.8): once the opening-batch cut-over flag is on, the reason `opening_balance` is RESERVED for an Opening Balance Batch.
+    if (code.toLowerCase() === 'opening_balance' && this.config.get<unknown>('inventory.opening_batch_required') === true) {
+      throw new ConflictException('The reason "opening_balance" is reserved for Opening Balance Batches; a manual receipt cannot use it.');
+    }
     const glAccountCode = this.reasonMap()[code];
     if (!glAccountCode) {
       throw new ConflictException(

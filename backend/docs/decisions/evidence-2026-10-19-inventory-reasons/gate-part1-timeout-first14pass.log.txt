@@ -1,0 +1,296 @@
+
+=== REGRESSION: src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts
+[31m[Nest] 19512  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٥:٠١ م [31m  ERROR[39m [38;5;3m[ClosingSnapshotRecoveryScheduler] [39m[31mClosing Snapshot recovery sweep failed for Company company-1[39m
+Error: boom
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\application\closing-snapshot-recovery.scheduler.spec.ts:60:54)
+    at Promise.then.completed (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:316:40)
+    at _runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:121:9)
+    at run (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-runner\build\runTest.js:444:34)
+[31m[Nest] 19512  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٥:٠١ م [31m  ERROR[39m [38;5;3m[ClosingSnapshotRecoveryScheduler] [39m[31mClosing Snapshot recovery sweep failed for Company company-1[39m
+Error: not ACTIVE
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\application\closing-snapshot-recovery.scheduler.spec.ts:68:57)
+    at Promise.then.completed (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\utils.js:298:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\utils.js:231:10)
+    at _callCircusTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:316:40)
+    at _runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:252:3)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:126:9)
+    at _runTestsForDescribeBlock (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:121:9)
+    at run (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\run.js:71:3)
+    at runAndTransformResultsToJestFormat (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapterInit.js:122:21)
+    at jestAdapter (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:79:19)
+    at runTestInternal (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-runner\build\runTest.js:367:16)
+    at runTest (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\node_modules\jest-runner\build\runTest.js:444:34)
+PASS src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts (19.882 s)
+  ClosingSnapshotRecoveryScheduler.runOnce — Multi-Company Area 9 (per-Company sweep, not ambient)
+    √ sweeps every ACTIVE Company's own connection, never the ambient (no-arg) form (9 ms)
+    √ never calls retryPending/detectOverdue with no arguments (the ambient-fallback form) when sweeping Companies (1 ms)
+    √ one Company failing does not stop the sweep for the rest (18 ms)
+    √ a Company whose database is not ACTIVE (getDataSource throws) is skipped, not fatal to the sweep (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        19.964 s
+Ran all test suites matching /src\\domains\\accounting\\application\\closing-snapshot-recovery.scheduler.spec.ts/i.
+RESULT PASS src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts
+PASS src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts (30.79 s)
+  NAV-02 — accounting policy configuration (validated, Company-aware) — real-Postgres, A/B
+    √ 1. LIST: exactly the 13 keys posting actually consumes, grouped, all UNSET on a fresh installation (the 5 unconsumed AR/AP hint keys are not offered) (9 ms)
+    √ 2. SET a valid account through the existing engine (installation scope): stored, status OK, audited in the Company; a typical type gives no warning (26 ms)
+    √ 3. HARD RULES (same as posting): unknown / header / inactive / control accounts are rejected before anything is stored; the previous value and the audit trail are untouched (52 ms)
+    √ 4. ADVISORY type check: an unusual account type is saved with a WARNING (no accounting rule is invented), a typical one is not warned (17 ms)
+    √ 5. REASON MAP (manual receipt reasons): valid map saved; one bad entry rejects the whole map; invalid reason code rejected; clear returns to unset (fail-closed) (20 ms)
+    √ 6. ONLY managed keys are reachable: an arbitrary key and the unconsumed AR/AP hint keys are refused (4 ms)
+    √ 7. COMPANY ISOLATION: validation uses the REQUESTING Company's chart — the same installation-wide value is OK in A and INVALID in B; B cannot save A-only codes; audit lands only in the acting Company; B's DataSource is never requested for A's calls (41 ms)
+    √ 8. POSTING VERIFICATION: a value saved through this service is what real posting uses — with the clearing account set via the service the D8 acquisition helper posts Dr cost / Cr that account; unset (fail-closed) it is rejected before any write (218 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        30.88 s, estimated 34 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\accounting-policy-config.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/accounting.company-isolation.spec.ts
+PASS src/domains/accounting/interface/accounting.company-isolation.spec.ts (38.888 s)
+  AccountingController Area 21 retrofit — real-Postgres Company isolation
+    √ Chart of Accounts: each Company owns its chart — same codes are reusable, the tree/list never cross Companies, an unknown parent is a 404 (584 ms)
+    √ Chart templates are imported into the caller's Company only (170 ms)
+    √ Currencies, financial dimensions and tax codes/periods are Company-local (64 ms)
+    √ Fiscal years and periods are Company-local; the period close is FA-01-gated, approved by the checker inside the Company, and the other Company cannot touch it (944 ms)
+    √ Test F — nothing leaked into the other Company's accounting tables (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        38.999 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\accounting.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/accounting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
+[31m[Nest] 15128  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٦:٤٥ م [31m  ERROR[39m [38;5;3m[AllExceptionsFilter] [39m[31mUnhandled exception[39m
+TypeError: Cannot read properties of undefined (reading 'slice')
+    at FinancialReportingService.getDepreciationAddBack (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\application\financial-reporting.service.ts:269:25)
+    at FinancialReportingService.getCashFlowStatement (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\application\financial-reporting.service.ts:364:44)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\interface\cash-flow-date-validation.company-isolation.spec.ts:144:7)
+PASS src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts (31.905 s)
+  Cash Flow Statement — date validation (real Postgres, 2026-10-15)
+    √ reproduces the original defect at the read-model layer: no dates → TypeError → client would get 500 INTERNAL_ERROR (35 ms)
+    √ missing from → 400 VALIDATION_ERROR, and no query is issued (7 ms)
+    √ missing to → 400 VALIDATION_ERROR, and no query is issued (4 ms)
+    √ both missing → 400 VALIDATION_ERROR, and no query is issued (4 ms)
+    √ empty from → 400 VALIDATION_ERROR, and no query is issued (4 ms)
+    √ bad format from (DD/MM/YYYY) → 400 VALIDATION_ERROR, and no query is issued (3 ms)
+    √ bad format to (no day) → 400 VALIDATION_ERROR, and no query is issued (4 ms)
+    √ non-date text to → 400 VALIDATION_ERROR, and no query is issued (3 ms)
+    √ impossible calendar date from → 400 VALIDATION_ERROR, and no query is issued (6 ms)
+    √ timestamp instead of date → 400 VALIDATION_ERROR, and no query is issued (5 ms)
+    √ repeated parameter (array) → 400 VALIDATION_ERROR, and no query is issued (4 ms)
+    √ the export route applies the same check (400 before any query) (2 ms)
+    √ valid dates → 200, identical to the read model, per Company (A 100.00 vs B 250.00) (137 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       13 passed, 13 total
+Snapshots:   0 total
+Time:        31.999 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\cash-flow-date-validation.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts (40.545 s)
+  Document reversal (slice R) - every original movement reversed exactly: issue restores its original cost, receipts/adjustments/counts mirror their journal, transfers go back; atomic, idempotent - real-Postgres, A/B
+    √ 1. ISSUE reversal after later movements restores the ORIGINAL issued cost (no second consumption): valuation = GL, journal = mirror, document reversed (817 ms)
+    √ 2. RECEIPT reversal (D3-B, with cost and reason) after later movements: mirror Dr reason account / Cr Inventory at the original value; the average follows the totals; needs the stock on hand (801 ms)
+    √ 3. TRANSFER reversal is a forward transfer back (Model A, no journal); it needs the stock at the destination (480 ms)
+    √ 4. COUNT / ADJUSTMENT reversal restores the original value through the mirror of the loss / gain journal (703 ms)
+    √ 5. IDEMPOTENT and SAFE: a second reversal is refused, parallel reversals produce one effect, a reversal of a reversal and of a non-posted document are refused, pending / closed-period reversals write nothing and leave the original `posted` (979 ms)
+    √ 6. ATOMIC: a failure half-way through a multi-line reversal rolls EVERYTHING back (no reversal document, original still posted); the retry reverses once (394 ms)
+    √ 7. CONSISTENCY and COMPANY ISOLATION: every event POSTED, journals balanced, valuation = GL, history consistent; Company B untouched (105 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        40.628 s, estimated 45 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\document-reversal.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+[31m[Nest] 17256  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٨:٠١ م [31m  ERROR[39m [38;5;3m[CompanyEventDispatcherScheduler] [39m[31mEvent dispatch sweep failed for Company 1790d7f6-3396-4ed7-96fa-dddb9de69595[39m
+Error: simulated Company A connection failure
+    at Object.getDataSource (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\interface\event-engine.company-isolation.spec.ts:207:40)
+    at CompanyEventDispatcherScheduler.runOnce (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\foundation\events\company-event-dispatcher.scheduler.ts:56:53)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\inventory-lifecycle\backend\src\domains\accounting\interface\event-engine.company-isolation.spec.ts:212:26)
+[33m[Nest] 17256  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٨:٠١ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mTopic "d10.ambient.only" has only ambient-scope subscribers — its Company-outbox events are marked 'skipped' (ADR-075 §5).[39m
+[33m[Nest] 17256  - [39m١٩‏/١٠‏/٢٠٢٦، ٤:٥٨:٠٢ م [33m   WARN[39m [38;5;3m[EventBusService] [39m[33mEvent handler for "d10.fails" failed in Company 1790d7f6-3396-4ed7-96fa-dddb9de69595: boom[39m
+PASS src/domains/accounting/interface/event-engine.company-isolation.spec.ts (30.549 s)
+  Event Engine — Company context (D10) — real-Postgres
+    √ A/B isolation with IDENTICAL event type, idempotency key, source entity and account codes: each event posts ONLY in its own Company (and B's DataSource is never requested while A dispatches) (286 ms)
+    √ dispatchAfterCommit: a no-op inside an ACTIVE transaction (rows not committed); Company dispatch after commit with the root manager (85 ms)
+    √ per-Company scheduler sweep: each Company's outbox is processed with that Company's manager; a Company whose connection fails does not stop the other (333 ms)
+    √ subscriber classification: an ambient-only subscriber is NEVER run on a Company event (row → skipped); a Company-scope subscriber runs with {manager, companyId}; ambient sibling on the same topic does not (18 ms)
+    √ concurrent claims (FOR UPDATE SKIP LOCKED): three simultaneous dispatchers process every row exactly once (217 ms)
+    √ lease recovery: a row stuck "processing" past the lease (crashed dispatcher) is reclaimed; a freshly leased row is not (19 ms)
+    √ a failing Company handler leaves the row retryable in THAT Company only (attempts incremented, back to pending) (13 ms)
+    √ type sanity: a transaction manager is accepted by dispatchAfterCommit (compile-time contract) (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        30.638 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\event-engine.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts (30.713 s)
+  D8 acquisition-journal helper — Dr cost / Cr Acquisition Clearing, fail-closed — real-Postgres, A/B
+    √ 1. FAIL CLOSED before any mutation: clearing account unset / unknown / header / inactive / control (AP) → rejected naming the config key; no journal, no event, the asset stays pending (119 ms)
+    √ 2. HAPPY PATH (Option C): Dr asset cost 12000 / Cr Acquisition Clearing 12000, balanced, posted + linked → the asset is ACTIVE; neither AP nor Bank is touched; the GL reads back exactly (138 ms)
+    √ 3. NOT REPEATABLE: a second call is refused (asset no longer pending) and creates nothing; the asset is a normal active asset — a depreciation run charges it (94 ms)
+    √ 4. POSTING FAILURE rolls everything back: an asset acquired in a date with no open fiscal period is rejected with the engine's reason — no journal, no event row, the asset stays pending (81 ms)
+    √ 5. ISOLATION: Company B's helper posts only in B against B's own chart; A is untouched by B; B's DataSource is never requested for A's calls; the Platform DB holds no accounting tables (278 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        30.807 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-acquisition-helper.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts (31.142 s)
+  D8 — fixed-asset acquisition-journal candidates (manual JE + link) — real-Postgres, A/B
+    √ 1. CANDIDATES = POSTED entries with a debit on the asset's cost account for EXACTLY its cost; drafts, other amounts and other accounts are excluded; nothing is created (280 ms)
+    √ 2. LINK activates the asset (rules re-validated at link time); the linked entry is then no longer a candidate for another asset, and linking it again is rejected (210 ms)
+    √ 3. ISOLATION: Company B sees only its own entries/assets; A's asset id is unknown to B; the other Company's DataSource is never requested (134 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        31.232 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-acquisition-link.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts (30.702 s)
+  FA-02 — disposal gain/loss accounts (separate, configured, fail-closed) — real-Postgres, A/B
+    √ 1. LOSS needs the LOSS account: unset / unknown / header / inactive / control-function accounts are rejected BEFORE any mutation; a usable one lets it through (315 ms)
+    √ 2. GAIN needs the GAIN account (and NOT the loss account): unset is rejected before mutation; configured → Cr gain, balanced, no loss line (190 ms)
+    √ 3. BREAK-EVEN (proceeds = cost): no gain/loss line and neither account needs to be configured (144 ms)
+    √ 4. APPROVAL re-checks: if the configured account becomes unusable after submission, the decision is refused BEFORE it is recorded (still pending), and succeeds once fixed (155 ms)
+    √ 5. ISOLATION: the disposal posts into the Company that owns it; B is untouched by A's disposals; B's DataSource is never requested for A's calls; B resolves its OWN accounts (146 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        30.791 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-disposal-gain-loss.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts (32.971 s)
+  FA-02 — disposal reconciliation with real depreciation (NBV, gain, loss) — real-Postgres, A/B
+    √ 1. DEPRECIATION first: the run charges 1000 / 500 (12 months) and the GL accumulated depreciation holds exactly that (426 ms)
+    √ 2. GAIN: NBV 11000, proceeds 12500 → gain 1500 credited to the GAIN account; Dr accum 1000 + Dr cash 12500 = Cr cost 12000 + Cr gain 1500; cost and accumulated depreciation are fully removed from the GL; no decoy / loss account touched (222 ms)
+    √ 3. LOSS: NBV 5500, proceeds 4000 → loss 1500 debited to the LOSS account; Dr accum 500 + Dr cash 4000 + Dr loss 1500 = Cr cost 6000; GL is clean afterwards (159 ms)
+    √ 4. MISSING config with real depreciation: a gain disposal with the gain account unset and a loss disposal with the loss account unset are each rejected before any mutation (194 ms)
+    √ 5. ISOLATION: Company B has its own chart and is untouched by A's disposals; B posts its own gain in B only; A's DataSource-only calls never request B; the Platform DB holds no accounting rows (456 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        33.061 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset-disposal-reconciliation.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+PASS src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts (47.403 s)
+  FixedAssetController Area 21 retrofit — real-Postgres Company isolation
+    √ assets are registered in their own Company; an account of another Company is not a valid reference (120 ms)
+    √ a depreciation run charges and posts only the Company's own active assets, and its GL journal lands in that Company (159 ms)
+    √ a disposal is submitted and decided inside the Company; the other Company can neither see nor decide it; reconciliation runs are local (180 ms)
+    √ Test F — nothing leaked into the other Company's fixed-asset tables (7 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        47.515 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\fixed-asset.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+PASS src/domains/accounting/interface/general-ledger.company-isolation.spec.ts (42.618 s)
+  GeneralLedgerController Area 21 retrofit — real-Postgres Company isolation (2026-10-04)
+    √ create → submit → post for Company A lands entirely in Company A's database (numbered, POSTED) — Company B sees nothing (173 ms)
+    √ Company B posts its own, different journal (250.00) independently — Company A's list is unchanged (103 ms)
+    √ getEntry / updateEntry / submitEntry / postEntry / reverseEntry of Company A's journal id through Company B's manager are all rejected (A→B DENY) (84 ms)
+    √ B→A DENY — Company B's journal id through Company A's manager is rejected (13 ms)
+    √ trial balance / account ledger are per-Company — A totals 100.00, B totals 250.00, never the sum; a foreign account id is rejected (32 ms)
+    √ balance sheet / P&L / cash-flow are per-Company (A 100.00 vs B 250.00) and a foreign tax period id is not found (84 ms)
+    √ financial event ingest for Company A posts a journal in Company A only; list/get/redrive are per-Company (99 ms)
+    √ reversing Company A's journal nets A's trial balance accordingly and leaves Company B untouched (97 ms)
+    √ Test F — resolving Company A's general-ledger data never even requests Company B's DataSource (225 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        42.72 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\general-ledger.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/grni.company-isolation.spec.ts
+PASS src/domains/accounting/interface/grni.company-isolation.spec.ts (31.868 s)
+  GrniController Area 21 retrofit — real-Postgres Company isolation (2026-09-28)
+    √ reconcile for Company A sees Company A's outstanding receipt (20.00) vs an empty GL -> drift_found, persisted in A's database (84 ms)
+    √ reconcile for Company B sees no outstanding receipts -> matched — Company A's 20.00 never leaks into B (79 ms)
+    √ listRuns via Company A returns only A's run, via Company B only B's (10 ms)
+    √ getRun / closeRun of Company A's run id through Company B's manager is rejected (A→B DENY) (45 ms)
+    √ closeRun for Company A closes only Company A's run (22 ms)
+    √ Test F — resolving Company A's GRNI data never even requests Company B's DataSource (16 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        31.967 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\grni.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/grni.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+PASS src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts (47.269 s)
+  Inventory lifecycle C1 - valuation as-of, reconciliation v2, posting status, GL/TB read models - real-Postgres, A/B
+    √ 1. a clean ledger reconciles to MATCHED exactly; the run records basis/classification and the existing status values are unchanged (242 ms)
+    √ 2. rounding is attributed EXACTLY (no tolerance): a fractional average posts 9.7778 -> 9.78, the run is drift_found but EXPLAINED with zero unexplained (214 ms)
+    √ 3. a REJECTED event is itemised as unposted value with its reason, and the posting status turns to attention; re-drive clears both (211 ms)
+    √ 4. a pending outbox row is itemised as unposted value and shows as pending; after the flush it posts once (190 ms)
+    √ 5. an approved F07 entry (GL only) is itemised as "without valuation effect"; the identity explained + unexplained = difference holds (123 ms)
+    √ 6. a valuation-only change with no event and no journal is NOT explained: classification unexplained with the exact remainder (the control still raises the alarm) (98 ms)
+    √ 7. PREVIEW persists nothing; RECONCILE writes only its own run row and audit records - no journal, event, outbox, stock or valuation row (197 ms)
+    √ 8. valuation AS OF a date is rebuilt from the dated history; a past-date reconciliation compares THEN with THEN; history consistency holds (85 ms)
+    √ 9. GL lines carry ADDITIVE traceability (event, reference, entry state) and keep every existing field (28 ms)
+    √ 10. the PERIODIC trial balance: opening + period = closing per account and in total, roll-up from the chart, three independent balance tests; the default payload is unchanged (80 ms)
+    √ 11. the financial status of ONE document, by reference: none / pending / posted - from the events themselves (127 ms)
+    √ 12. the overview COST KPI: valuation of the visible warehouses only, null without the permission, selling price unchanged (200 ms)
+    √ 13. no duplicate journal on any retry or repeated read, and the identity still holds at the end (209 ms)
+    √ 14. ISOLATION: Company B is untouched by every new read, has its own empty answers, and the Platform DataSource was never requested (148 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       14 passed, 14 total
+Snapshots:   0 total
+Time:        47.515 s
+Ran all test suites matching /src\\domains\\accounting\\interface\\inventory-lifecycle-c1.company-isolation.spec.ts/i.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts

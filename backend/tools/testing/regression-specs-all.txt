@@ -101,3 +101,17 @@ src/foundation/release/release-execution-environment-check.spec.ts
 src/foundation/release/release-migration-registry.real-pg.spec.ts
 src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
 src/foundation/scope/access-scope.f6.real-pg.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c4.migrations.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c6.migrations.company-isolation.spec.ts
+src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+
+src/domains/accounting/interface/movement-reason-reference.company-isolation.spec.ts
+src/domains/accounting/interface/movement-reason-reference.migrations.company-isolation.spec.ts
+src/foundation/release/release-upload.http.spec.ts
