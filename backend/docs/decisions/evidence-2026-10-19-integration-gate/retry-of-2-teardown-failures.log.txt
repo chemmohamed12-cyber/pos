@@ -1,0 +1,98 @@
+
+=== REGRESSION: src/foundation/database-provisioning/database-provisioning.service.spec.ts
+PASS src/foundation/database-provisioning/database-provisioning.service.spec.ts (27.786 s)
+  DatabaseProvisioningService (Area 4 + Area 16 joint unit, real disposable Postgres)
+    √ provisions a Company end-to-end: registers the database, migrates it, health-checks it, marks READY (proof points 1, 2, 7) (2128 ms)
+    √ ADR-073 negative integrity proof — an unknown Platform User is rejected BEFORE any Company-DB write, even with no local FK to catch it (1539 ms)
+    √ a provisioning failure (unreachable database) leaves a recoverable FAILED state, does not mark the Company READY (proof point 5) (58 ms)
+    √ retrying with a corrected connection reuses the same registry row and succeeds (proof point 6) (1922 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        27.852 s, estimated 29 s
+Ran all test suites matching /src\\foundation\\database-provisioning\\database-provisioning.service.spec.ts/i.
+RESULT PASS src/foundation/database-provisioning/database-provisioning.service.spec.ts
+
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-old-zjq5rW\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-old-zjq5rW\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-old-zjq5rW\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\core\1790900001001-CoreNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\hr\1790900001003-HrNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\manufacturing\1790900001004-MfgFirst.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\sales\1790900001002-SalesNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-new-DSTFch\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\core\1790900000001-CoreBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\hr\1790900001003-HrNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\core\1790900001001-CoreNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\hr\1790900000003-HrBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\manufacturing\1790900001004-MfgFirst.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\sales\1790900001002-SalesNew.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+ts-jest[ts-compiler] (WARN) Got a `.js` file to compile while `allowJs` option is not set to `true` (file: D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\integration\backend\.test-tmp\fo-fail-WPskss\dist\database\migrations\sales\1790900000002-SalesBase.js). To fix this:
+  - if you want TypeScript to process JS files, set `allowJs` to `true` in your TypeScript config (usually tsconfig.json)
+  - if you do not want TypeScript to process your `.js` files, in your Jest config change the `transform` key which value is `ts-jest` so that it does not match `.js` files anymore
+  console.log
+    Migration "SalesNew1790900001002" failed, error: injected failure in SalesNew
+
+      at Function.log (platform/PlatformTools.ts:274:17)
+
+PASS src/foundation/release/company-fanout.real-pg.spec.ts (47.372 s)
+  Company fan-out — real Postgres (isolated instance only)
+    √ NAME CONVENTION: the file-name -> migration-name mapping that tag derivation relies on matches TypeORM exactly for EVERY migration in the real compiled set (555 ms)
+    √ tagsReceivedByCompany: core always; another tag only if the Company has at least one executed migration of it (1 ms)
+    plan (read-only)
+      √ discovers READY Companies only, derives each one's tags from ITS OWN history, never invents a tag, and writes nothing (7864 ms)
+      √ a READY Company that cannot be evaluated is a BLOCKER (never silently skipped) (1177 ms)
+    restore points
+      √ policy `create`: one verified pre_update backup per Company that has something pending — none for a Company with nothing to do (2494 ms)
+      √ policy `create`: a backup that does not verify BLOCKS (nothing is migrated by this call, by construction) (1228 ms)
+      √ policy `require-recent`: no verified backup => BLOCKED; a verified recent one is accepted (basis `recent`); an OLD one is not (1039 ms)
+    migrate
+      √ HAPPY PATH: every applicable READY Company is migrated READY -> MIGRATING -> READY; the SUSPENDED one and the never-had tag are untouched; verify is clean; a re-run is a no-op; evidence is in the audit chain (8131 ms)
+      √ STOPS AT THE FIRST FAILURE: the earlier Company stays migrated (forward-only), the failing one is rolled back by its own transaction and provably unchanged -> READY, the later one is NOT TOUCHED (5614 ms)
+      √ a Company that is no longer READY at its turn is NOT migrated and the sweep stops (LA-1 re-check at execution time) (2564 ms)
+      √ verify() reports a Company that still has pending migrations (the independent post-condition) (1291 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        47.464 s
+Ran all test suites matching /src\\foundation\\release\\company-fanout.real-pg.spec.ts/i.
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+
+REGRESSION DONE: 2/2 passed
