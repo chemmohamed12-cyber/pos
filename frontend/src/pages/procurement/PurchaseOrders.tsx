@@ -48,6 +48,7 @@ interface GoodsReceipt {
 }
 interface DraftLine {
   productId: string;
+  productSku: string;
   productName: string;
   quantity: string;
   unitCostBase: string;
@@ -70,6 +71,8 @@ export function PurchaseOrders() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
+  // Items assigned to each warehouse (D1) — `null` until loaded or if the call fails, in which case the picker falls back to every item.
+  const [warehouseItems, setWarehouseItems] = useState<Array<{ warehouseId: string; productId: string }> | null>(null);
   const [orders, setOrders] = useState<PurchaseOrderRow[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<PurchaseOrderDetail | null>(null);
@@ -79,6 +82,8 @@ export function PurchaseOrders() {
   const [warehouseId, setWarehouseId] = useState('');
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
   const [lineProductSearch, setLineProductSearch] = useState('');
+  // The item actually picked from the list. Several items can share a name (different codes), so the line is added by this id, never by looking the name up.
+  const [pickedProduct, setPickedProduct] = useState<ProductOption | null>(null);
   const [lineQty, setLineQty] = useState('');
   const [lineCost, setLineCost] = useState('');
   const [creating, setCreating] = useState(false);
@@ -111,6 +116,8 @@ export function PurchaseOrders() {
     'field.status',
     'field.notes',
     'field.product',
+    'field.code',
+    'error.product_already_on_transaction',
     'field.quantity',
     'action.create_purchase_order',
     'action.add_po_line',
@@ -133,16 +140,18 @@ export function PurchaseOrders() {
 
   async function load() {
     try {
-      const [ord, sup, wh, prod] = await Promise.all([
+      const [ord, sup, wh, prod, whItems] = await Promise.all([
         api.get<PurchaseOrderRow[]>('/procurement/purchase-orders'),
         api.get<Supplier[]>('/procurement/suppliers/all'),
         api.get<Warehouse[]>('/inventory/warehouses'),
         api.get<ProductOption[]>('/products/all'),
+        api.get<Array<{ warehouseId: string; productId: string }>>('/inventory/warehouse-items').catch(() => null),
       ]);
       setOrders(ord);
       setSuppliers(sup);
       setWarehouses(wh);
       setProducts(prod);
+      setWarehouseItems(whItems);
       if (wh[0]) setWarehouseId((w) => w || wh[0].id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load purchase orders.');
@@ -169,12 +178,52 @@ export function PurchaseOrders() {
     setReceiveQty({});
   }
 
+  // Only the items assigned to the chosen warehouse are offered (all items while the assignments are unavailable).
+  const pickerProducts = useMemo(() => {
+    if (!warehouseItems || !warehouseId) return products;
+    const assigned = new Set(warehouseItems.filter((w) => w.warehouseId === warehouseId).map((w) => w.productId));
+    return products.filter((p) => assigned.has(p.id));
+  }, [products, warehouseItems, warehouseId]);
+
+  // An item already on the draft is no longer listed in the picker; a scanned or typed code for it still resolves and gets the duplicate warning below.
+  const usedProductIds = useMemo(() => new Set(draftLines.map((l) => l.productId)), [draftLines]);
+
+  function duplicateWarning(product: ProductOption): string {
+    return `"${product.sku}" — ${t('error.product_already_on_transaction')}`;
+  }
+
+  function onPickProduct(product: ProductOption) {
+    if (draftLines.some((l) => l.productId === product.id)) {
+      setError(duplicateWarning(product));
+      setTimeout(() => {
+        setLineProductSearch('');
+        setPickedProduct(null);
+      }, 0); // after the picker has filled its own text
+      return;
+    }
+    setError(null);
+    setPickedProduct(product);
+    setLineProductSearch(product.name);
+  }
+
+  function onSearchTextChange(text: string) {
+    setLineProductSearch(text);
+    setPickedProduct((prev) => (prev && prev.name === text ? prev : null));
+  }
+
   function addDraftLine() {
     if (!lineProductSearch) return;
-    const product = products.find((p) => p.name === lineProductSearch);
+    const sameName = pickerProducts.filter((p) => p.name === lineProductSearch);
+    const product = pickedProduct && pickedProduct.name === lineProductSearch ? pickedProduct : sameName.length === 1 ? sameName[0] : undefined;
     if (!product || !lineQty || !lineCost) return;
-    setDraftLines((prev) => [...prev, { productId: product.id, productName: product.name, quantity: lineQty, unitCostBase: lineCost }]);
+    if (draftLines.some((l) => l.productId === product.id)) {
+      setError(duplicateWarning(product));
+      return;
+    }
+    setError(null);
+    setDraftLines((prev) => [...prev, { productId: product.id, productSku: product.sku, productName: product.name, quantity: lineQty, unitCostBase: lineCost }]);
     setLineProductSearch('');
+    setPickedProduct(null);
     setLineQty('');
     setLineCost('');
   }
@@ -243,6 +292,7 @@ export function PurchaseOrders() {
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.legalName ?? id;
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
+  const productSku = (id: string) => products.find((p) => p.id === id)?.sku ?? '';
 
   return (
     <div>
@@ -267,7 +317,16 @@ export function PurchaseOrders() {
               </div>
               <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
                 <label>{t('field.warehouse')}</label>
-                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required>
+                <select
+                  value={warehouseId}
+                  onChange={(e) => {
+                    setWarehouseId(e.target.value);
+                    setLineProductSearch('');
+                    setPickedProduct(null);
+                    setError(null);
+                  }}
+                  required
+                >
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.code} — {w.name}
@@ -279,7 +338,7 @@ export function PurchaseOrders() {
 
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10 }}>
               <div style={{ minWidth: 260 }}>
-                <ProductCombobox products={products} value={lineProductSearch} onValueChange={setLineProductSearch} onSelect={(p) => setLineProductSearch(p.name)} placeholder={t('field.product')} />
+                <ProductCombobox products={pickerProducts} excludedIds={usedProductIds} value={lineProductSearch} onValueChange={onSearchTextChange} onSelect={onPickProduct} placeholder={t('field.product')} />
               </div>
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>{t('field.quantity')}</label>
@@ -298,6 +357,7 @@ export function PurchaseOrders() {
               <table className="data-table" style={{ marginBottom: 14 }}>
                 <thead>
                   <tr>
+                    <th>{t('field.code')}</th>
                     <th>{t('field.product')}</th>
                     <th>{t('field.quantity')}</th>
                     <th>{t('field.on_hand')} / {t('field.reserved')} / {t('field.available')}</th>
@@ -309,6 +369,7 @@ export function PurchaseOrders() {
                 <tbody>
                   {draftLines.map((l, i) => (
                     <tr key={i}>
+                      <td>{l.productSku}</td>
                       <td>{l.productName}</td>
                       <td>{l.quantity}</td>
                       <StockCell stock={draftStock[l.productId]} />
@@ -322,7 +383,7 @@ export function PurchaseOrders() {
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={4} style={{ textAlign: 'end', fontWeight: 600 }}>
+                    <td colSpan={5} style={{ textAlign: 'end', fontWeight: 600 }}>
                       {t('field.total_amount')}
                     </td>
                     <td style={{ fontWeight: 600 }}>{draftTotal.toFixed(2)}</td>
@@ -411,6 +472,7 @@ export function PurchaseOrders() {
             <table className="data-table" style={{ marginBottom: 14 }}>
               <thead>
                 <tr>
+                  <th>{t('field.code')}</th>
                   <th>{t('field.product')}</th>
                   <th>{t('field.quantity_ordered')}</th>
                   <th>{t('field.quantity_received')}</th>
@@ -423,6 +485,7 @@ export function PurchaseOrders() {
                   const remaining = Number(l.quantity) - Number(l.quantityReceived);
                   return (
                     <tr key={l.id}>
+                      <td>{productSku(l.productId)}</td>
                       <td>{productName(l.productId)}</td>
                       <td>{l.quantity}</td>
                       <td>{l.quantityReceived}</td>

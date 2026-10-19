@@ -17,6 +17,8 @@ interface ProductComboboxProps {
   /** Clears the input after selection instead of filling it with the selected product's name — for "search to add a line" flows. */
   clearOnSelect?: boolean;
   maxResults?: number;
+  /** Items hidden from the LIST (e.g. already on the document). A scanned or typed exact code still resolves them, so the caller can warn instead of the scan being refused. */
+  excludedIds?: ReadonlySet<string>;
   /** Scan-or-type (master data step 2): Enter resolves the typed text as an exact item code / barcode (`GET /products/lookup`). Default on; the list stays the manual fallback. */
   scanLookup?: boolean;
 }
@@ -35,7 +37,7 @@ interface ProductComboboxProps {
  * click still selects. An unknown or unselectable code shows a message and leaves the text and the list in place, so the user
  * can always pick the item by hand. Enter never submits the surrounding form from this field.
  */
-export function ProductCombobox({ products, value, onValueChange, onSelect, placeholder, clearOnSelect, maxResults = 50, scanLookup = true }: ProductComboboxProps) {
+export function ProductCombobox({ products, value, onValueChange, onSelect, placeholder, clearOnSelect, maxResults = 50, scanLookup = true, excludedIds }: ProductComboboxProps) {
   const { t, preload } = useLanguage();
   preload(['panel.barcode_not_found', 'panel.barcode_not_available']);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
@@ -45,9 +47,10 @@ export function ProductCombobox({ products, value, onValueChange, onSelect, plac
 
   const results = useMemo(() => {
     const q = value.trim().toLowerCase();
-    const matches = q ? products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)) : products;
+    const listed = excludedIds ? products.filter((p) => !excludedIds.has(p.id)) : products;
+    const matches = q ? listed.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)) : listed;
     return [...matches].sort((a, b) => a.name.localeCompare(b.name)).slice(0, maxResults);
-  }, [value, products, maxResults]);
+  }, [value, products, maxResults, excludedIds]);
 
   async function resolveCode(raw: string) {
     const code = raw.trim();
