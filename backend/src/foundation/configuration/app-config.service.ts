@@ -219,6 +219,11 @@ export class AppConfigService {
     };
   }
 
+  /** Release Center upload size cap in bytes (`RELEASE_UPLOAD_MAX_MB`, default 200). */
+  get releaseUploadMaxBytes(): number {
+    return (this.configService.get<number>('RELEASE_UPLOAD_MAX_MB') ?? 200) * 1024 * 1024;
+  }
+
   get releaseExecution(): ReleaseExecutionConfig {
     return {
       appRoot: this.configService.get<string>('RELEASE_APP_ROOT')!,
