@@ -1,0 +1,20 @@
+# Ten-file difference review - Main checkout (uncommitted) vs integration 513496f (2026-10-20)
+
+Method: for every uncommitted source file in the Main checkout (master 5e41647 + working changes), compared its content (line endings ignored) with the same path at the integration tip. 85 files are identical; 10 differ. Each difference was read line by line. Classes: A = integration change already replaces the old behaviour; B = main-only change that must be preserved; C = irrelevant / cosmetic.
+
+| # | File | main-only / integration-only lines | What the main-only lines are | Class |
+|---|---|---|---|---|
+| 1 | frontend/src/pages/warehouse/ItemDetails.tsx | 92 / 73 | The earlier **read-only** Item Details (commit baaeb411): the "not defined in the current data model" placeholders for item type / category / default warehouse / reorder level / description / image / barcode, a local `Bom` / `BomComponent` read-only table via `GET /bom/:id`, and the `bom` state + effect. Integration replaces each of them with the committed master-data step 1 version (6fcae5a): editable `ItemBasicPanel`, `ItemBarcodesPanel`, `ItemBomPanel` (the BOM tab the browser check exercised), categories, item-type and below-reorder badge. Every main-only tab body has an integration counterpart; no main-only behaviour is lost. | **A** |
+| 2 | frontend/src/pages/procurement/PurchaseOrders.tsx | 6 / 3 | The first, uncommitted hotfix variant of the picker (an `availableProducts` list filtered before the picker). Integration carries the committed `eef92a1`: `excludedIds` (hides used items by id, scan/typed codes still resolve and get the duplicate warning). Same intent, superseded. | **A** |
+| 3 | backend/src/domains/procurement/application/purchase-order.service.ts | 2 / 4 | The older `list(manager, visibleWarehouseIds)` signature. Integration adds the optional `supplierId` filter (supplier profile purchases tab) while keeping the F6 warehouse filter. Superset. | **A** |
+| 4 | backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts | 1 / 4 | The older spec wiring; integration wires the real `ProductsService` because `unassignItem` now clears a default warehouse. Assertions unchanged. | **A** |
+| 5 | backend/src/domains/inventory-warehouse/interface/inventory.controller.ts | 1 / 18 | One import line without `ValidateIf`. Integration adds the `ValidateIf` import and the `POST items/:productId/default-warehouse` route + DTO (master data step 1). | **A** |
+| 6 | backend/src/domains/inventory-warehouse/application/inventory.service.ts | 0 / 22 | none - integration-only (`setDefaultWarehouse`, default-warehouse clearing on unassign). | **A** (nothing main-only) |
+| 7 | frontend/src/App.tsx | 0 / 2 | none - integration adds the `SupplierProfile` route. | **A** (nothing main-only) |
+| 8 | frontend/src/styles/ui.css | 0 / 28 | none - integration adds the item-master editing styles. | **A** (nothing main-only) |
+| 9 | backend/src/domains/accounting/interface/general-ledger.controller.ts | 1 / 1 | Same import list in a different alphabetical order (`NotFoundException`, `Optional`, `Param` ...). No behaviour. | **C** |
+| 10 | backend/tools/testing/regression-specs-all.txt | 1 / 6 | The `cash-flow-date-validation` spec listed at a different position (same spec, present in integration at line 12); integration additionally lists product-master-data, product-name-uniqueness, customer-profile, supplier-profile and the release specs. | **C** |
+
+Result: **no class B difference.** Every main-only line is an older version of something the integration branch supersedes, or cosmetic. Nothing meaningful is main-only and not understood, so no stop condition applies. The Main checkout files are not read-write touched by the switch (integration runs from its own worktree), so none of this main-only content is deleted either way.
+
+Integration worktree status before the switch: clean except for test evidence produced by the gate runs (untracked `evidence-2026-10-10-biz/T-*` folders, `controlled-scenario-results.json` re-written by the C1 spec, and this evidence folder) - documented, no source changes.
