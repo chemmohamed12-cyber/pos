@@ -45,7 +45,7 @@ export interface InventoryEventBase {
  * inference). See `D3-INVENTORY-POSTING-POLICY-2026-10-04.md`. `'dispatch'` is also the meaning of an event with no
  * `glKind` (events published before D3).
  */
-export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in';
+export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in' | 'opening_reversal' | 'opening_correction';
 
 /**
  * `inventory.movement.recorded` — one allow-listed stock movement (ADR-040 D2, extended by D3 to opening stock,
@@ -126,6 +126,12 @@ export interface InventoryValuationContract {
   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
   /** C1 (ADR-INV-08) - OPTIONAL, read-only: the valued position per warehouse and product, current (no date / today) or rebuilt from the dated history. */
   getValuedPositions?(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
+  /**
+   * C4 (ADR-INV-01 section 2.3) - OPTIONAL, MUTATING, idempotent: appends the offsetting `reversal` history row of a previously recorded receipt (the ORIGINAL
+   * recorded cost, inverted, never recalculated) and returns the value it reversed so the caller can post the matching journal. `null` when the original row does
+   * not exist (nothing is invented).
+   */
+  reverseReceiptCost?(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null>;
   /** C1 - OPTIONAL, read-only: every (warehouse, product) whose running state disagrees with the sum of its own dated history. */
   checkHistoryConsistency?(manager?: EntityManager): Promise<HistoryInconsistency[]>;
   /** PURE — no mutation, ever. The current running unit cost for one product/warehouse, for reference (e.g. an FA-01 maker's read-only lookup — Blueprint D11). */

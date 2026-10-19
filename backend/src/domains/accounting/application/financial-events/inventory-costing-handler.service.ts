@@ -4,6 +4,7 @@ import { INVENTORY_VALUATION_CONTRACT, InventoryGlKind, InventoryValuationContra
 
 const COGS_ACCOUNT_CONFIG_KEY = 'accounting.inventory_cogs_account_code';
 const OPENING_BALANCE_ACCOUNT_CONFIG_KEY = 'accounting.inventory_opening_balance_account_code';
+const OPENING_CORRECTION_ACCOUNT_CONFIG_KEY = 'accounting.inventory_opening_correction_account_code';
 const ADJUSTMENT_GAIN_ACCOUNT_CONFIG_KEY = 'accounting.inventory_adjustment_gain_account_code';
 const ADJUSTMENT_LOSS_ACCOUNT_CONFIG_KEY = 'accounting.inventory_adjustment_loss_account_code';
 const MANUAL_RECEIPT_REASON_ACCOUNTS_CONFIG_KEY = 'accounting.inventory_manual_receipt_reason_accounts';
@@ -97,6 +98,55 @@ export class InventoryCostingHandlerService implements OnModuleInit {
             { accountId: opening.id, credit: total, description: 'Opening balance' },
           ],
           `Opening stock ${str(p.referenceId) ?? event.sourceEntityId}`,
+        );
+      }
+
+      // ---- opening_reversal (C4, ADR-INV-01 2.3): the exceptional correction of an UNTOUCHED opening line. The valuation engine appends the offsetting row at the ORIGINAL recorded
+      //      cost (never recalculated) and the journal reverses the original value: Dr configured opening-balance account / Cr Inventory. Accounts resolved BEFORE the mutation. ----
+      if (glKind === 'opening_reversal') {
+        const originalMovementId = str(p.originalMovementId);
+        if (!originalMovementId) return { kind: 'rejected', reason: 'opening reversal: missing originalMovementId' };
+        const opening = await ctx.resolveConfiguredPostableAccount(OPENING_BALANCE_ACCOUNT_CONFIG_KEY);
+        if (!opening.ok) return configReason('opening-balance', OPENING_BALANCE_ACCOUNT_CONFIG_KEY, opening);
+        const reversed = this.valuation.reverseReceiptCost ? await this.valuation.reverseReceiptCost(`inventory-valuation:receipt:${originalMovementId}`, idempotencyKey, ctx.manager, event.businessDate) : null;
+        if (!reversed || !(Number(reversed.valueBase) > 0)) return { kind: 'rejected', reason: 'opening reversal: the original valuation row was not found - nothing to reverse' };
+        return draft(
+          [
+            { accountId: opening.id, debit: reversed.valueBase, description: 'Opening balance (reversal)' },
+            { accountId: inventoryAccount, credit: reversed.valueBase, description: 'Inventory asset (opening reversed)' },
+          ],
+          `Opening reversal ${str(p.referenceId) ?? event.sourceEntityId}`,
+        );
+      }
+
+      // ---- opening_correction (C4, O-1): an approved, traceable correction of an opening AFTER stock has moved. The counter account is the configured EQUITY-side correction
+      //      account - never profit and loss. Increase: valuation at the supplied unit cost, Dr Inventory / Cr correction; decrease: consumed at the moving average, Dr correction / Cr Inventory. ----
+      if (glKind === 'opening_correction') {
+        const correction = await ctx.resolveConfiguredPostableAccount(OPENING_CORRECTION_ACCOUNT_CONFIG_KEY);
+        if (!correction.ok) return configReason('opening-correction', OPENING_CORRECTION_ACCOUNT_CONFIG_KEY, correction);
+        const label = `Opening correction ${str(p.referenceId) ?? event.sourceEntityId}`;
+        if (quantity > 0) {
+          const unit = str(p.unitCostBase);
+          if (!unit || !(Number(unit) > 0)) return { kind: 'rejected', reason: 'opening correction (increase): missing/invalid unitCostBase' };
+          const total = (quantity * Number(unit)).toFixed(4);
+          await this.valuation.recordReceiptCost(productId, warehouseId, quantity, unit, idempotencyKey, ctx.manager, event.businessDate);
+          return draft(
+            [
+              { accountId: inventoryAccount, debit: total, description: 'Inventory asset (opening correction, increase)' },
+              { accountId: correction.id, credit: total, description: 'Opening correction' },
+            ],
+            label,
+          );
+        }
+        const consumed = await this.valuation.consumeIssueCost(productId, warehouseId, Math.abs(quantity), idempotencyKey, ctx.manager, event.businessDate);
+        if (!consumed) return { kind: 'rejected', reason: 'no_valuation_source' };
+        if ('rejected' in consumed) return { kind: 'rejected', reason: consumed.rejected };
+        return draft(
+          [
+            { accountId: correction.id, debit: consumed.totalCostBase, description: 'Opening correction' },
+            { accountId: inventoryAccount, credit: consumed.totalCostBase, description: 'Inventory asset (opening correction, decrease)' },
+          ],
+          label,
         );
       }
 

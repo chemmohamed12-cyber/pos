@@ -46,7 +46,7 @@ const WAREHOUSE_EXPORT_COLUMNS: ColumnSpec[] = [
   { key: 'code', header: 'Warehouse Code', width: 18 },
   { key: 'name', header: 'Warehouse Name', width: 30 },
 ];
-const OPENING_STOCK_IMPORT_COLUMNS: ColumnSpec[] = [
+export const OPENING_STOCK_IMPORT_COLUMNS: ColumnSpec[] = [
   { key: 'warehouseCode', header: 'Warehouse Code', width: 18, example: 'WH-01' },
   { key: 'productSku', header: 'Product SKU', width: 20, example: 'SKU-0001' },
   { key: 'quantity', header: 'Quantity', width: 14, example: 100 },

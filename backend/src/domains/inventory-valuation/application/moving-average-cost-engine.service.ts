@@ -350,11 +350,11 @@ export class MovingAverageCostEngine implements CostEngine {
     });
   }
 
-  async applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager): Promise<void> {
-    await this.run(manager, async (m) => {
+  async applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null> {
+    return this.run(manager, async (m) => {
       const histRepo = m.getRepository(InventoryValuationMovement);
       const original = await histRepo.findOne({ where: { idempotencyKey: originalIdempotencyKey } });
-      if (!original) return; // nothing to reverse — disclosed, not invented
+      if (!original) return null; // nothing to reverse — disclosed, not invented
 
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [this.lockKey(original.warehouseId, original.productId)]);
 
@@ -406,8 +406,10 @@ export class MovingAverageCostEngine implements CostEngine {
           quantityAfterValueBase: row.after_value,
           averageCostAfterBase: afterAvg,
           idempotencyKey: reversalIdempotencyKey,
+          ...(businessDate ? { businessDate } : {}),
         }),
       );
+      return { valueBase: original.valueDeltaBase };
     });
   }
 

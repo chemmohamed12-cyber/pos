@@ -79,6 +79,14 @@ export const inventoryManifest: ModuleManifest = {
     // `accounting.inventory.adjust`/`.approve` nodes (D11/D21) — F08 does not duplicate FA-01.
     { node: 'inventory.valuation', title_code: 'perm.inventory.valuation', parent: 'inventory' },
     { node: 'inventory.valuation.view', title_code: 'perm.inventory.valuation.view', parent: 'inventory.valuation' },
+
+    // C4 (ADR-INV-01) - the Opening Balance Batch. `.create` drafts / imports / submits / posts (read-only reads); `.approve` decides an opening (FA-01, two approvers);
+    // `.correct` creates and decides a reversal / post-movement correction; `.override` allows the eligibility exception (a pair that already has activity).
+    { node: 'inventory.opening_batch', title_code: 'perm.inventory.opening_batch', parent: 'inventory' },
+    { node: 'inventory.opening_batch.create', title_code: 'perm.inventory.opening_batch.create', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.approve', title_code: 'perm.inventory.opening_batch.approve', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.correct', title_code: 'perm.inventory.opening_batch.correct', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.override', title_code: 'perm.inventory.opening_batch.override', parent: 'inventory.opening_batch' },
   ],
 
   feature_codes: [
@@ -121,6 +129,14 @@ export const inventoryManifest: ModuleManifest = {
       type: 'enum',
       allowed: ['off', 'on'],
       default: 'off',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // C4 (ADR-INV-01 section 2.2.8) - the opening cut-over switch. Off (default): the legacy direct import and the reason `opening_balance` keep working. On: openings come in
+    // only through an Opening Balance Batch; the legacy import is refused and `opening_balance` is reserved. Flip only after the owner has reviewed the real databases (C5).
+    {
+      key: 'inventory.opening_batch_required',
+      type: 'bool',
+      default: false,
       scope_levels: ['platform', 'edition', 'installation'],
     },
     {

@@ -106,3 +106,5 @@ src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isola
 src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
 src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+src/domains/accounting/interface/inventory-lifecycle-c4.migrations.company-isolation.spec.ts

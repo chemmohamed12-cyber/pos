@@ -16,6 +16,7 @@ import {
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { InventoryReservationContract, InventoryLogisticsContract } from '../../../foundation/module-registry/contracts/inventory.contract';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
+import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { INVENTORY_EVENT_TOPICS, INVENTORY_VALUATION_CONTRACT, InventoryGlKind, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 
@@ -37,9 +38,13 @@ export const MANUAL_RECEIPT_REFERENCE_TYPE = 'manual_receipt';
 
 function glKindFor(movementType: MovementType, referenceType: string | null, unitCostBase: string | null | undefined): InventoryGlKind | null {
   if (movementType === 'dispatch') return 'dispatch';
+  // C4 (ADR-INV-01): the reversal and the post-movement correction of an opening batch have their own kinds (checked before the generic adjustment).
+  if (movementType === 'adjustment' && referenceType === 'opening_batch_reversal') return 'opening_reversal';
+  if (movementType === 'adjustment' && referenceType === 'opening_batch_correction') return 'opening_correction';
   if (movementType === 'adjustment') return 'adjustment';
   if (movementType === 'return_in') return 'return_in';
-  if (movementType === 'receipt' && referenceType === 'excel_import' && unitCostBase != null && unitCostBase !== '') return 'opening_stock';
+  // C4 (ADR-INV-01): a posted Opening Balance Batch is an opening exactly like the legacy import; its reversal and its post-movement correction have their own kinds.
+  if (movementType === 'receipt' && (referenceType === 'excel_import' || referenceType === 'opening_batch') && unitCostBase != null && unitCostBase !== '') return 'opening_stock';
   if (movementType === 'receipt' && referenceType === MANUAL_RECEIPT_REFERENCE_TYPE && unitCostBase != null && unitCostBase !== '') return 'manual_receipt';
   return null;
 }
@@ -75,6 +80,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // D3-B — the manual-receipt pre-mutation gate, bound by `accounting` (foundation holder; no module cycle).
     // Unbound ⇒ no accounting installed ⇒ a manual receipt cannot be validated and is rejected (fail-closed).
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
+    // C4 - the cut-over flag `inventory.opening_batch_required`; absent engine = flag off (pre-C4 behaviour).
+    @Optional() private readonly config?: ConfigurationEngineService,
   ) {}
 
   /**
@@ -236,6 +243,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // C2 (ADR-INV-02) — the document's EXPLICIT business date (YYYY-MM-DD). Omitted = today (UTC), exactly as before. Validated BEFORE any write
     // (format, not in the future, open fiscal period) and carried on the event, the valuation history row and therefore the journal.
     businessDate?: string | null,
+    // C4 — additive fields merged into the event payload (batch id, original movement, reason ...); never overrides a standard field.
+    eventExtras?: Record<string, unknown>,
   ): Promise<StockMovement> {
     // F07-H1 (ADR-040 D9, CTO Mandatory Condition 4) — when the caller
     // supplies no transaction of its own, open one here so the
@@ -248,7 +257,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // `manager`) keeps that same atomicity unchanged.
     if (!manager) {
       return this.dataSource.transaction((txManager) =>
-        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode, businessDate),
+        this.recordMovement(warehouseId, productId, quantity, movementType, referenceType, referenceId, actorUserId, txManager, unitCostBase, reasonCode, businessDate, eventExtras),
       );
     }
 
@@ -288,9 +297,10 @@ export class InventoryService implements InventoryReservationContract, Inventory
     // at ingest time, never from this payload; fail-closed (`no_valuation_source`) when unavailable.
     const glKind = glKindFor(movementType, referenceType, unitCostBase);
     // The kinds whose COST is an input resolved BEFORE the movement (every other kind resolves cost from the valuation engine at ingest).
-    const carriesCost = glKind === 'opening_stock' || glKind === 'manual_receipt' || (glKind === 'return_in' && unitCostBase != null && unitCostBase !== '');
+    const carriesCost = glKind === 'opening_stock' || glKind === 'manual_receipt' || ((glKind === 'return_in' || glKind === 'opening_correction') && unitCostBase != null && unitCostBase !== '');
     if (glKind) {
       await this.events.publish(manager, INVENTORY_EVENT_TOPICS.movementRecorded, {
+        ...(eventExtras ?? {}),
         idempotencyKey: `inventory:movement:${movement.id}:recorded`,
         businessDate: eventDate,
         orgUnitId: null,
@@ -1120,6 +1130,10 @@ export class InventoryService implements InventoryReservationContract, Inventory
     /** C2 — the explicit business date (cut-off) of the whole import; omitted = today. A closed period / future date rejects every row with a clear message, nothing written. */
     businessDate?: string | null,
   ): Promise<{ succeeded: StockMovement[]; rejected: Array<{ row: number; errors: string[] }> }> {
+    // C4 (ADR-INV-01 section 2.2.8): once the cut-over flag is on, the legacy direct import is closed - openings come in only through an Opening Balance Batch.
+    if (this.config?.get<unknown>('inventory.opening_batch_required') === true) {
+      throw new ConflictException('The direct opening-stock import is closed: create an Opening Balance Batch (draft, control totals, approval, post) instead.');
+    }
     const succeeded: StockMovement[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
     const allWarehouses = await (manager ?? this.dataSource).getRepository(Warehouse).find();

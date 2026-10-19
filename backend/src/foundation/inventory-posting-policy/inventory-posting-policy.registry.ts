@@ -53,6 +53,12 @@ export interface InventoryPostingPolicy {
    */
   assertPostingDateOpen?(businessDate: string, manager?: EntityManager): Promise<void>;
   /**
+   * C4 (ADR-INV-01) - OPTIONAL pre-mutation gate of an Opening Balance Batch: the `inventory` control account exists and the account its journal needs resolves (opening:
+   * the configured opening-balance account; reversal: the same; correction: the configured opening-correction account, which must be EQUITY-side so a wrong opening
+   * never distorts profit and loss). Throws (409) BEFORE any stock/valuation write. No fallback account.
+   */
+  assertOpeningBatchPostable?(kind: 'opening' | 'reversal' | 'correction', manager?: EntityManager): Promise<void>;
+  /**
    * C2 (ADR-INV-10) - OPTIONAL read-only financial status of the events that reference an operational record (document, movement): what the response of an
    * in-request dispatch reports, so a document never claims "posted to GL" while its posting is pending or rejected.
    */

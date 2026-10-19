@@ -488,6 +488,8 @@ export const accountingManifest: ModuleManifest = {
     // auto-picked account. Resolved via `resolveConfiguredPostableAccount` (must exist, be active, postable, and carry NO
     // control function).
     { key: 'accounting.inventory_opening_balance_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // C4 (ADR-INV-01, decision O-1): the EQUITY-side account an approved correction of an opening balance AFTER stock has moved posts against, so a wrong opening never distorts profit and loss.
+    { key: 'accounting.inventory_opening_correction_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_gain_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_loss_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     // D3-B (2026-10-04) — manual-receipt Reason Code → Offset GL account, as a JSON map `{ "<reasonCode>": "<glAccountCode>" }`.

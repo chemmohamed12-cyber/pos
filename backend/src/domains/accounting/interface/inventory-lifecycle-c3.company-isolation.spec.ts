@@ -3,7 +3,6 @@ import { InventoryService } from '../../inventory-warehouse/application/inventor
 import { WarehouseTransactionsService } from '../../inventory-warehouse/application/warehouse-transactions.service';
 import { InventoryPostingDispatchService } from '../../inventory-warehouse/application/inventory-posting-dispatch.service';
 import { WarehouseTransactionsController } from '../../inventory-warehouse/interface/warehouse-transactions.controller';
-import { InventoryController } from '../../inventory-warehouse/interface/inventory.controller';
 import { ProductsService } from '../../commerce/application/products.service';
 import { InventoryValuationService } from '../../inventory-valuation/application/inventory-valuation.service';
 import { MovingAverageCostEngine } from '../../inventory-valuation/application/moving-average-cost-engine.service';
@@ -28,7 +27,7 @@ import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
-import { setUpTwoCompanyHarness, TwoCompanyHarness, assertDataSourceNeverRequestedFor } from '../../../foundation/testing/two-company-real-pg-harness';
+import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 
 /**
  * Inventory lifecycle, slice C2 (CTO authorisation 2026-10-18) - real PostgreSQL, Company A with Company B as the untouched witness.
@@ -61,7 +60,6 @@ describe('Inventory lifecycle C3 - receipt approval and segregation of duties at
   const worker = randomUUID(); // creates documents
   const supervisor = randomUUID(); // approves / posts
   const nobody = randomUUID(); // holds no role
-  const today = new Date().toISOString().slice(0, 10);
   const daysFrom = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
   const at = (d: number) => new Date(`${daysFrom(d)}T12:00:00Z`);
   type Key = 'A' | 'B';
@@ -173,8 +171,6 @@ describe('Inventory lifecycle C3 - receipt approval and segregation of duties at
       [docId],
     )) as Array<{ status: string; rejectionReason: string | null; journalEntryId: string | null; id: string; eventDate: string; glKind: string }>;
   const journalDate = async (journalEntryId: string) => (await (await dsOf('A')).query(`SELECT "businessDate"::text AS d FROM accounting_journal_entries WHERE id = $1`, [journalEntryId]))[0].d as string;
-  const valuationRows = async () =>
-    (await (await dsOf('A')).query(`SELECT kind, "businessDate"::text AS d, "valueDeltaBase"::text AS v, quantity FROM inventory_valuation_movements ORDER BY "createdAt", id`)) as Array<{ kind: string; d: string; v: string; quantity: number }>;
   const glInventory = async (asOf?: string) => (await ledger.getAccountLedger((await (await dsOf('A')).query(`SELECT id FROM accounting_gl_accounts WHERE code = '1120'`))[0].id, asOf ? { to: asOf } : {}, (await dsOf('A')).manager)).closingBalanceBase;
   const snapshot = async () => ({
     stock: await cnt('A', 'stock_movements'),
