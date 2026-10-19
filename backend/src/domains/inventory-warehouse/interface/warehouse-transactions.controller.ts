@@ -61,6 +61,15 @@ class CreateTransactionDto {
   @IsString()
   reasonCode?: string;
 
+  /** ADR-INV-04 - the record that justifies the document: its type (warehouse_transaction, opening_batch, sales_order, ...) and id. */
+  @IsOptional()
+  @IsString()
+  referenceType?: string;
+
+  @IsOptional()
+  @IsString()
+  referenceId?: string;
+
   @IsOptional()
   @IsString()
   notes?: string;
@@ -151,6 +160,8 @@ export class WarehouseTransactionsController {
       dto.movementDate ? new Date(dto.movementDate) : undefined,
       req.companyContext.dataSource.manager,
       dto.reasonCode ?? null,
+      dto.referenceType ?? null,
+      dto.referenceId ?? null,
     );
   }
 

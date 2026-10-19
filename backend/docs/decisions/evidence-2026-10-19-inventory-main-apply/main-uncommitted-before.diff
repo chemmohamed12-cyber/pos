@@ -1,0 +1,2442 @@
+diff --git a/.claude/launch.json b/.claude/launch.json
+index 5b5ab4a..a39aa76 100644
+--- a/.claude/launch.json
++++ b/.claude/launch.json
+@@ -45,6 +45,100 @@
+         "set VITE_API_TARGET=http://localhost:3601&& npm --prefix frontend run dev -- --host 127.0.0.1 --port 5601"
+       ],
+       "port": 5601
++    },
++    {
++      "name": "cr-backend",
++      "runtimeExecutable": "powershell",
++      "runtimeArgs": [
++        "-NoProfile",
++        "-Command",
++        "Set-Location backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_ui_cp'; $env:PORT='3602'; $env:NODE_ENV='development'; node dist/main.js"
++      ],
++      "port": 3602
++    },
++    {
++      "name": "cr-frontend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "set VITE_API_TARGET=http://localhost:3602&& npm --prefix frontend run dev -- --host 127.0.0.1 --port 5602"
++      ],
++      "port": 5602
++    },
++    {
++      "name": "dev-preview-backend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "cd /d backend && node ../.claude/worktrees/integration/backend/dist/main.js"
++      ],
++      "port": 3500
++    },
++    {
++      "name": "dev-preview-frontend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "npm --prefix .claude/worktrees/integration/frontend run dev -- --host 127.0.0.1 --port 5173"
++      ],
++      "port": 5173
++    },
++    {
++      "name": "md-backend",
++      "runtimeExecutable": "powershell",
++      "runtimeArgs": [
++        "-NoProfile",
++        "-Command",
++        "Set-Location .claude/worktrees/master-data-item/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_ui_cp'; $env:PORT='3603'; $env:NODE_ENV='development'; node dist/main.js"
++      ],
++      "port": 3603
++    },
++    {
++      "name": "md-frontend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "set VITE_API_TARGET=http://localhost:3603&& npm --prefix .claude/worktrees/master-data-item/frontend run dev -- --host 127.0.0.1 --port 5603"
++      ],
++      "port": 5603
++    },
++    {
++      "name": "pv-backend",
++      "runtimeExecutable": "powershell",
++      "runtimeArgs": [
++        "-NoProfile",
++        "-Command",
++        "Set-Location .claude/worktrees/local-preview/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t96_preview_cp'; $env:PORT='3610'; $env:NODE_ENV='development'; node dist/main.js"
++      ],
++      "port": 3610
++    },
++    {
++      "name": "pv-frontend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "set VITE_API_TARGET=http://localhost:3610&& npm --prefix .claude/worktrees/local-preview/frontend run dev -- --host 127.0.0.1 --port 5610"
++      ],
++      "port": 5610
++    },
++    {
++      "name": "bc-backend",
++      "runtimeExecutable": "powershell",
++      "runtimeArgs": [
++        "-NoProfile",
++        "-Command",
++        "Set-Location .claude/worktrees/md-step1/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_bc_cp'; $env:PORT='3611'; $env:NODE_ENV='development'; node dist/main.js"
++      ],
++      "port": 3611
++    },
++    {
++      "name": "bc-frontend",
++      "runtimeExecutable": "cmd",
++      "runtimeArgs": [
++        "/c",
++        "set VITE_API_TARGET=http://localhost:3611&& npm --prefix .claude/worktrees/md-step1/frontend run dev -- --host 127.0.0.1 --port 5611"
++      ],
++      "port": 5611
+     }
+   ]
+-}
++}
+\ No newline at end of file
+diff --git a/backend/docs/decisions/DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md b/backend/docs/decisions/DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md
+index eba5ea1..1acd045 100644
+--- a/backend/docs/decisions/DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md
++++ b/backend/docs/decisions/DAII-FINAL-DECISION-AND-OWNER-REGISTER-2026-10-14.md
+@@ -151,5 +151,15 @@ Total items: **41** across **16** roles.
+ ## Recorded CTO decisions (2026-10-14, "Final Local Phase Closure")
+ Recorded as received; they change no acceptance criterion. (1) GRNI/fixed_asset (A4, C11), F-INV-001 (C5, O1), D-04 (C6, O5) and T2 (C9, O7) are **not automatic blockers of local-development closure**; each stays pending and is not claimed complete. (2) Independent review of matrix rows 19-20 stays **mandatory** (C4, O2). (3) Decisions for rows 14 (A1, A2, R1), 17 (C7, O6), 21 (C1-C3, S1) and 27 (Phase 0 items, C12) are pursued with each owner; nothing is assumed approved. (4) Hosting checks and load tests, formally deferred deployment verification, do not block local closure and stay NOT RUN. (5) Phase 0, Phase 1, Phase 2 and Release remain separate dispositions.
+ 
++## CR-2026-10-15 / F11 items (added 2026-10-15; outside the role index above)
++Source: `F11_COMPLETION_REPORT.md`. Nothing here is assumed approved; "RECORDED" means the instruction of 2026-10-15 fixed the position for this release.
++
++| ID | Subject | Decision / resource / answer needed (exact) | Owner / co-approver | Evidence | Blocks | Status |
++|---|---|---|---|---|---|---|
++| F11-D7 | D7 amendment: PO/PR item eligibility | Sign off that (a) a new PO, (b) a PO approval and (c) a new PR refuse an item that is missing or `discontinued` (409, every bad line listed); a PR may still carry a `draft` item (New Item flow); an already-approved PO stays receivable (D7 in-flight rule unchanged); reject/cancel stay ungated. | CTO; business owner of procurement (to be named) | F11_COMPLETION_REPORT.md §2; procurement-item-eligibility spec | release of F11 | **APPROVED by the owner 2026-10-16** (in chat: refuse missing/discontinued items on a new PO, its approval and a new PR) |
++| F11-DCR7 | D-CR7 ledger-date policy for stock movements | **For this release: keep the current behaviour.** `stock_movements` carries only the posting time `createdAt`; a warehouse document's business date (`warehouse_transactions.movementDate`) stays on the document and is not carried to the ledger; the Warehouse Movements report filters by posting time. Any change (labelling the report "posting date", or carrying the business date onto the ledger with a migration and backfill) needs the authorised owner's approval. | ACCOUNTING_POLICY_OWNER; INVENTORY_OWNER | F11_COMPLETION_REPORT.md §4 M-2; inventory-movement-dates spec test 3 (pins the policy) | any change of the ledger-date basis | RECORDED (current behaviour retained for this release) |
++| F11-TZ | Target-host database session time zone | Run, read-only, on the target host's database as the application role: `SHOW timezone;` and `SELECT now(), current_date;` and attach the output. The movement-report day boundaries (and the existing `dateFrom`, sub-ledger `entryDate` filters) use this zone; local and test clusters are `Africa/Cairo`; the application sets no session zone of its own. | ENVIRONMENT_OWNER; READ_ONLY_OPERATOR | F11_COMPLETION_REPORT.md §4, §7 | confirmation of the M-1 boundary on the host | PENDING (no host access) |
++| F11-RFQ | RFQ-award dead-letter for an item discontinued after PR approval | Retained as a documented residual risk; no rebuild in this scope. The award PO is created by the outbox handler; a refused create is retried and then marked `failed`, the RFQ stays `sent` with no PO (same mechanism already applied to draft items). A buyer-visible exception is a separate future scope. | CTO | F11_COMPLETION_REPORT.md §7 | — | RECORDED (residual risk) |
++
+ ## Rules that apply to every item
+ No name, permission or answer is assumed. A decision pending does not stop unrelated work. No real-database repair or realignment, production change, or restricted operation is performed without the explicit authorisation named in the item. The same question is not asked twice: a role that has already answered is referenced by ID, not re-asked.
+diff --git a/backend/src/domains/accounting/accounting.module.ts b/backend/src/domains/accounting/accounting.module.ts
+index 12bdd12..88b63d8 100644
+--- a/backend/src/domains/accounting/accounting.module.ts
++++ b/backend/src/domains/accounting/accounting.module.ts
+@@ -50,6 +50,7 @@ import { ApAdjustmentService } from './application/ap-adjustment.service';
+ import { CashBankReconciliationService } from './application/cash-bank-reconciliation.service';
+ import { CashBankAdjustmentService } from './application/cash-bank-adjustment.service';
+ import { InventoryReconciliationService } from './application/inventory-reconciliation.service';
++import { PostingStatusService } from './application/posting-status.service';
+ import { InventoryAdjustmentService } from './application/inventory-adjustment.service';
+ import { InventoryCostingHandlerService } from './application/financial-events/inventory-costing-handler.service';
+ import { FixedAssetService } from './application/fixed-asset.service';
+@@ -220,6 +221,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
+     CashBankReconciliationService,
+     CashBankAdjustmentService,
+     InventoryReconciliationService,
++    PostingStatusService,
+     InventoryAdjustmentService,
+     InventoryCostingHandlerService,
+     InventoryPostingPolicyService,
+diff --git a/backend/src/domains/accounting/application/inventory-reconciliation.service.ts b/backend/src/domains/accounting/application/inventory-reconciliation.service.ts
+index 8b289cc..9e6b076 100644
+--- a/backend/src/domains/accounting/application/inventory-reconciliation.service.ts
++++ b/backend/src/domains/accounting/application/inventory-reconciliation.service.ts
+@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
+ import { InventoryReconciliationRun } from '../infrastructure/inventory-reconciliation-run.entity';
+ import { GLAccount } from '../infrastructure/gl-account.entity';
+ import { LedgerService } from './ledger.service';
++import { DifferenceAnalysis, analyzeInventoryDifference } from './inventory-difference-analysis';
+ import { AuditService } from '../../../foundation/audit/audit.service';
+ import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+ import { MANUFACTURING_WIP_CONTRACT, ManufacturingWipContract } from '../../../foundation/module-registry/contracts/manufacturing-wip.contract';
+@@ -106,7 +107,74 @@ export class InventoryReconciliationService {
+     }
+ 
+     // --- Valuation source present (future F08) -------------------------------
+-    const rawValued = await this.valuation.getValuedOnHandTotal(asOfDate, manager);
++    const computed = await this.computeWithValuation(this.valuation, inv.id, asOfDate, glBalanceBase, gl.lines.length, manager);
++    const saved = await this.save(repo, {
++      input,
++      asOfDate,
++      subledgerTotalBase: computed.subledgerTotalBase,
++      glBalanceBase,
++      driftBase: computed.driftBase,
++      status: computed.matched ? 'matched' : 'drift_found',
++      driftBreakdown: computed.driftBreakdown,
++      explainedBase: computed.explainedBase,
++      unexplainedBase: computed.unexplainedBase,
++      basis: computed.basis,
++      classification: computed.classification,
++      actorUserId,
++    }, manager);
++    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase: computed.subledgerTotalBase, glBalanceBase, driftBase: computed.driftBase, status: saved.status, classification: computed.classification }, manager);
++    return saved;
++  }
++
++  /**
++   * Slice C1 (ADR-INV-09) - the SAME computation as `reconcile`, but it persists NOTHING (no run row, no audit record): a pure read for the screen.
++   * Returns the numbers, the classification and the itemised categories.
++   */
++  async preview(input: InventoryReconcileInput, manager?: EntityManager): Promise<Record<string, unknown>> {
++    const asOfDate = input.asOfDate ?? utcBusinessDate();
++    const inv = await this.inventoryAccount(manager);
++    const gl = await this.ledger.getAccountLedger(inv.id, { to: asOfDate, orgUnitId: input.orgUnitId ?? undefined }, manager);
++    if (!this.valuation) {
++      return { asOfDate, status: 'no_valuation_source', classification: null, glBalanceBase: gl.closingBalanceBase, subledgerTotalBase: null, driftBase: null };
++    }
++    const c = await this.computeWithValuation(this.valuation, inv.id, asOfDate, gl.closingBalanceBase, gl.lines.length, manager);
++    return {
++      asOfDate,
++      status: c.matched ? 'matched' : 'drift_found',
++      classification: c.classification,
++      basis: c.basis,
++      subledgerTotalBase: c.subledgerTotalBase,
++      glBalanceBase: gl.closingBalanceBase,
++      driftBase: c.driftBase,
++      explainedBase: c.explainedBase,
++      unexplainedBase: c.unexplainedBase,
++      warehouseBreakdown: c.warehouseBreakdown,
++      analysis: c.analysis,
++      historyInconsistencies: c.historyInconsistencies,
++    };
++  }
++
++  private async computeWithValuation(
++    valuation: InventoryValuationContract,
++    inventoryAccountId: string,
++    asOfDate: string,
++    glBalanceBase: string,
++    glLineCount: number,
++    manager?: EntityManager,
++  ): Promise<{
++    matched: boolean;
++    subledgerTotalBase: string;
++    driftBase: string;
++    explainedBase: string | null;
++    unexplainedBase: string | null;
++    basis: 'current' | 'as_of';
++    classification: 'matched' | 'explained' | 'unexplained';
++    driftBreakdown: Record<string, unknown> | null;
++    warehouseBreakdown: Array<{ warehouseId: string; totalValueBase: string }>;
++    analysis: DifferenceAnalysis;
++    historyInconsistencies: number | null;
++  }> {
++    const rawValued = await valuation.getValuedOnHandTotal(asOfDate, manager);
+     // Month-End dependency (independent review, Phase 1) — exclude every Manufacturing WIP
+     // sub-warehouse from THIS reconciliation's own sum; `WipReconciliationService` covers that
+     // slice against the `wip` GL account separately. See the constructor's `manufacturingWip`
+@@ -125,6 +193,13 @@ export class InventoryReconciliationService {
+     const driftBase = d.drift;
+     const matched = Number(driftBase) === 0;
+ 
++    // C1: itemised, exact attribution (rounding, unposted value, F07, manual journals) - read-only SQL, no tolerance.
++    const analysis = await analyzeInventoryDifference(this.em(manager), this.ledger.postedFilter, inventoryAccountId, asOfDate);
++    const [rem] = (await this.em(manager).query(`SELECT ($1::numeric(20,4) - $2::numeric(20,4))::numeric(20,4) AS unexplained`, [driftBase, analysis.explainedBase])) as Array<{ unexplained: string }>;
++    const classification: 'matched' | 'explained' | 'unexplained' = matched ? 'matched' : Number(rem.unexplained) === 0 ? 'explained' : 'unexplained';
++    const basis: 'current' | 'as_of' = asOfDate < utcBusinessDate() ? 'as_of' : 'current';
++    const history = valuation.checkHistoryConsistency ? (await valuation.checkHistoryConsistency(manager)).length : null;
++
+     const driftBreakdown: Record<string, unknown> | null = matched
+       ? null
+       : {
+@@ -132,21 +207,31 @@ export class InventoryReconciliationService {
+             'The valued on-hand position and the GL `inventory` account differ. Common causes: a dispatch FinancialEvent REJECTED (never posted); a manual journal on the inventory account (blocked — allowManualJournal=false); a movement type not yet mapped to GL.',
+           warehouseBreakdown: valued,
+           glClosingBalanceBase: glBalanceBase,
+-          glLineCount: gl.lines.length,
++          glLineCount,
++          classification,
++          explainedBase: analysis.explainedBase,
++          unexplainedBase: rem.unexplained,
++          categories: analysis.categories,
++          roundingByWarehouse: analysis.roundingByWarehouse,
++          unpostedItems: analysis.unpostedItems,
++          f07Entries: analysis.f07Entries,
++          rejectedWithoutValueEffect: analysis.rejectedWithoutValueEffect,
++          historyInconsistencies: history,
+         };
+ 
+-    const saved = await this.save(repo, {
+-      input,
+-      asOfDate,
++    return {
++      matched,
+       subledgerTotalBase,
+-      glBalanceBase,
+       driftBase,
+-      status: matched ? 'matched' : 'drift_found',
++      explainedBase: matched ? null : analysis.explainedBase,
++      unexplainedBase: matched ? null : rem.unexplained,
++      basis,
++      classification,
+       driftBreakdown,
+-      actorUserId,
+-    }, manager);
+-    await this.recordAudit(actorUserId, saved, { asOfDate, subledgerTotalBase, glBalanceBase, driftBase, status: saved.status }, manager);
+-    return saved;
++      warehouseBreakdown: valued,
++      analysis,
++      historyInconsistencies: history,
++    };
+   }
+ 
+   async closeRun(id: string, actorUserId: string, manager?: EntityManager): Promise<InventoryReconciliationRun> {
+@@ -179,6 +264,10 @@ export class InventoryReconciliationService {
+       driftBase: string | null;
+       status: InventoryReconciliationRun['status'];
+       driftBreakdown: Record<string, unknown> | null;
++      explainedBase?: string | null;
++      unexplainedBase?: string | null;
++      basis?: 'current' | 'as_of' | null;
++      classification?: 'matched' | 'explained' | 'unexplained' | null;
+       actorUserId: string;
+     }, _manager?: EntityManager): Promise<InventoryReconciliationRun> {
+     try {
+@@ -192,6 +281,10 @@ export class InventoryReconciliationService {
+           driftBase: r.driftBase,
+           status: r.status,
+           driftBreakdown: r.driftBreakdown,
++          explainedBase: r.explainedBase ?? null,
++          unexplainedBase: r.unexplainedBase ?? null,
++          basis: r.basis ?? null,
++          classification: r.classification ?? null,
+           runByUserId: r.actorUserId,
+           closedAt: null,
+         }),
+diff --git a/backend/src/domains/accounting/application/ledger.service.ts b/backend/src/domains/accounting/application/ledger.service.ts
+index 9d0ec53..ded575a 100644
+--- a/backend/src/domains/accounting/application/ledger.service.ts
++++ b/backend/src/domains/accounting/application/ledger.service.ts
+@@ -19,6 +19,16 @@ export interface LedgerLineRow {
+   debitBase: string;
+   creditBase: string;
+   runningBalanceBase: string;
++  /**
++   * Slice C1 (ADR-INV-11) - ADDITIVE traceability fields (every existing field above keeps its meaning). `entryState` is `POSTED` or `REVERSED` (a line is only
++   * ever on the ledger in one of those states); the event fields are NULL for entries that did not come from a financial event (manual / opening / reversal of a
++   * manual entry). `referenceType` / `referenceId` are what the originating event carries (warehouse document, opening batch, goods receipt, ...).
++   */
++  entryState?: string | null;
++  financialEventId?: string | null;
++  eventType?: string | null;
++  referenceType?: string | null;
++  referenceId?: string | null;
+ }
+ 
+ export interface AccountLedger {
+@@ -40,13 +50,80 @@ export interface TrialBalanceRow {
+   creditBase: string;
+ }
+ 
++export interface TrialBalanceQuery {
++  orgUnitId?: string;
++  from?: string;
++  to?: string;
++}
++
+ export interface TrialBalance {
+   rows: TrialBalanceRow[];
++  /** GROSS posted debit activity in the window (not the sum of the rows' net figures). */
+   totalDebitBase: string;
++  /** GROSS posted credit activity in the window. */
+   totalCreditBase: string;
+   balanced: boolean;
+ }
+ 
++/**
++ * CR-2026-10-15 — the Trial Balance screen payload. TWO DIFFERENT TOTALS, never interchangeable:
++ *  - `totalDebitBase` / `totalCreditBase` (inherited, LOCKED CONTRACT): GROSS posted activity — Σ of every posted line's debit / credit.
++ *    Signed into closing snapshots (`ClosingSnapshotService`) and asserted by the GL specs. Do not change their meaning.
++ *  - `balanceTotalDebitBase` / `balanceTotalCreditBase`: Σ of the displayed rows — each account's NET balance on its debit or credit
++ *    side. These are what the screen's footer shows. They equal the gross totals only when no account has both debit and credit lines.
++ */
++export interface TrialBalanceReport extends TrialBalance {
++  /** Σ over accounts of GREATEST(net, 0) — the sum of the displayed debit column. */
++  balanceTotalDebitBase: string;
++  /** Σ over accounts of GREATEST(-net, 0) — the sum of the displayed credit column. */
++  balanceTotalCreditBase: string;
++}
++
++/**
++ * Slice C1 (ADR-INV-11) - the PERIODIC trial balance (`GET /accounting/trial-balance?mode=periodic`): per account the opening balance (everything strictly before
++ * `from`), the period debit and credit, and the closing balance, with parent accounts rolled up from the chart. The default `getTrialBalance` /
++ * `getTrialBalanceReport` payloads - including the locked gross totals the closing snapshot signs - are NOT changed by it.
++ */
++export interface PeriodicTrialBalanceRow {
++  accountId: string;
++  code: string;
++  name: string;
++  nameAr: string | null;
++  accountType: string;
++  normalBalance: string;
++  parentAccountId: string | null;
++  /** true for a non-postable (group) account: its figures are the roll-up of its descendants. */
++  isGroup: boolean;
++  /** signed net, debit positive: opening / closing */
++  openingBase: string;
++  closingBase: string;
++  openingDebitBase: string;
++  openingCreditBase: string;
++  periodDebitBase: string;
++  periodCreditBase: string;
++  closingDebitBase: string;
++  closingCreditBase: string;
++}
++
++export interface PeriodicTrialBalance {
++  mode: 'periodic';
++  from: string | null;
++  to: string | null;
++  rows: PeriodicTrialBalanceRow[];
++  /** totals over POSTABLE accounts only (group rows are roll-ups and are never added in) */
++  totals: {
++    openingDebitBase: string;
++    openingCreditBase: string;
++    periodDebitBase: string;
++    periodCreditBase: string;
++    closingDebitBase: string;
++    closingCreditBase: string;
++  };
++  /** each side balances on its own: opening debits = opening credits, period debits = period credits, closing debits = closing credits */
++  balanced: { opening: boolean; period: boolean; closing: boolean };
++  generatedAt: string;
++}
++
+ /**
+  * F03 — General Ledger read model (Blueprint §11, ADR-035 D9). **Every
+  * figure is a PostgreSQL `NUMERIC` aggregation over POSTED
+@@ -64,7 +141,8 @@ export class LedgerService {
+   // A REVERSED entry's lines are permanent historical fact; the reversing entry adds its own
+   // offsetting POSTED lines, so the net is zero but BOTH sets remain visible on the account
+   // (ADR-035 D3 — append-only). Only DRAFT / VALIDATED entries are excluded.
+-  private readonly postedFilter = `EXISTS (
++  /** C1: public (read-only string) so read-side analyses reuse the ONE definition of "a posted entry"; the alias of the entries table must be `e`. */
++  readonly postedFilter = `EXISTS (
+     SELECT 1 FROM process_instances pi
+     WHERE pi."definitionKey" = 'accounting_journal_entry'
+       AND pi."entityType" = 'JournalEntry'
+@@ -121,8 +199,14 @@ export class LedgerService {
+               ($${openParam}::numeric(20,4) + SUM(l."debitBase" - l."creditBase") OVER (
+                  ORDER BY e."businessDate" ASC, e."entryNumber" ASC NULLS LAST, l."lineNumber" ASC
+                  ROWS UNBOUNDED PRECEDING
+-              ))::numeric(20,4) AS "runningBalanceBase"
++              ))::numeric(20,4) AS "runningBalanceBase",
++              (SELECT pi."currentState" FROM process_instances pi
++                WHERE pi."definitionKey" = 'accounting_journal_entry' AND pi."entityType" = 'JournalEntry' AND pi."entityId" = e.id::text LIMIT 1) AS "entryState",
++              fe.id AS "financialEventId", fe."eventType" AS "eventType",
++              COALESCE(fe.payload->>'referenceType', CASE WHEN fe."eventType" = 'procurement.goods_receipt.posted' THEN 'goods_receipt' END) AS "referenceType",
++              COALESCE(fe.payload->>'referenceId', fe.payload->>'goodsReceiptId') AS "referenceId"
+        FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
++       LEFT JOIN accounting_financial_events fe ON fe.id = e."financialEventId"
+        WHERE ${periodScope}
+        ORDER BY e."businessDate" ASC, e."entryNumber" ASC NULLS LAST, l."lineNumber" ASC`,
+       [...periodParams, openingBalanceBase],
+@@ -150,23 +234,9 @@ export class LedgerService {
+   }
+ 
+   /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+-  async getTrialBalance(query: { orgUnitId?: string; from?: string; to?: string } = {}, manager?: EntityManager): Promise<TrialBalance> {
++  async getTrialBalance(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalance> {
+     const runner = manager ?? this.dataSource;
+-    const params: unknown[] = [];
+-    const conds: string[] = [this.postedFilter];
+-    if (query.orgUnitId) {
+-      params.push(query.orgUnitId);
+-      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
+-    }
+-    if (query.from) {
+-      params.push(query.from);
+-      conds.push(`e."businessDate" >= $${params.length}`);
+-    }
+-    if (query.to) {
+-      params.push(query.to);
+-      conds.push(`e."businessDate" <= $${params.length}`);
+-    }
+-    const where = conds.join(' AND ');
++    const { where, params } = this.trialBalanceWhere(query);
+ 
+     const rows = (await runner.query(
+       `SELECT a.id AS "accountId", a.code, a.name, a."accountType", a."normalBalance",
+@@ -201,4 +271,116 @@ export class LedgerService {
+       balanced: tot?.balanced ?? true,
+     };
+   }
++
++  /**
++   * CR-2026-10-15 — the Trial Balance SCREEN. The rows show each account's NET balance, but `totalDebitBase`/`totalCreditBase` are the
++   * GROSS posted activity (a contract the closing snapshot signs and the GL specs assert), so they did not equal the column sums whenever
++   * an account had both debit and credit lines. This adds `balanceTotalDebitBase`/`balanceTotalCreditBase` — the sums of exactly the
++   * displayed row figures, computed SQL-side over the same per-account aggregate — and leaves every existing field unchanged.
++   */
++  async getTrialBalanceReport(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalanceReport> {
++    const runner = manager ?? this.dataSource;
++    const tb = await this.getTrialBalance(query, manager);
++    const { where, params } = this.trialBalanceWhere(query);
++    const [bal] = (await runner.query(
++      `SELECT COALESCE(SUM(GREATEST(net, 0)),0)::numeric(20,4)  AS d,
++              COALESCE(SUM(GREATEST(-net, 0)),0)::numeric(20,4) AS c
++       FROM (
++         SELECT (COALESCE(SUM(l."debitBase"),0) - COALESCE(SUM(l."creditBase"),0))::numeric(20,4) AS net
++         FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
++         WHERE ${where}
++         GROUP BY l."accountId"
++       ) agg`,
++      params,
++    )) as Array<{ d: string; c: string }>;
++    return { ...tb, balanceTotalDebitBase: bal?.d ?? '0.0000', balanceTotalCreditBase: bal?.c ?? '0.0000' };
++  }
++
++  async getPeriodicTrialBalance(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<PeriodicTrialBalance> {
++    const runner = manager ?? this.dataSource;
++    const params: unknown[] = [query.from ?? null, query.to ?? null];
++    let org = '';
++    if (query.orgUnitId) {
++      params.push(query.orgUnitId);
++      org = ` AND (l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`;
++    }
++    const baseCte = `base AS (
++      SELECT l."accountId" AS account_id,
++             COALESCE(SUM(CASE WHEN $1::date IS NOT NULL AND e."businessDate" < $1::date THEN l."debitBase" - l."creditBase" ELSE 0 END), 0) AS opening,
++             COALESCE(SUM(CASE WHEN ($1::date IS NULL OR e."businessDate" >= $1::date) THEN l."debitBase" ELSE 0 END), 0) AS pdr,
++             COALESCE(SUM(CASE WHEN ($1::date IS NULL OR e."businessDate" >= $1::date) THEN l."creditBase" ELSE 0 END), 0) AS pcr
++        FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
++       WHERE ${this.postedFilter} AND ($2::date IS NULL OR e."businessDate" <= $2::date)${org}
++       GROUP BY l."accountId"
++    )`;
++    const rows = (await runner.query(
++      `WITH RECURSIVE ${baseCte},
++       tree AS (
++         SELECT a.id AS leaf_id, a.id AS anc_id, 0 AS depth FROM accounting_gl_accounts a
++         UNION ALL
++         SELECT t.leaf_id, c."parentAccountId", t.depth + 1 FROM tree t JOIN accounting_gl_accounts c ON c.id = t.anc_id
++          WHERE c."parentAccountId" IS NOT NULL AND t.depth < 20
++       ),
++       rolled AS (
++         SELECT t.anc_id AS account_id, SUM(b.opening) AS opening, SUM(b.pdr) AS pdr, SUM(b.pcr) AS pcr
++           FROM tree t JOIN base b ON b.account_id = t.leaf_id GROUP BY t.anc_id
++       )
++       SELECT a.id AS "accountId", a.code, a.name, a."nameAr", a."accountType", a."normalBalance", a."parentAccountId", NOT a."isPostable" AS "isGroup",
++              r.opening::numeric(20,4) AS "openingBase", (r.opening + r.pdr - r.pcr)::numeric(20,4) AS "closingBase",
++              GREATEST(r.opening, 0)::numeric(20,4) AS "openingDebitBase", GREATEST(-r.opening, 0)::numeric(20,4) AS "openingCreditBase",
++              r.pdr::numeric(20,4) AS "periodDebitBase", r.pcr::numeric(20,4) AS "periodCreditBase",
++              GREATEST(r.opening + r.pdr - r.pcr, 0)::numeric(20,4) AS "closingDebitBase", GREATEST(-(r.opening + r.pdr - r.pcr), 0)::numeric(20,4) AS "closingCreditBase"
++         FROM rolled r JOIN accounting_gl_accounts a ON a.id = r.account_id
++        WHERE r.opening <> 0 OR r.pdr <> 0 OR r.pcr <> 0
++        ORDER BY a.code ASC`,
++      params,
++    )) as PeriodicTrialBalanceRow[];
++
++    // totals over the accounts that carry lines (never over roll-ups), straight from the same base aggregate
++    const [t] = (await runner.query(
++      `WITH ${baseCte}
++       SELECT COALESCE(SUM(GREATEST(opening, 0)), 0)::numeric(20,4) AS "openingDebitBase", COALESCE(SUM(GREATEST(-opening, 0)), 0)::numeric(20,4) AS "openingCreditBase",
++              COALESCE(SUM(pdr), 0)::numeric(20,4) AS "periodDebitBase", COALESCE(SUM(pcr), 0)::numeric(20,4) AS "periodCreditBase",
++              COALESCE(SUM(GREATEST(opening + pdr - pcr, 0)), 0)::numeric(20,4) AS "closingDebitBase", COALESCE(SUM(GREATEST(-(opening + pdr - pcr), 0)), 0)::numeric(20,4) AS "closingCreditBase",
++              (COALESCE(SUM(opening), 0) = 0) AS "openingBalanced", (COALESCE(SUM(pdr), 0) = COALESCE(SUM(pcr), 0)) AS "periodBalanced",
++              (COALESCE(SUM(opening + pdr - pcr), 0) = 0) AS "closingBalanced"
++         FROM base`,
++      params,
++    )) as Array<PeriodicTrialBalance['totals'] & { openingBalanced: boolean; periodBalanced: boolean; closingBalanced: boolean }>;
++
++    return {
++      mode: 'periodic',
++      from: query.from ?? null,
++      to: query.to ?? null,
++      rows,
++      totals: {
++        openingDebitBase: t.openingDebitBase,
++        openingCreditBase: t.openingCreditBase,
++        periodDebitBase: t.periodDebitBase,
++        periodCreditBase: t.periodCreditBase,
++        closingDebitBase: t.closingDebitBase,
++        closingCreditBase: t.closingCreditBase,
++      },
++      balanced: { opening: t.openingBalanced, period: t.periodBalanced, closing: t.closingBalanced },
++      generatedAt: new Date().toISOString(),
++    };
++  }
++
++  private trialBalanceWhere(query: TrialBalanceQuery): { where: string; params: unknown[] } {
++    const params: unknown[] = [];
++    const conds: string[] = [this.postedFilter];
++    if (query.orgUnitId) {
++      params.push(query.orgUnitId);
++      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
++    }
++    if (query.from) {
++      params.push(query.from);
++      conds.push(`e."businessDate" >= $${params.length}`);
++    }
++    if (query.to) {
++      params.push(query.to);
++      conds.push(`e."businessDate" <= $${params.length}`);
++    }
++    return { where: conds.join(' AND '), params };
++  }
+ }
+diff --git a/backend/src/domains/accounting/infrastructure/inventory-reconciliation-run.entity.ts b/backend/src/domains/accounting/infrastructure/inventory-reconciliation-run.entity.ts
+index d80c6fc..67ba60d 100644
+--- a/backend/src/domains/accounting/infrastructure/inventory-reconciliation-run.entity.ts
++++ b/backend/src/domains/accounting/infrastructure/inventory-reconciliation-run.entity.ts
+@@ -49,6 +49,22 @@ export class InventoryReconciliationRun {
+   @Column({ type: 'uuid' })
+   runByUserId!: string;
+ 
++  /** Slice C1 (ADR-INV-09) - the part of `driftBase` covered by itemised categories (NULL on runs written before reconciliation v2). */
++  @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
++  explainedBase!: string | null;
++
++  /** The remainder after the itemised categories; NULL on older runs. */
++  @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
++  unexplainedBase!: string | null;
++
++  /** How the valuation side was read: `current` (running state) or `as_of` (rebuilt from the dated history). */
++  @Column({ type: 'varchar', length: 16, nullable: true })
++  basis!: 'current' | 'as_of' | null;
++
++  /** `matched` (difference exactly 0) | `explained` (non-zero, fully explained) | `unexplained`. `status` keeps its original values and meaning. */
++  @Column({ type: 'varchar', length: 16, nullable: true })
++  classification!: 'matched' | 'explained' | 'unexplained' | null;
++
+   @CreateDateColumn({ type: 'timestamptz' })
+   createdAt!: Date;
+ 
+diff --git a/backend/src/domains/accounting/interface/general-ledger.controller.ts b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+index 8c0dd89..c75fdfd 100644
+--- a/backend/src/domains/accounting/interface/general-ledger.controller.ts
++++ b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+@@ -1,4 +1,4 @@
+-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
++import { BadRequestException, Body, Controller, Get, NotFoundException, Optional, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+ import { Throttle } from '@nestjs/throttler';
+ import type { Response } from 'express';
+ import { Type } from 'class-transformer';
+@@ -7,6 +7,7 @@ import { JournalEntryService } from '../application/journal-entry.service';
+ import { LedgerService } from '../application/ledger.service';
+ import { FinancialReportingService, SectionAccountRow } from '../application/financial-reporting.service';
+ import { FinancialEventService } from '../application/financial-events/financial-event.service';
++import { PostingStatusService } from '../application/posting-status.service';
+ import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
+ import { JOURNAL_SOURCE_TYPES } from '../domain/journal';
+ import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+@@ -129,6 +130,23 @@ class ReverseJournalEntryDto {
+   description?: string;
+ }
+ 
++/**
++ * The Cash Flow Statement requires both ends of its period (its depreciation add-back reads `from`/`to`
++ * as calendar dates). A missing or malformed date is rejected with a 400 (VALIDATION_ERROR) before any
++ * query runs, instead of surfacing as a 500 from inside the read model.
++ */
++function requireReportDateRange(from: unknown, to: unknown): void {
++  for (const [name, value] of [['from', from], ['to', to]] as const) {
++    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
++      throw new BadRequestException(`Query parameter "${name}" is required as a date in YYYY-MM-DD format.`);
++    }
++    const d = new Date(`${value}T00:00:00Z`);
++    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) {
++      throw new BadRequestException(`Query parameter "${name}" is not a valid calendar date.`);
++    }
++  }
++}
++
+ /**
+  * F03 — General Ledger + Financial Event Engine (Blueprint §20). Every
+  * route: `@RequireModule('accounting')` (404 for an un-entitled module,
+@@ -152,6 +170,8 @@ export class GeneralLedgerController {
+     private readonly reporting: FinancialReportingService,
+     private readonly financialEvents: FinancialEventService,
+     private readonly excel: ExcelService,
++    // C1: optional so older direct constructions (specs) keep compiling; Nest always provides it.
++    @Optional() private readonly postingStatus?: PostingStatusService,
+   ) {}
+ 
+   // ---- Journals ----
+@@ -249,10 +269,19 @@ export class GeneralLedgerController {
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.ledger.view', 'read-only')
+   @Get('trial-balance')
+-  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
++  async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string, @Query('mode') mode?: string) {
+     if (!req.companyContext) throw new UnauthorizedException();
+     const manager = req.companyContext.dataSource.manager;
+-    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
++    // C1 (ADR-INV-11): `mode=periodic` is an additive read model (opening / period debit / period credit / closing); without it the payload is exactly what it has always been.
++    if (mode === 'periodic') {
++      for (const [name, value] of [['from', from], ['to', to]] as Array<[string, string | undefined]>) {
++        if (value !== undefined && !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) throw new BadRequestException(`Query parameter "${name}" must be a date in YYYY-MM-DD format.`);
++      }
++      return this.ledger.getPeriodicTrialBalance({ from, to, orgUnitId }, manager);
++    }
++    if (mode !== undefined) throw new BadRequestException('mode must be "periodic" or omitted.');
++    // CR-2026-10-15 — same payload plus `balanceTotal*` (the sums of the displayed net rows) for the screen's footer.
++    return this.ledger.getTrialBalanceReport({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+@@ -353,6 +382,7 @@ export class GeneralLedgerController {
+   @Get('reports/cash-flow')
+   async getCashFlowStatement(@Req() req: CompanyScopedRequest, @Query('from') from: string, @Query('to') to: string, @Query('orgUnitId') orgUnitId?: string) {
+     if (!req.companyContext) throw new UnauthorizedException();
++    requireReportDateRange(from, to);
+     const manager = req.companyContext.dataSource.manager;
+     return this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
+   }
+@@ -369,6 +399,7 @@ export class GeneralLedgerController {
+     @Res() res: Response,
+   ) {
+     if (!req.companyContext) throw new UnauthorizedException();
++    requireReportDateRange(from, to);
+     const manager = req.companyContext.dataSource.manager;
+     const cf = await this.reporting.getCashFlowStatement({ from, to, orgUnitId }, manager);
+     const rows = [
+@@ -409,6 +440,30 @@ export class GeneralLedgerController {
+     return { section, code: r.code, name: r.nameAr ?? r.name, balance: r.balance };
+   }
+ 
++  // ---- Posting visibility (slice C1, ADR-INV-10): READ-ONLY. Nothing here writes, retries or re-drives. ----
++
++  @UseGuards(PermissionGuard)
++  @RequirePermission('accounting.financial_event.view', 'read-only')
++  @Get('posting-status')
++  async getPostingStatus(@Req() req: CompanyScopedRequest, @Query('domain') domain?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    if (domain !== undefined && domain !== 'inventory') throw new BadRequestException('domain must be "inventory".');
++    if (!this.postingStatus) throw new NotFoundException();
++    return this.postingStatus.getInventoryStatus(req.companyContext.dataSource.manager);
++  }
++
++  /** The financial effect of one operational document: declared BEFORE `financial-events/:id` so "by-reference" is never parsed as an id. */
++  @UseGuards(PermissionGuard)
++  @RequirePermission('accounting.financial_event.view', 'read-only')
++  @Get('financial-events/by-reference')
++  async getFinancialStatusByReference(@Req() req: CompanyScopedRequest, @Query('referenceType') referenceType?: string, @Query('referenceId') referenceId?: string) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    if (!referenceType || !/^[a-z_]{1,64}$/.test(referenceType)) throw new BadRequestException('referenceType is required (lower-case letters and underscores).');
++    if (!referenceId || !/^[0-9a-f-]{36}$/i.test(referenceId)) throw new BadRequestException('referenceId must be a UUID.');
++    if (!this.postingStatus) throw new NotFoundException();
++    return this.postingStatus.getFinancialStatusByReference(referenceType, referenceId, req.companyContext.dataSource.manager);
++  }
++
+   // ---- Financial Events ----
+ 
+   @UseGuards(PermissionGuard)
+diff --git a/backend/src/domains/accounting/interface/inventory-accounting.controller.ts b/backend/src/domains/accounting/interface/inventory-accounting.controller.ts
+index c1fb8d9..69d2c68 100644
+--- a/backend/src/domains/accounting/interface/inventory-accounting.controller.ts
++++ b/backend/src/domains/accounting/interface/inventory-accounting.controller.ts
+@@ -1,4 +1,4 @@
+-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
++import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+ import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+ import { InventoryReconciliationService } from '../application/inventory-reconciliation.service';
+ import { InventoryAdjustmentService } from '../application/inventory-adjustment.service';
+@@ -100,6 +100,15 @@ export class InventoryAccountingController {
+     return this.reconciliation.getRun(id, req.companyContext!.dataSource.manager);
+   }
+ 
++  /** C1 (ADR-INV-09) - a pure read of the same computation `POST reconciliations` records: persists NOTHING (no run row, no audit record, no event). */
++  @UseGuards(PermissionGuard)
++  @RequirePermission('accounting.inventory.view', 'read-only')
++  @Get('reconciliation-preview')
++  async previewReconciliation(@Req() req: CompanyScopedRequest, @Query('asOfDate') asOfDate?: string, @Query('orgUnitId') orgUnitId?: string) {
++    if (asOfDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) throw new BadRequestException('asOfDate must be a date (YYYY-MM-DD).');
++    return this.reconciliation.preview({ asOfDate, orgUnitId }, req.companyContext!.dataSource.manager);
++  }
++
+   @UseGuards(PermissionGuard)
+   @RequirePermission('accounting.inventory.create', 'editable')
+   @Post('reconciliations')
+diff --git a/backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts b/backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts
+index ef6894b..0f6d1cd 100644
+--- a/backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts
++++ b/backend/src/domains/inventory-valuation/application/inventory-valuation.service.ts
+@@ -1,6 +1,6 @@
+ import { Inject, Injectable } from '@nestjs/common';
+ import { EntityManager } from 'typeorm';
+-import { InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
++import { HistoryInconsistency, InventoryValuationContract, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+ import { COST_ENGINE, CostEngine } from '../domain/cost-engine';
+ 
+ /**
+@@ -23,6 +23,14 @@ export class InventoryValuationService implements InventoryValuationContract {
+     return this.costEngine.getValuedOnHandTotal(asOfDate, manager);
+   }
+ 
++  async getValuedPositions(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]> {
++    return this.costEngine.getValuedPositions(asOfDate, filter, manager);
++  }
++
++  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
++    return this.costEngine.checkHistoryConsistency(manager);
++  }
++
+   async getUnitCost(productId: string, warehouseId: string, _asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null> {
+     return this.costEngine.resolveIssueCost(productId, warehouseId, manager);
+   }
+diff --git a/backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts b/backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts
+index c003526..32a7b1d 100644
+--- a/backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts
++++ b/backend/src/domains/inventory-valuation/application/moving-average-cost-engine.service.ts
+@@ -1,6 +1,7 @@
+ import { Injectable } from '@nestjs/common';
+ import { DataSource, EntityManager } from 'typeorm';
+ import { CostEngine } from '../domain/cost-engine';
++import type { HistoryInconsistency, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+ import { InventoryValuationState } from '../infrastructure/inventory-valuation-state.entity';
+ import { InventoryValuationMovement } from '../infrastructure/inventory-valuation-movement.entity';
+ 
+@@ -408,12 +409,88 @@ export class MovingAverageCostEngine implements CostEngine {
+ 
+   /** Read-only. `asOfDate` is accepted for `InventoryValuationContract` shape compatibility — the
+    * running state IS always "as of now" (ADR-041 D23: no historical reconstruction in F08 V1). */
+-  async getValuedOnHandTotal(_asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
++  /**
++   * C1 (ADR-INV-08): a date that is today (UTC) or later - or no date - reads the running state exactly as before. A PAST date is rebuilt from the dated
++   * history (`inventory_valuation_movements.businessDate <= asOf`), so a historical reconciliation no longer compares "now" with "then".
++   */
++  private isCurrentBasis(asOfDate?: string): boolean {
++    if (!asOfDate) return true;
++    return asOfDate >= new Date().toISOString().slice(0, 10);
++  }
++
++  async getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>> {
++    const source = manager ?? this.dataSource;
++    if (this.isCurrentBasis(asOfDate)) {
++      const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
++        `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
++         FROM inventory_valuation_state GROUP BY "warehouseId"`,
++      );
++      return rows;
++    }
++    return source.query(
++      `SELECT "warehouseId", COALESCE(SUM("valueDeltaBase"), 0)::numeric(20,4) AS "totalValueBase"
++       FROM inventory_valuation_movements WHERE "businessDate" <= $1::date GROUP BY "warehouseId"`,
++      [asOfDate],
++    );
++  }
++
++  async getValuedPositions(asOfDate?: string, filter: ValuedPositionFilter = {}, manager?: EntityManager): Promise<ValuedPosition[]> {
++    const source = manager ?? this.dataSource;
++    const params: unknown[] = [];
++    const conds: string[] = [];
++    if (filter.warehouseIds) {
++      params.push(filter.warehouseIds);
++      conds.push(`"warehouseId" = ANY($${params.length}::uuid[])`);
++    }
++    if (filter.productId) {
++      params.push(filter.productId);
++      conds.push(`"productId" = $${params.length}::uuid`);
++    }
++    const extra = conds.length ? 'AND ' + conds.join(' AND ') : '';
++    type Row = { warehouseId: string; productId: string; quantity: number | string; totalValueBase: string; averageCostBase: string | null };
++    let rows: Row[];
++    if (this.isCurrentBasis(asOfDate)) {
++      rows = await source.query(
++        `SELECT "warehouseId", "productId", "onHandQuantity" AS quantity, "totalValueBase"::numeric(20,4) AS "totalValueBase",
++                CASE WHEN "onHandQuantity" > 0 THEN ("totalValueBase" / "onHandQuantity")::numeric(20,4) ELSE NULL END AS "averageCostBase"
++         FROM inventory_valuation_state
++         WHERE ("onHandQuantity" <> 0 OR "totalValueBase" <> 0) ${extra}
++         ORDER BY "warehouseId", "productId"`,
++        params,
++      );
++    } else {
++      params.push(asOfDate);
++      rows = await source.query(
++        `SELECT "warehouseId", "productId", SUM(quantity)::int AS quantity, SUM("valueDeltaBase")::numeric(20,4) AS "totalValueBase",
++                CASE WHEN SUM(quantity) > 0 THEN (SUM("valueDeltaBase") / SUM(quantity))::numeric(20,4) ELSE NULL END AS "averageCostBase"
++         FROM inventory_valuation_movements
++         WHERE "businessDate" <= $${params.length}::date ${extra}
++         GROUP BY "warehouseId", "productId"
++         HAVING SUM(quantity) <> 0 OR SUM("valueDeltaBase") <> 0
++         ORDER BY "warehouseId", "productId"`,
++        params,
++      );
++    }
++    return rows.map((r) => ({ warehouseId: r.warehouseId, productId: r.productId, quantity: Number(r.quantity), totalValueBase: r.totalValueBase, averageCostBase: r.averageCostBase }));
++  }
++
++  async checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]> {
+     const source = manager ?? this.dataSource;
+-    const rows: Array<{ warehouseId: string; totalValueBase: string }> = await source.query(
+-      `SELECT "warehouseId", COALESCE(SUM("totalValueBase"), 0)::numeric(20,4) AS "totalValueBase"
+-       FROM inventory_valuation_state GROUP BY "warehouseId"`,
++    type Row = { warehouseId: string; productId: string; stateQuantity: number | string; historyQuantity: number | string; stateValueBase: string; historyValueBase: string };
++    const rows: Row[] = await source.query(
++      `WITH h AS (
++         SELECT "warehouseId", "productId", SUM(quantity)::int AS qty, SUM("valueDeltaBase")::numeric(20,4) AS val
++         FROM inventory_valuation_movements GROUP BY 1, 2
++       ), s AS (
++         SELECT "warehouseId", "productId", "onHandQuantity" AS qty, "totalValueBase"::numeric(20,4) AS val FROM inventory_valuation_state
++       )
++       SELECT COALESCE(s."warehouseId", h."warehouseId") AS "warehouseId", COALESCE(s."productId", h."productId") AS "productId",
++              COALESCE(s.qty, 0) AS "stateQuantity", COALESCE(h.qty, 0) AS "historyQuantity",
++              COALESCE(s.val, 0)::numeric(20,4) AS "stateValueBase", COALESCE(h.val, 0)::numeric(20,4) AS "historyValueBase"
++       FROM s FULL OUTER JOIN h ON h."warehouseId" = s."warehouseId" AND h."productId" = s."productId"
++       WHERE COALESCE(s.qty, 0) <> COALESCE(h.qty, 0) OR COALESCE(s.val, 0) <> COALESCE(h.val, 0)
++       ORDER BY 1, 2`,
+     );
+-    return rows;
++    return rows.map((r) => ({ ...r, stateQuantity: Number(r.stateQuantity), historyQuantity: Number(r.historyQuantity) }));
+   }
+ }
+diff --git a/backend/src/domains/inventory-valuation/domain/cost-engine.ts b/backend/src/domains/inventory-valuation/domain/cost-engine.ts
+index bde6f2d..db00dfb 100644
+--- a/backend/src/domains/inventory-valuation/domain/cost-engine.ts
++++ b/backend/src/domains/inventory-valuation/domain/cost-engine.ts
+@@ -1,4 +1,5 @@
+ import { EntityManager } from 'typeorm';
++import type { HistoryInconsistency, ValuedPosition, ValuedPositionFilter } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+ 
+ /**
+  * F08 — Inventory Valuation (ADR-041 D25). F08-internal only — never
+@@ -86,8 +87,14 @@ export interface CostEngine {
+   /** MUTATING — reversal-not-edit (ADR-041 D14): reapplies the ORIGINAL movement's own recorded cost, inverted, as a NEW history row — never edits history, never recalculates. */
+   applyReversal(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager): Promise<void>;
+ 
+-  /** Read-only — the valued on-hand position per warehouse, for F07's reconciliation (D19). */
++  /** Read-only — the valued on-hand position per warehouse, for F07's reconciliation (D19). With a PAST `asOfDate` it is rebuilt from the dated history (C1, ADR-INV-08). */
+   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
++
++  /** C1 (ADR-INV-08) - read-only: the valued position per warehouse AND product, current or as of a date. */
++  getValuedPositions(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
++
++  /** C1 - read-only consistency check of the running state against the sum of its own dated history (every pair that disagrees). */
++  checkHistoryConsistency(manager?: EntityManager): Promise<HistoryInconsistency[]>;
+ }
+ 
+ export const COST_ENGINE = Symbol('COST_ENGINE');
+diff --git a/backend/src/domains/inventory-valuation/infrastructure/inventory-valuation-movement.entity.ts b/backend/src/domains/inventory-valuation/infrastructure/inventory-valuation-movement.entity.ts
+index c00adac..4ccf827 100644
+--- a/backend/src/domains/inventory-valuation/infrastructure/inventory-valuation-movement.entity.ts
++++ b/backend/src/domains/inventory-valuation/infrastructure/inventory-valuation-movement.entity.ts
+@@ -54,4 +54,13 @@ export class InventoryValuationMovement {
+ 
+   @CreateDateColumn({ type: 'timestamptz' })
+   createdAt!: Date;
++
++  /**
++   * Slice C1 (ADR-INV-08) - the accounting-facing (business) date of this valuation movement, so the valuation can be rebuilt AS OF a date.
++   * Defaults in the database to the UTC date at insert time (the date the inventory events carry today); rows written before the column existed
++   * were backfilled with the UTC date of `createdAt` (their PROCESSING date).
++   */
++  @Index('IDX_inventory_valuation_movements_businessDate')
++  @Column({ type: 'date', nullable: true, default: () => `((now() AT TIME ZONE 'UTC')::date)` })
++  businessDate!: string | null;
+ }
+diff --git a/backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts b/backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts
+index 5cca2b1..4aa3764 100644
+--- a/backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts
++++ b/backend/src/domains/inventory-valuation/interface/inventory-valuation.controller.ts
+@@ -1,10 +1,15 @@
+-import { Controller, Get, NotFoundException, ParseUUIDPipe, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
++import { BadRequestException, Controller, Get, NotFoundException, ParseUUIDPipe, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+ import { InventoryValuationService } from '../application/inventory-valuation.service';
+ import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
+ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
+ import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
+ import { PermissionGuard } from '../../../foundation/permission/permission.guard';
+ import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
++import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
++import { WarehouseScopeFiltered } from '../../../foundation/scope/warehouse-scope.decorator';
++
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+ 
+ /**
+  * F08 — Inventory Valuation (ADR-041 D11/D24). Exactly ONE read-only
+@@ -24,7 +29,10 @@ import { RequirePermission } from '../../../foundation/permission/require-permis
+ @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
+ @RequireModule('inventory')
+ export class InventoryValuationController {
+-  constructor(private readonly valuation: InventoryValuationService) {}
++  constructor(
++    private readonly valuation: InventoryValuationService,
++    private readonly scopes: AccessScopeService,
++  ) {}
+ 
+   @UseGuards(PermissionGuard)
+   @RequirePermission('inventory.valuation.view', 'read-only')
+@@ -39,4 +47,71 @@ export class InventoryValuationController {
+     if (!result) throw new NotFoundException('no_valuation_source');
+     return result;
+   }
++
++  /**
++   * Slice C1 (ADR-INV-08) - READ-ONLY valuation report: the valued position per warehouse and item, now or AS OF a date, or per warehouse (`groupBy=warehouse`).
++   * Names are not joined here (this module imports nothing from inventory-warehouse): rows carry ids and the screen resolves them like every other inventory
++   * screen. Warehouse scope (F6): rows of warehouses the caller cannot see are never returned, and naming an invisible warehouse answers 404.
++   * Never writes anything; a past date is rebuilt from the dated history and flagged when that history does not add up to the running state.
++   */
++  @UseGuards(PermissionGuard)
++  @RequirePermission('inventory.valuation.view', 'read-only')
++  @WarehouseScopeFiltered("valuation of the caller's visible warehouses only")
++  @Get('report')
++  async report(
++    @Req() req: CompanyScopedRequest,
++    @Query('warehouseId') warehouseId?: string,
++    @Query('productId') productId?: string,
++    @Query('asOf') asOf?: string,
++    @Query('groupBy') groupBy?: string,
++  ) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    if (warehouseId !== undefined && !UUID_RE.test(warehouseId)) throw new BadRequestException('warehouseId must be a UUID.');
++    if (productId !== undefined && !UUID_RE.test(productId)) throw new BadRequestException('productId must be a UUID.');
++    if (asOf !== undefined && !DATE_RE.test(asOf)) throw new BadRequestException('asOf must be a date (YYYY-MM-DD).');
++    if (groupBy !== undefined && groupBy !== 'warehouse' && groupBy !== 'item') throw new BadRequestException('groupBy must be "warehouse" or "item".');
++    const manager = req.companyContext.dataSource.manager;
++    const scope = await this.scopes.forRequest(req);
++    const visible = await this.scopes.visibleWarehouseIds(scope, manager);
++    if (warehouseId && visible !== 'ALL' && !visible.includes(warehouseId)) throw new NotFoundException();
++    const warehouseIds = warehouseId ? [warehouseId] : visible === 'ALL' ? undefined : visible;
++    const today = new Date().toISOString().slice(0, 10);
++    const basis: 'current' | 'as_of' = asOf && asOf < today ? 'as_of' : 'current';
++    const positions = await this.valuation.getValuedPositions(asOf, { warehouseIds, productId }, manager);
++    let historyInconsistencies: number | null = null;
++    if (basis === 'as_of') historyInconsistencies = (await this.valuation.checkHistoryConsistency(manager)).length;
++    const mode = groupBy ?? 'item';
++    let rows: Array<{ warehouseId: string; productId: string | null; quantity: number; totalValueBase: string; averageCostBase: string | null }>;
++    if (mode === 'warehouse') {
++      const byWarehouse = new Map<string, { quantity: number; scaled: number }>();
++      for (const p of positions) {
++        const cur = byWarehouse.get(p.warehouseId) ?? { quantity: 0, scaled: 0 };
++        cur.quantity += p.quantity;
++        cur.scaled += Math.round(Number(p.totalValueBase) * 10000);
++        byWarehouse.set(p.warehouseId, cur);
++      }
++      rows = [...byWarehouse.entries()].map(([wh, v]) => ({ warehouseId: wh, productId: null, quantity: v.quantity, totalValueBase: this.fmt(v.scaled), averageCostBase: null }));
++    } else {
++      rows = positions.map((p) => ({ warehouseId: p.warehouseId, productId: p.productId, quantity: p.quantity, totalValueBase: p.totalValueBase, averageCostBase: p.averageCostBase }));
++    }
++    const totalScaled = positions.reduce((s, p) => s + Math.round(Number(p.totalValueBase) * 10000), 0);
++    return {
++      asOf: asOf ?? today,
++      basis,
++      groupBy: mode,
++      rows,
++      totals: { quantity: positions.reduce((s, p) => s + p.quantity, 0), valueBase: this.fmt(totalScaled) },
++      historyInconsistencies,
++      note: basis === 'as_of' ? 'Rebuilt from the dated valuation history; movements written before business dates were recorded carry their processing date.' : null,
++    };
++  }
++
++  /** 4-decimal string from a scaled (x10000) integer. Values are numeric(20,4) money amounts well inside the exact-integer range of a double. */
++  private fmt(scaled: number): string {
++    const neg = scaled < 0;
++    const abs = Math.abs(scaled);
++    const whole = Math.floor(abs / 10000);
++    const frac = String(abs % 10000).padStart(4, '0');
++    return `${neg ? '-' : ''}${whole}.${frac}`;
++  }
+ }
+diff --git a/backend/src/domains/inventory-valuation/inventory-valuation.module.ts b/backend/src/domains/inventory-valuation/inventory-valuation.module.ts
+index 3f9568b..52c0762 100644
+--- a/backend/src/domains/inventory-valuation/inventory-valuation.module.ts
++++ b/backend/src/domains/inventory-valuation/inventory-valuation.module.ts
+@@ -11,6 +11,7 @@ import { AuthenticationModule } from '../../foundation/authentication/authentica
+ import { PermissionModule } from '../../foundation/permission/permission.module';
+ import { CompanyModule } from '../../foundation/company/company.module';
+ import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
++import { ScopeModule } from '../../foundation/scope/scope.module';
+ 
+ /**
+  * F08 — Inventory Valuation (ADR-041 D1). Ships under the EXISTING
+@@ -31,6 +32,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
+     // retrofit.
+     CompanyModule,
+     DatabaseRegistryModule,
++    ScopeModule, // C1: the valuation report applies the F6 warehouse scope
+   ],
+   controllers: [InventoryValuationController],
+   providers: [
+diff --git a/backend/src/domains/inventory-warehouse/application/inventory.service.ts b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+index 5ea1e7f..d4f8670 100644
+--- a/backend/src/domains/inventory-warehouse/application/inventory.service.ts
++++ b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+@@ -516,8 +516,17 @@ export class InventoryService implements InventoryReservationContract, Inventory
+     }
+     if (filters.dateTo) {
+       params.push(filters.dateTo);
+-      conditions.push(`"createdAt" <= $${params.length}`);
++      // CR-2026-10-15 (M-1) — the screen sends a date-only `YYYY-MM-DD` (an `<input type="date">`). Compared as `<=` it meant midnight at
++      // the START of that day, so the whole selected end day (including "today") was dropped. A date-only value is now inclusive of the
++      // whole day (`< next day`, the same session-time-zone midnight `dateFrom` already uses); a full timestamp keeps its exact `<=`.
++      conditions.push(
++        /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo)
++          ? `"createdAt" < ($${params.length}::date + 1)`
++          : `"createdAt" <= $${params.length}`,
++      );
+     }
++    // Dates filter the ledger's posting time (`createdAt`). A warehouse document's own business date (`warehouse_transactions.movementDate`,
++    // settable to a past day) is NOT carried onto the stock ledger — that is the current ledger-date policy (decision D-CR7), not a filter bug.
+ 
+     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+     return (manager ?? this.dataSource).query(
+@@ -726,6 +735,20 @@ export class InventoryService implements InventoryReservationContract, Inventory
+     return { requested: unique.length, assigned: inserted.length, alreadyAssigned: unique.length - inserted.length };
+   }
+ 
++  /**
++   * D1 — every (warehouse, item) default/origin marker, for the Products screen's warehouse column. Read-only. `visibleWarehouseIds`
++   * (F6) limits it to the caller's visible warehouses; omitted = unrestricted.
++   */
++  async listWarehouseItemAssignments(visibleWarehouseIds?: string[], manager?: EntityManager): Promise<Array<{ warehouseId: string; productId: string }>> {
++    const params: unknown[] = [];
++    let where = '';
++    if (visibleWarehouseIds) {
++      params.push(visibleWarehouseIds);
++      where = `WHERE "warehouseId" = ANY($1::uuid[])`;
++    }
++    return (manager ?? this.dataSource).query(`SELECT "warehouseId", "productId" FROM "warehouse_items" ${where} ORDER BY "createdAt"`, params);
++  }
++
+   /**
+    * D1 — remove an item's default/origin marker. Always allowed: it is metadata, not stock. If the item still holds stock here it
+    * simply shows up in this warehouse's grid as "holds stock, not a default" (the ledger is the truth).
+diff --git a/backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts b/backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts
+index 7ce80a2..7153a99 100644
+--- a/backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts
++++ b/backend/src/domains/inventory-warehouse/application/warehouse-transactions.service.ts
+@@ -11,6 +11,7 @@ import { AuthorizationService } from '../../../foundation/authorization/authoriz
+ import { AuditService } from '../../../foundation/audit/audit.service';
+ import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
+ import { InventoryService } from './inventory.service';
++import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
+ import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+ 
+ export interface TransactionLineInput {
+@@ -43,6 +44,9 @@ export class WarehouseTransactionsService {
+     private readonly inventory: InventoryService,
+     // D3-B — the manual-receipt gate bound by accounting; unbound ⇒ receipts are rejected (fail-closed).
+     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
++    // Slice C1 (ADR-INV-07) - the cost-based inventory value of the overview. `@Optional()` and last: every existing construction site is unaffected, and an
++    // installation without the valuation module simply reports no cost value.
++    @Optional() @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation?: InventoryValuationContract,
+   ) {}
+ 
+   async createTransaction(
+@@ -247,9 +251,13 @@ export class WarehouseTransactionsService {
+    * per-product/warehouse minimum-stock threshold exists to compare
+    * against yet.
+    */
+-  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[]): Promise<{
++  async getOverview(manager?: EntityManager, visibleWarehouseIds?: string[], includeCost = false): Promise<{
+     totalWarehouses: number;
+     totalInventoryValueAtSellingPrice: string;
++    /** C1 (ADR-INV-07) - the valuation (cost) of the visible warehouses; `null` when the caller may not see valuation or no valuation module is bound. */
++    totalInventoryValueAtCost: string | null;
++    /** C1 - when the cost figure was read (server time). */
++    valuationAsOf: string | null;
+     todaysMovementsCount: number;
+     reservedStockUnits: number;
+     pendingApprovalsCount: number;
+@@ -270,11 +278,24 @@ export class WarehouseTransactionsService {
+     todayStart.setHours(0, 0, 0, 0);
+     const todaysMovements = await this.inventory.listMovements({ dateFrom: todayStart.toISOString(), visibleWarehouseIds }, manager);
+ 
++    // C1 (ADR-INV-07): cost comes from the valuation contract (never a raw table read), summed over the caller's visible warehouses only.
++    let totalInventoryValueAtCost: string | null = null;
++    let valuationAsOf: string | null = null;
++    if (includeCost && this.valuation) {
++      const perWarehouse = await this.valuation.getValuedOnHandTotal(undefined, manager);
++      const visible = visibleWarehouseIds ? new Set(visibleWarehouseIds) : null;
++      const scaled = perWarehouse.filter((w) => !visible || visible.has(w.warehouseId)).reduce((sum, w) => sum + Math.round(Number(w.totalValueBase) * 10000), 0);
++      totalInventoryValueAtCost = (scaled / 10000).toFixed(2);
++      valuationAsOf = new Date().toISOString();
++    }
++
+     return {
+       totalWarehouses: warehouses.length,
+       totalInventoryValueAtSellingPrice: stockReport
+         .reduce((sum, row) => sum + row.onHand * (priceById.get(row.productId) ?? 0), 0)
+         .toFixed(2),
++      totalInventoryValueAtCost,
++      valuationAsOf,
+       todaysMovementsCount: todaysMovements.length,
+       reservedStockUnits: stockReport.reduce((sum, row) => sum + row.reserved, 0),
+       pendingApprovalsCount: allTransactions.filter((t) => t.state === 'submitted').length,
+diff --git a/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts b/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
+index 92fc3fa..949f17c 100644
+--- a/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
++++ b/backend/src/domains/inventory-warehouse/interface/inventory.controller.ts
+@@ -485,6 +485,15 @@ export class InventoryController {
+     );
+   }
+ 
++  /** D1 — every item's default/origin warehouse markers (Products screen column), limited to the caller's visible warehouses. Read-only. */
++  @WarehouseScopeFiltered('warehouse item markers of the caller\'s visible warehouses only')
++  @Get('warehouse-items')
++  async listWarehouseItemAssignments(@Req() req: CompanyScopedRequest) {
++    if (!req.companyContext) throw new UnauthorizedException();
++    const visible = await this.visibleWarehouses(req);
++    return this.inventory.listWarehouseItemAssignments(visible === 'ALL' ? undefined : visible, req.companyContext.dataSource.manager);
++  }
++
+   /** D1 — assign items to a warehouse (master data, bulk, idempotent). Advisory: nothing is blocked by assignment yet. */
+   @UseGuards(PermissionGuard)
+   @RequirePermission('inventory.warehouse.edit', 'editable')
+diff --git a/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts b/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+index 6b63942..9ebf7c0 100644
+--- a/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
++++ b/backend/src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+@@ -130,4 +130,17 @@ describe('D1 — Item↔Warehouse assignment (master data, grid scope, backfill)
+     expect(await service.assignItems(ids.whB, [ids.pB], actor, b.manager)).toEqual({ requested: 1, assigned: 1, alreadyAssigned: 0 });
+     expect(await pairs(a, ids.whA)).not.toContain(ids.pB);
+   });
++
++  it('8. LIST (Products screen column): every marker of the Company; the F6 visible-warehouse filter keeps only those warehouses; per Company', async () => {
++    const a = await dsA();
++    const b = await dsB();
++    const key = (r: { warehouseId: string; productId: string }) => `${r.warehouseId}:${r.productId}`;
++    const expected: Array<{ warehouseId: string; productId: string }> = await a.query(`SELECT "warehouseId", "productId" FROM warehouse_items`);
++    expect((await service.listWarehouseItemAssignments(undefined, a.manager)).map(key).sort()).toEqual(expected.map(key).sort());
++    const onlyA2 = await service.listWarehouseItemAssignments([ids.whA2], a.manager);
++    expect(onlyA2.length).toBeGreaterThan(0);
++    expect(onlyA2.every((r) => r.warehouseId === ids.whA2)).toBe(true);
++    expect(await service.listWarehouseItemAssignments([], a.manager)).toEqual([]);
++    expect((await service.listWarehouseItemAssignments(undefined, b.manager)).map(key)).toEqual([`${ids.whB}:${ids.pB}`]);
++  });
+ });
+diff --git a/backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts b/backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts
+index 316fd3e..0e1efeb 100644
+--- a/backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts
++++ b/backend/src/domains/inventory-warehouse/interface/warehouse-transactions.controller.ts
+@@ -11,6 +11,7 @@ import { AccessScopeService } from '../../../foundation/scope/access-scope.servi
+ import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
+ import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
+ import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
++import { AuthorizationContextService } from '../../../foundation/authorization/authorization-context.service';
+ 
+ class TransactionLineDto {
+   @IsString()
+@@ -119,6 +120,7 @@ export class WarehouseTransactionsController {
+   constructor(
+     private readonly transactions: WarehouseTransactionsService,
+     private readonly scopes: AccessScopeService,
++    private readonly contexts: AuthorizationContextService,
+   ) {}
+ 
+   /** F6 — the caller's visible warehouses for the list/overview filters (`undefined` = unrestricted). */
+@@ -172,7 +174,10 @@ export class WarehouseTransactionsController {
+   @Get('overview')
+   async overview(@Req() req: CompanyScopedRequest) {
+     if (!req.companyContext) throw new UnauthorizedException();
+-    return this.transactions.getOverview(req.companyContext.dataSource.manager, await this.visibleOnly(req));
++    // C1 (ADR-INV-07): the cost figure is only computed for a caller who holds the valuation view permission; everyone else keeps the quantity KPIs and the
++    // selling-price figure exactly as before (the cost fields are null).
++    const includeCost = (await this.contexts.forRequest(req)).hasAtLeast('inventory.valuation.view', 'read-only');
++    return this.transactions.getOverview(req.companyContext.dataSource.manager, await this.visibleOnly(req), includeCost);
+   }
+ 
+   /**
+diff --git a/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts b/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
+index 09dd712..4002e17 100644
+--- a/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
++++ b/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
+@@ -7,8 +7,10 @@ import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundat
+  * approved (Approval Engine, `sales.catalog.edit`) and it becomes `active`; the chain must never carry an item that was not approved:
+  *   - Purchase Request APPROVAL requires every line's product to be `active` (the earliest gate — an approved PR never points at an
+  *     unapproved item), re-checked when the RFQ is raised;
+- *   - PO creation and Goods Receipt refuse a `draft` product (defence in depth for any path that reaches them: direct PO, RFQ award,
+- *     legacy documents) — a later `discontinued` product on an already-issued PO is NOT blocked (in-flight orders keep working).
++ *   - Goods Receipt refuses a `draft` product (defence in depth for legacy documents) — a later `discontinued` product on an
++ *     already-APPROVED PO is NOT blocked (in-flight orders keep working);
++ *   - CR-2026-10-15 amends D7 for PO creation and PO approval: both require every product to exist and be `active` (direct PO and
++ *     RFQ award alike), and PR creation refuses a missing or `discontinued` product (`draft` stays allowed for the New Item flow).
+  * Every check runs BEFORE any mutation (fail closed). The Product is reached only through the published Sales contract.
+  */
+ @Injectable()
+@@ -30,7 +32,24 @@ export class ProductLifecycleGate {
+     );
+   }
+ 
+-  /** No product may still be `draft` (PO creation / Goods Receipt). */
++  /**
++   * CR-2026-10-15 — every product must exist and be in one of `allowed` (PO creation and approval: `active`; PR creation: `active` or
++   * `draft`). Rejects the whole document with one controlled 409 that lists EVERY ineligible line — a missing id never reaches the
++   * database as a raw foreign-key error.
++   */
++  async assertEligible(productIds: string[], allowed: ReadonlyArray<'draft' | 'active' | 'discontinued'>, context: string, manager?: EntityManager): Promise<void> {
++    const bad = (await this.load(productIds, manager)).filter((p) => !p.snapshot || !allowed.includes(p.snapshot.status));
++    if (bad.length === 0) return;
++    // `draft` keeps the D7 wording users already see ("a draft item whose New Item Request has not been approved").
++    const reason = (s: NonNullable<(typeof bad)[number]['snapshot']>) =>
++      s.status === 'draft' ? 'is a draft item whose New Item Request has not been approved' : `is ${s.status}`;
++    throw new ConflictException(
++      `${context}: ${bad.map((p) => (p.snapshot ? `"${p.snapshot.sku} — ${p.snapshot.name}" ${reason(p.snapshot)}` : `item ${p.id} does not exist`)).join('; ')}. ` +
++        'Fix or remove these lines and try again — nothing was saved.',
++    );
++  }
++
++  /** No product may still be `draft` (Goods Receipt). */
+   async assertNoneDraft(productIds: string[], context: string, manager?: EntityManager): Promise<void> {
+     const drafts = (await this.load(productIds, manager)).filter((p) => p.snapshot?.status === 'draft');
+     if (drafts.length === 0) return;
+diff --git a/backend/src/domains/procurement/application/purchase-order.service.ts b/backend/src/domains/procurement/application/purchase-order.service.ts
+index 40e3937..be83309 100644
+--- a/backend/src/domains/procurement/application/purchase-order.service.ts
++++ b/backend/src/domains/procurement/application/purchase-order.service.ts
+@@ -74,7 +74,8 @@ export class PurchaseOrderService {
+     // `purchase_orders.warehouseId` has no FK — an unknown warehouse is rejected (404) before any mutation, same as an unknown supplier above.
+     await this.warehouses.getWarehouse(input.warehouseId, externalManager);
+ 
+-    await this.lifecycleGate.assertNoneDraft(input.lines.map((l) => l.productId), 'Cannot create this Purchase Order', externalManager); // D7 gate (before any mutation)
++    // D7 as amended by CR-2026-10-15: every item must exist and be active (before any mutation; a missing id is a 409, never a raw FK error).
++    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active'], 'Cannot create this Purchase Order', externalManager);
+     await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO', true, externalManager);
+ 
+     const run = async (manager: EntityManager): Promise<PurchaseOrder> => {
+@@ -145,6 +146,12 @@ export class PurchaseOrderService {
+       );
+       throw new ForbiddenException('Maker/checker: the user who created this Purchase Order cannot approve it. Another authorized user must approve it.');
+     }
++    if (action === 'approve') {
++      // CR-2026-10-15 — an item discontinued after the PO was raised blocks its approval (checked BEFORE the transition). Once approved,
++      // the PO is in flight and Goods Receipt stays allowed (D7).
++      const lines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: id } });
++      await this.lifecycleGate.assertEligible(lines.map((l) => l.productId), ['active'], 'Cannot approve this Purchase Order', manager);
++    }
+     const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId, manager);
+     await this.audit.record(
+       {
+diff --git a/backend/src/domains/procurement/application/purchase-request.service.ts b/backend/src/domains/procurement/application/purchase-request.service.ts
+index d4068d4..a741da1 100644
+--- a/backend/src/domains/procurement/application/purchase-request.service.ts
++++ b/backend/src/domains/procurement/application/purchase-request.service.ts
+@@ -83,6 +83,9 @@ export class PurchaseRequestService {
+     // `purchase_requests.warehouseId` has no FK — an unknown warehouse is rejected here (404, the inventory contract's own error), BEFORE any
+     // numbering/mutation, in the caller's Company database. The F6 WarehouseScopeGuard deliberately leaves an unknown warehouse to the handler.
+     await this.warehouses.getWarehouse(input.warehouseId, manager);
++    // CR-2026-10-15 — a missing or discontinued item is refused up front (409, never a raw FK error); a `draft` item stays allowed
++    // because the New Item Request flow raises a PR for it before approval (the approval gate still requires `active`).
++    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active', 'draft'], 'Cannot create this Purchase Request', manager);
+ 
+     await this.numbering.registerDocumentType(PR_DOCUMENT_TYPE, 'PR', true, manager);
+ 
+diff --git a/backend/src/foundation/module-registry/contracts/inventory-events.contract.ts b/backend/src/foundation/module-registry/contracts/inventory-events.contract.ts
+index 01f524e..899e4c2 100644
+--- a/backend/src/foundation/module-registry/contracts/inventory-events.contract.ts
++++ b/backend/src/foundation/module-registry/contracts/inventory-events.contract.ts
+@@ -98,9 +98,36 @@ export const INVENTORY_ADJUSTMENT_APPROVED_EVENT = 'accounting.inventory.adjustm
+  * Valuation — FIFO/moving-average/standard cost) domain binds an
+  * implementation to light this up, with zero F07 change.
+  */
++export interface ValuedPositionFilter {
++  warehouseIds?: string[];
++  productId?: string;
++}
++
++export interface ValuedPosition {
++  warehouseId: string;
++  productId: string;
++  quantity: number;
++  totalValueBase: string;
++  /** `totalValueBase / quantity` at 4 dp, or NULL when the quantity is not positive. */
++  averageCostBase: string | null;
++}
++
++export interface HistoryInconsistency {
++  warehouseId: string;
++  productId: string;
++  stateQuantity: number;
++  historyQuantity: number;
++  stateValueBase: string;
++  historyValueBase: string;
++}
++
+ export interface InventoryValuationContract {
+   /** The valued on-hand position per warehouse, as of a date. Read-only. */
+   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
++  /** C1 (ADR-INV-08) - OPTIONAL, read-only: the valued position per warehouse and product, current (no date / today) or rebuilt from the dated history. */
++  getValuedPositions?(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
++  /** C1 - OPTIONAL, read-only: every (warehouse, product) whose running state disagrees with the sum of its own dated history. */
++  checkHistoryConsistency?(manager?: EntityManager): Promise<HistoryInconsistency[]>;
+   /** PURE — no mutation, ever. The current running unit cost for one product/warehouse, for reference (e.g. an FA-01 maker's read-only lookup — Blueprint D11). */
+   getUnitCost(productId: string, warehouseId: string, asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null>;
+   /**
+diff --git a/backend/src/foundation/navigation/navigation-registry.ts b/backend/src/foundation/navigation/navigation-registry.ts
+index 24d398f..ad304b8 100644
+--- a/backend/src/foundation/navigation/navigation-registry.ts
++++ b/backend/src/foundation/navigation/navigation-registry.ts
+@@ -102,6 +102,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
+       { to: '/movement-center', code: 'nav.movement_center', module: 'inventory', workflowRule: 'nav.warehouse' },
+       { to: '/inventory', code: 'nav.inventory', module: 'inventory', workflowRule: 'nav.warehouse' },
+       { to: '/stock-count', code: 'nav.stock_count', module: 'inventory', workflowRule: 'nav.warehouse' },
++      // C1 (2026-10-17): the valuation report is served by `GET inventory/valuation/report`, gated by `inventory.valuation.view` (read-only).
++      { to: '/inventory/valuation-report', code: 'nav.valuation_report', module: 'inventory', permissionNode: 'inventory.valuation' },
+     ],
+   },
+   {
+diff --git a/backend/tools/testing/regression-specs-all.txt b/backend/tools/testing/regression-specs-all.txt
+index 524a231..8e02b3d 100644
+--- a/backend/tools/testing/regression-specs-all.txt
++++ b/backend/tools/testing/regression-specs-all.txt
+@@ -8,6 +8,7 @@ src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolatio
+ src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+ src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+ src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
++src/domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts
+ src/domains/accounting/interface/grni.company-isolation.spec.ts
+ src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+ src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts
+@@ -33,6 +34,7 @@ src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+ src/domains/hr/interface/hr.company-isolation.spec.ts
+ src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
++src/domains/inventory-warehouse/interface/inventory-movement-dates.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+ src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+@@ -44,6 +46,7 @@ src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+ src/domains/procurement/interface/new-item-request.company-isolation.spec.ts
+ src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+ src/domains/procurement/interface/purchase-request.company-isolation.spec.ts
++src/domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts
+ src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts
+ src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts
+ src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+@@ -94,3 +97,6 @@ src/foundation/release/release-execution-environment-check.spec.ts
+ src/foundation/release/release-migration-registry.real-pg.spec.ts
+ src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+ src/foundation/scope/access-scope.f6.real-pg.spec.ts
++src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
++src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
++src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 5d37939..4042750 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -114,9 +114,11 @@ import { CustomerPrint } from './pages/print/CustomerPrint';
+ import { ProductListPrint } from './pages/print/ProductListPrint';
+ import { PriceListPrint } from './pages/print/PriceListPrint';
+ import { WarehouseOverview } from './pages/warehouse/WarehouseOverview';
++import { ValuationReport } from './pages/warehouse/ValuationReport';
+ import { MovementCenter } from './pages/warehouse/MovementCenter';
+ import { WarehouseTransactionForm } from './pages/warehouse/WarehouseTransactionForm';
+ import { WarehouseTransactionDetail } from './pages/warehouse/WarehouseTransactionDetail';
++import { ItemDetailsRoute } from './pages/warehouse/ItemDetails';
+ import { StockCountStart } from './pages/warehouse/StockCountStart';
+ import { StockCountEntry } from './pages/warehouse/StockCountEntry';
+ import { WarehouseTransactionPrint } from './pages/print/WarehouseTransactionPrint';
+@@ -216,6 +218,7 @@ function AppRoutes() {
+         <Route path="purchase-requests" element={<PurchaseRequests />} />
+         <Route path="rfqs" element={<Rfqs />} />
+         <Route path="inventory" element={<Inventory />} />
++        <Route path="inventory/items/:productId" element={<ItemDetailsRoute />} />
+         <Route path="fulfillment" element={<Fulfillment />} />
+         <Route path="shipments" element={<Shipments />} />
+         <Route path="shipping-methods" element={<ShippingMethods />} />
+@@ -279,6 +282,7 @@ function AppRoutes() {
+         <Route path="accounting/journals/:id" element={<JournalDetail />} />
+         <Route path="accounting/ledger" element={<GeneralLedger />} />
+         <Route path="accounting/trial-balance" element={<TrialBalance />} />
++        <Route path="inventory/valuation-report" element={<ValuationReport />} />
+         <Route path="accounting/financial-events" element={<FinancialEvents />} />
+         <Route path="accounting/ar" element={<ArReconciliation />} />
+         <Route path="accounting/ap" element={<ApReconciliation />} />
+diff --git a/frontend/src/pages/Inventory.tsx b/frontend/src/pages/Inventory.tsx
+index c95d495..09271c4 100644
+--- a/frontend/src/pages/Inventory.tsx
++++ b/frontend/src/pages/Inventory.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useMemo, useState } from 'react';
+-import { useSearchParams } from 'react-router-dom';
++import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+ import { api, ApiError } from '../lib/api';
+ import { useAuth } from '../context/AuthContext';
+ import { useLanguage } from '../context/LanguageContext';
+@@ -47,6 +47,7 @@ type SortColumn = (typeof SORTABLE_COLUMNS)[number];
+ export function Inventory() {
+   const { can } = useAuth();
+   const { t, preload } = useLanguage();
++  const navigate = useNavigate();
+   const [searchParams, setSearchParams] = useSearchParams();
+   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+   const [warehouseId, setWarehouseId] = useState('');
+@@ -99,6 +100,7 @@ export function Inventory() {
+     'field.rejected_rows',
+     'field.row',
+     'field.errors',
++    'action.open_item_details',
+   ]);
+ 
+   useEffect(() => {
+@@ -192,6 +194,9 @@ export function Inventory() {
+     }
+   }
+ 
++  // The originating warehouse travels with the item link so its page can return here.
++  const itemHref = (productId: string) => `/inventory/items/${productId}${warehouseId ? `?warehouseId=${warehouseId}` : ''}`;
++
+   const totalPages = useMemo(() => (data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1), [data]);
+ 
+   function sortIndicator(col: SortColumn) {
+@@ -330,16 +335,33 @@ export function Inventory() {
+               </thead>
+               <tbody>
+                 {data.rows.map((r) => (
+-                  <tr key={r.productId}>
+-                    <td>{r.sku}</td>
+-                    <td>{r.name}</td>
++                  // Item Details click-through: the whole row opens the item; SKU and name are real links (keyboard / new tab).
++                  <tr key={r.productId} className="clickable-row" onClick={() => navigate(itemHref(r.productId))}>
++                    <td>
++                      <Link to={itemHref(r.productId)} onClick={(e) => e.stopPropagation()} title={t('action.open_item_details')}>
++                        {r.sku}
++                      </Link>
++                    </td>
++                    <td>
++                      <Link to={itemHref(r.productId)} onClick={(e) => e.stopPropagation()} title={t('action.open_item_details')}>
++                        {r.name}
++                      </Link>
++                    </td>
+                     <td>{r.unit ?? '—'}</td>
+                     <td style={{ whiteSpace: 'nowrap' }}>
+                       {r.assigned ? (
+                         <>
+                           <span style={{ color: '#166534' }}>{t('value.assigned.yes')}</span>
+                           {can('inventory.warehouse.edit', 'editable') && (
+-                            <button className="btn btn-secondary" style={{ marginInlineStart: 8 }} title={t('action.remove_from_warehouse')} onClick={() => removeItem(r.productId)}>
++                            <button
++                              className="btn btn-secondary"
++                              style={{ marginInlineStart: 8 }}
++                              title={t('action.remove_from_warehouse')}
++                              onClick={(e) => {
++                                e.stopPropagation();
++                                removeItem(r.productId);
++                              }}
++                            >
+                               ×
+                             </button>
+                           )}
+diff --git a/frontend/src/pages/Products.tsx b/frontend/src/pages/Products.tsx
+index 118a822..a23053d 100644
+--- a/frontend/src/pages/Products.tsx
++++ b/frontend/src/pages/Products.tsx
+@@ -39,6 +39,9 @@ export function Products() {
+   const [editName, setEditName] = useState('');
+   const [editPrice, setEditPrice] = useState('');
+   const [editUnit, setEditUnit] = useState('');
++  // D1 — the item's default/origin warehouses (warehouse_items markers), shown as a column and editable with the item.
++  const [assignments, setAssignments] = useState<Map<string, string[]>>(new Map());
++  const [editWarehouseIds, setEditWarehouseIds] = useState<string[]>([]);
+   const [savingEdit, setSavingEdit] = useState(false);
+ 
+   preload([
+@@ -48,6 +51,7 @@ export function Products() {
+     'field.unit_price',
+     'field.unit',
+     'field.default_warehouse',
++    'field.warehouse',
+     'field.status',
+     'field.actions',
+     'action.create',
+@@ -71,11 +75,29 @@ export function Products() {
+     try {
+       const data = await api.get<Product[]>('/products/all');
+       setProducts(data);
++      await loadAssignments();
+     } catch (err) {
+       setError(err instanceof ApiError ? err.message : 'Failed to load products.');
+     }
+   }
+ 
++  async function loadAssignments() {
++    try {
++      const rows = await api.get<Array<{ warehouseId: string; productId: string }>>('/inventory/warehouse-items');
++      const map = new Map<string, string[]>();
++      for (const r of rows) map.set(r.productId, [...(map.get(r.productId) ?? []), r.warehouseId]);
++      setAssignments(map);
++    } catch {
++      setAssignments(new Map()); // optional column — the catalogue still works without warehouse access
++    }
++  }
++
++  const warehouseLabel = (id: string) => {
++    const w = warehouses.find((x) => x.id === id);
++    return w ? `${w.code} — ${w.name}` : null;
++  };
++  const canEditWarehouses = can('inventory.warehouse.edit', 'editable') && warehouses.length > 0;
++
+   useEffect(() => {
+     load();
+     api
+@@ -115,6 +137,7 @@ export function Products() {
+     setEditName(product.name);
+     setEditPrice(product.unitPrice);
+     setEditUnit(product.unit ?? '');
++    setEditWarehouseIds(assignments.get(product.id) ?? []);
+     setError(null);
+   }
+ 
+@@ -135,6 +158,15 @@ export function Products() {
+       if (editUnit !== (product.unit ?? '')) {
+         await api.post(`/products/${product.id}/unit`, { unit: editUnit });
+       }
++      if (canEditWarehouses) {
++        const before = assignments.get(product.id) ?? [];
++        for (const id of editWarehouseIds.filter((w) => !before.includes(w))) {
++          await api.post(`/inventory/warehouses/${id}/items`, { productIds: [product.id] });
++        }
++        for (const id of before.filter((w) => !editWarehouseIds.includes(w))) {
++          await api.delete(`/inventory/warehouses/${id}/items/${product.id}`);
++        }
++      }
+       setEditingId(null);
+       await load();
+     } catch (err) {
+@@ -230,6 +262,7 @@ export function Products() {
+               <th>{t('field.name')}</th>
+               <th>{t('field.unit_price')}</th>
+               <th>{t('field.unit')}</th>
++              <th>{t('field.warehouse')}</th>
+               <th>{t('field.status')}</th>
+               {can('sales.catalog.edit', 'editable') && <th>{t('field.actions')}</th>}
+             </tr>
+@@ -250,6 +283,26 @@ export function Products() {
+                     )}
+                   </td>
+                   <td>{isEditing ? <input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} /> : (p.unit ?? '—')}</td>
++                  <td>
++                    {isEditing && canEditWarehouses ? (
++                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
++                        {warehouses.map((w) => (
++                          <label key={w.id} style={{ display: 'flex', gap: 6, alignItems: 'center', whiteSpace: 'nowrap' }}>
++                            <input
++                              type="checkbox"
++                              checked={editWarehouseIds.includes(w.id)}
++                              onChange={(e) =>
++                                setEditWarehouseIds((prev) => (e.target.checked ? [...prev, w.id] : prev.filter((x) => x !== w.id)))
++                              }
++                            />
++                            {w.code} — {w.name}
++                          </label>
++                        ))}
++                      </div>
++                    ) : (
++                      (assignments.get(p.id) ?? []).map(warehouseLabel).filter(Boolean).join('، ') || '—'
++                    )}
++                  </td>
+                   <td>
+                     <StatusBadge code={`product_status.${p.status}`} />
+                   </td>
+diff --git a/frontend/src/pages/accounting/FinancialEvents.tsx b/frontend/src/pages/accounting/FinancialEvents.tsx
+index 7c4a10c..dcfd0cc 100644
+--- a/frontend/src/pages/accounting/FinancialEvents.tsx
++++ b/frontend/src/pages/accounting/FinancialEvents.tsx
+@@ -1,7 +1,9 @@
+-import { useEffect, useState } from 'react';
++import { useState } from 'react';
+ import { api, ApiError } from '../../lib/api';
+ import { useLanguage } from '../../context/LanguageContext';
+ import { StatusBadge } from '../../components/StatusBadge';
++import { useAutoRefresh } from '../../lib/useAutoRefresh';
++import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+ 
+ interface FinancialEvent {
+   id: string;
+@@ -39,26 +41,28 @@ export function FinancialEvents() {
+   const [busyId, setBusyId] = useState<string | null>(null);
+   const [error, setError] = useState<string | null>(null);
+ 
+-  async function load() {
+-    try {
+-      const qs = status ? `?status=${status}` : '';
+-      setEvents(await api.get<FinancialEvent[]>(`/accounting/financial-events${qs}`));
+-    } catch (err) {
+-      setError(err instanceof ApiError ? err.message : 'Failed to load financial events.');
+-    }
+-  }
+-
+-  useEffect(() => {
+-    load();
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [status]);
++  const refresh = useAutoRefresh(
++    async (isCurrent) => {
++      try {
++        const qs = status ? `?status=${status}` : '';
++        const list = await api.get<FinancialEvent[]>(`/accounting/financial-events${qs}`);
++        if (!isCurrent()) return;
++        setEvents(list);
++        setError(null);
++      } catch (err) {
++        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load financial events.');
++        throw err;
++      }
++    },
++    [status],
++  );
+ 
+   async function redrive(id: string) {
+     setBusyId(id);
+     setError(null);
+     try {
+       await api.post(`/accounting/financial-events/${id}/redrive`);
+-      await load();
++      refresh.refresh();
+     } catch (err) {
+       setError(err instanceof ApiError ? err.message : 'Failed to redrive event.');
+     } finally {
+@@ -70,6 +74,10 @@ export function FinancialEvents() {
+     <div>
+       <div className="page-header">
+         <h1>{t('nav.financial_events')}</h1>
++        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++          <PostingStatusChip />
++          <RefreshStamp refresh={refresh} />
++        </div>
+       </div>
+ 
+       <div className="card" style={{ marginBottom: 20 }}>
+diff --git a/frontend/src/pages/accounting/GeneralLedger.tsx b/frontend/src/pages/accounting/GeneralLedger.tsx
+index 6c5952a..6b22b32 100644
+--- a/frontend/src/pages/accounting/GeneralLedger.tsx
++++ b/frontend/src/pages/accounting/GeneralLedger.tsx
+@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
+ import { useSearchParams } from 'react-router-dom';
+ import { api, ApiError } from '../../lib/api';
+ import { useLanguage } from '../../context/LanguageContext';
++import { useAutoRefresh } from '../../lib/useAutoRefresh';
++import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+ 
+ interface GLAccount {
+   id: string;
+@@ -19,6 +21,11 @@ interface LedgerLineRow {
+   debitBase: string;
+   creditBase: string;
+   runningBalanceBase: string;
++  entryState?: string | null;
++  financialEventId?: string | null;
++  eventType?: string | null;
++  referenceType?: string | null;
++  referenceId?: string | null;
+ }
+ interface AccountLedger {
+   account: { id: string; code: string; name: string; accountType: string; normalBalance: string };
+@@ -42,6 +49,8 @@ const PRELOAD = [
+   'field.entry_number',
+   'field.from_date',
+   'field.to_date',
++  'field.gl_source',
++  'field.gl_entry_state',
+ ];
+ 
+ /** F03 — General Ledger read model. Account picker + date range, mirrors `TreasuryLedger.tsx`'s own filter shape. */
+@@ -51,8 +60,8 @@ export function GeneralLedger() {
+   const [searchParams] = useSearchParams();
+   const [accounts, setAccounts] = useState<GLAccount[]>([]);
+   const [accountId, setAccountId] = useState(searchParams.get('accountId') ?? '');
+-  const [from, setFrom] = useState('');
+-  const [to, setTo] = useState('');
++  const [from, setFrom] = useState(searchParams.get('from') ?? '');
++  const [to, setTo] = useState(searchParams.get('to') ?? '');
+   const [ledger, setLedger] = useState<AccountLedger | null>(null);
+   const [error, setError] = useState<string | null>(null);
+ 
+@@ -64,22 +73,33 @@ export function GeneralLedger() {
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+-  useEffect(() => {
+-    if (!accountId) return;
+-    const qs = new URLSearchParams();
+-    if (from) qs.set('from', from);
+-    if (to) qs.set('to', to);
+-    setError(null);
+-    api
+-      .get<AccountLedger>(`/accounting/ledger/${accountId}${qs.toString() ? `?${qs}` : ''}`)
+-      .then(setLedger)
+-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load ledger.'));
+-  }, [accountId, from, to]);
++  const refresh = useAutoRefresh(
++    async (isCurrent) => {
++      if (!accountId) return;
++      const qs = new URLSearchParams();
++      if (from) qs.set('from', from);
++      if (to) qs.set('to', to);
++      try {
++        const data = await api.get<AccountLedger>(`/accounting/ledger/${accountId}${qs.toString() ? `?${qs}` : ''}`);
++        if (!isCurrent()) return;
++        setLedger(data);
++        setError(null);
++      } catch (err) {
++        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load ledger.');
++        throw err;
++      }
++    },
++    [accountId, from, to],
++  );
+ 
+   return (
+     <div>
+       <div className="page-header">
+         <h1>{t('nav.general_ledger')}</h1>
++        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++          <PostingStatusChip />
++          <RefreshStamp refresh={refresh} />
++        </div>
+       </div>
+ 
+       <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+@@ -132,6 +152,8 @@ export function GeneralLedger() {
+                 <th>{t('field.entry_number')}</th>
+                 <th>{t('field.business_date')}</th>
+                 <th>{t('field.description')}</th>
++                <th>{t('field.gl_source')}</th>
++                <th>{t('field.gl_entry_state')}</th>
+                 <th>{t('field.debit_base')}</th>
+                 <th>{t('field.credit_base')}</th>
+                 <th>{t('field.closing_balance')}</th>
+@@ -143,6 +165,8 @@ export function GeneralLedger() {
+                   <td>{l.entryNumber ?? '—'}</td>
+                   <td>{l.businessDate}</td>
+                   <td>{l.lineDescription ?? l.description ?? '—'}</td>
++                  <td title={l.eventType ?? undefined}>{l.referenceType ? t(`reference_type.${l.referenceType}`) : l.sourceType}</td>
++                  <td>{l.entryState ?? '—'}</td>
+                   <td>{Number(l.debitBase) > 0 ? l.debitBase : ''}</td>
+                   <td>{Number(l.creditBase) > 0 ? l.creditBase : ''}</td>
+                   <td>{l.runningBalanceBase}</td>
+diff --git a/frontend/src/pages/accounting/InventoryAccounting.tsx b/frontend/src/pages/accounting/InventoryAccounting.tsx
+index 2791cca..e12e299 100644
+--- a/frontend/src/pages/accounting/InventoryAccounting.tsx
++++ b/frontend/src/pages/accounting/InventoryAccounting.tsx
+@@ -3,6 +3,8 @@ import { api, ApiError } from '../../lib/api';
+ import { useLanguage } from '../../context/LanguageContext';
+ import { StatusBadge } from '../../components/StatusBadge';
+ import { ApprovalsPanel } from '../../components/ApprovalsPanel';
++import { useAutoRefresh } from '../../lib/useAutoRefresh';
++import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+ 
+ const INVENTORY_ADJUSTMENT_KINDS = ['physical_count_variance', 'valuation_write_down'] as const;
+ const INVENTORY_REQUEST_TYPE_CODES = INVENTORY_ADJUSTMENT_KINDS.map((k) => `accounting.inventory.${k}`);
+@@ -22,6 +24,19 @@ interface ReconciliationRun {
+   asOfDate: string;
+   status: 'open' | 'matched' | 'drift_found' | 'closed' | 'no_valuation_source';
+   createdAt: string;
++  classification?: 'matched' | 'explained' | 'unexplained' | null;
++}
++/** C1 (ADR-INV-09): the live, persisted-nowhere comparison valuation vs General Ledger with the itemised explanation of any difference. */
++interface ReconciliationPreview {
++  asOfDate: string;
++  status: string;
++  classification: 'matched' | 'explained' | 'unexplained' | null;
++  subledgerTotalBase: string | null;
++  glBalanceBase: string;
++  driftBase: string | null;
++  explainedBase?: string | null;
++  unexplainedBase?: string | null;
++  analysis?: { categories: Array<{ code: string; amountBase: string; count: number }> };
+ }
+ 
+ const PRELOAD = [
+@@ -48,6 +63,19 @@ const PRELOAD = [
+   'panel.no_inventory_reconciliations_yet',
+   'panel.inventory_adjustment_submitted_approval',
+   'panel.no_valuation_source',
++  'panel.recon_preview',
++  'field.recon_valuation',
++  'field.recon_gl',
++  'field.recon_drift',
++  'field.recon_explained',
++  'field.recon_unexplained',
++  'value.recon_class.matched',
++  'value.recon_class.explained',
++  'value.recon_class.unexplained',
++  'value.recon_cat.rounding',
++  'value.recon_cat.unposted_value',
++  'value.recon_cat.f07_without_valuation_effect',
++  'value.recon_cat.manual_or_opening_journals',
+ ];
+ 
+ /** F07 — Inventory Accounting (ADR-040). No prior frontend spec existed for this domain (confirmed absent from every terminology seed and from the recovered production bundle's own route list) — built directly against `inventory-accounting.controller.ts`. */
+@@ -56,6 +84,7 @@ export function InventoryAccounting() {
+   preload(PRELOAD);
+ 
+   const [runs, setRuns] = useState<ReconciliationRun[] | null>(null);
++  const [preview, setPreview] = useState<ReconciliationPreview | null>(null);
+   const [products, setProducts] = useState<Product[]>([]);
+   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+   const [busy, setBusy] = useState(false);
+@@ -86,16 +115,24 @@ export function InventoryAccounting() {
+     }
+   }
+ 
+-  async function loadRuns() {
+-    try {
+-      setRuns(await api.get<ReconciliationRun[]>('/accounting/inventory/reconciliations'));
+-    } catch (err) {
+-      setError(err instanceof ApiError ? err.message : 'Failed to load inventory reconciliations.');
+-    }
+-  }
++  const refresh = useAutoRefresh(
++    async (isCurrent) => {
++      try {
++        const list = await api.get<ReconciliationRun[]>('/accounting/inventory/reconciliations');
++        const live = await api.get<ReconciliationPreview>('/accounting/inventory/reconciliation-preview').catch(() => null);
++        if (!isCurrent()) return;
++        setRuns(list);
++        setPreview(live);
++      } catch (err) {
++        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load inventory reconciliations.');
++        throw err;
++      }
++    },
++    [],
++  );
++  const loadRuns = async () => refresh.refresh();
+ 
+   useEffect(() => {
+-    loadRuns();
+     api.get<Product[]>('/products').then(setProducts).catch(() => setProducts([]));
+     api.get<Warehouse[]>('/inventory/warehouses').then(setWarehouses).catch(() => setWarehouses([]));
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+@@ -156,11 +193,44 @@ export function InventoryAccounting() {
+     <div>
+       <div className="page-header">
+         <h1>{t('nav.inventory_accounting')}</h1>
+-        <button className="btn btn-primary" disabled={busy} onClick={runReconciliation}>
+-          {t('action.run_reconciliation')}
+-        </button>
++        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++          <PostingStatusChip />
++          <RefreshStamp refresh={refresh} />
++          <button className="btn btn-primary" disabled={busy} onClick={runReconciliation}>
++            {t('action.run_reconciliation')}
++          </button>
++        </div>
+       </div>
+ 
++      {preview && preview.subledgerTotalBase !== null && (
++        <div className="card" style={{ marginBottom: 20 }}>
++          <h3 style={{ marginTop: 0 }}>
++            {t('panel.recon_preview')}{' '}
++            {preview.classification && <span className={`status-badge ${preview.classification === 'matched' ? 'positive' : preview.classification === 'explained' ? 'warning' : 'negative'}`}>{t(`value.recon_class.${preview.classification}`)}</span>}
++          </h3>
++          <div className="detail-grid">
++            <div className="kpi-tile"><div className="label">{t('field.recon_valuation')}</div><div className="value">{preview.subledgerTotalBase}</div></div>
++            <div className="kpi-tile"><div className="label">{t('field.recon_gl')}</div><div className="value">{preview.glBalanceBase}</div></div>
++            <div className="kpi-tile"><div className="label">{t('field.recon_drift')}</div><div className="value">{preview.driftBase}</div></div>
++            {preview.explainedBase != null && <div className="kpi-tile"><div className="label">{t('field.recon_explained')}</div><div className="value">{preview.explainedBase}</div></div>}
++            {preview.unexplainedBase != null && <div className="kpi-tile"><div className="label">{t('field.recon_unexplained')}</div><div className="value" style={{ color: Number(preview.unexplainedBase) !== 0 ? '#a3262d' : undefined }}>{preview.unexplainedBase}</div></div>}
++          </div>
++          {preview.analysis && Number(preview.driftBase) !== 0 && (
++            <table className="data-table" style={{ marginTop: 12 }}>
++              <tbody>
++                {preview.analysis.categories.filter((c) => Number(c.amountBase) !== 0 || c.count > 0).map((c) => (
++                  <tr key={c.code}>
++                    <td>{t(`value.recon_cat.${c.code}`)}</td>
++                    <td>{c.count}</td>
++                    <td>{c.amountBase}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
++          )}
++        </div>
++      )}
++
+       {error && <div className="error-text">{error}</div>}
+       {notice && <div className="empty-state">{notice}</div>}
+ 
+diff --git a/frontend/src/pages/accounting/TrialBalance.tsx b/frontend/src/pages/accounting/TrialBalance.tsx
+index 4622b0c..28e8930 100644
+--- a/frontend/src/pages/accounting/TrialBalance.tsx
++++ b/frontend/src/pages/accounting/TrialBalance.tsx
+@@ -1,7 +1,9 @@
+-import { useEffect, useState } from 'react';
++import { useState } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { api, ApiError } from '../../lib/api';
+ import { useLanguage } from '../../context/LanguageContext';
++import { useAutoRefresh } from '../../lib/useAutoRefresh';
++import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+ 
+ interface TrialBalanceRow {
+   accountId: string;
+@@ -16,8 +18,37 @@ interface TrialBalance {
+   rows: TrialBalanceRow[];
+   totalDebitBase: string;
+   totalCreditBase: string;
++  /** CR-2026-10-15 — sums of the displayed (net) row figures; the footer shows these so it always equals the columns. */
++  balanceTotalDebitBase: string;
++  balanceTotalCreditBase: string;
+   balanced: boolean;
+ }
++/** C1 (ADR-INV-11) - `mode=periodic`: opening, period movement and closing per account, parents rolled up from the chart. */
++interface PeriodicRow {
++  accountId: string;
++  code: string;
++  name: string;
++  accountType: string;
++  isGroup: boolean;
++  openingDebitBase: string;
++  openingCreditBase: string;
++  periodDebitBase: string;
++  periodCreditBase: string;
++  closingDebitBase: string;
++  closingCreditBase: string;
++}
++interface PeriodicTrialBalance {
++  rows: PeriodicRow[];
++  totals: {
++    openingDebitBase: string;
++    openingCreditBase: string;
++    periodDebitBase: string;
++    periodCreditBase: string;
++    closingDebitBase: string;
++    closingCreditBase: string;
++  };
++  balanced: { opening: boolean; period: boolean; closing: boolean };
++}
+ 
+ const PRELOAD = [
+   'nav.trial_balance',
+@@ -31,36 +62,75 @@ const PRELOAD = [
+   'panel.trial_balance_footer',
+   'panel.balanced',
+   'panel.not_balanced',
++  'panel.tb_mode_periodic',
++  'panel.tb_mode_standard',
++  'field.tb_opening',
++  'field.tb_period_debit',
++  'field.tb_period_credit',
++  'field.tb_closing',
++  'panel.tb_balanced_opening',
++  'panel.tb_balanced_period',
++  'panel.tb_balanced_closing',
+   ...['asset', 'liability', 'equity', 'revenue', 'expense'].map((v) => `value.account_type.${v}`),
+ ];
+ 
+-/** F03 — General Ledger read model. Reuses `getTrialBalance` (same source as `AccountingCover`'s own KPI). */
++const show = (v: string) => (Number(v) > 0 ? v : '');
++
++/** F03 — General Ledger read model. Reuses `getTrialBalance` (same source as `AccountingCover`'s own KPI); C1 adds the periodic view and a drill-down that keeps the account AND the period. */
+ export function TrialBalance() {
+   const { t, preload } = useLanguage();
+   preload(PRELOAD);
+   const navigate = useNavigate();
+   const [from, setFrom] = useState('');
+   const [to, setTo] = useState('');
++  const [periodic, setPeriodic] = useState(false);
+   const [tb, setTb] = useState<TrialBalance | null>(null);
++  const [ptb, setPtb] = useState<PeriodicTrialBalance | null>(null);
+   const [error, setError] = useState<string | null>(null);
+ 
+-  useEffect(() => {
+-    const qs = new URLSearchParams();
++  const refresh = useAutoRefresh(
++    async (isCurrent) => {
++      const qs = new URLSearchParams();
++      if (from) qs.set('from', from);
++      if (to) qs.set('to', to);
++      if (periodic) qs.set('mode', 'periodic');
++      try {
++        const data = await api.get<TrialBalance | PeriodicTrialBalance>(`/accounting/trial-balance${qs.toString() ? `?${qs}` : ''}`);
++        if (!isCurrent()) return;
++        if (periodic) {
++          setPtb(data as PeriodicTrialBalance);
++          setTb(null);
++        } else {
++          setTb(data as TrialBalance);
++          setPtb(null);
++        }
++        setError(null);
++      } catch (err) {
++        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load trial balance.');
++        throw err;
++      }
++    },
++    [from, to, periodic],
++  );
++
++  const drill = (accountId: string) => {
++    const qs = new URLSearchParams({ accountId });
+     if (from) qs.set('from', from);
+     if (to) qs.set('to', to);
+-    api
+-      .get<TrialBalance>(`/accounting/trial-balance${qs.toString() ? `?${qs}` : ''}`)
+-      .then(setTb)
+-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load trial balance.'));
+-  }, [from, to]);
++    navigate(`/accounting/ledger?${qs}`);
++  };
+ 
+   return (
+     <div>
+-      <div className="page-header">
++      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <h1>{t('nav.trial_balance')}</h1>
++        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++          <PostingStatusChip />
++          <RefreshStamp refresh={refresh} />
++        </div>
+       </div>
+ 
+-      <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-end' }}>
++      <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+         <div className="form-field" style={{ marginBottom: 0 }}>
+           <label>{t('field.from_date')}</label>
+           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+@@ -69,11 +139,15 @@ export function TrialBalance() {
+           <label>{t('field.to_date')}</label>
+           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+         </div>
++        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
++          <input type="checkbox" checked={periodic} onChange={(e) => setPeriodic(e.target.checked)} />
++          {t(periodic ? 'panel.tb_mode_periodic' : 'panel.tb_mode_standard')}
++        </label>
+       </div>
+ 
+       {error && <div className="error-text">{error}</div>}
+ 
+-      {tb && (
++      {tb && !periodic && (
+         <>
+           <p>
+             <span className={tb.balanced ? 'status-badge positive' : 'status-badge negative'}>{t(tb.balanced ? 'panel.balanced' : 'panel.not_balanced')}</span>
+@@ -90,20 +164,76 @@ export function TrialBalance() {
+             </thead>
+             <tbody>
+               {tb.rows.map((r) => (
+-                <tr key={r.accountId} style={{ cursor: 'pointer' }} onClick={() => navigate(`/accounting/ledger?accountId=${r.accountId}`)}>
++                <tr key={r.accountId} style={{ cursor: 'pointer' }} onClick={() => drill(r.accountId)}>
+                   <td>{r.code}</td>
+                   <td>{r.name}</td>
+                   <td>{t(`value.account_type.${r.accountType}`)}</td>
+-                  <td>{Number(r.debitBase) > 0 ? r.debitBase : ''}</td>
+-                  <td>{Number(r.creditBase) > 0 ? r.creditBase : ''}</td>
++                  <td>{show(r.debitBase)}</td>
++                  <td>{show(r.creditBase)}</td>
+                 </tr>
+               ))}
+             </tbody>
+             <tfoot>
+               <tr style={{ fontWeight: 600 }}>
+                 <td colSpan={3}>{t('panel.trial_balance_footer')}</td>
+-                <td>{tb.totalDebitBase}</td>
+-                <td>{tb.totalCreditBase}</td>
++                <td>{tb.balanceTotalDebitBase}</td>
++                <td>{tb.balanceTotalCreditBase}</td>
++              </tr>
++            </tfoot>
++          </table>
++        </>
++      )}
++
++      {ptb && periodic && (
++        <>
++          <p style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
++            {(['opening', 'period', 'closing'] as const).map((k) => (
++              <span key={k} className={ptb.balanced[k] ? 'status-badge positive' : 'status-badge negative'}>
++                {t(`panel.tb_balanced_${k}`)}
++              </span>
++            ))}
++          </p>
++          <table className="data-table">
++            <thead>
++              <tr>
++                <th rowSpan={2}>{t('field.account_code')}</th>
++                <th rowSpan={2}>{t('field.account_name')}</th>
++                <th colSpan={2}>{t('field.tb_opening')}</th>
++                <th colSpan={2}>{t('field.tb_period_debit')} / {t('field.tb_period_credit')}</th>
++                <th colSpan={2}>{t('field.tb_closing')}</th>
++              </tr>
++              <tr>
++                <th>{t('field.debit_base')}</th>
++                <th>{t('field.credit_base')}</th>
++                <th>{t('field.debit_base')}</th>
++                <th>{t('field.credit_base')}</th>
++                <th>{t('field.debit_base')}</th>
++                <th>{t('field.credit_base')}</th>
++              </tr>
++            </thead>
++            <tbody>
++              {ptb.rows.map((r) => (
++                <tr key={r.accountId} style={{ cursor: r.isGroup ? undefined : 'pointer', fontWeight: r.isGroup ? 600 : undefined }} onClick={() => !r.isGroup && drill(r.accountId)}>
++                  <td>{r.code}</td>
++                  <td>{r.name}</td>
++                  <td>{show(r.openingDebitBase)}</td>
++                  <td>{show(r.openingCreditBase)}</td>
++                  <td>{show(r.periodDebitBase)}</td>
++                  <td>{show(r.periodCreditBase)}</td>
++                  <td>{show(r.closingDebitBase)}</td>
++                  <td>{show(r.closingCreditBase)}</td>
++                </tr>
++              ))}
++            </tbody>
++            <tfoot>
++              <tr style={{ fontWeight: 600 }}>
++                <td colSpan={2}>{t('panel.trial_balance_footer')}</td>
++                <td>{ptb.totals.openingDebitBase}</td>
++                <td>{ptb.totals.openingCreditBase}</td>
++                <td>{ptb.totals.periodDebitBase}</td>
++                <td>{ptb.totals.periodCreditBase}</td>
++                <td>{ptb.totals.closingDebitBase}</td>
++                <td>{ptb.totals.closingCreditBase}</td>
+               </tr>
+             </tfoot>
+           </table>
+diff --git a/frontend/src/pages/warehouse/WarehouseOverview.tsx b/frontend/src/pages/warehouse/WarehouseOverview.tsx
+index 3b033cd..9904b6d 100644
+--- a/frontend/src/pages/warehouse/WarehouseOverview.tsx
++++ b/frontend/src/pages/warehouse/WarehouseOverview.tsx
+@@ -1,12 +1,17 @@
+-import { useEffect, useState } from 'react';
++import { useState } from 'react';
+ import { Link } from 'react-router-dom';
+ import { api } from '../../lib/api';
+ import { useLanguage } from '../../context/LanguageContext';
+ import { ErrorState } from '../../components/ErrorState';
++import { useAutoRefresh } from '../../lib/useAutoRefresh';
++import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+ 
+ interface Overview {
+   totalWarehouses: number;
+   totalInventoryValueAtSellingPrice: string;
++  /** C1: the moving-average valuation (the figure the GL inventory account equals); null without `inventory.valuation.view`. */
++  totalInventoryValueAtCost?: string | null;
++  valuationAsOf?: string | null;
+   todaysMovementsCount: number;
+   reservedStockUnits: number;
+   pendingApprovalsCount: number;
+@@ -49,6 +54,7 @@ export function WarehouseOverview() {
+     'nav.stock_count',
+     'field.total_inventory_value',
+     'field.at_selling_price',
++    'field.at_cost',
+     'field.total_warehouses',
+     'field.todays_movements',
+     'field.reserved_stock',
+@@ -65,30 +71,28 @@ export function WarehouseOverview() {
+     'field.on_hand',
+   ]);
+ 
+-  function load() {
+-    setLoadError(null);
+-    setOverview(null);
+-    (async () => {
+-      try {
+-        const [ov, wh, prod] = await Promise.all([
+-          api.get<Overview>('/warehouse-transactions/overview'),
+-          api.get<Warehouse[]>('/inventory/warehouses'),
+-          api.get<Product[]>('/products/all'),
+-        ]);
+-        setOverview(ov);
+-        setWarehouses(wh);
+-        setProducts(prod);
+-      } catch (err) {
+-        // Foundation fix: this load had no error handling — a failure left
+-        // the page stuck on "Loading…" forever with no explanation.
+-        setLoadError(err);
+-      }
+-    })();
+-  }
+-
+-  useEffect(load, []);
++  // C1 (ADR-INV-10): the screen refreshes itself (focus / visibility / every 30 s while visible); a failed refresh keeps the last good numbers on screen.
++  const refresh = useAutoRefresh(async (isCurrent) => {
++    try {
++      const [ov, wh, prod] = await Promise.all([
++        api.get<Overview>('/warehouse-transactions/overview'),
++        api.get<Warehouse[]>('/inventory/warehouses'),
++        api.get<Product[]>('/products/all'),
++      ]);
++      if (!isCurrent()) return;
++      setOverview(ov);
++      setWarehouses(wh);
++      setProducts(prod);
++      setLoadError(null);
++    } catch (err) {
++      // Foundation fix: this load had no error handling — a failure left the page stuck on "Loading…" forever with no explanation.
++      if (isCurrent()) setLoadError((prev: unknown) => prev ?? err);
++      throw err;
++    }
++  }, []);
++  const load = refresh.refresh;
+ 
+-  if (loadError) {
++  if (loadError && !overview) {
+     return (
+       <div>
+         <div className="page-header">
+@@ -113,6 +117,10 @@ export function WarehouseOverview() {
+     <div>
+       <div className="page-header">
+         <h1>{t('nav.warehouse_overview')}</h1>
++        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++          <PostingStatusChip />
++          <RefreshStamp refresh={refresh} />
++        </div>
+       </div>
+ 
+       {/* CTO directive ("Section Cover / Main Dashboard System") — the shortcut row every section's Cover shares. */}
+@@ -128,9 +136,15 @@ export function WarehouseOverview() {
+           <div className="label">{t('field.total_warehouses')}</div>
+           <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalWarehouses}</div>
+         </div>
++        {overview.totalInventoryValueAtCost != null && (
++          <Link to="/inventory/valuation-report" className="card detail-field" style={{ textDecoration: 'none', color: 'inherit' }}>
++            <div className="label">{t('field.total_inventory_value')} <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({t('field.at_cost')})</span></div>
++            <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalInventoryValueAtCost}</div>
++          </Link>
++        )}
+         <div className="card detail-field">
+           <div className="label">{t('field.total_inventory_value')} <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({t('field.at_selling_price')})</span></div>
+-          <div className="value" style={{ fontSize: '1.6rem' }}>{overview.totalInventoryValueAtSellingPrice}</div>
++          <div className="value" style={{ fontSize: overview.totalInventoryValueAtCost != null ? '1.1rem' : '1.6rem' }}>{overview.totalInventoryValueAtSellingPrice}</div>
+         </div>
+         <div className="card detail-field">
+           <div className="label">{t('field.todays_movements')}</div>
+diff --git a/frontend/src/styles/ui.css b/frontend/src/styles/ui.css
+index 0d4d365..3b3ff4f 100644
+--- a/frontend/src/styles/ui.css
++++ b/frontend/src/styles/ui.css
+@@ -400,3 +400,139 @@ table.data-table {
+   font-size: 0.85rem;
+   text-align: center;
+ }
++
++/* Inventory grid -> Item Details click-through (2026-10-15). */
++tr.clickable-row {
++  cursor: pointer;
++}
++tr.clickable-row:hover td {
++  background: #f5f8ff;
++}
++
++/* Item Details page — header with a reserved image area, numbered section tabs (as in the product-definition reference), one panel. */
++.item-breadcrumb {
++  font-size: 0.82rem;
++  color: #6b7280;
++  margin-block-end: 4px;
++}
++.item-header {
++  display: flex;
++  gap: 20px;
++  align-items: center;
++  margin-block-end: 16px;
++}
++.item-image {
++  flex: 0 0 112px;
++  height: 112px;
++  border: 1px dashed #c9cfda;
++  border-radius: 8px;
++  background: #f6f7f9;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 6px;
++  color: #8a93a3;
++}
++.item-image-initials {
++  font-size: 1.6rem;
++  font-weight: 700;
++  color: #9aa3b2;
++}
++.item-image-caption {
++  font-size: 0.72rem;
++  text-align: center;
++  padding-inline: 6px;
++}
++.item-header-main {
++  min-width: 0;
++}
++.item-title {
++  margin: 0;
++  font-size: 1.25rem;
++}
++.item-sku {
++  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
++  color: #374151;
++  margin-block: 4px 10px;
++}
++.item-header-meta {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px 18px;
++  align-items: center;
++  font-size: 0.9rem;
++  color: #4b5563;
++}
++.item-tabs {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++  margin-block-end: 0;
++}
++.item-tab {
++  border: 1px solid #e2e5eb;
++  border-block-end: none;
++  background: #f2f3f5;
++  color: #4b5563;
++  padding: 10px 16px;
++  border-start-start-radius: 8px;
++  border-start-end-radius: 8px;
++  font-size: 0.9rem;
++  cursor: pointer;
++}
++.item-tab.active {
++  background: #fff;
++  color: #2f5fd7;
++  font-weight: 600;
++  box-shadow: inset 0 -3px 0 #2f5fd7;
++}
++.item-panel {
++  border-start-start-radius: 0;
++}
++.item-filters {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 12px;
++  align-items: flex-end;
++}
++.item-filters .form-field {
++  margin-block-end: 0;
++  min-width: 180px;
++}
++.item-note {
++  font-size: 0.82rem;
++  color: #6b7280;
++  margin-block: 10px;
++}
++.item-not-in-model {
++  font-size: 0.82rem;
++  font-weight: 400;
++  color: #9aa3b2;
++}
++.item-doc-number {
++  white-space: nowrap;
++}
++.item-ledger-opening td {
++  background: #f9fafb;
++  font-style: italic;
++}
++.item-reconciled {
++  color: #166534;
++  font-size: 0.85rem;
++}
++@media (max-width: 900px) {
++  .item-header {
++    flex-direction: column;
++    align-items: flex-start;
++  }
++  .item-tab {
++    flex: 1 1 calc(50% - 8px);
++    border-radius: 6px;
++    border-block-end: 1px solid #e2e5eb;
++  }
++  .item-panel {
++    border-start-start-radius: 8px;
++    margin-block-start: 8px;
++  }
++}

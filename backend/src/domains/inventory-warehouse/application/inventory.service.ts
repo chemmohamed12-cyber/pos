@@ -327,6 +327,16 @@ export class InventoryService implements InventoryReservationContract, Inventory
   }
 
   /**
+   * ADR-INV-04 / CTO 2026-10-19 - the direct `POST /inventory/movements` receipt path must not bypass the approval workflow: when `inventory.receipt_approval_required` is `on`, a manual receipt
+   * has to be a receipt DOCUMENT that is submitted and approved. Called FIRST by the route (before any read or write), so a refusal changes nothing. `off` = today's behaviour.
+   */
+  assertDirectManualReceiptAllowed(): void {
+    if (this.config?.get<unknown>('inventory.receipt_approval_required') === 'on') {
+      throw new ConflictException('A manual receipt requires approval: create a receipt document (Movement Center), submit it, and have it approved - the direct movement endpoint cannot be used while receipt approval is required.');
+    }
+  }
+
+  /**
    * C2 (ADR-INV-02) — the business date an inventory posting carries. `undefined` => today (UTC), no gate (today's behaviour, every unchanged caller).
    * An EXPLICIT date must be a real calendar date, not in the future, and fall in an OPEN fiscal period (accounting's gate, bound through the posting
    * policy; absent => no GL => no gate). Rejects BEFORE any write; the date is never silently changed. Public so a document can validate once up front.

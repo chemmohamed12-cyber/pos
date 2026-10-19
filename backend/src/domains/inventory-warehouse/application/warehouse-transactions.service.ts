@@ -5,6 +5,7 @@ import { WarehouseTransactionLine } from '../infrastructure/warehouse-transactio
 import { WarehouseTransactionType, NUMBERING_SERIES_BY_TYPE, NO_APPROVAL_REQUIRED } from '../domain/warehouse-transaction-type';
 import { WAREHOUSE_TRANSACTION_PROCESS } from '../domain/warehouse-transaction-process';
 import { WAREHOUSE_TRANSACTION_ACTION_ROLES, WAREHOUSE_TRANSACTION_ACTION_RULES } from '../domain/warehouse-transaction-action-roles';
+import { MovementReasonEntry, parseMovementReasonCatalog, ReferenceRecord, REFERENCE_TABLES, validateReasonAndReference } from '../domain/movement-reason-catalog';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -110,8 +111,11 @@ export class WarehouseTransactionsService {
     actorUserId: string,
     movementDate?: Date,
     manager?: EntityManager,
-    // D3-B — controlled reason code; mandatory for `receipt`, ignored for every other type.
+    // D3-B — controlled reason code; mandatory for `receipt`. ADR-INV-04: every type may carry a catalog reason, validated per `inventory.reference_enforcement`.
     reasonCode?: string | null,
+    // ADR-INV-04 - the record that justifies the document (type + id); validated against the reason's reference kind.
+    referenceType?: string | null,
+    referenceId?: string | null,
   ): Promise<WarehouseTransaction> {
     if (lines.length === 0) {
       throw new BadRequestException('A warehouse transaction must have at least one line.');
@@ -146,6 +150,12 @@ export class WarehouseTransactionsService {
       if (!snapshot) throw new BadRequestException(`Product "${line.productId}" was not found.`);
     }
 
+    // ADR-INV-04: reason + reference matrix. `enforce` refuses HERE, before any number is issued or row written; `warn` lets the document through and audits the problems after it is saved.
+    const reasonCheck = await this.checkReasonAndReference(type, reasonCode ?? null, referenceType ?? null, referenceId ?? null, notes ?? reason, manager ?? this.dataSource.manager);
+    if (reasonCheck.mode === 'enforce' && reasonCheck.problems.length > 0) {
+      throw new BadRequestException(`The reason / reference of this ${type} document is not acceptable: ${reasonCheck.problems.join('; ')}.`);
+    }
+
     // D3-B (CTO-approved Manual Receipt policy) — a receipt needs an explicit unit cost on EVERY line and a controlled
     // reason code with a valid configured offset account. Rejected here, before any write; re-checked at posting.
     const receiptReasonCode = type === 'receipt' ? (reasonCode ?? '').trim() : '';
@@ -176,7 +186,9 @@ export class WarehouseTransactionsService {
           destinationWarehouseId,
           reference,
           reason,
-          reasonCode: type === 'receipt' ? receiptReasonCode : null,
+          reasonCode: type === 'receipt' ? receiptReasonCode : (reasonCode ?? '').trim() || null,
+          referenceType: referenceType ?? null,
+          referenceId: referenceId ?? null,
           notes,
           createdByUserId: actorUserId,
           movementDate: movementDate ?? new Date(),
@@ -205,12 +217,57 @@ export class WarehouseTransactionsService {
         resourceId: transaction.id,
         result: 'success',
         correlationId: null,
-        after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length },
+        after: { transactionNumber, type, warehouseId, destinationWarehouseId, lineCount: lines.length, reasonCode: transaction.reasonCode, referenceType: transaction.referenceType, referenceId: transaction.referenceId },
       },
       manager,
     );
+    if (reasonCheck.mode === 'warn' && reasonCheck.problems.length > 0) await this.auditReasonWarning(transaction.id, actorUserId, 'create', reasonCheck.problems, manager);
 
     return transaction;
+  }
+
+  /** ADR-INV-04 - the enforcement mode (`off` | `warn` | `enforce`; absent engine = off) and the problems of a reason / reference, read on the Company's own connection. */
+  private async checkReasonAndReference(
+    type: string,
+    reasonCode: string | null,
+    referenceType: string | null,
+    referenceId: string | null,
+    note: string | null,
+    m: EntityManager,
+  ): Promise<{ mode: string; problems: string[] }> {
+    const mode = this.flag('inventory.reference_enforcement');
+    if (mode === 'off' || type === 'count') return { mode: 'off', problems: [] };
+    const catalog: MovementReasonEntry[] = parseMovementReasonCatalog(this.config?.get<unknown>('inventory.movement_reason_catalog'));
+    const problems = await validateReasonAndReference({ type, reasonCode, referenceType, referenceId, note }, catalog, (t, id) => this.lookupReference(t, id, m));
+    return { mode, problems };
+  }
+
+  private async auditReasonWarning(documentId: string, actorUserId: string, stage: string, problems: string[], manager?: EntityManager): Promise<void> {
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'warehouse_transaction.reference_warning', resource: 'warehouse_transaction', resourceId: documentId, result: 'success', correlationId: null, after: { stage, mode: 'warn', problems } },
+      manager,
+    );
+  }
+
+  private async lookupReference(referenceType: string, referenceId: string, m: EntityManager): Promise<ReferenceRecord> {
+    const table = REFERENCE_TABLES[referenceType]; // fixed allow-list: never a user-supplied identifier
+    if (!table) return { exists: false };
+    if (referenceType === 'warehouse_transaction') {
+      const [row] = (await m.query(
+        `SELECT t.type AS "docType", (SELECT pi."currentState" FROM process_instances pi WHERE pi."definitionKey" = 'warehouse_transaction' AND pi."entityId" = t.id::text LIMIT 1) AS state FROM warehouse_transactions t WHERE t.id = $1`,
+        [referenceId],
+      )) as Array<{ docType: string; state: string | null }>;
+      return row ? { exists: true, docType: row.docType, state: row.state ?? undefined } : { exists: false };
+    }
+    if (referenceType === 'opening_batch') {
+      const [row] = (await m.query(
+        `SELECT (SELECT pi."currentState" FROM process_instances pi WHERE pi."definitionKey" = 'inventory_opening_batch' AND pi."entityId" = b.id::text LIMIT 1) AS state FROM inventory_opening_batches b WHERE b.id = $1`,
+        [referenceId],
+      )) as Array<{ state: string | null }>;
+      return row ? { exists: true, state: row.state ?? undefined } : { exists: false };
+    }
+    const rows = (await m.query(`SELECT 1 FROM "${table}" WHERE id = $1`, [referenceId])) as unknown[];
+    return { exists: rows.length > 0 };
   }
 
   /**
@@ -450,6 +507,12 @@ export class WarehouseTransactionsService {
 
     // C3: refused (or audited, in warn mode) BEFORE any state change or write.
     if (action === 'approve' || action === 'post') await this.enforceSeparationOfDuties(txn, action, actorUserId, manager);
+
+    if (action === 'submit' && txn.type !== 'count') {
+      const check = await this.checkReasonAndReference(txn.type, txn.reasonCode, txn.referenceType, txn.referenceId, txn.notes ?? txn.reason, manager ?? this.dataSource.manager);
+      if (check.mode === 'enforce' && check.problems.length > 0) throw new BadRequestException(`The reason / reference of ${txn.transactionNumber} is not acceptable: ${check.problems.join('; ')}.`);
+      if (check.mode === 'warn' && check.problems.length > 0) await this.auditReasonWarning(txn.id, actorUserId, 'submit', check.problems, manager);
+    }
 
     if (action === 'submit' && txn.type === 'count') {
       const lines = await this.getLines(transactionId, manager);

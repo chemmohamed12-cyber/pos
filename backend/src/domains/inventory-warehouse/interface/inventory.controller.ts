@@ -376,6 +376,8 @@ export class InventoryController {
     if (dto.movementType !== 'receipt') {
       throw new GoneException({ statusCode: 410, error: 'Gone', code: 'INVENTORY_MOVEMENT_TYPE_CLOSED', message: `Movement type "${dto.movementType}" is no longer accepted on this endpoint; use the governed document flow (warehouse transactions, shipments, returns).` });
     }
+    // CTO 2026-10-19: with receipt approval required this endpoint must not bypass the workflow - refused before anything is read or written.
+    this.inventory.assertDirectManualReceiptAllowed();
     // D3-B — a receipt through this endpoint IS a manual receipt: explicit cost + controlled reason, validated before any write.
     const manager = req.companyContext.dataSource.manager;
     await this.inventory.assertMovementTargetsExist(dto.warehouseId, dto.productId, manager);

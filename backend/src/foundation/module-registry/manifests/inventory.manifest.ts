@@ -139,6 +139,23 @@ export const inventoryManifest: ModuleManifest = {
       default: false,
       scope_levels: ['platform', 'edition', 'installation'],
     },
+    // ADR-INV-04 (2026-10-19) - the approved catalog of movement reasons (code, movement types, reference kind, approval, financial note). Accounting is NOT driven by it (G-ISS-1: issues still
+    // post COGS; receipts use accounting.inventory_manual_receipt_reason_accounts). An absent / malformed value falls back to the built-in default catalog, never to "no rules".
+    {
+      key: 'inventory.movement_reason_catalog',
+      type: 'json',
+      default: [],
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // ADR-INV-04 - enforcement of the reason / reference matrix on warehouse documents: off = no check; warn = allowed, audited as `warehouse_transaction.reference_warning` (measure real data);
+    // enforce = refused before anything is written. C3/C5 staging: ships `warn`; the switch to `enforce` is the owner's decision after the data review.
+    {
+      key: 'inventory.reference_enforcement',
+      type: 'enum',
+      allowed: ['off', 'warn', 'enforce'],
+      default: 'warn',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
     {
       key: 'inventory.reservation_hold_minutes',
       type: 'int',

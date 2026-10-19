@@ -1,0 +1,41 @@
+// READ-ONLY facts for the C5 switch plan: SELECT statements only against daii_dev and its Company databases.
+const fs = require('fs');
+const path = require('path');
+const MAIN = 'D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/backend';
+const { Client } = require(path.join('D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/.claude/worktrees/inventory-lifecycle/backend', 'node_modules', 'pg'));
+const env = Object.fromEntries(fs.readFileSync(path.join(MAIN, '.env'), 'utf8').split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+const conn = (database) => new Client({ host: env.DB_HOST, port: Number(env.DB_PORT), user: env.DB_USER, password: env.DB_PASSWORD, database });
+const q = async (c, sql, p) => (await c.query(sql, p)).rows;
+(async () => {
+  const out = {};
+  const cp = conn(env.DB_NAME);
+  await cp.connect();
+  out.companies = (await q(cp, `SELECT c.id, c.name, c.status, r."databaseName" AS "dbName" FROM companies c LEFT JOIN database_registries r ON r."companyId" = c.id ORDER BY c.name`));
+  out.platformConfig = await q(cp, `SELECT cv."key", cv."value", cv."scopeType", cv."scopeId" FROM config_values cv WHERE cv."archivedAt" IS NULL AND (cv."key" LIKE 'inventory.%' OR cv."key" LIKE 'accounting.inventory%')`).catch((e) => 'ERR ' + e.message);
+  const cols = await q(cp, `SELECT column_name FROM information_schema.columns WHERE table_name='companies'`);
+  out.companyColumns = cols.map((c) => c.column_name);
+  await cp.end();
+  out.perCompany = {};
+  for (const c of out.companies) {
+    if (!c.dbName) continue;
+    const cc = conn(c.dbName);
+    try {
+      await cc.connect();
+      const r = {};
+      r.users = Number((await q(cc, `SELECT count(*) n FROM users`))[0].n);
+      r.rolesOfUsers = await q(cc, `SELECT ro."key" AS role, count(*)::int n FROM user_roles ur JOIN roles ro ON ro.id = ur."roleId" GROUP BY 1 ORDER BY 1`);
+      r.warehouseDocsByState = await q(cc, `SELECT t.type, pi."currentState" AS state, count(*)::int n FROM warehouse_transactions t LEFT JOIN process_instances pi ON pi."definitionKey"='warehouse_transaction' AND pi."entityId"=t.id::text GROUP BY 1,2 ORDER BY 1,2`);
+      r.docsWithoutReason = await q(cc, `SELECT type, count(*)::int n FROM warehouse_transactions WHERE "reasonCode" IS NULL GROUP BY 1`);
+      r.sodViolations = await q(cc, `SELECT count(*)::int n FROM audit_records WHERE action = 'warehouse_transaction.sod_violation'`);
+      r.sodSameActorPostedDocs = await q(cc, `SELECT count(*)::int n FROM warehouse_transactions t JOIN process_instances pi ON pi."definitionKey"='warehouse_transaction' AND pi."entityId"=t.id::text AND pi."currentState"='posted' WHERE t.type IN ('receipt','issue','adjustment','count')`);
+      r.openingBatches = await q(cc, `SELECT count(*)::int n FROM information_schema.tables WHERE table_name='inventory_opening_batches'`);
+      r.stockMovementsNoDoc = await q(cc, `SELECT "referenceType", count(*)::int n FROM stock_movements GROUP BY 1 ORDER BY 2 DESC LIMIT 8`);
+      r.glInventoryAccount = await q(cc, `SELECT count(*)::int n FROM accounting_gl_accounts WHERE code='1120'`);
+      out.perCompany[c.name] = r;
+      await cc.end();
+    } catch (e) {
+      out.perCompany[c.name] = 'ERR ' + e.message;
+    }
+  }
+  console.log(JSON.stringify(out, null, 1));
+})().catch((e) => { console.error('FAILED', e.message); process.exit(1); });
