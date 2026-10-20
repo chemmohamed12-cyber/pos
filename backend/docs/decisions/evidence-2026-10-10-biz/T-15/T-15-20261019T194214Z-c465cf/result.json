@@ -1,0 +1,71 @@
+{
+  "testId": "T-15",
+  "runId": "T-15-20261019T194214Z-c465cf",
+  "finishedAt": "2026-10-19T19:43:02.327Z",
+  "results": [
+    {
+      "id": "T-15-correctness-under-load",
+      "status": "PASS",
+      "note": "{\"allClean\":true,\"invariantsOk\":true,\"inv\":{\"drainedEvents\":760,\"bankBal\":1000000,\"expectedBank\":1000000,\"payRows\":380,\"paymentsOk\":380,\"reservedRows\":380,\"reservedOk\":380,\"auditRows\":380,\"auditOk\":380,\"negativeStockPairs\":0,\"onHandHot\":100000}}"
+    },
+    {
+      "id": "T-15-baseline-recorded",
+      "status": "PASS",
+      "note": "capacity table written for 1/5/10/25/50 in-flight operations x 4 write paths; NO latency/throughput threshold applied (D-10 unapproved)"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-15/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":1,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-15/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-15/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":-380,\"glArNet\":-380}"
+    },
+    {
+      "id": "T-10/T-15/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-15/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":1000000,\"declaredNonGlTreasury\":999620,\"expectedGl\":380,\"glNet\":380}"
+    },
+    {
+      "id": "T-10/T-15/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-15/R7",
+      "status": "PASS",
+      "note": "{\"events\":380,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-15/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-15/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 1000000.00 funding cash-in and 380 x 1.00 cash-outs are deliberately non-emitting"
+    },
+    {
+      "id": "T-10/T-15/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

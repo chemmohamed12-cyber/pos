@@ -1,0 +1,10 @@
+{
+  "environment": "frontend :5602 (Vite, current tree) -> backend :3602 (dist/main.js from the CI build of the final code) -> disposable daii_test_biz_t97_ui_cp / _co on the approved cluster 127.0.0.1:5546; login = bv-bootstrap fixture test admin (disposable)",
+  "fullView_DOM": { "rows": [["CR-1000","80.0000",""],["CR-2000","","20.0000"],["CR-4000","","100.0000"],["CR-5000","40.0000",""]], "footer": ["120.0000","120.0000"], "displayedRowSums": [120,120], "footerEqualsRows": true, "badge": "balanced" },
+  "from_2026-02-01_DOM": { "rows": [["CR-1000","","20.0000"],["CR-2000","","20.0000"],["CR-5000","40.0000",""]], "footer": ["40.0000","40.0000"], "displayedRowSums": [40,40] },
+  "GET /api/accounting/trial-balance": { "keys": ["balanceTotalCreditBase","balanceTotalDebitBase","balanced","rows","totalCreditBase","totalDebitBase"], "totalDebitBase": "230.0000", "totalCreditBase": "230.0000", "balanceTotalDebitBase": "120.0000", "balanceTotalCreditBase": "120.0000", "balanced": true },
+  "GET /api/accounting/trial-balance?from=2026-02-01": { "totalDebitBase": "130.0000", "balanceTotalDebitBase": "40.0000", "balanceTotalCreditBase": "40.0000" },
+  "GET /api/accounting/ledger (unchanged getTrialBalance contract)": { "keys": ["balanced","rows","totalCreditBase","totalDebitBase"], "totalDebitBase": "230.0000", "totalCreditBase": "230.0000" },
+  "consoleErrors": "none (read_console_messages, errors only)",
+  "note": "Raw label keys (panel.*, field.*, value.*) appear because the disposable DB has no terminology seed; unrelated to this change."
+}

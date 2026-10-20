@@ -1,0 +1,11 @@
+{
+  "testId": "T-00",
+  "runId": "T-00-20261019T193104Z-919b75",
+  "finishedAt": "2026-10-19T19:31:16.415Z",
+  "results": [
+    {
+      "id": "fresh-from-current-migrations",
+      "status": "PASS"
+    }
+  ]
+}

@@ -50,6 +50,7 @@ import { ApAdjustmentService } from './application/ap-adjustment.service';
 import { CashBankReconciliationService } from './application/cash-bank-reconciliation.service';
 import { CashBankAdjustmentService } from './application/cash-bank-adjustment.service';
 import { InventoryReconciliationService } from './application/inventory-reconciliation.service';
+import { PostingStatusService } from './application/posting-status.service';
 import { InventoryAdjustmentService } from './application/inventory-adjustment.service';
 import { InventoryCostingHandlerService } from './application/financial-events/inventory-costing-handler.service';
 import { FixedAssetService } from './application/fixed-asset.service';
@@ -220,6 +221,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     CashBankReconciliationService,
     CashBankAdjustmentService,
     InventoryReconciliationService,
+    PostingStatusService,
     InventoryAdjustmentService,
     InventoryCostingHandlerService,
     InventoryPostingPolicyService,

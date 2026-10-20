@@ -1,0 +1,656 @@
+{
+  "generatedAt": "2026-10-19T19:20:34.777Z",
+  "allPass": true,
+  "checks": [
+    {
+      "step": "A",
+      "what": "valued positions",
+      "expected": [
+        {
+          "warehouseId": "1447132b-f9dc-40d5-9750-11e6dbbe4489",
+          "productId": "354cf272-899f-4e41-a9bf-d842767de5ca",
+          "quantity": 10,
+          "totalValueBase": "50.0000",
+          "averageCostBase": "5.0000"
+        },
+        {
+          "warehouseId": "559a3abd-12cc-4eac-91c1-722de103a2ad",
+          "productId": "424bb039-5891-49d4-96f5-44aa4180b06a",
+          "quantity": 4,
+          "totalValueBase": "10.0000",
+          "averageCostBase": "2.5000"
+        }
+      ],
+      "actual": [
+        {
+          "warehouseId": "1447132b-f9dc-40d5-9750-11e6dbbe4489",
+          "productId": "354cf272-899f-4e41-a9bf-d842767de5ca",
+          "quantity": 10,
+          "totalValueBase": "50.0000",
+          "averageCostBase": "5.0000"
+        },
+        {
+          "warehouseId": "559a3abd-12cc-4eac-91c1-722de103a2ad",
+          "productId": "424bb039-5891-49d4-96f5-44aa4180b06a",
+          "quantity": 4,
+          "totalValueBase": "10.0000",
+          "averageCostBase": "2.5000"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "step": "A",
+      "what": "GL 1120 balance",
+      "expected": "60.0000",
+      "actual": "60.0000",
+      "pass": true
+    },
+    {
+      "step": "A",
+      "what": "preview status / classification / drift",
+      "expected": [
+        "matched",
+        "matched",
+        "0.0000"
+      ],
+      "actual": [
+        "matched",
+        "matched",
+        "0.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "B",
+      "what": "P1 after receipt (avg of 50 + 40 over 15 units)",
+      "expected": {
+        "quantity": 15,
+        "totalValueBase": "90.0000",
+        "averageCostBase": "6.0000"
+      },
+      "actual": {
+        "quantity": 15,
+        "totalValueBase": "90.0000",
+        "averageCostBase": "6.0000"
+      },
+      "pass": true
+    },
+    {
+      "step": "B",
+      "what": "GL after receipt",
+      "expected": "100.0000",
+      "actual": "100.0000",
+      "pass": true
+    },
+    {
+      "step": "B",
+      "what": "P1 after the -3 adjustment",
+      "expected": {
+        "quantity": 12,
+        "totalValueBase": "72.0000",
+        "averageCostBase": "6.0000"
+      },
+      "actual": {
+        "quantity": 12,
+        "totalValueBase": "72.0000",
+        "averageCostBase": "6.0000"
+      },
+      "pass": true
+    },
+    {
+      "step": "B",
+      "what": "GL after adjustment (100 - 18)",
+      "expected": "82.0000",
+      "actual": "82.0000",
+      "pass": true
+    },
+    {
+      "step": "B",
+      "what": "preview status / classification / drift / subledger / GL",
+      "expected": [
+        "matched",
+        "matched",
+        "0.0000",
+        "82.0000",
+        "82.0000"
+      ],
+      "actual": [
+        "matched",
+        "matched",
+        "0.0000",
+        "82.0000",
+        "82.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "P2 valuation after the -2 issue (19.0000 - 5.4286)",
+      "expected": {
+        "quantity": 5,
+        "totalValueBase": "13.5714"
+      },
+      "actual": {
+        "quantity": 5,
+        "totalValueBase": "13.5714"
+      },
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "GL (82 + 9 - 5.43)",
+      "expected": "85.5700",
+      "actual": "85.5700",
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "subledger / GL / difference (valuation minus GL)",
+      "expected": [
+        "85.5714",
+        "85.5700",
+        "0.0014"
+      ],
+      "actual": [
+        "85.5714",
+        "85.5700",
+        "0.0014"
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "status stays drift_found (never hidden), classification explained",
+      "expected": [
+        "drift_found",
+        "explained"
+      ],
+      "actual": [
+        "drift_found",
+        "explained"
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "explained / unexplained",
+      "expected": [
+        "0.0014",
+        "0.0000"
+      ],
+      "actual": [
+        "0.0014",
+        "0.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "rounding category amount and number of postings",
+      "expected": [
+        "0.0014",
+        1
+      ],
+      "actual": [
+        "0.0014",
+        1
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "the other categories are empty",
+      "expected": [
+        "0.0000",
+        "0.0000",
+        "0.0000"
+      ],
+      "actual": [
+        "0.0000",
+        "0.0000",
+        "0.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "rounding attributed to the warehouse that issued",
+      "expected": [
+        {
+          "warehouseId": "559a3abd-12cc-4eac-91c1-722de103a2ad",
+          "amountBase": "0.0014",
+          "postings": 1
+        }
+      ],
+      "actual": [
+        {
+          "warehouseId": "559a3abd-12cc-4eac-91c1-722de103a2ad",
+          "amountBase": "0.0014",
+          "postings": 1
+        }
+      ],
+      "pass": true
+    },
+    {
+      "step": "C",
+      "what": "recorded run: status / classification / basis / drift",
+      "expected": [
+        "drift_found",
+        "explained",
+        "current",
+        "0.0014"
+      ],
+      "actual": [
+        "drift_found",
+        "explained",
+        "current",
+        "0.0014"
+      ],
+      "pass": true
+    },
+    {
+      "step": "D",
+      "what": "by warehouse",
+      "expected": {
+        "WH1": {
+          "quantity": 12,
+          "value": "72.0000"
+        },
+        "WH2": {
+          "quantity": 5,
+          "value": "13.5714"
+        }
+      },
+      "actual": {
+        "WH1": {
+          "quantity": 12,
+          "value": "72.0000"
+        },
+        "WH2": {
+          "quantity": 5,
+          "value": "13.5714"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D",
+      "what": "report total (quantity, value)",
+      "expected": [
+        17,
+        "85.5714"
+      ],
+      "actual": [
+        17,
+        "85.5714"
+      ],
+      "pass": true
+    },
+    {
+      "step": "D",
+      "what": "history consistency (state equals the sum of the dated history)",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "default (by item): rows and totals",
+      "expected": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ],
+          [
+            "WH2",
+            "P2",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 17,
+          "valueBase": "85.5714"
+        }
+      },
+      "actual": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ],
+          [
+            "WH2",
+            "P2",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 17,
+          "valueBase": "85.5714"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "groupBy=warehouse",
+      "expected": {
+        "rows": [
+          [
+            "WH1",
+            "-",
+            12,
+            "72.0000"
+          ],
+          [
+            "WH2",
+            "-",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 17,
+          "valueBase": "85.5714"
+        }
+      },
+      "actual": {
+        "rows": [
+          [
+            "WH1",
+            "-",
+            12,
+            "72.0000"
+          ],
+          [
+            "WH2",
+            "-",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 17,
+          "valueBase": "85.5714"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "filter warehouse WH2",
+      "expected": {
+        "rows": [
+          [
+            "WH2",
+            "P2",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 5,
+          "valueBase": "13.5714"
+        }
+      },
+      "actual": {
+        "rows": [
+          [
+            "WH2",
+            "P2",
+            5,
+            "13.5714"
+          ]
+        ],
+        "totals": {
+          "quantity": 5,
+          "valueBase": "13.5714"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "filter item P1",
+      "expected": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ]
+        ],
+        "totals": {
+          "quantity": 12,
+          "valueBase": "72.0000"
+        }
+      },
+      "actual": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ]
+        ],
+        "totals": {
+          "quantity": 12,
+          "valueBase": "72.0000"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "F6 scope: only the visible warehouse is valued and totalled",
+      "expected": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ]
+        ],
+        "totals": {
+          "quantity": 12,
+          "valueBase": "72.0000"
+        }
+      },
+      "actual": {
+        "rows": [
+          [
+            "WH1",
+            "P1",
+            12,
+            "72.0000"
+          ]
+        ],
+        "totals": {
+          "quantity": 12,
+          "valueBase": "72.0000"
+        }
+      },
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "naming an invisible warehouse answers 404",
+      "expected": "NotFoundException",
+      "actual": "NotFoundException",
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "invalid asOf / groupBy / warehouseId answer 400",
+      "expected": "BadRequestException x3",
+      "actual": "BadRequestException x3",
+      "pass": true
+    },
+    {
+      "step": "D2",
+      "what": "asOf = today is the current basis",
+      "expected": [
+        "current",
+        null
+      ],
+      "actual": [
+        "current",
+        null
+      ],
+      "pass": true
+    },
+    {
+      "step": "E",
+      "what": "valued positions as of 2026-10-14",
+      "expected": [
+        {
+          "quantity": 4,
+          "totalValueBase": "10.0000"
+        },
+        {
+          "quantity": 10,
+          "totalValueBase": "50.0000"
+        }
+      ],
+      "actual": [
+        {
+          "quantity": 4,
+          "totalValueBase": "10.0000"
+        },
+        {
+          "quantity": 10,
+          "totalValueBase": "50.0000"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "step": "E",
+      "what": "GL as of the same date",
+      "expected": "60.0000",
+      "actual": "60.0000",
+      "pass": true
+    },
+    {
+      "step": "E",
+      "what": "as-of preview basis / status / classification / drift",
+      "expected": [
+        "as_of",
+        "matched",
+        "matched",
+        "0.0000"
+      ],
+      "actual": [
+        "as_of",
+        "matched",
+        "matched",
+        "0.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "E",
+      "what": "before anything existed",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "step": "F",
+      "what": "difference now",
+      "expected": "1.0014",
+      "actual": "1.0014",
+      "pass": true
+    },
+    {
+      "step": "F",
+      "what": "explained (rounding only) / unexplained (the injected 1.0000)",
+      "expected": [
+        "0.0014",
+        "1.0000"
+      ],
+      "actual": [
+        "0.0014",
+        "1.0000"
+      ],
+      "pass": true
+    },
+    {
+      "step": "F",
+      "what": "classification",
+      "expected": "unexplained",
+      "actual": "unexplained",
+      "pass": true
+    },
+    {
+      "step": "G",
+      "what": "journal count after repeated flushes and reads",
+      "expected": 6,
+      "actual": 6,
+      "pass": true
+    },
+    {
+      "step": "G",
+      "what": "unbalanced journals",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "step": "G",
+      "what": "Company B row counts (all zero)",
+      "expected": {
+        "stock_movements": 0,
+        "inventory_valuation_state": 0,
+        "inventory_valuation_movements": 0,
+        "accounting_financial_events": 0,
+        "accounting_journal_entries": 0,
+        "event_outbox": 0,
+        "accounting_inventory_reconciliation_runs": 0
+      },
+      "actual": {
+        "stock_movements": 0,
+        "inventory_valuation_state": 0,
+        "inventory_valuation_movements": 0,
+        "accounting_financial_events": 0,
+        "accounting_journal_entries": 0,
+        "event_outbox": 0,
+        "accounting_inventory_reconciliation_runs": 0
+      },
+      "pass": true
+    },
+    {
+      "step": "G",
+      "what": "Company B reconciliation and valuation answers",
+      "expected": [
+        "matched",
+        "0.0000",
+        []
+      ],
+      "actual": [
+        "matched",
+        "0.0000",
+        []
+      ],
+      "pass": true
+    },
+    {
+      "step": "G",
+      "what": "Platform event_outbox rows",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    }
+  ]
+}

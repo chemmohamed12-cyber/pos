@@ -3,6 +3,8 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { useAutoRefresh } from '../../lib/useAutoRefresh';
+import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
 
 const INVENTORY_ADJUSTMENT_KINDS = ['physical_count_variance', 'valuation_write_down'] as const;
 const INVENTORY_REQUEST_TYPE_CODES = INVENTORY_ADJUSTMENT_KINDS.map((k) => `accounting.inventory.${k}`);
@@ -22,6 +24,19 @@ interface ReconciliationRun {
   asOfDate: string;
   status: 'open' | 'matched' | 'drift_found' | 'closed' | 'no_valuation_source';
   createdAt: string;
+  classification?: 'matched' | 'explained' | 'unexplained' | null;
+}
+/** C1 (ADR-INV-09): the live, persisted-nowhere comparison valuation vs General Ledger with the itemised explanation of any difference. */
+interface ReconciliationPreview {
+  asOfDate: string;
+  status: string;
+  classification: 'matched' | 'explained' | 'unexplained' | null;
+  subledgerTotalBase: string | null;
+  glBalanceBase: string;
+  driftBase: string | null;
+  explainedBase?: string | null;
+  unexplainedBase?: string | null;
+  analysis?: { categories: Array<{ code: string; amountBase: string; count: number }> };
 }
 
 const PRELOAD = [
@@ -48,6 +63,19 @@ const PRELOAD = [
   'panel.no_inventory_reconciliations_yet',
   'panel.inventory_adjustment_submitted_approval',
   'panel.no_valuation_source',
+  'panel.recon_preview',
+  'field.recon_valuation',
+  'field.recon_gl',
+  'field.recon_drift',
+  'field.recon_explained',
+  'field.recon_unexplained',
+  'value.recon_class.matched',
+  'value.recon_class.explained',
+  'value.recon_class.unexplained',
+  'value.recon_cat.rounding',
+  'value.recon_cat.unposted_value',
+  'value.recon_cat.f07_without_valuation_effect',
+  'value.recon_cat.manual_or_opening_journals',
 ];
 
 /** F07 — Inventory Accounting (ADR-040). No prior frontend spec existed for this domain (confirmed absent from every terminology seed and from the recovered production bundle's own route list) — built directly against `inventory-accounting.controller.ts`. */
@@ -56,6 +84,7 @@ export function InventoryAccounting() {
   preload(PRELOAD);
 
   const [runs, setRuns] = useState<ReconciliationRun[] | null>(null);
+  const [preview, setPreview] = useState<ReconciliationPreview | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [busy, setBusy] = useState(false);
@@ -86,16 +115,24 @@ export function InventoryAccounting() {
     }
   }
 
-  async function loadRuns() {
-    try {
-      setRuns(await api.get<ReconciliationRun[]>('/accounting/inventory/reconciliations'));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load inventory reconciliations.');
-    }
-  }
+  const refresh = useAutoRefresh(
+    async (isCurrent) => {
+      try {
+        const list = await api.get<ReconciliationRun[]>('/accounting/inventory/reconciliations');
+        const live = await api.get<ReconciliationPreview>('/accounting/inventory/reconciliation-preview').catch(() => null);
+        if (!isCurrent()) return;
+        setRuns(list);
+        setPreview(live);
+      } catch (err) {
+        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load inventory reconciliations.');
+        throw err;
+      }
+    },
+    [],
+  );
+  const loadRuns = async () => refresh.refresh();
 
   useEffect(() => {
-    loadRuns();
     api.get<Product[]>('/products').then(setProducts).catch(() => setProducts([]));
     api.get<Warehouse[]>('/inventory/warehouses').then(setWarehouses).catch(() => setWarehouses([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,10 +193,43 @@ export function InventoryAccounting() {
     <div>
       <div className="page-header">
         <h1>{t('nav.inventory_accounting')}</h1>
-        <button className="btn btn-primary" disabled={busy} onClick={runReconciliation}>
-          {t('action.run_reconciliation')}
-        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <PostingStatusChip />
+          <RefreshStamp refresh={refresh} />
+          <button className="btn btn-primary" disabled={busy} onClick={runReconciliation}>
+            {t('action.run_reconciliation')}
+          </button>
+        </div>
       </div>
+
+      {preview && preview.subledgerTotalBase !== null && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>
+            {t('panel.recon_preview')}{' '}
+            {preview.classification && <span className={`status-badge ${preview.classification === 'matched' ? 'positive' : preview.classification === 'explained' ? 'warning' : 'negative'}`}>{t(`value.recon_class.${preview.classification}`)}</span>}
+          </h3>
+          <div className="detail-grid">
+            <div className="kpi-tile"><div className="label">{t('field.recon_valuation')}</div><div className="value">{preview.subledgerTotalBase}</div></div>
+            <div className="kpi-tile"><div className="label">{t('field.recon_gl')}</div><div className="value">{preview.glBalanceBase}</div></div>
+            <div className="kpi-tile"><div className="label">{t('field.recon_drift')}</div><div className="value">{preview.driftBase}</div></div>
+            {preview.explainedBase != null && <div className="kpi-tile"><div className="label">{t('field.recon_explained')}</div><div className="value">{preview.explainedBase}</div></div>}
+            {preview.unexplainedBase != null && <div className="kpi-tile"><div className="label">{t('field.recon_unexplained')}</div><div className="value" style={{ color: Number(preview.unexplainedBase) !== 0 ? '#a3262d' : undefined }}>{preview.unexplainedBase}</div></div>}
+          </div>
+          {preview.analysis && Number(preview.driftBase) !== 0 && (
+            <table className="data-table" style={{ marginTop: 12 }}>
+              <tbody>
+                {preview.analysis.categories.filter((c) => Number(c.amountBase) !== 0 || c.count > 0).map((c) => (
+                  <tr key={c.code}>
+                    <td>{t(`value.recon_cat.${c.code}`)}</td>
+                    <td>{c.count}</td>
+                    <td>{c.amountBase}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {error && <div className="error-text">{error}</div>}
       {notice && <div className="empty-state">{notice}</div>}

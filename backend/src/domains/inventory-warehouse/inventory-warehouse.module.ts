@@ -7,6 +7,12 @@ import { WarehouseTransaction } from './infrastructure/warehouse-transaction.ent
 import { WarehouseTransactionLine } from './infrastructure/warehouse-transaction-line.entity';
 import { InventoryService } from './application/inventory.service';
 import { WarehouseTransactionsService } from './application/warehouse-transactions.service';
+import { InventoryPostingDispatchService } from './application/inventory-posting-dispatch.service';
+import { OpeningBatchService } from './application/opening-batch.service';
+import { OpeningBatchController } from './interface/opening-batch.controller';
+import { OpeningBatch } from './infrastructure/opening-batch.entity';
+import { OpeningBatchLine } from './infrastructure/opening-batch-line.entity';
+import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { InventoryController } from './interface/inventory.controller';
 import { WarehouseTransactionsController } from './interface/warehouse-transactions.controller';
 import { AuditModule } from '../../foundation/audit/audit.module';
@@ -28,7 +34,9 @@ import { WarehouseItem } from './infrastructure/warehouse-item.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Warehouse, StockMovement, StockReservation, WarehouseTransaction, WarehouseTransactionLine, WarehouseItem]),
+    TypeOrmModule.forFeature([Warehouse, StockMovement, StockReservation, WarehouseTransaction, WarehouseTransactionLine, WarehouseItem, OpeningBatch, OpeningBatchLine]),
+    // C4 - FA-01 for the two-approver gate of an Opening Balance Batch.
+    ApprovalEngineModule,
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -54,10 +62,12 @@ import { WarehouseItem } from './infrastructure/warehouse-item.entity';
     // F6 — AccessScopeService + WarehouseScopeGuard (the scope pilot).
     ScopeModule,
   ],
-  controllers: [InventoryController, WarehouseTransactionsController],
+  controllers: [InventoryController, WarehouseTransactionsController, OpeningBatchController],
   providers: [
     InventoryService,
     WarehouseTransactionsService,
+    InventoryPostingDispatchService,
+    OpeningBatchService,
     { provide: INVENTORY_RESERVATION_CONTRACT, useExisting: InventoryService },
     { provide: INVENTORY_LOGISTICS_CONTRACT, useExisting: InventoryService },
   ],

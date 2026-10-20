@@ -114,9 +114,11 @@ import { CustomerPrint } from './pages/print/CustomerPrint';
 import { ProductListPrint } from './pages/print/ProductListPrint';
 import { PriceListPrint } from './pages/print/PriceListPrint';
 import { WarehouseOverview } from './pages/warehouse/WarehouseOverview';
+import { ValuationReport } from './pages/warehouse/ValuationReport';
 import { MovementCenter } from './pages/warehouse/MovementCenter';
 import { WarehouseTransactionForm } from './pages/warehouse/WarehouseTransactionForm';
 import { WarehouseTransactionDetail } from './pages/warehouse/WarehouseTransactionDetail';
+import { ItemDetailsRoute } from './pages/warehouse/ItemDetails';
 import { StockCountStart } from './pages/warehouse/StockCountStart';
 import { StockCountEntry } from './pages/warehouse/StockCountEntry';
 import { WarehouseTransactionPrint } from './pages/print/WarehouseTransactionPrint';
@@ -216,6 +218,7 @@ function AppRoutes() {
         <Route path="purchase-requests" element={<PurchaseRequests />} />
         <Route path="rfqs" element={<Rfqs />} />
         <Route path="inventory" element={<Inventory />} />
+        <Route path="inventory/items/:productId" element={<ItemDetailsRoute />} />
         <Route path="fulfillment" element={<Fulfillment />} />
         <Route path="shipments" element={<Shipments />} />
         <Route path="shipping-methods" element={<ShippingMethods />} />
@@ -279,6 +282,7 @@ function AppRoutes() {
         <Route path="accounting/journals/:id" element={<JournalDetail />} />
         <Route path="accounting/ledger" element={<GeneralLedger />} />
         <Route path="accounting/trial-balance" element={<TrialBalance />} />
+        <Route path="inventory/valuation-report" element={<ValuationReport />} />
         <Route path="accounting/financial-events" element={<FinancialEvents />} />
         <Route path="accounting/ar" element={<ArReconciliation />} />
         <Route path="accounting/ap" element={<ApReconciliation />} />

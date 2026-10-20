@@ -1,0 +1,290 @@
+{
+  "procurement": {
+    "po_active": {
+      "ok": true,
+      "value": "PO-2026-000001"
+    },
+    "po_discontinued": {
+      "ok": true,
+      "value": "PO-2026-000002"
+    },
+    "po_draft": {
+      "ok": false,
+      "error": {
+        "class": "ConflictException",
+        "status": 409,
+        "message": "Cannot create this Purchase Order: \"SKU-DRAFT — Draft item\" is a draft item whose New Item Request has not been approved."
+      }
+    },
+    "po_missing": {
+      "ok": false,
+      "error": {
+        "class": "QueryFailedError",
+        "status": null,
+        "message": "insert or update on table \"purchase_order_lines\" violates foreign key constraint \"purchase_order_lines_productId_fkey\""
+      }
+    },
+    "po_mixed_active_plus_missing": {
+      "ok": false,
+      "error": {
+        "class": "QueryFailedError",
+        "status": null,
+        "message": "insert or update on table \"purchase_order_lines\" violates foreign key constraint \"purchase_order_lines_productId_fkey\""
+      }
+    },
+    "po_rows_added_by_missing_and_mixed": 0,
+    "po_rows_added_total": 2,
+    "po_numbers_issued": [
+      "PO-2026-000001",
+      "PO-2026-000002"
+    ],
+    "po_submit_after_item_discontinued": {
+      "ok": true,
+      "value": {
+        "state": "submitted"
+      }
+    },
+    "po_approve_after_item_discontinued": {
+      "ok": true,
+      "value": {
+        "state": "approved"
+      }
+    },
+    "pr_create_discontinued": {
+      "ok": true,
+      "value": "PR-2026-000001"
+    },
+    "pr_create_draft": {
+      "ok": true,
+      "value": "PR-2026-000002"
+    },
+    "pr_create_missing": {
+      "ok": false,
+      "error": {
+        "class": "QueryFailedError",
+        "status": null,
+        "message": "insert or update on table \"purchase_request_lines\" violates foreign key constraint \"purchase_request_lines_productId_fkey\""
+      }
+    },
+    "pr_rows_added": 2,
+    "pr_approve_discontinued": {
+      "ok": false,
+      "error": {
+        "class": "ConflictException",
+        "status": 409,
+        "message": "Cannot approve this Purchase Request: \"SKU-DISC — Discontinued item\" is discontinued. Only approved (active) items can move through procurement — a new item must have its New Item Request approved first."
+      }
+    }
+  },
+  "transfer": {
+    "receipt_submit": "posted",
+    "after_receipt": {
+      "stockReport": [
+        {
+          "wh": "RAW",
+          "onHand": 100
+        }
+      ],
+      "gridRaw": [
+        {
+          "onHand": 100,
+          "assigned": false
+        }
+      ],
+      "gridProd": []
+    },
+    "after_transfer_draft": {
+      "stockReport": [
+        {
+          "wh": "RAW",
+          "onHand": 100
+        }
+      ],
+      "gridRaw": [
+        {
+          "onHand": 100,
+          "assigned": false
+        }
+      ],
+      "gridProd": []
+    },
+    "transfer_submit": {
+      "ok": true,
+      "value": "submitted"
+    },
+    "after_transfer_submitted": {
+      "stockReport": [
+        {
+          "wh": "RAW",
+          "onHand": 100
+        }
+      ],
+      "gridRaw": [
+        {
+          "onHand": 100,
+          "assigned": false
+        }
+      ],
+      "gridProd": []
+    },
+    "transfer_approve": {
+      "ok": true,
+      "value": "posted"
+    },
+    "after_transfer_approved": {
+      "stockReport": [
+        {
+          "wh": "RAW",
+          "onHand": 70
+        },
+        {
+          "wh": "PROD",
+          "onHand": 30
+        }
+      ],
+      "gridRaw": [
+        {
+          "onHand": 70,
+          "assigned": false
+        }
+      ],
+      "gridProd": [
+        {
+          "onHand": 30,
+          "assigned": false
+        }
+      ]
+    },
+    "transfer_post": {
+      "ok": true,
+      "value": "posted"
+    },
+    "after_transfer_posted": {
+      "stockReport": [
+        {
+          "wh": "RAW",
+          "onHand": 70
+        },
+        {
+          "wh": "PROD",
+          "onHand": 30
+        }
+      ],
+      "gridRaw": [
+        {
+          "onHand": 70,
+          "assigned": false
+        }
+      ],
+      "gridProd": [
+        {
+          "onHand": 30,
+          "assigned": false
+        }
+      ]
+    },
+    "transfer_post_again": {
+      "ok": true,
+      "value": "posted"
+    },
+    "movement_rows_for_transfer": [
+      {
+        "is_raw": true,
+        "movementType": "transfer_out",
+        "qty": -30,
+        "referenceType": "warehouse_transaction"
+      },
+      {
+        "is_raw": false,
+        "movementType": "transfer_in",
+        "qty": 30,
+        "referenceType": "warehouse_transaction"
+      }
+    ],
+    "movement_report_fields": [
+      "id",
+      "warehouseId",
+      "productId",
+      "quantity",
+      "movementType",
+      "referenceType",
+      "referenceId",
+      "createdByUserId",
+      "createdAt"
+    ],
+    "raw_running_balance": [
+      {
+        "type": "receipt",
+        "qty": 100,
+        "balance": 100
+      },
+      {
+        "type": "transfer_out",
+        "qty": -30,
+        "balance": 70
+      }
+    ],
+    "raw_running_matches_stock": true
+  },
+  "trialBalance": {
+    "noFilter": {
+      "rows": [
+        {
+          "code": "1000",
+          "debit": "60.0000",
+          "credit": "0.0000"
+        },
+        {
+          "code": "4000",
+          "debit": "0.0000",
+          "credit": "100.0000"
+        },
+        {
+          "code": "5000",
+          "debit": "40.0000",
+          "credit": "0.0000"
+        }
+      ],
+      "rowDebitSum": 100,
+      "rowCreditSum": 100,
+      "footerDebit": "190.0000",
+      "footerCredit": "190.0000",
+      "balanced": true
+    },
+    "fromFeb1": {
+      "rows": [
+        {
+          "code": "1000",
+          "debit": "0.0000",
+          "credit": "40.0000"
+        },
+        {
+          "code": "5000",
+          "debit": "40.0000",
+          "credit": "0.0000"
+        }
+      ],
+      "rowDebitSum": 40,
+      "rowCreditSum": 40,
+      "footerDebit": "90.0000",
+      "footerCredit": "90.0000",
+      "balanced": true
+    }
+  },
+  "productColumns": [
+    "id:uuid",
+    "sku:character varying",
+    "name:character varying",
+    "unitPrice:numeric",
+    "status:character varying",
+    "createdAt:timestamp with time zone",
+    "updatedAt:timestamp with time zone",
+    "unit:character varying"
+  ],
+  "productIndexes": [
+    "CREATE UNIQUE INDEX products_pkey ON public.products USING btree (id)",
+    "CREATE UNIQUE INDEX \"IDX_products_sku\" ON public.products USING btree (sku)",
+    "CREATE INDEX \"IDX_products_status\" ON public.products USING btree (status)"
+  ],
+  "barcodeLikeColumnsAnywhere": []
+}

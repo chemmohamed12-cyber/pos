@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { access, readdir, stat, statfs } from 'fs/promises';
 import { constants as FS } from 'fs';
 import { join } from 'path';
+import { diagnoseBinary } from './binary-check';
 import { AppConfigService } from '../configuration/app-config.service';
 
 export type PreflightStatus = 'pass' | 'fail' | 'warn' | 'skip';
@@ -62,22 +63,15 @@ export class DeployPreflightService {
     const { appRoot, frontendRuntimePath, passengerRestartFile } = this.config.releaseExecution;
 
     // --- 1. Binaries: configured, absolute, executable -----------------
-    for (const [name, bin, crit] of [
-      ['bin.node', nodeBin, true],
-      ['bin.npm', npmBin, false],
-      ['bin.pg_dump', pgDumpBin, true],
-      ['bin.pg_restore', pgRestoreBin, true],
-    ] as Array<[string, string, boolean]>) {
-      if (!bin || (!bin.startsWith('/') && !/^[a-zA-Z]:[\\/]/.test(bin))) {
-        add(name, crit ? 'fail' : 'warn', `"${bin}" is not an absolute path — set it explicitly (v1.0.3 report item 13/14).`, crit);
-        continue;
-      }
-      try {
-        await access(bin, FS.X_OK);
-        add(name, 'pass', bin, crit);
-      } catch {
-        add(name, crit ? 'fail' : 'warn', `"${bin}" is not executable / not found on this host.`, crit);
-      }
+    for (const [name, envVar, bin, crit] of [
+      ['bin.node', 'NODE_BIN', nodeBin, true],
+      ['bin.npm', 'NPM_BIN', npmBin, false],
+      ['bin.pg_dump', 'PG_DUMP_BIN', pgDumpBin, true],
+      ['bin.pg_restore', 'PG_RESTORE_BIN', pgRestoreBin, true],
+    ] as Array<[string, string, string, boolean]>) {
+      // The absolute-path rule is unchanged; the diagnosis only names the variable to set and the precise reason (missing / not a file / not executable). Nothing is executed.
+      const d = await diagnoseBinary(envVar, bin);
+      add(name, d.ok ? 'pass' : crit ? 'fail' : 'warn', d.detail, crit);
     }
 
     // --- 2. Filesystem anchors ---------------------------------------

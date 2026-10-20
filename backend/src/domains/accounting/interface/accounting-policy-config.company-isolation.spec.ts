@@ -37,7 +37,7 @@ class ConfigDouble {
 
 /**
  * NAV-02 (2026-10-06) — Accounting Policy configuration over the existing Configuration Engine. Real PostgreSQL, Company A with Company B as
- * the witness. Proves: the managed keys (12 consumed by posting), validation against the REQUESTING Company's chart with the same rule posting
+ * the witness. Proves: the managed keys (13 consumed by posting; the 13th, the opening-correction account, was added by C4), validation against the REQUESTING Company's chart with the same rule posting
  * applies (exists / active / postable / non-control), advisory type warnings, reason maps, Company isolation of validation and audit, and that
  * a value saved through the service is what real posting then uses (D8 acquisition helper posts to the configured account).
  */
@@ -126,9 +126,9 @@ describe('NAV-02 — accounting policy configuration (validated, Company-aware) 
   const CLEARING = 'accounting.fixed_asset_acquisition_clearing_account_code';
   const auditCount = async (k: Key, action: string) => Number((await (await mgr(k)).query(`SELECT count(*) AS n FROM audit_records WHERE action = $1`, [action]))[0].n);
 
-  it('1. LIST: exactly the 12 keys posting actually consumes, grouped, all UNSET on a fresh installation (the 5 unconsumed AR/AP hint keys are not offered)', async () => {
+  it('1. LIST: exactly the 13 keys posting actually consumes, grouped, all UNSET on a fresh installation (the 5 unconsumed AR/AP hint keys are not offered)', async () => {
     const list = await policy.list(await mgr('A'));
-    expect(list).toHaveLength(12);
+    expect(list).toHaveLength(13);
     expect(ACCOUNTING_POLICY_KEYS.map((k) => k.key)).not.toContain('accounting.ap_expense_account_code');
     expect(list.every((v) => v.status === 'unset')).toBe(true);
     expect([...new Set(list.map((v) => v.group))].sort()).toEqual(['cash', 'fixed_assets', 'inventory', 'procurement', 'sales']);

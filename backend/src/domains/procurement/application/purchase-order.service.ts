@@ -74,7 +74,8 @@ export class PurchaseOrderService {
     // `purchase_orders.warehouseId` has no FK — an unknown warehouse is rejected (404) before any mutation, same as an unknown supplier above.
     await this.warehouses.getWarehouse(input.warehouseId, externalManager);
 
-    await this.lifecycleGate.assertNoneDraft(input.lines.map((l) => l.productId), 'Cannot create this Purchase Order', externalManager); // D7 gate (before any mutation)
+    // D7 as amended by CR-2026-10-15: every item must exist and be active (before any mutation; a missing id is a 409, never a raw FK error).
+    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active'], 'Cannot create this Purchase Order', externalManager);
     await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO', true, externalManager);
 
     const run = async (manager: EntityManager): Promise<PurchaseOrder> => {
@@ -144,6 +145,12 @@ export class PurchaseOrderService {
         manager,
       );
       throw new ForbiddenException('Maker/checker: the user who created this Purchase Order cannot approve it. Another authorized user must approve it.');
+    }
+    if (action === 'approve') {
+      // CR-2026-10-15 — an item discontinued after the PO was raised blocks its approval (checked BEFORE the transition). Once approved,
+      // the PO is in flight and Goods Receipt stays allowed (D7).
+      const lines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: id } });
+      await this.lifecycleGate.assertEligible(lines.map((l) => l.productId), ['active'], 'Cannot approve this Purchase Order', manager);
     }
     const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId, manager);
     await this.audit.record(

@@ -45,6 +45,138 @@
         "set VITE_API_TARGET=http://localhost:3601&& npm --prefix frontend run dev -- --host 127.0.0.1 --port 5601"
       ],
       "port": 5601
+    },
+    {
+      "name": "cr-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_ui_cp'; $env:PORT='3602'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3602
+    },
+    {
+      "name": "cr-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3602&& npm --prefix frontend run dev -- --host 127.0.0.1 --port 5602"
+      ],
+      "port": 5602
+    },
+    {
+      "name": "dev-preview-backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d backend && node ../.claude/worktrees/integration/backend/dist/main.js"
+      ],
+      "port": 3500
+    },
+    {
+      "name": "dev-preview-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "npm --prefix .claude/worktrees/integration/frontend run dev -- --host 127.0.0.1 --port 5173"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "md-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location .claude/worktrees/master-data-item/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_ui_cp'; $env:PORT='3603'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3603
+    },
+    {
+      "name": "md-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3603&& npm --prefix .claude/worktrees/master-data-item/frontend run dev -- --host 127.0.0.1 --port 5603"
+      ],
+      "port": 5603
+    },
+    {
+      "name": "pv-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location .claude/worktrees/local-preview/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t96_preview_cp'; $env:PORT='3610'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3610
+    },
+    {
+      "name": "pv-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3610&& npm --prefix .claude/worktrees/local-preview/frontend run dev -- --host 127.0.0.1 --port 5610"
+      ],
+      "port": 5610
+    },
+    {
+      "name": "bc-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location .claude/worktrees/md-step1/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_bc_cp'; $env:PORT='3611'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3611
+    },
+    {
+      "name": "bc-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3611&& npm --prefix .claude/worktrees/md-step1/frontend run dev -- --host 127.0.0.1 --port 5611"
+      ],
+      "port": 5611
+    },
+    {
+      "name": "po-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location .claude/worktrees/item-name-guard/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_po_cp'; $env:PORT='3613'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3613
+    },
+    {
+      "name": "po-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3613&& npm --prefix .claude/worktrees/po-picker-hotfix/frontend run dev -- --host 127.0.0.1 --port 5612"
+      ],
+      "port": 5612
+    },
+    {
+      "name": "i18-backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location .claude/worktrees/i18n-raw-codes/backend; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='5546'; $env:DB_USER='daii_biz_test'; $env:DB_PASSWORD=[Environment]::GetEnvironmentVariable('DAII_BIZ_PG_PASSWORD','User'); $env:DB_NAME='daii_test_biz_t97_i18_cp'; $env:PORT='3614'; $env:NODE_ENV='development'; node dist/main.js"
+      ],
+      "port": 3614
+    },
+    {
+      "name": "i18-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_TARGET=http://localhost:3614&& npm --prefix .claude/worktrees/i18n-raw-codes/frontend run dev -- --host 127.0.0.1 --port 5612"
+      ],
+      "port": 5612
     }
   ]
 }

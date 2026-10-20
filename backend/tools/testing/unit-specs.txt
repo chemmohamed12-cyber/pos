@@ -60,3 +60,4 @@ src/foundation/release/staged-activation.service.spec.ts
 src/foundation/release/upgrade-resolver.spec.ts
 src/foundation/scope/warehouse-scope.coverage.spec.ts
 src/foundation/testing/test-teardown-retry.spec.ts
+src/foundation/release/release-upload-readiness.spec.ts

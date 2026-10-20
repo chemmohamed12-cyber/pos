@@ -79,6 +79,14 @@ export const inventoryManifest: ModuleManifest = {
     // `accounting.inventory.adjust`/`.approve` nodes (D11/D21) — F08 does not duplicate FA-01.
     { node: 'inventory.valuation', title_code: 'perm.inventory.valuation', parent: 'inventory' },
     { node: 'inventory.valuation.view', title_code: 'perm.inventory.valuation.view', parent: 'inventory.valuation' },
+
+    // C4 (ADR-INV-01) - the Opening Balance Batch. `.create` drafts / imports / submits / posts (read-only reads); `.approve` decides an opening (FA-01, two approvers);
+    // `.correct` creates and decides a reversal / post-movement correction; `.override` allows the eligibility exception (a pair that already has activity).
+    { node: 'inventory.opening_batch', title_code: 'perm.inventory.opening_batch', parent: 'inventory' },
+    { node: 'inventory.opening_batch.create', title_code: 'perm.inventory.opening_batch.create', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.approve', title_code: 'perm.inventory.opening_batch.approve', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.correct', title_code: 'perm.inventory.opening_batch.correct', parent: 'inventory.opening_batch' },
+    { node: 'inventory.opening_batch.override', title_code: 'perm.inventory.opening_batch.override', parent: 'inventory.opening_batch' },
   ],
 
   feature_codes: [
@@ -103,6 +111,49 @@ export const inventoryManifest: ModuleManifest = {
       key: 'inventory.negative_stock_allowed',
       type: 'bool',
       default: false,
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // C3 (ADR-INV-03) - segregation of duties on warehouse documents with a financial effect: `off` = no check (pre-C3), `warn` = allow and audit
+    // `warehouse_transaction.sod_violation`, `on` = refuse the creator approving / posting their own document. Staged: C3 ships `warn`; the switch to `on` is C5.
+    {
+      key: 'inventory.document_sod_enforced',
+      type: 'enum',
+      allowed: ['off', 'warn', 'on'],
+      default: 'warn',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // C3 (ADR-INV-03) - a manual receipt (a receipt document with a reason code, i.e. with a financial effect) waits for approval instead of auto-posting on
+    // submit. `off` (default) keeps today's straight-through behaviour; `on` makes it draft -> submitted -> approved -> posted. Reversal documents are unaffected.
+    {
+      key: 'inventory.receipt_approval_required',
+      type: 'enum',
+      allowed: ['off', 'on'],
+      default: 'off',
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // C4 (ADR-INV-01 section 2.2.8) - the opening cut-over switch. Off (default): the legacy direct import and the reason `opening_balance` keep working. On: openings come in
+    // only through an Opening Balance Batch; the legacy import is refused and `opening_balance` is reserved. Flip only after the owner has reviewed the real databases (C5).
+    {
+      key: 'inventory.opening_batch_required',
+      type: 'bool',
+      default: false,
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // ADR-INV-04 (2026-10-19) - the approved catalog of movement reasons (code, movement types, reference kind, approval, financial note). Accounting is NOT driven by it (G-ISS-1: issues still
+    // post COGS; receipts use accounting.inventory_manual_receipt_reason_accounts). An absent / malformed value falls back to the built-in default catalog, never to "no rules".
+    {
+      key: 'inventory.movement_reason_catalog',
+      type: 'json',
+      default: [],
+      scope_levels: ['platform', 'edition', 'installation'],
+    },
+    // ADR-INV-04 - enforcement of the reason / reference matrix on warehouse documents: off = no check; warn = allowed, audited as `warehouse_transaction.reference_warning` (measure real data);
+    // enforce = refused before anything is written. C3/C5 staging: ships `warn`; the switch to `enforce` is the owner's decision after the data review.
+    {
+      key: 'inventory.reference_enforcement',
+      type: 'enum',
+      allowed: ['off', 'warn', 'enforce'],
+      default: 'warn',
       scope_levels: ['platform', 'edition', 'installation'],
     },
     {

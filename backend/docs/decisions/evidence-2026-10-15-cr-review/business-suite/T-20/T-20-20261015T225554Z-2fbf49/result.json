@@ -1,0 +1,52 @@
+{
+  "testId": "T-20",
+  "runId": "T-20-20261015T225554Z-2fbf49",
+  "finishedAt": "2026-10-15T22:56:05.738Z",
+  "results": [
+    {
+      "id": "H1-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"cap\":10,\"allowed\":10,\"errors\":0,\"counter\":10}"
+    },
+    {
+      "id": "H1-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"cap\":10,\"allowed\":10,\"errors\":0,\"counter\":10}"
+    },
+    {
+      "id": "H2-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"releaseCallsOk\":5,\"stillActive\":0}"
+    },
+    {
+      "id": "H2-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"releaseCallsOk\":5,\"stillActive\":0}"
+    },
+    {
+      "id": "H3-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"fulfilCallsOk\":1,\"dispatchMovements\":1,\"onHandDelta\":-3}"
+    },
+    {
+      "id": "H3-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"fulfilCallsOk\":1,\"dispatchMovements\":1,\"onHandDelta\":-3}"
+    },
+    {
+      "id": "H4-A-plain-manager",
+      "status": "PASS",
+      "note": "{\"instances\":1,\"errors\":0,\"tally\":{\"OK\":10}}"
+    },
+    {
+      "id": "H4-B-transaction-manager",
+      "status": "PASS",
+      "note": "{\"instances\":1,\"errors\":0,\"tally\":{\"OK\":10}}"
+    },
+    {
+      "id": "H5-shipment-transition",
+      "status": "BLOCKED",
+      "note": "NOT RUN: needs a full shipment fixture (order, invoice, custody, couriers); no probe was written — never counted as a pass"
+    }
+  ]
+}

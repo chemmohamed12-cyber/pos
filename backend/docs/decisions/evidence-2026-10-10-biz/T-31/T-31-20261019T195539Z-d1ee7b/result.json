@@ -1,0 +1,57 @@
+{
+  "testId": "T-31",
+  "runId": "T-31-20261019T195539Z-d1ee7b",
+  "finishedAt": "2026-10-19T19:55:51.155Z",
+  "results": [
+    {
+      "id": "P1-A-plain-manager-concurrent-payments-never-overpay",
+      "status": "PASS",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":1,\"calls\":8,\"ok\":1,\"tally\":{\"ConflictException:409\":7,\"OK\":1},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":2,\"calls\":8,\"ok\":1,\"tally\":{\"ConflictException:409\":7,\"OK\":1},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1}]"
+    },
+    {
+      "id": "P1-B-transaction-manager-concurrent-payments-never-overpay",
+      "status": "PASS",
+      "note": "[{\"round\":0,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":1,\"calls\":8,\"ok\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1},{\"round\":2,\"calls\":8,\"ok\":1,\"tally\":{\"ConflictException:409\":7,\"OK\":1},\"invoiceTotal\":100,\"remainingAfter\":40,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1}]"
+    },
+    {
+      "id": "P2-outer-rollback-leaves-no-payment-ledger-treasury-or-audit-trace",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"balanceBefore\":\"10360.00\",\"balanceAfter\":\"10360.00\",\"payments\":0,\"paidTotal\":0,\"ledgerCredits\":0,\"treasuryTxns\":0,\"auditRows\":0} / {\"retryOk\":true,\"payments\":1,\"paidTotal\":40,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1}"
+    },
+    {
+      "id": "P4-A-plain-manager-single-payment-and-exact-remainder",
+      "status": "PASS",
+      "note": "{\"paymentId\":\"3906eb1c-c924-435b-9abb-2052dad940cc\",\"balanceDelta\":60,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1,\"secondRefused\":true,\"remainderAccepted\":true,\"end\":{\"payments\":2,\"paidTotal\":100,\"ledgerCredits\":2,\"treasuryTxns\":2,\"auditRows\":2}}"
+    },
+    {
+      "id": "P4-B-transaction-manager-single-payment-and-exact-remainder",
+      "status": "PASS",
+      "note": "{\"paymentId\":\"b2d2f8e5-ed4c-4c41-830d-cdcc9b3d02c1\",\"balanceDelta\":60,\"payments\":1,\"paidTotal\":60,\"ledgerCredits\":1,\"treasuryTxns\":1,\"auditRows\":1,\"secondRefused\":true,\"remainderAccepted\":true,\"end\":{\"payments\":2,\"paidTotal\":100,\"ledgerCredits\":2,\"treasuryTxns\":2,\"auditRows\":2}}"
+    },
+    {
+      "id": "P5-A-plain-manager-recordPayment-failure-after-cash-in-is-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"method\":\"recordPayment\",\"style\":\"plain\",\"failed\":true,\"balanceBefore\":\"10600.00\",\"balanceAfter\":\"10600.00\",\"paymentRows\":0,\"orphanCashIn\":0,\"retryOk\":true}"
+    },
+    {
+      "id": "P5-B-transaction-manager-recordPayment-failure-after-cash-in-is-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"method\":\"recordPayment\",\"style\":\"transaction\",\"failed\":true,\"balanceBefore\":\"10650.00\",\"balanceAfter\":\"10650.00\",\"paymentRows\":0,\"orphanCashIn\":0,\"retryOk\":true}"
+    },
+    {
+      "id": "P5-A-plain-manager-recordOnAccountPayment-failure-after-cash-in-is-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"method\":\"recordOnAccountPayment\",\"style\":\"plain\",\"failed\":true,\"balanceBefore\":\"10700.00\",\"balanceAfter\":\"10700.00\",\"paymentRows\":0,\"orphanCashIn\":0,\"retryOk\":true}"
+    },
+    {
+      "id": "P5-B-transaction-manager-recordOnAccountPayment-failure-after-cash-in-is-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"method\":\"recordOnAccountPayment\",\"style\":\"transaction\",\"failed\":true,\"balanceBefore\":\"10750.00\",\"balanceAfter\":\"10750.00\",\"paymentRows\":0,\"orphanCashIn\":0,\"retryOk\":true}"
+    },
+    {
+      "id": "P3-audit-chain-valid-after-all-payment-probes",
+      "status": "PASS",
+      "note": "{\"chainValid\":true}"
+    }
+  ]
+}

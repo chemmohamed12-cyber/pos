@@ -102,6 +102,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/movement-center', code: 'nav.movement_center', module: 'inventory', workflowRule: 'nav.warehouse' },
       { to: '/inventory', code: 'nav.inventory', module: 'inventory', workflowRule: 'nav.warehouse' },
       { to: '/stock-count', code: 'nav.stock_count', module: 'inventory', workflowRule: 'nav.warehouse' },
+      // C1 (2026-10-17): the valuation report is served by `GET inventory/valuation/report`, gated by `inventory.valuation.view` (read-only).
+      { to: '/inventory/valuation-report', code: 'nav.valuation_report', module: 'inventory', permissionNode: 'inventory.valuation' },
     ],
   },
   {

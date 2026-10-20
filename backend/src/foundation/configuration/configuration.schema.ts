@@ -65,6 +65,9 @@ export const configurationValidationSchema = Joi.object({
   // preflight fail loudly if the configured value is not executable.
   PG_DUMP_BIN: Joi.string().default('pg_dump'),
   PG_RESTORE_BIN: Joi.string().default('pg_restore'),
+  // Release Center - the largest release ZIP the upload endpoint accepts, in MB (was a hard-coded 200). The default keeps today's behaviour.
+  // A reverse proxy / hosting layer in front of the application has its OWN limit that this setting does not change.
+  RELEASE_UPLOAD_MAX_MB: Joi.number().integer().min(1).max(2048).default(200),
 
   // Release Center — Execution Layer (Phase C) + v1.0.3 deployment
   // hardening. RELEASE_APP_ROOT defaults to the running process's own

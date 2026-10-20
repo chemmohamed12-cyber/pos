@@ -1,0 +1,287 @@
+diff --git a/backend/src/domains/accounting/application/ledger.service.ts b/backend/src/domains/accounting/application/ledger.service.ts
+index 9d0ec53..c85e91c 100644
+--- a/backend/src/domains/accounting/application/ledger.service.ts
++++ b/backend/src/domains/accounting/application/ledger.service.ts
+@@ -40,13 +40,35 @@ export interface TrialBalanceRow {
+   creditBase: string;
+ }
+ 
++export interface TrialBalanceQuery {
++  orgUnitId?: string;
++  from?: string;
++  to?: string;
++}
++
+ export interface TrialBalance {
+   rows: TrialBalanceRow[];
++  /** GROSS posted debit activity in the window (not the sum of the rows' net figures). */
+   totalDebitBase: string;
++  /** GROSS posted credit activity in the window. */
+   totalCreditBase: string;
+   balanced: boolean;
+ }
+ 
++/**
++ * CR-2026-10-15 — the Trial Balance screen payload. TWO DIFFERENT TOTALS, never interchangeable:
++ *  - `totalDebitBase` / `totalCreditBase` (inherited, LOCKED CONTRACT): GROSS posted activity — Σ of every posted line's debit / credit.
++ *    Signed into closing snapshots (`ClosingSnapshotService`) and asserted by the GL specs. Do not change their meaning.
++ *  - `balanceTotalDebitBase` / `balanceTotalCreditBase`: Σ of the displayed rows — each account's NET balance on its debit or credit
++ *    side. These are what the screen's footer shows. They equal the gross totals only when no account has both debit and credit lines.
++ */
++export interface TrialBalanceReport extends TrialBalance {
++  /** Σ over accounts of GREATEST(net, 0) — the sum of the displayed debit column. */
++  balanceTotalDebitBase: string;
++  /** Σ over accounts of GREATEST(-net, 0) — the sum of the displayed credit column. */
++  balanceTotalCreditBase: string;
++}
++
+ /**
+  * F03 — General Ledger read model (Blueprint §11, ADR-035 D9). **Every
+  * figure is a PostgreSQL `NUMERIC` aggregation over POSTED
+@@ -150,23 +172,9 @@ export class LedgerService {
+   }
+ 
+   /** Multi-Company Area 9 (2026-09-22) — `manager?` added so a company-scoped caller (`ClosingSnapshotService`) can run this against that Company's own connection instead of the ambient one. Falls back to the ambient `this.dataSource` when omitted, unchanged for every existing caller. */
+-  async getTrialBalance(query: { orgUnitId?: string; from?: string; to?: string } = {}, manager?: EntityManager): Promise<TrialBalance> {
++  async getTrialBalance(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalance> {
+     const runner = manager ?? this.dataSource;
+-    const params: unknown[] = [];
+-    const conds: string[] = [this.postedFilter];
+-    if (query.orgUnitId) {
+-      params.push(query.orgUnitId);
+-      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
+-    }
+-    if (query.from) {
+-      params.push(query.from);
+-      conds.push(`e."businessDate" >= $${params.length}`);
+-    }
+-    if (query.to) {
+-      params.push(query.to);
+-      conds.push(`e."businessDate" <= $${params.length}`);
+-    }
+-    const where = conds.join(' AND ');
++    const { where, params } = this.trialBalanceWhere(query);
+ 
+     const rows = (await runner.query(
+       `SELECT a.id AS "accountId", a.code, a.name, a."accountType", a."normalBalance",
+@@ -201,4 +209,46 @@ export class LedgerService {
+       balanced: tot?.balanced ?? true,
+     };
+   }
++
++  /**
++   * CR-2026-10-15 — the Trial Balance SCREEN. The rows show each account's NET balance, but `totalDebitBase`/`totalCreditBase` are the
++   * GROSS posted activity (a contract the closing snapshot signs and the GL specs assert), so they did not equal the column sums whenever
++   * an account had both debit and credit lines. This adds `balanceTotalDebitBase`/`balanceTotalCreditBase` — the sums of exactly the
++   * displayed row figures, computed SQL-side over the same per-account aggregate — and leaves every existing field unchanged.
++   */
++  async getTrialBalanceReport(query: TrialBalanceQuery = {}, manager?: EntityManager): Promise<TrialBalanceReport> {
++    const runner = manager ?? this.dataSource;
++    const tb = await this.getTrialBalance(query, manager);
++    const { where, params } = this.trialBalanceWhere(query);
++    const [bal] = (await runner.query(
++      `SELECT COALESCE(SUM(GREATEST(net, 0)),0)::numeric(20,4)  AS d,
++              COALESCE(SUM(GREATEST(-net, 0)),0)::numeric(20,4) AS c
++       FROM (
++         SELECT (COALESCE(SUM(l."debitBase"),0) - COALESCE(SUM(l."creditBase"),0))::numeric(20,4) AS net
++         FROM accounting_journal_lines l JOIN accounting_journal_entries e ON e.id = l."journalEntryId"
++         WHERE ${where}
++         GROUP BY l."accountId"
++       ) agg`,
++      params,
++    )) as Array<{ d: string; c: string }>;
++    return { ...tb, balanceTotalDebitBase: bal?.d ?? '0.0000', balanceTotalCreditBase: bal?.c ?? '0.0000' };
++  }
++
++  private trialBalanceWhere(query: TrialBalanceQuery): { where: string; params: unknown[] } {
++    const params: unknown[] = [];
++    const conds: string[] = [this.postedFilter];
++    if (query.orgUnitId) {
++      params.push(query.orgUnitId);
++      conds.push(`(l."orgUnitId" = $${params.length} OR e."orgUnitId" = $${params.length})`);
++    }
++    if (query.from) {
++      params.push(query.from);
++      conds.push(`e."businessDate" >= $${params.length}`);
++    }
++    if (query.to) {
++      params.push(query.to);
++      conds.push(`e."businessDate" <= $${params.length}`);
++    }
++    return { where: conds.join(' AND '), params };
++  }
+ }
+diff --git a/backend/src/domains/accounting/interface/general-ledger.controller.ts b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+index 8c0dd89..1145919 100644
+--- a/backend/src/domains/accounting/interface/general-ledger.controller.ts
++++ b/backend/src/domains/accounting/interface/general-ledger.controller.ts
+@@ -252,7 +252,8 @@ export class GeneralLedgerController {
+   async getTrialBalance(@Req() req: CompanyScopedRequest, @Query('from') from?: string, @Query('to') to?: string, @Query('orgUnitId') orgUnitId?: string) {
+     if (!req.companyContext) throw new UnauthorizedException();
+     const manager = req.companyContext.dataSource.manager;
+-    return this.ledger.getTrialBalance({ from, to, orgUnitId }, manager);
++    // CR-2026-10-15 — same payload plus `balanceTotal*` (the sums of the displayed net rows) for the screen's footer.
++    return this.ledger.getTrialBalanceReport({ from, to, orgUnitId }, manager);
+   }
+ 
+   @UseGuards(PermissionGuard)
+diff --git a/backend/src/domains/inventory-warehouse/application/inventory.service.ts b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+index 5ea1e7f..dd3096d 100644
+--- a/backend/src/domains/inventory-warehouse/application/inventory.service.ts
++++ b/backend/src/domains/inventory-warehouse/application/inventory.service.ts
+@@ -516,8 +516,17 @@ export class InventoryService implements InventoryReservationContract, Inventory
+     }
+     if (filters.dateTo) {
+       params.push(filters.dateTo);
+-      conditions.push(`"createdAt" <= $${params.length}`);
++      // CR-2026-10-15 (M-1) — the screen sends a date-only `YYYY-MM-DD` (an `<input type="date">`). Compared as `<=` it meant midnight at
++      // the START of that day, so the whole selected end day (including "today") was dropped. A date-only value is now inclusive of the
++      // whole day (`< next day`, the same session-time-zone midnight `dateFrom` already uses); a full timestamp keeps its exact `<=`.
++      conditions.push(
++        /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo)
++          ? `"createdAt" < ($${params.length}::date + 1)`
++          : `"createdAt" <= $${params.length}`,
++      );
+     }
++    // Dates filter the ledger's posting time (`createdAt`). A warehouse document's own business date (`warehouse_transactions.movementDate`,
++    // settable to a past day) is NOT carried onto the stock ledger — that is the current ledger-date policy (decision D-CR7), not a filter bug.
+ 
+     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+     return (manager ?? this.dataSource).query(
+diff --git a/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts b/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
+index 09dd712..4002e17 100644
+--- a/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
++++ b/backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
+@@ -7,8 +7,10 @@ import { SALES_PRODUCTS_CONTRACT, SalesProductsContract } from '../../../foundat
+  * approved (Approval Engine, `sales.catalog.edit`) and it becomes `active`; the chain must never carry an item that was not approved:
+  *   - Purchase Request APPROVAL requires every line's product to be `active` (the earliest gate — an approved PR never points at an
+  *     unapproved item), re-checked when the RFQ is raised;
+- *   - PO creation and Goods Receipt refuse a `draft` product (defence in depth for any path that reaches them: direct PO, RFQ award,
+- *     legacy documents) — a later `discontinued` product on an already-issued PO is NOT blocked (in-flight orders keep working).
++ *   - Goods Receipt refuses a `draft` product (defence in depth for legacy documents) — a later `discontinued` product on an
++ *     already-APPROVED PO is NOT blocked (in-flight orders keep working);
++ *   - CR-2026-10-15 amends D7 for PO creation and PO approval: both require every product to exist and be `active` (direct PO and
++ *     RFQ award alike), and PR creation refuses a missing or `discontinued` product (`draft` stays allowed for the New Item flow).
+  * Every check runs BEFORE any mutation (fail closed). The Product is reached only through the published Sales contract.
+  */
+ @Injectable()
+@@ -30,7 +32,24 @@ export class ProductLifecycleGate {
+     );
+   }
+ 
+-  /** No product may still be `draft` (PO creation / Goods Receipt). */
++  /**
++   * CR-2026-10-15 — every product must exist and be in one of `allowed` (PO creation and approval: `active`; PR creation: `active` or
++   * `draft`). Rejects the whole document with one controlled 409 that lists EVERY ineligible line — a missing id never reaches the
++   * database as a raw foreign-key error.
++   */
++  async assertEligible(productIds: string[], allowed: ReadonlyArray<'draft' | 'active' | 'discontinued'>, context: string, manager?: EntityManager): Promise<void> {
++    const bad = (await this.load(productIds, manager)).filter((p) => !p.snapshot || !allowed.includes(p.snapshot.status));
++    if (bad.length === 0) return;
++    // `draft` keeps the D7 wording users already see ("a draft item whose New Item Request has not been approved").
++    const reason = (s: NonNullable<(typeof bad)[number]['snapshot']>) =>
++      s.status === 'draft' ? 'is a draft item whose New Item Request has not been approved' : `is ${s.status}`;
++    throw new ConflictException(
++      `${context}: ${bad.map((p) => (p.snapshot ? `"${p.snapshot.sku} — ${p.snapshot.name}" ${reason(p.snapshot)}` : `item ${p.id} does not exist`)).join('; ')}. ` +
++        'Fix or remove these lines and try again — nothing was saved.',
++    );
++  }
++
++  /** No product may still be `draft` (Goods Receipt). */
+   async assertNoneDraft(productIds: string[], context: string, manager?: EntityManager): Promise<void> {
+     const drafts = (await this.load(productIds, manager)).filter((p) => p.snapshot?.status === 'draft');
+     if (drafts.length === 0) return;
+diff --git a/backend/src/domains/procurement/application/purchase-order.service.ts b/backend/src/domains/procurement/application/purchase-order.service.ts
+index 40e3937..be83309 100644
+--- a/backend/src/domains/procurement/application/purchase-order.service.ts
++++ b/backend/src/domains/procurement/application/purchase-order.service.ts
+@@ -74,7 +74,8 @@ export class PurchaseOrderService {
+     // `purchase_orders.warehouseId` has no FK — an unknown warehouse is rejected (404) before any mutation, same as an unknown supplier above.
+     await this.warehouses.getWarehouse(input.warehouseId, externalManager);
+ 
+-    await this.lifecycleGate.assertNoneDraft(input.lines.map((l) => l.productId), 'Cannot create this Purchase Order', externalManager); // D7 gate (before any mutation)
++    // D7 as amended by CR-2026-10-15: every item must exist and be active (before any mutation; a missing id is a 409, never a raw FK error).
++    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active'], 'Cannot create this Purchase Order', externalManager);
+     await this.numbering.registerDocumentType(PO_DOCUMENT_TYPE, 'PO', true, externalManager);
+ 
+     const run = async (manager: EntityManager): Promise<PurchaseOrder> => {
+@@ -145,6 +146,12 @@ export class PurchaseOrderService {
+       );
+       throw new ForbiddenException('Maker/checker: the user who created this Purchase Order cannot approve it. Another authorized user must approve it.');
+     }
++    if (action === 'approve') {
++      // CR-2026-10-15 — an item discontinued after the PO was raised blocks its approval (checked BEFORE the transition). Once approved,
++      // the PO is in flight and Goods Receipt stays allowed (D7).
++      const lines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: id } });
++      await this.lifecycleGate.assertEligible(lines.map((l) => l.productId), ['active'], 'Cannot approve this Purchase Order', manager);
++    }
+     const instance = await this.processEngine.transition(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, id, action, actorUserId, manager);
+     await this.audit.record(
+       {
+diff --git a/backend/src/domains/procurement/application/purchase-request.service.ts b/backend/src/domains/procurement/application/purchase-request.service.ts
+index d4068d4..a741da1 100644
+--- a/backend/src/domains/procurement/application/purchase-request.service.ts
++++ b/backend/src/domains/procurement/application/purchase-request.service.ts
+@@ -83,6 +83,9 @@ export class PurchaseRequestService {
+     // `purchase_requests.warehouseId` has no FK — an unknown warehouse is rejected here (404, the inventory contract's own error), BEFORE any
+     // numbering/mutation, in the caller's Company database. The F6 WarehouseScopeGuard deliberately leaves an unknown warehouse to the handler.
+     await this.warehouses.getWarehouse(input.warehouseId, manager);
++    // CR-2026-10-15 — a missing or discontinued item is refused up front (409, never a raw FK error); a `draft` item stays allowed
++    // because the New Item Request flow raises a PR for it before approval (the approval gate still requires `active`).
++    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active', 'draft'], 'Cannot create this Purchase Request', manager);
+ 
+     await this.numbering.registerDocumentType(PR_DOCUMENT_TYPE, 'PR', true, manager);
+ 
+diff --git a/backend/tools/testing/regression-specs-all.txt b/backend/tools/testing/regression-specs-all.txt
+index 524a231..563243f 100644
+--- a/backend/tools/testing/regression-specs-all.txt
++++ b/backend/tools/testing/regression-specs-all.txt
+@@ -8,6 +8,7 @@ src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolatio
+ src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+ src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+ src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
++src/domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts
+ src/domains/accounting/interface/grni.company-isolation.spec.ts
+ src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+ src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts
+@@ -33,6 +34,7 @@ src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+ src/domains/hr/interface/hr.company-isolation.spec.ts
+ src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
++src/domains/inventory-warehouse/interface/inventory-movement-dates.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+ src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+ src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+@@ -44,6 +46,7 @@ src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+ src/domains/procurement/interface/new-item-request.company-isolation.spec.ts
+ src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+ src/domains/procurement/interface/purchase-request.company-isolation.spec.ts
++src/domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts
+ src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts
+ src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts
+ src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+diff --git a/frontend/src/pages/accounting/TrialBalance.tsx b/frontend/src/pages/accounting/TrialBalance.tsx
+index 4622b0c..f6a4e68 100644
+--- a/frontend/src/pages/accounting/TrialBalance.tsx
++++ b/frontend/src/pages/accounting/TrialBalance.tsx
+@@ -16,6 +16,9 @@ interface TrialBalance {
+   rows: TrialBalanceRow[];
+   totalDebitBase: string;
+   totalCreditBase: string;
++  /** CR-2026-10-15 — sums of the displayed (net) row figures; the footer shows these so it always equals the columns. */
++  balanceTotalDebitBase: string;
++  balanceTotalCreditBase: string;
+   balanced: boolean;
+ }
+ 
+@@ -102,8 +105,8 @@ export function TrialBalance() {
+             <tfoot>
+               <tr style={{ fontWeight: 600 }}>
+                 <td colSpan={3}>{t('panel.trial_balance_footer')}</td>
+-                <td>{tb.totalDebitBase}</td>
+-                <td>{tb.totalCreditBase}</td>
++                <td>{tb.balanceTotalDebitBase}</td>
++                <td>{tb.balanceTotalCreditBase}</td>
+               </tr>
+             </tfoot>
+           </table>

@@ -1,0 +1,12 @@
+{
+  "testId": "T-10",
+  "runId": "T-10-20261019T193945Z-f84c24",
+  "finishedAt": "2026-10-19T19:39:45.602Z",
+  "results": [
+    {
+      "id": "T-10",
+      "status": "PASS",
+      "note": ""
+    }
+  ]
+}

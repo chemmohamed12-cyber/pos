@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useAutoRefresh } from '../../lib/useAutoRefresh';
+import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
 
 interface FinancialEvent {
   id: string;
@@ -39,26 +41,28 @@ export function FinancialEvents() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    try {
-      const qs = status ? `?status=${status}` : '';
-      setEvents(await api.get<FinancialEvent[]>(`/accounting/financial-events${qs}`));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load financial events.');
-    }
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  const refresh = useAutoRefresh(
+    async (isCurrent) => {
+      try {
+        const qs = status ? `?status=${status}` : '';
+        const list = await api.get<FinancialEvent[]>(`/accounting/financial-events${qs}`);
+        if (!isCurrent()) return;
+        setEvents(list);
+        setError(null);
+      } catch (err) {
+        if (isCurrent()) setError(err instanceof ApiError ? err.message : 'Failed to load financial events.');
+        throw err;
+      }
+    },
+    [status],
+  );
 
   async function redrive(id: string) {
     setBusyId(id);
     setError(null);
     try {
       await api.post(`/accounting/financial-events/${id}/redrive`);
-      await load();
+      refresh.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to redrive event.');
     } finally {
@@ -70,6 +74,10 @@ export function FinancialEvents() {
     <div>
       <div className="page-header">
         <h1>{t('nav.financial_events')}</h1>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <PostingStatusChip />
+          <RefreshStamp refresh={refresh} />
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>

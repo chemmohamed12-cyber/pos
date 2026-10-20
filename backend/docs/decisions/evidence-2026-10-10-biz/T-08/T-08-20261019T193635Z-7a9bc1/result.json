@@ -1,0 +1,71 @@
+{
+  "testId": "T-08",
+  "runId": "T-08-20261019T193635Z-7a9bc1",
+  "finishedAt": "2026-10-19T19:36:50.282Z",
+  "results": [
+    {
+      "id": "T-08-a-two-invoices",
+      "status": "PASS",
+      "note": "10 rounds: one application succeeds, the other is refused, unapplied = 200.00, exactly one application (2 ledger rows)"
+    },
+    {
+      "id": "T-08-b-same-invoice",
+      "status": "PASS",
+      "note": "10 rounds: one application succeeds, the other is refused, unapplied = 200.00, exactly one application (2 ledger rows)"
+    },
+    {
+      "id": "audit-chain-final",
+      "status": "PASS"
+    },
+    {
+      "id": "T-10/T-08/R1",
+      "status": "PASS",
+      "note": "{\"pairs\":0,\"differences\":[],\"negativePairs\":0}"
+    },
+    {
+      "id": "T-10/T-08/R2",
+      "status": "PASS",
+      "note": "{\"valuationRows\":0,\"valuationTotal\":0,\"glInventory\":0,\"differences\":[],\"explainedByDeclaredEvents\":[]}"
+    },
+    {
+      "id": "T-10/T-08/R3",
+      "status": "PASS",
+      "note": "{\"customerLedgerNet\":-10000,\"glArNet\":-10000}"
+    },
+    {
+      "id": "T-10/T-08/R4",
+      "status": "PASS",
+      "note": "{\"supplierLedgerNet\":0,\"glApNet\":0}"
+    },
+    {
+      "id": "T-10/T-08/R5",
+      "status": "PASS",
+      "note": "{\"treasuryNetMapped\":20000,\"declaredNonGlTreasury\":10000,\"expectedGl\":10000,\"glNet\":10000}"
+    },
+    {
+      "id": "T-10/T-08/R6",
+      "status": "PASS",
+      "note": "{\"unbalancedEntries\":0}"
+    },
+    {
+      "id": "T-10/T-08/R7",
+      "status": "PASS",
+      "note": "{\"events\":20,\"notPosted\":0,\"unexplainedNotPosted\":[],\"postedWithoutJournal\":0,\"duplicateIdempotencyKeys\":0,\"movementsWithoutEvent\":0,\"journalsWithoutEvent\":0,\"explained\":[]}"
+    },
+    {
+      "id": "T-10/T-08/R8",
+      "status": "PASS",
+      "note": "{\"taxNetCredit\":0,\"expectedTaxNetCredit\":0,\"grniWipPpvNonZero\":[],\"accountsSeen\":[]}"
+    },
+    {
+      "id": "T-10/T-08/R9",
+      "status": "PASS",
+      "note": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 10000.00 funding cash-in is deliberately non-emitting"
+    },
+    {
+      "id": "T-10/T-08/R10",
+      "status": "PASS",
+      "note": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+// TEMPORARY review probe for CR-2026-10-15 — observes current behaviour only; deleted after the run, never committed.
+import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import { PurchaseOrderService } from '../application/purchase-order.service';
+import { PurchaseRequestService } from '../application/purchase-request.service';
+import { AuditService } from '../../../foundation/audit/audit.service';
+import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
+import { EventBusService } from '../../../foundation/events/event-bus.service';
+import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
+import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
+import { Role } from '../../../foundation/authorization/role.entity';
+import { UserRole } from '../../../foundation/authorization/user-role.entity';
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { WarehouseTransactionsService } from '../../inventory-warehouse/application/warehouse-transactions.service';
+import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
+import { ProductsService } from '../../commerce/application/products.service';
+import { JournalEntryService, JOURNAL_ENTRY_DOCUMENT_TYPE } from '../../accounting/application/journal-entry.service';
+import { LedgerService } from '../../accounting/application/ledger.service';
+import { GLAccountService } from '../../accounting/application/gl-account.service';
+import { FiscalPeriodService } from '../../accounting/application/fiscal-period.service';
+import { CurrencyService } from '../../accounting/application/currency.service';
+import { FinancialDimensionService } from '../../accounting/application/financial-dimension.service';
+import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { makeWarehouseLookup } from './warehouse-lookup.test-helper';
+import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
+
+const OUT = process.env.CR_PROBE_OUT ?? 'cr-probe-results.json';
+const obs: Record<string, unknown> = {};
+const errInfo = (e: unknown) => ({ class: (e as Error)?.constructor?.name, status: (e as { status?: number }).status ?? null, message: String((e as Error)?.message).slice(0, 300) });
+async function attempt<T>(fn: () => Promise<T>) {
+  try {
+    const v = await fn();
+    return { ok: true as const, value: v };
+  } catch (e) {
+    return { ok: false as const, error: errInfo(e) };
+  }
+}
+
+describe('CR-2026-10-15 review probe (observation only)', () => {
+  jest.setTimeout(600_000);
+  let h: TwoCompanyHarness;
+  const maker = randomUUID();
+  const checker = randomUUID();
+  const ids = { supplier: randomUUID(), whRaw: randomUUID(), whProd: randomUUID(), active: randomUUID(), discontinued: randomUUID(), draft: randomUUID() };
+  let po: PurchaseOrderService;
+  let pr: PurchaseRequestService;
+  let wt: WarehouseTransactionsService;
+  let inv: InventoryService;
+  let journals: JournalEntryService;
+  let ledger: LedgerService;
+
+  beforeAll(async () => {
+    h = await setUpTwoCompanyHarness({ namePrefix: 'cr_probe', extraCompanyTags: ['sales', 'inventory', 'procurement', 'finance', 'accounting'] });
+    const ds = await h.connections.getDataSource(h.companyAId);
+    for (const u of [maker, checker]) {
+      await ds.query(`INSERT INTO "users" ("id","fullName","email") VALUES ($1,$2,$3)`, [u, 'Probe', `probe-${u}@test.local`]);
+    }
+    await ds.query(`INSERT INTO "roles" ("id","key") VALUES ($1,'admin') ON CONFLICT DO NOTHING`, [randomUUID()]);
+    const role: Array<{ id: string }> = await ds.query(`SELECT id FROM "roles" WHERE "key" = 'admin'`);
+    for (const u of [maker, checker]) await ds.query(`INSERT INTO "user_roles" ("id","userId","roleId") VALUES ($1,$2,$3)`, [randomUUID(), u, role[0].id]);
+    await ds.query(`INSERT INTO "warehouses" ("id","code","name","status","kind") VALUES ($1,'WH-RAW','Raw materials','active','main'), ($2,'WH-PROD','Production','active','main')`, [ids.whRaw, ids.whProd]);
+    await ds.query(
+      `INSERT INTO "products" ("id","sku","name","unitPrice","status") VALUES ($1,'SKU-ACT','Active item','10.00','active'), ($2,'SKU-DISC','Discontinued item','10.00','discontinued'), ($3,'SKU-DRAFT','Draft item','10.00','draft')`,
+      [ids.active, ids.discontinued, ids.draft],
+    );
+    await ds.query(`INSERT INTO "suppliers" ("id","code","legalName") VALUES ($1,'SUP-1','Probe Supplier')`, [ids.supplier]);
+
+    const inert = {} as never;
+    const audit = new AuditService(h.controlPlane);
+    const numbering = new NumberingService(h.controlPlane);
+    const processEngine = new ProcessEngineService(h.controlPlane);
+    po = new PurchaseOrderService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane), makeWarehouseLookup(h.controlPlane));
+    pr = new PurchaseRequestService(h.controlPlane, processEngine, numbering, audit, makeProductLifecycleGate(h.controlPlane), makeWarehouseLookup(h.controlPlane));
+
+    const authorization = new AuthorizationService(ds.getRepository(Role), ds.getRepository(UserRole));
+    const products = new ProductsService(h.controlPlane, audit, inert);
+    const policyRegistry = new InventoryPostingPolicyRegistry();
+    policyRegistry.bind({
+      assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }),
+      listManualReceiptReasons: () => ['FOUND_STOCK'],
+      assertSaleReturnPostable: async () => undefined,
+      assertSupplierInvoicePostable: async () => undefined,
+    });
+    inv = new InventoryService(h.controlPlane, audit, inert, inert, numbering, { publish: async () => undefined } as never, undefined, policyRegistry);
+    wt = new WarehouseTransactionsService(h.controlPlane, numbering, processEngine, authorization, audit, products, inv, policyRegistry);
+
+    await numbering.registerDocumentType(JOURNAL_ENTRY_DOCUMENT_TYPE, 'JV', true, ds.manager);
+    const events = new EventBusService(inert);
+    const currencies = new CurrencyService(h.controlPlane, audit);
+    const glAccounts = new GLAccountService(h.controlPlane, audit, events, inert, inert, currencies);
+    const fiscalPeriods = new FiscalPeriodService(h.controlPlane, processEngine, audit, inert, events, inert, inert);
+    const dimensions = new FinancialDimensionService(h.controlPlane, audit);
+    journals = new JournalEntryService(h.controlPlane, glAccounts, fiscalPeriods, currencies, audit, events, numbering, processEngine, { get: () => undefined } as unknown as ConfigurationEngineService, dimensions);
+    ledger = new LedgerService(h.controlPlane);
+  });
+
+  afterAll(async () => {
+    fs.writeFileSync(OUT, JSON.stringify(obs, null, 2));
+    await h.teardown();
+  });
+
+  it('1. procurement item validation', async () => {
+    const ds = await h.connections.getDataSource(h.companyAId);
+    const m = ds.manager;
+    const poCount = async () => Number((await ds.query(`SELECT COUNT(*)::int AS n FROM purchase_orders`))[0].n);
+    const prCount = async () => Number((await ds.query(`SELECT COUNT(*)::int AS n FROM purchase_requests`))[0].n);
+    const poLine = (productId: string) => ({ productId, quantity: '5', unitCostBase: '2.00' });
+    const poIn = (lines: ReturnType<typeof poLine>[]) => ({ supplierId: ids.supplier, warehouseId: ids.whRaw, lines });
+    const missing = randomUUID();
+
+    const r: Record<string, unknown> = {};
+    const before = await poCount();
+    r.po_active = await attempt(async () => (await po.create(poIn([poLine(ids.active)]), maker, m)).poNumber);
+    r.po_discontinued = await attempt(async () => (await po.create(poIn([poLine(ids.discontinued)]), maker, m)).poNumber);
+    r.po_draft = await attempt(async () => (await po.create(poIn([poLine(ids.draft)]), maker, m)).poNumber);
+    const beforeMissing = await poCount();
+    r.po_missing = await attempt(async () => (await po.create(poIn([poLine(missing)]), maker, m)).poNumber);
+    r.po_mixed_active_plus_missing = await attempt(async () => (await po.create(poIn([poLine(ids.active), poLine(missing)]), maker, m)).poNumber);
+    r.po_rows_added_by_missing_and_mixed = (await poCount()) - beforeMissing;
+    r.po_rows_added_total = (await poCount()) - before;
+    r.po_numbers_issued = (await ds.query(`SELECT "poNumber" FROM purchase_orders ORDER BY "createdAt"`)).map((x: { poNumber: string }) => x.poNumber);
+
+    // Item discontinued AFTER the PO was created: can the PO still be submitted and approved?
+    const created = await po.create(poIn([poLine(ids.active)]), maker, m);
+    await ds.query(`UPDATE products SET status = 'discontinued' WHERE id = $1`, [ids.active]);
+    r.po_submit_after_item_discontinued = await attempt(() => po.transition(created.id, 'submit', maker, m));
+    r.po_approve_after_item_discontinued = await attempt(() => po.transition(created.id, 'approve', checker, m));
+    await ds.query(`UPDATE products SET status = 'active' WHERE id = $1`, [ids.active]);
+
+    const prIn = (productId: string) => ({ warehouseId: ids.whRaw, lines: [{ productId, quantity: '5' }] });
+    const prBefore = await prCount();
+    r.pr_create_discontinued = await attempt(async () => (await pr.create(prIn(ids.discontinued), maker, m)).prNumber);
+    r.pr_create_draft = await attempt(async () => (await pr.create(prIn(ids.draft), maker, m)).prNumber);
+    r.pr_create_missing = await attempt(async () => (await pr.create(prIn(missing), maker, m)).prNumber);
+    r.pr_rows_added = (await prCount()) - prBefore;
+    const prDisc = await pr.create(prIn(ids.discontinued), maker, m);
+    await pr.transition(prDisc.id, 'submit', maker, m);
+    r.pr_approve_discontinued = await attempt(() => pr.transition(prDisc.id, 'approve', checker, m));
+    obs.procurement = r;
+  });
+
+  it('4/3. partial transfer raw -> production, per state, plus running balance', async () => {
+    const ds = await h.connections.getDataSource(h.companyAId);
+    const m = ds.manager;
+    const snapshot = async () => {
+      const report = await inv.getStockReport(undefined, m);
+      const rows = report.filter((x) => x.productId === ids.active).map((x) => ({ wh: x.warehouseId === ids.whRaw ? 'RAW' : x.warehouseId === ids.whProd ? 'PROD' : x.warehouseId, onHand: x.onHand }));
+      const gridRaw = (await inv.getWarehouseInventoryPage(ids.whRaw, { page: 1, pageSize: 50 }, m)).rows.filter((x) => x.productId === ids.active).map((x) => ({ onHand: x.onHand, assigned: x.assigned }));
+      const gridProd = (await inv.getWarehouseInventoryPage(ids.whProd, { page: 1, pageSize: 50 }, m)).rows.filter((x) => x.productId === ids.active).map((x) => ({ onHand: x.onHand, assigned: x.assigned }));
+      return { stockReport: rows, gridRaw, gridProd };
+    };
+    const r: Record<string, unknown> = {};
+    const receipt = await wt.createTransaction('receipt', ids.whRaw, null, [{ productId: ids.active, quantity: 100, unitCostBase: '2.00' }], null, null, null, maker, undefined, m, 'FOUND_STOCK');
+    r.receipt_submit = await wt.transition(receipt.id, 'submit', maker, m);
+    r.after_receipt = await snapshot();
+
+    const transfer = await wt.createTransaction('transfer', ids.whRaw, ids.whProd, [{ productId: ids.active, quantity: 30 }], null, null, null, maker, undefined, m);
+    r.after_transfer_draft = await snapshot();
+    r.transfer_submit = await attempt(() => wt.transition(transfer.id, 'submit', maker, m));
+    r.after_transfer_submitted = await snapshot();
+    r.transfer_approve = await attempt(() => wt.transition(transfer.id, 'approve', checker, m));
+    r.after_transfer_approved = await snapshot();
+    r.transfer_post = await attempt(() => wt.transition(transfer.id, 'post', checker, m));
+    r.after_transfer_posted = await snapshot();
+    r.transfer_post_again = await attempt(() => wt.transition(transfer.id, 'post', checker, m));
+    r.movement_rows_for_transfer = await ds.query(`SELECT "warehouseId" = $2 AS is_raw, "movementType", quantity::float AS qty, "referenceType" FROM stock_movements WHERE "referenceId" = $1 ORDER BY quantity`, [transfer.id, ids.whRaw]);
+
+    // Item 3: the existing movement report — fields returned, order, and a running balance derived from it.
+    const mv = await inv.listMovements({ warehouseId: ids.whRaw, productId: ids.active }, m);
+    r.movement_report_fields = Object.keys(mv[0] ?? {});
+    const asc = [...mv].reverse();
+    let bal = 0;
+    r.raw_running_balance = asc.map((x) => ({ type: (x as unknown as { movementType: string }).movementType, qty: Number(x.quantity), balance: (bal += Number(x.quantity)) }));
+    r.raw_running_matches_stock = bal === (await inv.getOnHandQuantityInTransaction(m, ids.whRaw, ids.active));
+    obs.transfer = r;
+  });
+
+  it('5. trial balance rows vs footer', async () => {
+    const ds = await h.connections.getDataSource(h.companyAId);
+    const m = ds.manager;
+    const year = new Date().toISOString().slice(0, 4);
+    const today = new Date().toISOString().slice(0, 10);
+    const fy = randomUUID();
+    const fp = randomUUID();
+    await ds.query(`INSERT INTO "accounting_fiscal_years" ("id","code","startDate","endDate") VALUES ($1,'FY',$2,$3)`, [fy, `${year}-01-01`, `${year}-12-31`]);
+    await ds.query(`INSERT INTO "accounting_fiscal_periods" ("id","fiscalYearId","code","startDate","endDate") VALUES ($1,$2,'P',$3,$4)`, [fp, fy, `${year}-01-01`, `${year}-12-31`]);
+    await ds.query(
+      `INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'accounting_fiscal_year','FiscalYear',$2,'active'), ($3,'accounting_fiscal_period','FiscalPeriod',$4,'open')`,
+      [randomUUID(), fy, randomUUID(), fp],
+    );
+    const acc = { cash: randomUUID(), revenue: randomUUID(), expense: randomUUID(), suspense: randomUUID() };
+    await ds.query(
+      `INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive") VALUES
+       ($1,'1000','Cash','asset','debit',true,true,true), ($2,'4000','Revenue','revenue','credit',true,true,true),
+       ($3,'5000','Expense','expense','debit',true,true,true), ($4,'1999','Suspense','asset','debit',true,true,true)`,
+      [acc.cash, acc.revenue, acc.expense, acc.suspense],
+    );
+    const post = async (date: string, dr: string, cr: string, amount: string) => {
+      const d = await journals.createEntry(
+        { sourceType: 'MANUAL', businessDate: date, description: 'probe', transactionCurrencyCode: 'EGP', lines: [{ accountId: dr, debit: amount }, { accountId: cr, credit: amount }] },
+        maker,
+        m,
+      );
+      await journals.postEntry(d.id, maker, {}, m);
+      return d.id;
+    };
+    // Manual journals cannot be backdated, so the "earlier" entry is posted today and moved to January in this disposable database.
+    const early = await post(today, acc.cash, acc.revenue, '100.00');
+    await ds.query(`UPDATE accounting_journal_entries SET "businessDate" = $2 WHERE id = $1`, [early, `${year}-01-15`]);
+    await post(today, acc.expense, acc.cash, '40.00');
+    await post(today, acc.suspense, acc.cash, '25.00'); // mixed activity, nets to zero
+    await post(today, acc.cash, acc.suspense, '25.00');
+
+    const sum = (rows: Array<{ debitBase: string; creditBase: string }>, k: 'debitBase' | 'creditBase') => rows.reduce((s, x) => s + Number(x[k]), 0);
+    const all = await ledger.getTrialBalance({}, m);
+    const fromFeb = await ledger.getTrialBalance({ from: `${year}-02-01` }, m);
+    const shape = (tb: typeof all) => ({
+      rows: tb.rows.map((x) => ({ code: x.code, debit: x.debitBase, credit: x.creditBase })),
+      rowDebitSum: sum(tb.rows, 'debitBase'),
+      rowCreditSum: sum(tb.rows, 'creditBase'),
+      footerDebit: tb.totalDebitBase,
+      footerCredit: tb.totalCreditBase,
+      balanced: tb.balanced,
+    });
+    obs.trialBalance = { noFilter: shape(all), fromFeb1: shape(fromFeb) };
+  });
+
+  it('6. products table columns', async () => {
+    const ds = await h.connections.getDataSource(h.companyAId);
+    obs.productColumns = (await ds.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'products' ORDER BY ordinal_position`)).map(
+      (c: { column_name: string; data_type: string }) => `${c.column_name}:${c.data_type}`,
+    );
+    obs.productIndexes = (await ds.query(`SELECT indexdef FROM pg_indexes WHERE tablename = 'products'`)).map((x: { indexdef: string }) => x.indexdef);
+    obs.barcodeLikeColumnsAnywhere = await ds.query(
+      `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (column_name ILIKE '%barcode%' OR column_name ILIKE 'ean%' OR column_name ILIKE '%gtin%' OR column_name ILIKE '%uom%')`,
+    );
+  });
+});

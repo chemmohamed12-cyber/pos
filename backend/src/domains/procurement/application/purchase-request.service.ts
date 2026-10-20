@@ -83,6 +83,9 @@ export class PurchaseRequestService {
     // `purchase_requests.warehouseId` has no FK — an unknown warehouse is rejected here (404, the inventory contract's own error), BEFORE any
     // numbering/mutation, in the caller's Company database. The F6 WarehouseScopeGuard deliberately leaves an unknown warehouse to the handler.
     await this.warehouses.getWarehouse(input.warehouseId, manager);
+    // CR-2026-10-15 — a missing or discontinued item is refused up front (409, never a raw FK error); a `draft` item stays allowed
+    // because the New Item Request flow raises a PR for it before approval (the approval gate still requires `active`).
+    await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active', 'draft'], 'Cannot create this Purchase Request', manager);
 
     await this.numbering.registerDocumentType(PR_DOCUMENT_TYPE, 'PR', true, manager);
 

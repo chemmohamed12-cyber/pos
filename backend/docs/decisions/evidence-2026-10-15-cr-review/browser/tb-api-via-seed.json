@@ -1,0 +1,59 @@
+{
+  "today": "2026-10-15",
+  "posted": 6,
+  "api": {
+    "all": {
+      "rows": [
+        [
+          "CR-1000",
+          "80.0000",
+          "0.0000"
+        ],
+        [
+          "CR-2000",
+          "0.0000",
+          "20.0000"
+        ],
+        [
+          "CR-4000",
+          "0.0000",
+          "100.0000"
+        ],
+        [
+          "CR-5000",
+          "40.0000",
+          "0.0000"
+        ]
+      ],
+      "balanceTotalDebitBase": "120.0000",
+      "balanceTotalCreditBase": "120.0000",
+      "totalDebitBase": "230.0000",
+      "totalCreditBase": "230.0000",
+      "balanced": true
+    },
+    "fromFeb1": {
+      "rows": [
+        [
+          "CR-1000",
+          "0.0000",
+          "20.0000"
+        ],
+        [
+          "CR-2000",
+          "0.0000",
+          "20.0000"
+        ],
+        [
+          "CR-5000",
+          "40.0000",
+          "0.0000"
+        ]
+      ],
+      "balanceTotalDebitBase": "40.0000",
+      "balanceTotalCreditBase": "40.0000",
+      "totalDebitBase": "130.0000",
+      "totalCreditBase": "130.0000",
+      "balanced": true
+    }
+  }
+}

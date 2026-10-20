@@ -130,4 +130,17 @@ describe('D1 — Item↔Warehouse assignment (master data, grid scope, backfill)
     expect(await service.assignItems(ids.whB, [ids.pB], actor, b.manager)).toEqual({ requested: 1, assigned: 1, alreadyAssigned: 0 });
     expect(await pairs(a, ids.whA)).not.toContain(ids.pB);
   });
+
+  it('8. LIST (Products screen column): every marker of the Company; the F6 visible-warehouse filter keeps only those warehouses; per Company', async () => {
+    const a = await dsA();
+    const b = await dsB();
+    const key = (r: { warehouseId: string; productId: string }) => `${r.warehouseId}:${r.productId}`;
+    const expected: Array<{ warehouseId: string; productId: string }> = await a.query(`SELECT "warehouseId", "productId" FROM warehouse_items`);
+    expect((await service.listWarehouseItemAssignments(undefined, a.manager)).map(key).sort()).toEqual(expected.map(key).sort());
+    const onlyA2 = await service.listWarehouseItemAssignments([ids.whA2], a.manager);
+    expect(onlyA2.length).toBeGreaterThan(0);
+    expect(onlyA2.every((r) => r.warehouseId === ids.whA2)).toBe(true);
+    expect(await service.listWarehouseItemAssignments([], a.manager)).toEqual([]);
+    expect((await service.listWarehouseItemAssignments(undefined, b.manager)).map(key)).toEqual([`${ids.whB}:${ids.pB}`]);
+  });
 });

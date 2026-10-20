@@ -1,0 +1,24 @@
+ .../accounting/application/ledger.service.ts       | 82 +++++++++++++++++-----
+ .../interface/general-ledger.controller.ts         |  3 +-
+ .../application/inventory.service.ts               | 11 ++-
+ .../application/product-lifecycle-gate.service.ts  | 25 ++++++-
+ .../application/purchase-order.service.ts          |  9 ++-
+ .../application/purchase-request.service.ts        |  3 +
+ backend/tools/testing/regression-specs-all.txt     |  3 +
+ frontend/src/pages/accounting/TrialBalance.tsx     |  7 +-
+ 8 files changed, 119 insertions(+), 24 deletions(-)
+ M backend/src/domains/accounting/application/ledger.service.ts
+ M backend/src/domains/accounting/interface/general-ledger.controller.ts
+ M backend/src/domains/inventory-warehouse/application/inventory.service.ts
+ M backend/src/domains/procurement/application/product-lifecycle-gate.service.ts
+ M backend/src/domains/procurement/application/purchase-order.service.ts
+ M backend/src/domains/procurement/application/purchase-request.service.ts
+ M backend/tools/testing/regression-specs-all.txt
+ M frontend/src/pages/accounting/TrialBalance.tsx
+?? backend/docs/decisions/DAII-CR-2026-10-15-PRE-IMPLEMENTATION-REVIEW.md
+?? backend/docs/decisions/evidence-2026-10-10-biz/T-07/T-07-20261015T134520Z-2d9710/
+?? backend/docs/decisions/evidence-2026-10-10-biz/T-07/T-07-20261015T144615Z-ed4759/
+?? backend/docs/decisions/evidence-2026-10-15-cr-review/
+?? backend/src/domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts
+?? backend/src/domains/inventory-warehouse/interface/inventory-movement-dates.company-isolation.spec.ts
+?? backend/src/domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts

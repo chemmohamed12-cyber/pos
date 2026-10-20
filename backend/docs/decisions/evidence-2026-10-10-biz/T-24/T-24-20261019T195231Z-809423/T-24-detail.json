@@ -1,0 +1,79 @@
+{
+  "H1-plain": {
+    "cap": 10,
+    "allowed": 10,
+    "errors": 0,
+    "counter": 10,
+    "retryAllowed": false,
+    "counterAfterRetry": 10
+  },
+  "H1-transaction": {
+    "cap": 10,
+    "allowed": 10,
+    "errors": 0,
+    "counter": 10,
+    "retryAllowed": false,
+    "counterAfterRetry": 10
+  },
+  "H1-rollback": {
+    "rolledBack": true,
+    "counterAfterRollback": 0,
+    "consumeAfterRollbackAllowed": true,
+    "counterEnd": 3
+  },
+  "H1-release": {
+    "consumed": 5,
+    "releases": 12,
+    "counterEnd": 0
+  },
+  "H2-plain": {
+    "reserved": 5,
+    "callsOk": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    },
+    "stillActive": 0,
+    "reservedAfter": 0,
+    "onHandDelta": 0,
+    "retryRefused": true
+  },
+  "H2-transaction": {
+    "reserved": 5,
+    "callsOk": 5,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 7
+    },
+    "stillActive": 0,
+    "reservedAfter": 0,
+    "onHandDelta": 0,
+    "retryRefused": true
+  },
+  "H2-rollback": {
+    "rolledBack": true,
+    "reservedAfterRollback": 5,
+    "retryOk": true,
+    "reservedEnd": 2
+  },
+  "H4-plain": {
+    "fulfilled": 10,
+    "rejected": 0,
+    "distinctInstanceIds": 1,
+    "rows": 1,
+    "state": "a"
+  },
+  "H4-transaction": {
+    "fulfilled": 10,
+    "rejected": 0,
+    "distinctInstanceIds": 1,
+    "rows": 1,
+    "state": "a"
+  },
+  "H4-rollback-retry": {
+    "rolledBack": true,
+    "rowsAfterRollback": 0,
+    "firstId": "2fe5ac39-daeb-40d7-ad83-e7458861d27e",
+    "secondSameId": true
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "request": {
+    "warehouseId": "c984eb0b-e934-4322-b7e8-13d621c0a696",
+    "productId": "429ef0b1-24ea-4822-9079-0e1bb70189e1",
+    "quantity": 0,
+    "movementType": "receipt",
+    "unitCostBase": "4.00",
+    "reasonCode": "FOUND_STOCK"
+  },
+  "user": "1a3ecc01-9a41-406f-b692-df695469322f",
+  "status": 400,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "A manual receipt quantity must be a positive number"
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

@@ -45,7 +45,7 @@ export interface InventoryEventBase {
  * inference). See `D3-INVENTORY-POSTING-POLICY-2026-10-04.md`. `'dispatch'` is also the meaning of an event with no
  * `glKind` (events published before D3).
  */
-export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in';
+export type InventoryGlKind = 'dispatch' | 'opening_stock' | 'manual_receipt' | 'adjustment' | 'return_in' | 'opening_reversal' | 'opening_correction' | 'movement_reversal';
 
 /**
  * `inventory.movement.recorded` — one allow-listed stock movement (ADR-040 D2, extended by D3 to opening stock,
@@ -98,9 +98,55 @@ export const INVENTORY_ADJUSTMENT_APPROVED_EVENT = 'accounting.inventory.adjustm
  * Valuation — FIFO/moving-average/standard cost) domain binds an
  * implementation to light this up, with zero F07 change.
  */
+export interface ValuedPositionFilter {
+  warehouseIds?: string[];
+  productId?: string;
+}
+
+export interface ValuedPosition {
+  warehouseId: string;
+  productId: string;
+  quantity: number;
+  totalValueBase: string;
+  /** `totalValueBase / quantity` at 4 dp, or NULL when the quantity is not positive. */
+  averageCostBase: string | null;
+}
+
+export interface HistoryInconsistency {
+  warehouseId: string;
+  productId: string;
+  stateQuantity: number;
+  historyQuantity: number;
+  stateValueBase: string;
+  historyValueBase: string;
+}
+
 export interface InventoryValuationContract {
   /** The valued on-hand position per warehouse, as of a date. Read-only. */
   getValuedOnHandTotal(asOfDate?: string, manager?: EntityManager): Promise<Array<{ warehouseId: string; totalValueBase: string }>>;
+  /** C1 (ADR-INV-08) - OPTIONAL, read-only: the valued position per warehouse and product, current (no date / today) or rebuilt from the dated history. */
+  getValuedPositions?(asOfDate?: string, filter?: ValuedPositionFilter, manager?: EntityManager): Promise<ValuedPosition[]>;
+  /**
+   * C4 (ADR-INV-01 section 2.3) - OPTIONAL, MUTATING, idempotent: appends the offsetting `reversal` history row of a previously recorded receipt (the ORIGINAL
+   * recorded cost, inverted, never recalculated) and returns the value it reversed so the caller can post the matching journal. `null` when the original row does
+   * not exist (nothing is invented).
+   */
+  reverseReceiptCost?(originalIdempotencyKey: string, reversalIdempotencyKey: string, manager?: EntityManager, businessDate?: string): Promise<{ valueBase: string } | null>;
+  /**
+   * C6 (ADR-INV-05 2.1) - OPTIONAL, MUTATING, idempotent on `idempotencyKey`: a VALUE-ONLY change of one (warehouse, product) position - quantity unchanged, `valueDelta` (signed
+   * decimal string; negative = write-down) added to the total value, the average recomputed. Appends a `revaluation` history row and nothing else. Fails closed with NO mutation when
+   * the position has no state / no quantity, or when the result would be negative. Called only by F07's handler inside the posting transaction (`ctx.manager`), after its accounts resolved.
+   */
+  applyRevaluation?(
+    productId: string,
+    warehouseId: string,
+    valueDelta: string,
+    idempotencyKey: string,
+    manager?: EntityManager,
+    businessDate?: string,
+  ): Promise<{ valueBase: string } | { rejected: 'no_valuation_source' | 'zero_quantity' | 'value_below_zero' }>;
+  /** C1 - OPTIONAL, read-only: every (warehouse, product) whose running state disagrees with the sum of its own dated history. */
+  checkHistoryConsistency?(manager?: EntityManager): Promise<HistoryInconsistency[]>;
   /** PURE — no mutation, ever. The current running unit cost for one product/warehouse, for reference (e.g. an FA-01 maker's read-only lookup — Blueprint D11). */
   getUnitCost(productId: string, warehouseId: string, asOfDate?: string, manager?: EntityManager): Promise<{ unitCostBase: string } | null>;
   /**
@@ -115,6 +161,8 @@ export interface InventoryValuationContract {
     quantity: number,
     idempotencyKey: string,
     manager?: EntityManager,
+    /** C2 (ADR-INV-02) - the accounting-facing date of the history row it writes (YYYY-MM-DD); omitted = the processing date (today, UTC), exactly as before. */
+    businessDate?: string,
   ): Promise<{ unitCostBase: string; totalCostBase: string } | { rejected: 'negative_on_hand' } | null>;
   /**
    * D4 (2026-10-05) — PURE read. The cost an ORIGINAL issue (dispatch) was actually charged, looked up by the idempotency
@@ -137,6 +185,8 @@ export interface InventoryValuationContract {
     unitCostBase: string,
     idempotencyKey: string,
     manager?: EntityManager,
+    /** C2 (ADR-INV-02) - the accounting-facing date of the history row (YYYY-MM-DD); omitted = the processing date (today, UTC), exactly as before. */
+    businessDate?: string,
   ): Promise<void>;
   /**
    * ADR-061 (Manufacturing) — NARROWLY SCOPED to Manufacturing Finished

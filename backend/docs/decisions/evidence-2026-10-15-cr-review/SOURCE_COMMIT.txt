@@ -1,0 +1,2 @@
+5e41647567db7d15d1288f170ea085e2ba52caef
+(evidence for the uncommitted working tree on top of this commit, 2026-10-15)

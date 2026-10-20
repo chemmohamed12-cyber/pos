@@ -4,6 +4,8 @@ import { Warehouse } from './infrastructure/warehouse.entity';
 import { WarehouseItem } from './infrastructure/warehouse-item.entity';
 import { WarehouseTransaction } from './infrastructure/warehouse-transaction.entity';
 import { WarehouseTransactionLine } from './infrastructure/warehouse-transaction-line.entity';
+import { OpeningBatch } from './infrastructure/opening-batch.entity';
+import { OpeningBatchLine } from './infrastructure/opening-batch-line.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Inventory Warehouse's own
@@ -14,4 +16,5 @@ import { WarehouseTransactionLine } from './infrastructure/warehouse-transaction
  * found missing entirely by the real-PG isolation spec, the same shape as
  * Delivery (§34) and Deposits (§36).
  */
-export const INVENTORY_WAREHOUSE_COMPANY_ENTITIES = [StockMovement, StockReservation, Warehouse, WarehouseTransaction, WarehouseTransactionLine, WarehouseItem];
+// C4 (ADR-INV-01): the Opening Balance Batch header and lines are Company-scoped.
+export const INVENTORY_WAREHOUSE_COMPANY_ENTITIES = [StockMovement, StockReservation, Warehouse, WarehouseTransaction, WarehouseTransactionLine, WarehouseItem, OpeningBatch, OpeningBatchLine];

@@ -11,6 +11,7 @@ import { AuthenticationModule } from '../../foundation/authentication/authentica
 import { PermissionModule } from '../../foundation/permission/permission.module';
 import { CompanyModule } from '../../foundation/company/company.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 
 /**
  * F08 — Inventory Valuation (ADR-041 D1). Ships under the EXISTING
@@ -31,6 +32,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     // retrofit.
     CompanyModule,
     DatabaseRegistryModule,
+    ScopeModule, // C1: the valuation report applies the F6 warehouse scope
   ],
   controllers: [InventoryValuationController],
   providers: [
