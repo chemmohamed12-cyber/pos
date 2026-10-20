@@ -47,6 +47,8 @@ export function TreasuryCover() {
     <SectionCover
       titleCode="nav_group.treasury"
       shortcuts={[
+        { to: '/treasury/workspace', labelCode: 'nav.treasury_workspace' },
+        { to: '/treasury/documents', labelCode: 'nav.treasury_documents' },
         { to: '/treasury/accounts', labelCode: 'nav.treasury_accounts' },
         { to: '/treasury/ledger', labelCode: 'nav.treasury_ledger' },
       ]}

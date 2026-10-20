@@ -12,6 +12,7 @@ import { TreasuryService } from '../../treasury/application/treasury.service';
 import { SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { AR_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ar-events.contract';
 import { runInTransaction } from '../../../foundation/transaction/run-in-transaction';
+import { FinanceCollectionContract, OpenInvoiceView, RecordCollectionInput } from '../../../foundation/module-registry/contracts/collection.contract';
 
 const PAYMENT_DOCUMENT_TYPE = 'customer_payment';
 const PAYMENT_PREFIX = 'PAY';
@@ -29,7 +30,7 @@ const PAYMENT_REVERSAL_PREFIX = 'PREV';
  * "credit on account" concept for an overpayment is future work).
  */
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements FinanceCollectionContract {
   constructor(
     private readonly dataSource: DataSource,
     private readonly numbering: NumberingService,
@@ -383,6 +384,145 @@ export class PaymentsService {
     const result = await runInTransaction(this.dataSource, manager, run);
     await this.events.dispatchAfterCommit(manager);
     return result;
+  }
+
+  /**
+   * T3 (2026-10-20) — ONE customer receipt settling SEVERAL invoices (and optionally leaving an unapplied remainder): a single Treasury cash-in for the total, a single
+   * payment row, one `payment` Customer-Ledger credit per invoice (plus one unapplied credit for the remainder), ONE `finance.payment.recorded` GL event for the total, and
+   * every touched invoice's status recomputed — all inside the caller's transaction. Rejected BEFORE any mutation: a non-positive total, a duplicate invoice, an invoice of
+   * another customer / not open / with less remaining than allocated, a customer outside the caller's scope, an unmapped receiving account. Locks are taken in sorted
+   * invoice order (deadlock safety) and remaining balances are read under them (no over-allocation by two concurrent receipts).
+   */
+  async recordCollection(
+    input: RecordCollectionInput,
+    actorUserId: string,
+    manager: EntityManager,
+  ): Promise<{ paymentId: string; paymentNumber: string; treasuryTransactionId: string; amount: string }> {
+    const allocations = input.allocations ?? [];
+    const unapplied = Number(input.unappliedAmount ?? '0');
+    if (!Number.isFinite(unapplied) || unapplied < 0) throw new BadRequestException('The unapplied amount cannot be negative.');
+    if (new Set(allocations.map((a) => a.invoiceId)).size !== allocations.length) throw new BadRequestException('An invoice can appear only once in a collection.');
+    for (const a of allocations) if (!Number.isFinite(Number(a.amount)) || Number(a.amount) <= 0) throw new BadRequestException('Every allocation must be a positive amount.');
+    const total = allocations.reduce((sum, a) => sum + Number(a.amount), 0) + unapplied;
+    if (total <= 0) throw new BadRequestException('A collection needs at least one allocation or an unapplied amount.');
+    await this.customers.getCustomer(input.customerId, actorUserId, manager);
+
+    const run = async (m: EntityManager) => {
+      const sorted = [...allocations].sort((a, b) => a.invoiceId.localeCompare(b.invoiceId));
+      for (const a of sorted) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payment:invoice:${a.invoiceId}`]);
+      const invoicesById = new Map<string, SalesInvoice>();
+      for (const a of sorted) {
+        const invoice = await m.getRepository(SalesInvoice).findOne({ where: { id: a.invoiceId } });
+        if (!invoice) throw new NotFoundException(`Invoice "${a.invoiceId}" not found.`);
+        if (invoice.customerId !== input.customerId) throw new ForbiddenException(`Invoice "${invoice.invoiceNumber}" belongs to a different customer.`);
+        const state = await this.invoices.getStatus(a.invoiceId, m);
+        if (state !== 'posted' && state !== 'partially_paid') throw new ConflictException(`Invoice "${invoice.invoiceNumber}" is "${state}" — only a posted or partially paid invoice can receive a collection.`);
+        const remaining = Number(await this.invoices.getInvoiceRemaining(a.invoiceId, m));
+        if (Number(a.amount) > remaining) throw new ConflictException(`Cannot allocate ${a.amount} — only ${remaining.toFixed(2)} remains on invoice "${invoice.invoiceNumber}".`);
+        invoicesById.set(a.invoiceId, invoice);
+      }
+      const totalStr = total.toFixed(2);
+      const { glAccountCode } = await this.treasury.requireGlMappedAccount(input.treasuryAccountId, m);
+      const treasuryTxn = await this.treasury.cashIn(input.treasuryAccountId, totalStr, input.customerId, null, input.reference ?? input.documentId, 'customer_payment', actorUserId, m);
+
+      await this.numbering.registerDocumentType(PAYMENT_DOCUMENT_TYPE, PAYMENT_PREFIX, true, m);
+      const paymentNumber = await this.numbering.getNextNumber(PAYMENT_DOCUMENT_TYPE, m);
+      const single = allocations.length === 1 && unapplied === 0 ? allocations[0].invoiceId : null; // keep the legacy one-invoice shape when that is what it is
+      const repo = m.getRepository(Payment);
+      const saved = await repo.save(
+        repo.create({
+          paymentNumber,
+          customerId: input.customerId,
+          invoiceId: single,
+          salesOrderId: null,
+          amount: totalStr,
+          method: input.method,
+          treasuryAccountId: input.treasuryAccountId,
+          treasuryTransactionId: treasuryTxn.id,
+          reference: input.reference ?? input.documentId,
+          recordedByUserId: actorUserId,
+        }),
+      );
+      for (const a of allocations) {
+        const invoice = invoicesById.get(a.invoiceId)!;
+        await this.ledger.postEntry(
+          {
+            customerId: input.customerId,
+            entryType: 'payment',
+            direction: 'credit',
+            amount: Number(a.amount).toFixed(2),
+            salesOrderId: invoice.salesOrderId,
+            invoiceId: a.invoiceId,
+            paymentId: saved.id,
+            treasuryTransactionId: treasuryTxn.id,
+            reference: paymentNumber,
+            reason: `Collection (${input.method}) - ${invoice.invoiceNumber}`,
+            createdByUserId: actorUserId,
+          },
+          m,
+        );
+      }
+      if (unapplied > 0) {
+        await this.ledger.postEntry(
+          {
+            customerId: input.customerId,
+            entryType: 'payment',
+            direction: 'credit',
+            amount: unapplied.toFixed(2),
+            salesOrderId: null,
+            invoiceId: null,
+            paymentId: saved.id,
+            treasuryTransactionId: treasuryTxn.id,
+            reference: paymentNumber,
+            reason: `Collection (${input.method}) - unapplied`,
+            createdByUserId: actorUserId,
+          },
+          m,
+        );
+      }
+      await this.events.publish(m, AR_EVENT_TOPICS.paymentRecorded, {
+        idempotencyKey: `customer-finance:payment:${saved.id}:recorded`,
+        businessDate: new Date().toISOString().slice(0, 10),
+        orgUnitId: null,
+        currency: 'EGP',
+        sourceEntityType: 'payment' as const,
+        sourceEntityId: saved.id,
+        externalDocument: null,
+        payloadVersion: 1,
+        paymentId: saved.id,
+        paymentNumber,
+        customerId: input.customerId,
+        invoiceId: single,
+        amount: totalStr,
+        method: input.method,
+        treasuryAccountId: input.treasuryAccountId,
+        glAccountCode,
+      });
+      for (const a of sorted) await this.invoices.recomputeStatus(a.invoiceId, actorUserId, m);
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'customer_finance.payment.recorded_collection',
+          resource: 'customer_payment',
+          resourceId: saved.id,
+          result: 'success',
+          correlationId: input.documentId,
+          after: { customerId: input.customerId, amount: totalStr, allocations: allocations.map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })), unapplied: unapplied.toFixed(2), documentId: input.documentId },
+        },
+        m,
+      );
+      return { paymentId: saved.id, paymentNumber, treasuryTransactionId: treasuryTxn.id, amount: totalStr };
+    };
+    return runInTransaction(this.dataSource, manager, run);
+  }
+
+  /** T3 — the customer's invoices that can still receive money (posted / partially paid), Scope-checked, with their derived remaining balance. */
+  async listOpenInvoices(customerId: string, actorUserId: string, manager: EntityManager): Promise<OpenInvoiceView[]> {
+    const all = await this.invoices.listInvoicesForCustomer(customerId, actorUserId, manager);
+    return all
+      .filter((i) => (i.state === 'posted' || i.state === 'partially_paid') && Number(i.remaining) > 0)
+      .map((i) => ({ id: i.id, invoiceNumber: i.invoiceNumber, remaining: i.remaining, state: i.state }));
   }
 
   /** CUS-01 — what is still UNAPPLIED on a payment: Σ(credit − debit) of its ledger rows that carry no invoice (derived, never stored; no status filter — same discipline as every balance here). */

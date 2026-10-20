@@ -52,6 +52,12 @@ export interface CashRecordedEvent extends TreasuryEventBase {
   direction: 'in' | 'out';
   /** explicit GL counter account code, or null → F03 falls back to the clearing-account config. */
   counterAccountCode: string | null;
+  /**
+   * T3 — a POSTING PROFILE reference instead of an account code: the handler resolves `counterReasonCode` through the company's reason→account map at `counterConfigKey`
+   * (postable, non-control, fail-closed). Used by Treasury Documents (miscellaneous receipt / disbursement) so no account number is hard-coded or user-chosen.
+   */
+  counterConfigKey?: string | null;
+  counterReasonCode?: string | null;
   treasuryTransactionId: string;
   /** set when this event is the offsetting leg of a reversal (ADR-038 D6). */
   reversalOf: string | null;

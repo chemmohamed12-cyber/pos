@@ -1,3 +1,5 @@
+import { TreasuryDocument } from './infrastructure/treasury-document.entity';
+import { TreasuryDocumentAllocation } from './infrastructure/treasury-document-allocation.entity';
 import { TreasuryAccount } from './infrastructure/treasury-account.entity';
 import { TreasuryAccountType } from './infrastructure/treasury-account-type.entity';
 import { TreasuryTransaction } from './infrastructure/treasury-transaction.entity';
@@ -8,4 +10,4 @@ import { TreasuryTransaction } from './infrastructure/treasury-transaction.entit
  * transitively today via `ClosingSnapshotService`'s injected
  * `FINANCE_TREASURY_CONTRACT`).
  */
-export const TREASURY_COMPANY_ENTITIES = [TreasuryAccount, TreasuryAccountType, TreasuryTransaction];
+export const TREASURY_COMPANY_ENTITIES = [TreasuryAccount, TreasuryAccountType, TreasuryTransaction, TreasuryDocument, TreasuryDocumentAllocation];

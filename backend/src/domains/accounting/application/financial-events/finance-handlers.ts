@@ -307,8 +307,15 @@ export async function handleCashRecorded(event: FinancialEvent, ctx: HandlerCont
   if (!bank) return { kind: 'rejected', reason: 'cash.recorded: the Treasury account is not GL-mapped to an active chart account' };
 
   const counterCode = str(p.counterAccountCode);
+  const profileKey = str(p.counterConfigKey);
+  const profileReason = str(p.counterReasonCode);
   let counterAcc: string | null;
-  if (counterCode) {
+  if (profileKey && profileReason) {
+    // T3 posting profile: the company's own reason -> account map decides (postable, non-control); never a code typed by the user.
+    const mapped = await ctx.resolveConfiguredMappedAccount(profileKey, profileReason);
+    if (!mapped.ok) return { kind: 'rejected', reason: `cash.recorded: reason "${profileReason}" has no usable account in "${profileKey}" (${mapped.reason}) - ask Accounting to map it` };
+    counterAcc = mapped.id;
+  } else if (counterCode) {
     counterAcc = await ctx.findAccountByCode(counterCode);
     if (!counterAcc) return { kind: 'rejected', reason: `cash.recorded: counter account "${counterCode}" not found` };
   } else {

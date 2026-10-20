@@ -64,6 +64,16 @@ export const financeManifest: ModuleManifest = {
     { node: 'finance.cash_account.mapping', title_code: 'perm.finance.cash_account.mapping', parent: 'finance.cash_account' },
     { node: 'finance.cash_account.mapping.manage', title_code: 'perm.finance.cash_account.mapping.manage', parent: 'finance.cash_account.mapping' },
 
+    // T3 — Treasury Documents: each stage of the lifecycle has its own node (prepare / submit / approve / execute / cancel / reverse); all inherit from `finance`.
+    { node: 'finance.cash_document', title_code: 'perm.finance.cash_document', parent: 'finance' },
+    { node: 'finance.cash_document.view', title_code: 'perm.finance.cash_document.view', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.create', title_code: 'perm.finance.cash_document.create', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.submit', title_code: 'perm.finance.cash_document.submit', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.approve', title_code: 'perm.finance.cash_document.approve', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.execute', title_code: 'perm.finance.cash_document.execute', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.cancel', title_code: 'perm.finance.cash_document.cancel', parent: 'finance.cash_document' },
+    { node: 'finance.cash_document.reverse', title_code: 'perm.finance.cash_document.reverse', parent: 'finance.cash_document' },
+
     { node: 'finance.invoice', title_code: 'perm.finance.invoice', parent: 'finance' },
     { node: 'finance.invoice.view', title_code: 'perm.finance.invoice.view', parent: 'finance.invoice' },
     { node: 'finance.invoice.create', title_code: 'perm.finance.invoice.create', parent: 'finance.invoice' },
@@ -100,6 +110,8 @@ export const financeManifest: ModuleManifest = {
       default: 'INV',
       scope_levels: ['platform', 'edition', 'installation'],
     },
+    // T3 - amounts at or below this limit skip the approval request. EMPTY (the default) = every Treasury Document needs a separate approver. The owner sets the number; none is assumed.
+    { key: 'finance.treasury_document_auto_approve_limit', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     {
       key: 'finance.allow_negative_treasury_balance',
       type: 'bool',

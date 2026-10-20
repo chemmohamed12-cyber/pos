@@ -30,6 +30,8 @@ interface GlEmitOpts {
   emitGlEvent: boolean;
   /** Reversals only: when the account is unmapped skip the event (mirrors an original that never had one) instead of refusing. */
   mirrorUnmapped?: boolean;
+  /** T3: posting-profile reference for the counter account of a direct cash movement (see CashRecordedEvent.counterConfigKey). */
+  counter?: { configKey: string; reasonCode: string };
 }
 const NO_EMIT: GlEmitOpts = { emitGlEvent: false };
 /** Treasury integrity (T1, G-04): a reversal MIRRORS its original — a legacy leg on an unmapped account never had a GL effect, so its reversal must not invent one (and must not fail). */
@@ -414,6 +416,8 @@ export class TreasuryService implements FinanceTreasuryContract {
       amount: args.txn.amount,
       direction: args.direction,
       counterAccountCode: null,
+      counterConfigKey: opts.counter?.configKey ?? null,
+      counterReasonCode: opts.counter?.reasonCode ?? null,
       treasuryTransactionId: args.txn.id,
       reversalOf: args.reversalOf,
       reference: args.txn.reference,
@@ -808,8 +812,9 @@ export class TreasuryService implements FinanceTreasuryContract {
     reason: string | null,
     actorUserId: string,
     manager?: EntityManager,
+    counter?: { configKey: string; reasonCode: string },
   ): Promise<TreasuryTransaction> {
-    return this.cashInCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true }, manager);
+    return this.cashInCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true, counter }, manager);
   }
 
   /** Direct Treasury-UI Cash Out. Publishes `treasury.cash.recorded` when the account is GL-mapped. */
@@ -822,8 +827,9 @@ export class TreasuryService implements FinanceTreasuryContract {
     reason: string | null,
     actorUserId: string,
     manager?: EntityManager,
+    counter?: { configKey: string; reasonCode: string },
   ): Promise<TreasuryTransaction> {
-    return this.cashOutCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true }, manager);
+    return this.cashOutCore(accountId, amount, customerId, salesOrderId, reference, reason, actorUserId, { emitGlEvent: true, counter }, manager);
   }
 
   /** Direct Treasury-UI Transfer. Publishes `treasury.transfer.completed` when both accounts are GL-mapped. */
@@ -920,7 +926,14 @@ export class TreasuryService implements FinanceTreasuryContract {
    * built handlers produce the offsetting journal — no dedicated
    * `treasury.transaction.reversed` topic.
    */
-  async reverseTransaction(transactionId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<TreasuryTransaction[]> {
+  async reverseTransaction(
+    transactionId: string,
+    reason: string,
+    actorUserId: string,
+    manager?: EntityManager,
+    /** `ownerBypass`: the caller IS the owning document (Treasury Document reverse) and takes responsibility for the business side; `counter`: the same posting-profile counter the original used. */
+    options?: { ownerBypass?: boolean; counter?: { configKey: string; reasonCode: string } },
+  ): Promise<TreasuryTransaction[]> {
     const repo = (manager ?? this.dataSource).getRepository(TreasuryTransaction);
     const original = await repo.findOne({ where: { id: transactionId } });
     if (!original) throw new NotFoundException(`Treasury transaction "${transactionId}" not found.`);
@@ -929,7 +942,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     }
     // T2 (G-06b): a leg that belongs to a business document is reversed through THAT document, which also unwinds the subledger / invoice and publishes the
     // correct mirror event. A raw reversal here would offset the clearing account instead of AR/AP and leave the document, ledger and invoice untouched.
-    const owner = await this.findOwningDocument(original, manager);
+    const owner = options?.ownerBypass ? null : await this.findOwningDocument(original, manager);
     if (owner) {
       throw new ConflictException(`This movement belongs to ${owner} — reverse it through that document, not from the Treasury ledger. Nothing was changed.`);
     }
@@ -1027,7 +1040,7 @@ export class TreasuryService implements FinanceTreasuryContract {
         await this.emitCashRecorded(
           txManager,
           { txn: reversalLeg, account, direction, reversalOf: original.id },
-          EMIT_MIRROR,
+          options?.counter ? { ...EMIT_MIRROR, counter: options.counter } : EMIT_MIRROR,
         );
       }
 
@@ -1066,6 +1079,15 @@ export class TreasuryService implements FinanceTreasuryContract {
     if (leg.depositId) return `customer deposit ${leg.depositId}`;
     if (leg.employeeId || leg.payrollRunId) return 'a payroll run';
     if (leg.reason === 'cod_collection_custody' || (leg.reason ?? '').startsWith('shipping_collection_')) return 'a delivery (COD) collection';
+    const docPresent: Array<{ ok: boolean }> = await runner.query(`SELECT to_regclass('treasury_documents') IS NOT NULL AS ok`);
+    if (docPresent[0]?.ok) {
+      const docs: Array<{ n: string }> = await runner.query(
+        `SELECT "documentNumber" AS n FROM "treasury_documents"
+         WHERE "executedTransactionId" = $1 OR ($2::uuid IS NOT NULL AND "executedTransactionId" IN (SELECT id FROM treasury_transactions WHERE "transferGroupId" = $2)) LIMIT 1`,
+        [leg.id, leg.transferGroupId],
+      );
+      if (docs.length > 0) return `treasury document ${docs[0].n}`;
+    }
     for (const [table, label] of [
       ['customer_payments', 'customer payment'],
       ['supplier_payments', 'supplier payment'],

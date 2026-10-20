@@ -512,6 +512,9 @@ export const accountingManifest: ModuleManifest = {
     { key: 'accounting.purchase_price_variance_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.sales_returns_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_manual_receipt_reason_accounts', type: 'json', default: {}, scope_levels: ['platform', 'edition', 'installation'] },
+    // T3 - Treasury Document posting profiles: reason code -> postable non-control GL account, owned by the company's Accounting (never defaulted; an unmapped reason cannot be prepared or executed).
+    { key: 'accounting.treasury_receipt_reason_accounts', type: 'json', default: {}, scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.treasury_disbursement_reason_accounts', type: 'json', default: {}, scope_levels: ['platform', 'edition', 'installation'] },
     // F12 — Fixed Assets (ADR-045 D10). Resolved via the existing
     // `resolveConfiguredPostableAccount` mechanism at DISPOSAL POSTING TIME (never at
     // submission) — unset/unresolvable → the disposal is REJECTED, fail-closed. No

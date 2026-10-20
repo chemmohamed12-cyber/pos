@@ -36,6 +36,7 @@ import { SalesModule } from './domains/sales/sales.module';
 import { SalesOrdersModule } from './domains/sales-orders/sales-orders.module';
 import { DepositControlModule } from './domains/deposit-control/deposit-control.module';
 import { TreasuryModule } from './domains/treasury/treasury.module';
+import { TreasuryDocumentsModule } from './domains/treasury/treasury-documents.module';
 import { InventoryWarehouseModule } from './domains/inventory-warehouse/inventory-warehouse.module';
 import { InventoryValuationModule } from './domains/inventory-valuation/inventory-valuation.module';
 import { FulfillmentModule } from './domains/fulfillment/fulfillment.module';
@@ -107,6 +108,7 @@ import { CommissionModule } from './domains/commission/commission.module';
     SalesOrdersModule,
     DepositControlModule,
     TreasuryModule,
+    TreasuryDocumentsModule,
     InventoryWarehouseModule,
     InventoryValuationModule,
     FulfillmentModule,

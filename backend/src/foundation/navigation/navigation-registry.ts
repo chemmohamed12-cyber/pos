@@ -152,6 +152,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // (incl. the ledger GET) — nav gates on the same node, `read-only`
       // being the minimum (editable satisfies it). Behaviour-identical to
       // the former `roles: ['admin','finance']` via the legacy-role backfill.
+      { to: '/treasury/workspace', code: 'nav.treasury_workspace', module: 'finance', permissionNode: 'finance' },
+      { to: '/treasury/documents', code: 'nav.treasury_documents', module: 'finance', permissionNode: 'finance.cash_document.view' },
       { to: '/treasury/accounts', code: 'nav.treasury_accounts', module: 'finance', permissionNode: 'finance' },
       { to: '/treasury/ledger', code: 'nav.treasury_ledger', module: 'finance', permissionNode: 'finance' },
     ],

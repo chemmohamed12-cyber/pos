@@ -8,6 +8,7 @@ import { Payment } from './infrastructure/payment.entity';
 import { CustomerLedgerService } from './application/customer-ledger.service';
 import { InvoiceService } from './application/invoices.service';
 import { PaymentsService } from './application/payments.service';
+import { FINANCE_COLLECTION_CONTRACT } from '../../foundation/module-registry/contracts/collection.contract';
 import { InvoicesController } from './interface/invoices.controller';
 import { PaymentsController } from './interface/payments.controller';
 import { CustomerLedgerController } from './interface/customer-ledger.controller';
@@ -70,9 +71,10 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CustomerLedgerService,
     InvoiceService,
     PaymentsService,
+    { provide: FINANCE_COLLECTION_CONTRACT, useExisting: PaymentsService },
     { provide: FINANCE_CUSTOMER_LEDGER_CONTRACT, useExisting: CustomerLedgerService },
     { provide: FINANCE_INVOICE_CONTRACT, useExisting: InvoiceService },
   ],
-  exports: [CustomerLedgerService, InvoiceService, PaymentsService, FINANCE_CUSTOMER_LEDGER_CONTRACT, FINANCE_INVOICE_CONTRACT],
+  exports: [CustomerLedgerService, InvoiceService, PaymentsService, FINANCE_CUSTOMER_LEDGER_CONTRACT, FINANCE_INVOICE_CONTRACT, FINANCE_COLLECTION_CONTRACT],
 })
 export class CustomerFinanceModule {}

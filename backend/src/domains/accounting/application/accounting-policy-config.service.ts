@@ -32,6 +32,8 @@ export const ACCOUNTING_POLICY_KEYS: readonly PolicyKeyDef[] = [
   { key: 'accounting.purchase_price_variance_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },
   { key: 'accounting.cash_bank_opening_balance_account_code', group: 'cash', kind: 'account', expectedTypes: ['equity'] },
   { key: 'accounting.cash_movement_clearing_account_code', group: 'cash', kind: 'account', expectedTypes: ['asset', 'liability'] },
+  { key: 'accounting.treasury_receipt_reason_accounts', group: 'cash', kind: 'reason_map', expectedTypes: ['revenue', 'liability', 'equity'] },
+  { key: 'accounting.treasury_disbursement_reason_accounts', group: 'cash', kind: 'reason_map', expectedTypes: ['expense', 'asset', 'liability'] },
   { key: 'accounting.fixed_asset_gain_on_disposal_account_code', group: 'fixed_assets', kind: 'account', expectedTypes: ['revenue'] },
   { key: 'accounting.fixed_asset_loss_on_disposal_account_code', group: 'fixed_assets', kind: 'account', expectedTypes: ['expense'] },
   { key: 'accounting.fixed_asset_acquisition_clearing_account_code', group: 'fixed_assets', kind: 'account', expectedTypes: ['liability', 'asset'] },

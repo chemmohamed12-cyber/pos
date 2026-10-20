@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { TreasuryController } from './treasury.controller';
+import { TreasuryDocumentsController } from './treasury-documents.controller';
 import { PaymentsController } from '../../customer-finance/interface/payments.controller';
 import { PERMISSION_METADATA_KEY, RequiredPermission } from '../../../foundation/permission/require-permission.decorator';
 import { MODULE_REGISTRY } from '../../../foundation/module-registry/module-registry';
@@ -47,5 +48,23 @@ describe('Treasury / payment authorization separation', () => {
     for (const [, node] of expected) expect(nodes.has(node)).toBe(true);
     expect(nodes.has('finance.payment.reverse')).toBe(true);
     for (const n of ['finance.cash.reverse', 'finance.payment.reverse', 'finance.cash.transfer', 'finance.cash_account.mapping.manage']) expect(nodeRisk(n)).not.toBe('low');
+  });
+
+  it.each([
+    ['list', 'finance.cash_document.view', 'read-only'],
+    ['get', 'finance.cash_document.view', 'read-only'],
+    ['effect', 'finance.cash_document.view', 'read-only'],
+    ['create', 'finance.cash_document.create', 'editable'],
+    ['update', 'finance.cash_document.create', 'editable'],
+    ['submit', 'finance.cash_document.submit', 'editable'],
+    ['decide', 'finance.cash_document.approve', 'editable'],
+    ['execute', 'finance.cash_document.execute', 'editable'],
+    ['cancel', 'finance.cash_document.cancel', 'editable'],
+    ['reverse', 'finance.cash_document.reverse', 'editable'],
+  ])('Treasury Documents route %s requires %s (%s) — prepare, submit, approve, execute, cancel and reverse are separate permissions', (method, node, access) => {
+    const r = required(TreasuryDocumentsController.prototype, method);
+    expect(r?.nodeKey).toBe(node);
+    expect(r?.access).toBe(access);
+    expect(MODULE_REGISTRY.nodesForModule('finance')).toContain(node);
   });
 });
