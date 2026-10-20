@@ -5,6 +5,7 @@ import { CustomerAssignment } from '../infrastructure/customer-assignment.entity
 import { canTransitionCustomerStatus, CustomerStatus } from '../domain/customer-status';
 import { isValidOrderWorkflowPolicy, OrderWorkflowPolicy } from '../domain/order-workflow-policy';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { CUSTOMER_CODE_KIND, assertEntityCodeFree, issueEntityCode, normalizeEntityCode, peekEntityCode, rethrowDuplicateCode } from '../../../foundation/numbering/entity-code';
 import { ScopeService } from '../../../foundation/scope/scope.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
@@ -81,6 +82,8 @@ export interface CustomerImportRow {
 }
 
 export interface CreateCustomerInput {
+  /** Optional (2026-10-20): omitted or blank = the next default serial (`CUST-000001` …); a typed code is used as is if it is valid and free. */
+  code?: string | null;
   name: string;
   phone?: string | null;
   managerName?: string | null;
@@ -123,6 +126,11 @@ export class CustomersService implements SalesCustomersContract {
     private readonly limits: LimitService,
   ) {}
 
+  /** The default customer code for the create form — the next `CUST-` serial that is not already taken. A preview only; nothing is issued. */
+  async peekNextCode(manager?: EntityManager): Promise<string> {
+    return peekEntityCode(this.numbering, manager ?? this.dataSource.manager, CUSTOMER_CODE_KIND);
+  }
+
   /**
    * P5 (Limit Engine) — `sales.max_customers` is the one manifest-declared
    * limit key with an obvious, unambiguous home: one customer record
@@ -144,11 +152,16 @@ export class CustomersService implements SalesCustomersContract {
       throw new ConflictException(`Customer limit reached (${gate.max}) — cannot create another customer.`);
     }
 
-    const code = await this.numbering.getNextNumber('customer', manager);
+    // A typed code is checked first (nothing is issued for it); otherwise the next serial is issued, skipping any number a typed code already took.
+    const em = manager ?? this.dataSource.manager;
+    const explicit = normalizeEntityCode(input.code, CUSTOMER_CODE_KIND, true);
+    if (explicit) await assertEntityCodeFree(em, CUSTOMER_CODE_KIND, explicit);
+    const code = explicit ?? (await issueEntityCode(this.numbering, em, CUSTOMER_CODE_KIND));
 
     const customer = await (manager ?? this.dataSource).transaction(async (txManager) => {
       const repo = txManager.getRepository(Customer);
-      const saved = await repo.save(
+      const saved = await repo
+        .save(
         repo.create({
           code,
           name: input.name,
@@ -170,7 +183,8 @@ export class CustomersService implements SalesCustomersContract {
           shippingMethodPreference: input.shippingMethodPreference ?? null,
           locationUrl: input.locationUrl ?? null,
         }),
-      );
+        )
+        .catch((err) => rethrowDuplicateCode(err, CUSTOMER_CODE_KIND, code));
 
       const consumed = await this.limits.consume('sales.max_customers', 1, txManager);
       if (!consumed.allowed) {
