@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CustomerLedgerEntry } from './infrastructure/customer-ledger-entry.entity';
 import { SalesInvoice } from './infrastructure/sales-invoice.entity';
 import { SalesInvoiceLine } from './infrastructure/sales-invoice-line.entity';
+import { CustomerPaymentReversal } from './infrastructure/customer-payment-reversal.entity';
 import { Payment } from './infrastructure/payment.entity';
 import { CustomerLedgerService } from './application/customer-ledger.service';
 import { InvoiceService } from './application/invoices.service';
@@ -37,7 +38,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CustomerLedgerEntry, SalesInvoice, SalesInvoiceLine, Payment]),
+    TypeOrmModule.forFeature([CustomerLedgerEntry, SalesInvoice, SalesInvoiceLine, Payment, CustomerPaymentReversal]),
     NumberingModule,
     EventsModule,
     ProcessEngineModule,

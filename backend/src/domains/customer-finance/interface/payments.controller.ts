@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, Inject, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNumberString, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { PaymentsService } from '../application/payments.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -52,6 +52,13 @@ class RecordOnAccountPaymentDto {
   @IsOptional()
   @IsString()
   reference?: string;
+}
+
+/** T2 — reverse a customer payment through its owning document. A reason is mandatory (audited). */
+class ReversePaymentDto {
+  @IsString()
+  @MinLength(3)
+  reason!: string;
 }
 
 /** CUS-01 — explicit settlement of an unapplied receipt against an invoice (partial amounts supported). */
@@ -133,6 +140,25 @@ export class PaymentsController {
       idempotencyKey,
       (txManager) =>
         this.payments.recordOnAccountPayment(dto.customerId, dto.salesOrderId ?? null, dto.amount, dto.method, dto.treasuryAccountId, dto.reference ?? null, req.user!.id, txManager),
+      req.companyContext.dataSource.manager,
+    );
+    await this.events.dispatchAfterCommit(req.companyContext.dataSource.manager);
+    return result;
+  }
+
+  /**
+   * T2 — reverse a customer payment through its owning document (Treasury leg + Customer Ledger + invoice status + GL mirror, one transaction).
+   * Own permission node (separate from recording); `Idempotency-Key` is honoured, and the DB's UNIQUE(paymentId) makes a double reversal impossible regardless.
+   */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.payment.reverse', 'editable')
+  @Post('payments/:id/reverse')
+  async reverse(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: ReversePaymentDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const result = await this.idempotency.withIdempotencyInTransaction(
+      'payments.reverse',
+      idempotencyKey,
+      (txManager) => this.payments.reversePayment(id, dto.reason, req.user!.id, txManager),
       req.companyContext.dataSource.manager,
     );
     await this.events.dispatchAfterCommit(req.companyContext.dataSource.manager);

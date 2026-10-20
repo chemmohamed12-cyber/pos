@@ -52,6 +52,7 @@ export const FINANCIAL_EVENT_TYPES: NameTable = {
   'finance.invoice.posted': ['ترحيل فاتورة بيع', 'Sales invoice posted'],
   'finance.invoice.voided': ['إلغاء فاتورة بيع', 'Sales invoice voided'],
   'finance.payment.recorded': ['تسجيل دفعة من عميل', 'Customer payment recorded'],
+  'finance.payment.reversed': ['عكس دفعة عميل', 'Customer payment reversed'],
   'finance.supplier_invoice.posted': ['ترحيل فاتورة مورد', 'Supplier invoice posted'],
   'finance.supplier_invoice.voided': ['إلغاء فاتورة مورد', 'Supplier invoice voided'],
   'finance.supplier_payment.recorded': ['تسجيل دفعة لمورد', 'Supplier payment recorded'],

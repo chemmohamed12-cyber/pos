@@ -63,3 +63,5 @@ src/foundation/testing/test-teardown-retry.spec.ts
 src/foundation/release/release-upload-readiness.spec.ts
 src/domains/inventory-warehouse/application/inventory-reference-numbers.spec.ts
 src/domains/commerce/application/product-image.service.spec.ts
+src/domains/treasury/interface/treasury-permissions.spec.ts
+src/domains/treasury/interface/treasury-generic-cash.spec.ts

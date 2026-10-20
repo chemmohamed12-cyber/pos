@@ -102,13 +102,18 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
-export async function apiFetch<T>(method: string, path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }): Promise<T> {
+/** T2: a client-generated key for one logical submission (one form instance). The server stores key + result in the same transaction as the money movement, so a retry or double-click replays the result instead of repeating the effect. */
+export function newIdempotencyKey(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export async function apiFetch<T>(method: string, path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean; idempotencyKey?: string }): Promise<T> {
   // A route that answers 401 for "not a member of this Company" (skipUnauthorizedHandler) must not be retried with a renewed token: that 401 is about THAT action, not the session.
   const res = await sendWithRefresh(
     (token) =>
       fetch(`${API_BASE}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : {}) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       }),
     !opts?.skipUnauthorizedHandler && path !== '/auth/login' && path !== '/auth/refresh',
@@ -152,7 +157,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => apiFetch<T>('GET', path),
-  post: <T>(path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean }) => apiFetch<T>('POST', path, body, opts),
+  post: <T>(path: string, body?: unknown, opts?: { skipUnauthorizedHandler?: boolean; idempotencyKey?: string }) => apiFetch<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown) => apiFetch<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => apiFetch<T>('PATCH', path, body),
   delete: <T>(path: string) => apiFetch<T>('DELETE', path),

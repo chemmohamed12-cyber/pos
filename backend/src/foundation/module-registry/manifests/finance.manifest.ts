@@ -58,6 +58,12 @@ export const financeManifest: ModuleManifest = {
     { node: 'finance.cash.transfer', title_code: 'perm.finance.cash.transfer', parent: 'finance.cash' },
     { node: 'finance.cash.reverse', title_code: 'perm.finance.cash.reverse', parent: 'finance.cash' },
 
+    // T2 (2026-10-20) — treasury-account administration split from money movement (both still inherit from `finance`, so no existing role gains or loses access)
+    { node: 'finance.cash_account', title_code: 'perm.finance.cash_account', parent: 'finance' },
+    { node: 'finance.cash_account.manage', title_code: 'perm.finance.cash_account.manage', parent: 'finance.cash_account' },
+    { node: 'finance.cash_account.mapping', title_code: 'perm.finance.cash_account.mapping', parent: 'finance.cash_account' },
+    { node: 'finance.cash_account.mapping.manage', title_code: 'perm.finance.cash_account.mapping.manage', parent: 'finance.cash_account.mapping' },
+
     { node: 'finance.invoice', title_code: 'perm.finance.invoice', parent: 'finance' },
     { node: 'finance.invoice.view', title_code: 'perm.finance.invoice.view', parent: 'finance.invoice' },
     { node: 'finance.invoice.create', title_code: 'perm.finance.invoice.create', parent: 'finance.invoice' },
@@ -67,6 +73,7 @@ export const financeManifest: ModuleManifest = {
     { node: 'finance.payment', title_code: 'perm.finance.payment', parent: 'finance' },
     { node: 'finance.payment.view', title_code: 'perm.finance.payment.view', parent: 'finance.payment' },
     { node: 'finance.payment.create', title_code: 'perm.finance.payment.create', parent: 'finance.payment' },
+    { node: 'finance.payment.reverse', title_code: 'perm.finance.payment.reverse', parent: 'finance.payment' },
 
     { node: 'finance.ledger', title_code: 'perm.finance.ledger', parent: 'finance' },
     { node: 'finance.ledger.view', title_code: 'perm.finance.ledger.view', parent: 'finance.ledger' },
@@ -126,6 +133,6 @@ export const financeManifest: ModuleManifest = {
     // published by `customer-finance` (InvoicesService / PaymentsService).
     // F06-H1: `treasury.cash.recorded` / `treasury.transfer.completed` really published
     // by `treasury` (TreasuryService, via the Transactional Outbox) — previously declared-only.
-    events: ['treasury.cash.recorded', 'treasury.transfer.completed', 'finance.invoice.posted', 'finance.invoice.voided', 'finance.payment.recorded'],
+    events: ['treasury.cash.recorded', 'treasury.transfer.completed', 'finance.invoice.posted', 'finance.invoice.voided', 'finance.payment.recorded', 'finance.payment.reversed'],
   },
 };

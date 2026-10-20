@@ -32,7 +32,7 @@ export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
  * F03's own generic posting gate, not in any calling domain.
  */
 /** Topics whose publisher owns the GL effect inside its own transaction — see `validateForPublish`. */
-const PUBLISH_GUARDED_TOPICS = ['treasury.cash.recorded', 'treasury.transfer.completed', 'finance.payment.recorded', 'finance.supplier_payment.recorded', 'deposit.verified', 'collection.remitted'] as const;
+const PUBLISH_GUARDED_TOPICS = ['treasury.cash.recorded', 'treasury.transfer.completed', 'finance.payment.recorded', 'finance.payment.reversed', 'finance.supplier_payment.recorded', 'deposit.verified', 'collection.remitted'] as const;
 
 const DEADLOCK_ERROR_CODE = '40P01';
 const MAX_POSTING_ATTEMPTS = 3;
@@ -52,6 +52,7 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   'finance.invoice.posted': 'finance',
   'finance.invoice.voided': 'finance',
   'finance.payment.recorded': 'finance',
+  'finance.payment.reversed': 'finance',
   'treasury.cash.recorded': 'treasury',
   'treasury.transfer.completed': 'treasury',
   'deposit.verified': 'deposit-control',

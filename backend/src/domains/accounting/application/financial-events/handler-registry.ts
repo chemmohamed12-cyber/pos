@@ -106,6 +106,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   'finance.invoice.posted',
   'finance.invoice.voided',
   'finance.payment.recorded',
+  // T2 (2026-10-20) — a customer payment reversed through its owning document: Dr AR / Cr bank
+  'finance.payment.reversed',
   // ADR-048 — Procurement's Supplier Invoice/AP real handlers (AP_EVENT_TOPICS' first publisher)
   'finance.supplier_invoice.posted',
   'finance.supplier_invoice.voided',

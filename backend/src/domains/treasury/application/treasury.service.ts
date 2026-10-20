@@ -529,7 +529,7 @@ export class TreasuryService implements FinanceTreasuryContract {
         resourceId: txn.id,
         result: 'success',
         correlationId: null,
-        after: { accountId, amount, customerId, salesOrderId },
+        after: { accountId, amount, customerId, salesOrderId, direct: opts.emitGlEvent },
       },
       manager,
     );
@@ -606,6 +606,7 @@ export class TreasuryService implements FinanceTreasuryContract {
           supplierInvoiceId: supplierRef?.supplierInvoiceId ?? null,
           employeeId: payrollRef?.employeeId ?? null,
           payrollRunId: payrollRef?.payrollRunId ?? null,
+          direct: opts.emitGlEvent,
         },
       },
       manager,
@@ -926,6 +927,12 @@ export class TreasuryService implements FinanceTreasuryContract {
     if (original.status !== 'posted') {
       throw new ConflictException(`Cannot reverse a transaction in status "${original.status}".`);
     }
+    // T2 (G-06b): a leg that belongs to a business document is reversed through THAT document, which also unwinds the subledger / invoice and publishes the
+    // correct mirror event. A raw reversal here would offset the clearing account instead of AR/AP and leave the document, ledger and invoice untouched.
+    const owner = await this.findOwningDocument(original, manager);
+    if (owner) {
+      throw new ConflictException(`This movement belongs to ${owner} — reverse it through that document, not from the Treasury ledger. Nothing was changed.`);
+    }
 
     const targets = original.transferGroupId
       ? await repo.find({ where: { transferGroupId: original.transferGroupId } })
@@ -1044,6 +1051,71 @@ export class TreasuryService implements FinanceTreasuryContract {
       );
     }
     return reversals;
+  }
+
+  /**
+   * T2 (G-06b) — which business document owns this Treasury leg's accounting story, or null when it is a plain Treasury movement (direct cash, transfer).
+   * Owned legs: deposit, payroll disbursement, COD custody/settlement, customer payment, supplier payment. A reversal row inherits its original's owner.
+   */
+  private async findOwningDocument(leg: TreasuryTransaction, manager?: EntityManager): Promise<string | null> {
+    const runner = manager ?? this.dataSource;
+    if (leg.reversalOfTransactionId) {
+      const original = await runner.getRepository(TreasuryTransaction).findOne({ where: { id: leg.reversalOfTransactionId } });
+      if (original) return this.findOwningDocument(original, manager);
+    }
+    if (leg.depositId) return `customer deposit ${leg.depositId}`;
+    if (leg.employeeId || leg.payrollRunId) return 'a payroll run';
+    if (leg.reason === 'cod_collection_custody' || (leg.reason ?? '').startsWith('shipping_collection_')) return 'a delivery (COD) collection';
+    for (const [table, label] of [
+      ['customer_payments', 'customer payment'],
+      ['supplier_payments', 'supplier payment'],
+    ] as const) {
+      const present: Array<{ ok: boolean }> = await runner.query(`SELECT to_regclass($1) IS NOT NULL AS ok`, [table]);
+      if (!present[0]?.ok) continue;
+      const rows: Array<{ n: string }> = await runner.query(`SELECT "paymentNumber" AS n FROM "${table}" WHERE "treasuryTransactionId" = $1 LIMIT 1`, [leg.id]);
+      if (rows.length > 0) return `${label} ${rows[0].n}`;
+    }
+    return null;
+  }
+
+  /**
+   * T2 — the OWNER-driven reversal of a single cash leg: appends the offsetting leg, flips the original to `reversed`, audits — and publishes NOTHING
+   * (the owning document publishes its own mirror event). Joins the caller's transaction. Refuses a transfer leg, an already-reversed leg, and (for a
+   * receipt) a reversal the account cannot fund — money that is no longer there cannot be handed back.
+   */
+  async reverseOwnedLeg(transactionId: string, reason: string, actorUserId: string, manager: EntityManager): Promise<TreasuryTransaction> {
+    return this.run(manager, async (m) => {
+      const repo = m.getRepository(TreasuryTransaction);
+      const original = await repo.findOne({ where: { id: transactionId } });
+      if (!original) throw new NotFoundException(`Treasury transaction "${transactionId}" not found.`);
+      if (original.transferGroupId) throw new BadRequestException('A transfer leg is not an owned cash leg — reverse the transfer itself.');
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${original.treasuryAccountId}`]);
+      const fresh = await repo.findOne({ where: { id: transactionId } });
+      if (!fresh || fresh.status !== 'posted') throw new ConflictException(`Cannot reverse transaction "${transactionId}" — it is "${fresh?.status ?? 'missing'}".`);
+      if (fresh.type === 'cash_in') await this.assertSufficientBalance(m, fresh.treasuryAccountId, fresh.amount);
+      const reversal = await this.insertLeg(m, {
+        type: fresh.type === 'cash_in' ? 'cash_out' : 'cash_in',
+        treasuryAccountId: fresh.treasuryAccountId,
+        amount: fresh.amount,
+        customerId: fresh.customerId,
+        salesOrderId: fresh.salesOrderId,
+        supplierId: fresh.supplierId,
+        supplierInvoiceId: fresh.supplierInvoiceId,
+        depositId: fresh.depositId,
+        transferGroupId: null,
+        reference: fresh.reference,
+        reason: `Reversal: ${reason}`,
+        movementDate: new Date(),
+        createdByUserId: actorUserId,
+        reversalOfTransactionId: fresh.id,
+      });
+      await repo.update(fresh.id, { status: 'reversed' });
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'treasury.transaction.reversed_by_owner', resource: 'treasury_transaction', resourceId: fresh.id, result: 'success', correlationId: reversal.id, after: { reason } },
+        m,
+      );
+      return reversal;
+    });
   }
 
   async listLedger(filters: { accountId?: string; customerId?: string; salesOrderId?: string }, manager?: EntityManager): Promise<TreasuryTransaction[]> {

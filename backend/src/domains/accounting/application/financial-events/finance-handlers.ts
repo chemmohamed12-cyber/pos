@@ -192,6 +192,33 @@ export async function handlePaymentRecorded(event: FinancialEvent, ctx: HandlerC
 }
 
 /**
+ * `finance.payment.reversed` → Dr AR / Cr Bank/Cash — the exact mirror of `finance.payment.recorded` (T2, 2026-10-20). Published ONLY by the owning
+ * business document (`PaymentsService.reversePayment`), never by a raw Treasury reversal (whose offset would otherwise land in the clearing account).
+ */
+export async function handlePaymentReversed(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
+  const p = event.payload;
+  const amount = amt(p.amount);
+  if (!amount) return { kind: 'rejected', reason: 'payment.reversed: missing/invalid amount' };
+  const bank = await resolveBankLeg(ctx, p);
+  const ar = await resolveAccount(ctx, p.arAccountCode, 'ar');
+  if (!bank) return { kind: 'rejected', reason: 'payment.reversed: the Treasury account is not GL-mapped to an active chart account' };
+  if (!ar) return { kind: 'rejected', reason: 'payment.reversed: no AR control account in the chart' };
+  return {
+    kind: 'draft',
+    draft: {
+      businessDate: event.businessDate,
+      description: `Payment ${str(p.paymentNumber) ?? event.sourceEntityId} reversed (${str(p.reversalNumber) ?? 'reversal'})`,
+      transactionCurrencyCode: event.transactionCurrencyCode,
+      orgUnitId: event.orgUnitId,
+      lines: [
+        { accountId: ar, debit: amount, description: 'Accounts receivable' },
+        { accountId: bank, credit: amount, description: 'Cash / bank' },
+      ],
+    },
+  };
+}
+
+/**
  * `deposit.verified` → Dr [the Treasury account's mapped GL code] / Cr `ar` (ADR-042 D1/D2/D9).
  * Structurally identical in shape to `handlePaymentRecorded` — a verified deposit is a
  * customer-facing cash event (money reducing what a customer owes), never a treasury-internal
@@ -337,6 +364,7 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   'finance.invoice.posted': handleInvoicePosted,
   'finance.invoice.voided': handleInvoiceVoided,
   'finance.payment.recorded': handlePaymentRecorded,
+  'finance.payment.reversed': handlePaymentReversed,
   // D4 — Revenue/AR/tax reversal of a completed return of an invoiced sale
   'returns.sale_return.credited': handleSalesReturnCredited,
   // ADR-048 — Procurement's Supplier Invoice/AP, the credit-normal mirror of the AR trio above.

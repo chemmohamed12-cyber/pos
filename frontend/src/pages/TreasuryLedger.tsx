@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, newIdempotencyKey } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { FinancialStatusCell } from '../components/FinancialTrace';
@@ -102,7 +102,14 @@ export function TreasuryLedger() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterAccountId]);
 
+  // T2: one idempotency key per logical submission — regenerated when a form is opened/closed or after a success, KEPT across a failed attempt so a retry is safe.
+  const idemKey = useRef<string>(newIdempotencyKey());
+  useEffect(() => {
+    idemKey.current = newIdempotencyKey();
+  }, [mode]);
+
   function resetForm() {
+    idemKey.current = newIdempotencyKey();
     setAccountId('');
     setDestinationAccountId('');
     setAmount('');
@@ -117,17 +124,21 @@ export function TreasuryLedger() {
     setError(null);
     try {
       if (mode === 'cash_in') {
-        await api.post('/treasury/cash-in', { accountId, amount, reference: reference || undefined, reason: reason || undefined });
+        await api.post('/treasury/cash-in', { accountId, amount, reference: reference || undefined, reason: reason || undefined }, { idempotencyKey: idemKey.current });
       } else if (mode === 'cash_out') {
-        await api.post('/treasury/cash-out', { accountId, amount, reference: reference || undefined, reason: reason || undefined });
+        await api.post('/treasury/cash-out', { accountId, amount, reference: reference || undefined, reason: reason || undefined }, { idempotencyKey: idemKey.current });
       } else if (mode === 'transfer') {
-        await api.post('/treasury/transfer', {
-          sourceAccountId: accountId,
-          destinationAccountId,
-          amount,
-          reference: reference || undefined,
-          reason: reason || undefined,
-        });
+        await api.post(
+          '/treasury/transfer',
+          {
+            sourceAccountId: accountId,
+            destinationAccountId,
+            amount,
+            reference: reference || undefined,
+            reason: reason || undefined,
+          },
+          { idempotencyKey: idemKey.current },
+        );
       }
       resetForm();
       await Promise.all([loadAccounts(), loadLedger()]);
@@ -224,11 +235,11 @@ export function TreasuryLedger() {
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>{t('field.reference')}</label>
-              <input value={reference} onChange={(e) => setReference(e.target.value)} />
+              <input value={reference} onChange={(e) => setReference(e.target.value)} required={mode === 'cash_in' || mode === 'cash_out'} />
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>{t('field.reason')}</label>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} />
+              <input value={reason} onChange={(e) => setReason(e.target.value)} required={mode === 'cash_in' || mode === 'cash_out'} minLength={mode === 'cash_in' || mode === 'cash_out' ? 3 : undefined} />
             </div>
             <button className="btn btn-primary" type="submit" disabled={busy}>
               {t('action.save')}

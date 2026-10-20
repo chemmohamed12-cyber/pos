@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { TreasuryService } from '../application/treasury.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -63,6 +63,22 @@ export class CashMoveDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+/**
+ * T2 (transitional restriction, 2026-10-20) — the generic cash-in / cash-out endpoints stay (no caller is broken) but may no longer carry misleading business
+ * labels or be anonymous: a customer / sales-order label on a direct movement creates NO receivable effect (the customer's invoice stays open), so it is refused
+ * and the user is pointed to the customer payment flow; a purpose (`reason`) and a supporting `reference` are mandatory. Removal of these endpoints waits for a
+ * reviewed caller inventory (every call is audited as `treasury.cash_in` / `treasury.cash_out` with `direct: true`).
+ */
+function assertGenericCashEntry(dto: CashMoveDto): void {
+  if (dto.customerId || dto.salesOrderId) {
+    throw new UnprocessableEntityException(
+      'A customer or sales order cannot be attached to a generic cash movement — it would not settle any invoice or change the customer account. Record the receipt as a customer payment instead. Nothing was recorded.',
+    );
+  }
+  if (!dto.reason || dto.reason.trim().length < 3) throw new BadRequestException('A purpose (reason) is required for a generic cash movement. Nothing was recorded.');
+  if (!dto.reference || dto.reference.trim().length < 1) throw new BadRequestException('A reference (the supporting document number) is required for a generic cash movement. Nothing was recorded.');
 }
 
 class TransferDto {
@@ -131,28 +147,28 @@ export class TreasuryController {
     private readonly events: EventBusService,
   ) {}
 
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash_account.manage', 'editable')
   @Post('account-types')
   async createAccountType(@Req() req: CompanyScopedRequest, @Body() dto: CreateAccountTypeDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.treasury.createAccountType(dto.code, dto.name, req.user.id, req.companyContext.dataSource.manager);
   }
 
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.view', 'editable')
   @Get('account-types')
   async listAccountTypes(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.treasury.listAccountTypes(req.companyContext.dataSource.manager);
   }
 
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash_account.manage', 'editable')
   @Post('accounts')
   async createAccount(@Req() req: CompanyScopedRequest, @Body() dto: CreateAccountDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.treasury.createAccount(dto.code, dto.name, dto.accountTypeId, req.user.id, req.companyContext.dataSource.manager);
   }
 
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.view', 'editable')
   @Get('accounts')
   async listAccounts(@Req() req: CompanyScopedRequest, @Query('search') search?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -163,7 +179,7 @@ export class TreasuryController {
   // gate only — no Scope check, unlike the sibling `ledger` read
   // (`assertLedgerAccountAccess`). Any `finance:editable` holder could
   // deactivate/reactivate any branch's account. Now scope-checked first.
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash_account.manage', 'editable')
   @Post('accounts/:id/status')
   async setAccountStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetAccountStatusDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -177,7 +193,7 @@ export class TreasuryController {
    * (a `bank` control account), or clear the mapping. Scope-checked first,
    * the same as `setAccountStatus`.
    */
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash_account.mapping.manage', 'editable')
   @Post('accounts/:id/gl-mapping')
   async setGlMapping(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetGlMappingDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -195,10 +211,11 @@ export class TreasuryController {
    * `Idempotency-Key` is opt-in and additive — a caller that sends none
    * gets the exact previous, unconditional behaviour.
    */
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.post', 'editable')
   @Post('cash-in')
   async cashIn(@Req() req: CompanyScopedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    assertGenericCashEntry(dto);
     const manager = req.companyContext.dataSource.manager;
     // F06-H1: the Treasury-UI path uses `cashInDirect` — the emitting
     // variant. The `FinanceTreasuryContract.cashIn` other domains call
@@ -215,10 +232,11 @@ export class TreasuryController {
   }
 
   /** Same finding/fix as `cashIn` above. */
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.post', 'editable')
   @Post('cash-out')
   async cashOut(@Req() req: CompanyScopedRequest, @Body() dto: CashMoveDto, @Headers('idempotency-key') idempotencyKey?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    assertGenericCashEntry(dto);
     const manager = req.companyContext.dataSource.manager;
     // T-06x: the dedup record and the cash movement commit together under a per-key lock (`withIdempotency` wrote the record after the operation, without a lock: concurrent same-key requests all executed).
     const result = await this.idempotency.withIdempotencyInTransaction(
@@ -232,7 +250,7 @@ export class TreasuryController {
   }
 
   /** Same finding/fix as `cashIn` above — a retried transfer would otherwise post a second pair of legs. */
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.transfer', 'editable')
   @Post('transfer')
   async transfer(@Req() req: CompanyScopedRequest, @Body() dto: TransferDto, @Headers('idempotency-key') idempotencyKey?: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
@@ -249,7 +267,7 @@ export class TreasuryController {
   }
 
   /** AUDIT-SEC-03 (F3) remediation: an `accountId` filter must pass ScopeResolver before the ledger query runs — was previously any `finance:editable` user, any account, no check. */
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.view', 'editable')
   @Get('ledger')
   async ledger(
     @Req() req: CompanyScopedRequest,
@@ -275,7 +293,7 @@ export class TreasuryController {
   // (double-credit/debit) a transaction on ANY treasury account across
   // org-unit boundaries. Resolves the transaction's owning account and
   // scope-checks it first, via the same mechanism the ledger read uses.
-  @RequirePermission('finance', 'editable')
+  @RequirePermission('finance.cash.reverse', 'editable')
   @Post('transactions/:id/reverse')
   async reverse(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: ReverseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();

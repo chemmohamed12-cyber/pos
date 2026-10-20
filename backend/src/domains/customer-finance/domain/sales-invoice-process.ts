@@ -21,5 +21,9 @@ export const SALES_INVOICE_PROCESS: ProcessDefinition = {
     { from: 'posted', to: 'paid', action: 'mark_paid' },
     { from: 'partially_paid', to: 'paid', action: 'mark_paid' },
     { from: 'posted', to: 'void', action: 'void' },
+    // T2 (2026-10-20) — a customer payment reversed through its owning document re-opens the invoice it had settled. Fired only by InvoiceService.resyncStatusAfterReversal.
+    { from: 'paid', to: 'partially_paid', action: 'reopen_partial' },
+    { from: 'paid', to: 'posted', action: 'reopen' },
+    { from: 'partially_paid', to: 'posted', action: 'reopen' },
   ],
 };

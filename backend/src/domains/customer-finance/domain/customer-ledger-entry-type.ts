@@ -8,6 +8,7 @@ export type CustomerLedgerEntryType =
   | 'sales_invoice'
   | 'deposit'
   | 'payment'
+  | 'payment_reversal' // T2 — the owning-document reversal of a payment: a debit that mirrors the payment's credit(s) wherever they currently sit
   | 'payment_application' // CUS-01 — moves part/all of an unapplied receipt onto an invoice (debit out of "unapplied" + credit onto the invoice); net customer balance unchanged
   | 'cod_collection'
   | 'return_credit_note'
@@ -20,6 +21,7 @@ export const CUSTOMER_LEDGER_ENTRY_TYPES: CustomerLedgerEntryType[] = [
   'sales_invoice',
   'deposit',
   'payment',
+  'payment_reversal',
   'payment_application',
   'cod_collection',
   'return_credit_note',

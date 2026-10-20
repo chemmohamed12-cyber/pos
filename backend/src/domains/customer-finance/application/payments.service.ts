@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { DataSource, EntityManager, In } from 'typeorm';
 import { Payment } from '../infrastructure/payment.entity';
 import { SalesInvoice } from '../infrastructure/sales-invoice.entity';
+import { CustomerPaymentReversal } from '../infrastructure/customer-payment-reversal.entity';
 import { CustomerLedgerService } from './customer-ledger.service';
 import { InvoiceService } from './invoices.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
@@ -14,6 +15,8 @@ import { runInTransaction } from '../../../foundation/transaction/run-in-transac
 
 const PAYMENT_DOCUMENT_TYPE = 'customer_payment';
 const PAYMENT_PREFIX = 'PAY';
+const PAYMENT_REVERSAL_DOCUMENT_TYPE = 'customer_payment_reversal';
+const PAYMENT_REVERSAL_PREFIX = 'PREV';
 
 /**
  * Customer Financial Account / AR (CTO directive) — Customer → Payment →
@@ -264,6 +267,122 @@ export class PaymentsService {
     const saved = await runInTransaction(this.dataSource, manager, run);
     await this.events.dispatchAfterCommit(manager);
     return saved;
+  }
+
+  /**
+   * T2 (2026-10-20) — REVERSE a customer payment through its OWNING document: ONE transaction that (1) appends the offsetting Treasury leg (no event of its own),
+   * (2) mirrors the payment's Customer Ledger credit(s) with `payment_reversal` debits wherever they currently sit (unapplied, on an invoice, or split by an
+   * application), (3) publishes the mirror GL event `finance.payment.reversed` (Dr AR / Cr the receiving account's mapped GL), (4) re-opens every invoice the
+   * payment had settled, (5) records the one-per-payment reversal row (UNIQUE on paymentId) and audits. Rejected BEFORE any mutation: blank reason, payment of a
+   * customer outside the caller's scope, already reversed, an unmapped Treasury account, a ledger that does not add up to the payment amount, a voided invoice,
+   * a receiving account that cannot fund the refund. The original payment, ledger rows, Treasury leg and journal stay untouched and linked.
+   */
+  async reversePayment(
+    paymentId: string,
+    reason: string,
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<{ reversalId: string; reversalNumber: string; paymentId: string; amount: string; invoicesReopened: string[] }> {
+    const why = (reason ?? '').trim();
+    if (why.length < 3) throw new BadRequestException('A reason is required to reverse a payment.');
+    const run = async (m: EntityManager) => {
+      const payment = await m.getRepository(Payment).findOne({ where: { id: paymentId } });
+      if (!payment) throw new NotFoundException(`Payment "${paymentId}" not found.`);
+      await this.customers.getCustomer(payment.customerId, actorUserId, m); // Scope
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payment:apply:${paymentId}`]);
+      await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payment:reverse:${paymentId}`]);
+
+      const already = await m.getRepository(CustomerPaymentReversal).findOne({ where: { paymentId } });
+      if (already) throw new ConflictException(`Payment "${payment.paymentNumber}" was already reversed (${already.reversalNumber}).`);
+      if (!payment.treasuryTransactionId) throw new ConflictException(`Payment "${payment.paymentNumber}" has no Treasury movement to reverse.`);
+
+      // where the payment's credit(s) currently sit in the Customer Ledger (net credit per invoice / unapplied bucket)
+      const buckets: Array<{ invoiceId: string | null; salesOrderId: string | null; net: string }> = await m.query(
+        `SELECT "invoiceId", "salesOrderId", SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END)::text AS net
+         FROM "customer_ledger_entries" WHERE "paymentId" = $1 GROUP BY "invoiceId", "salesOrderId" HAVING SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END) <> 0
+         ORDER BY "invoiceId" NULLS FIRST`,
+        [paymentId],
+      );
+      const total = buckets.reduce((a, b) => a + Number(b.net), 0);
+      if (buckets.some((b) => Number(b.net) < 0) || Math.abs(total - Number(payment.amount)) > 0.004) {
+        throw new ConflictException(`The Customer Ledger for payment "${payment.paymentNumber}" does not add up to its amount (${payment.amount}) — it cannot be reversed automatically. Nothing was changed.`);
+      }
+      const invoiceIds = [...new Set(buckets.map((b) => b.invoiceId).filter((id): id is string => !!id))].sort();
+      for (const id of invoiceIds) {
+        await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payment:invoice:${id}`]);
+        const state = await this.invoices.getStatus(id, m);
+        if (state === 'void') throw new ConflictException(`Invoice ${id} is void — the payment cannot be reversed against it. Nothing was changed.`);
+      }
+
+      const { glAccountCode } = await this.treasury.requireGlMappedAccount(payment.treasuryAccountId, m);
+      const reversalLeg = await this.treasury.reverseOwnedLeg(payment.treasuryTransactionId, `payment ${payment.paymentNumber}: ${why}`, actorUserId, m);
+
+      await this.numbering.registerDocumentType(PAYMENT_REVERSAL_DOCUMENT_TYPE, PAYMENT_REVERSAL_PREFIX, true, m);
+      const reversalNumber = await this.numbering.getNextNumber(PAYMENT_REVERSAL_DOCUMENT_TYPE, m);
+      const repo = m.getRepository(CustomerPaymentReversal);
+      const reversal = await repo.save(
+        repo.create({ reversalNumber, paymentId, reason: why, reversedByUserId: actorUserId, treasuryReversalTransactionId: reversalLeg.id, amount: payment.amount }),
+      );
+
+      for (const b of buckets) {
+        await this.ledger.postEntry(
+          {
+            customerId: payment.customerId,
+            entryType: 'payment_reversal',
+            direction: 'debit',
+            amount: Number(b.net).toFixed(2),
+            salesOrderId: b.salesOrderId,
+            invoiceId: b.invoiceId,
+            paymentId,
+            treasuryTransactionId: reversalLeg.id,
+            reference: reversalNumber,
+            reason: `Reversal of payment ${payment.paymentNumber}: ${why}`,
+            createdByUserId: actorUserId,
+          },
+          m,
+        );
+      }
+
+      await this.events.publish(m, AR_EVENT_TOPICS.paymentReversed, {
+        idempotencyKey: `customer-finance:payment:${paymentId}:reversed`,
+        businessDate: new Date().toISOString().slice(0, 10),
+        orgUnitId: null,
+        currency: 'EGP',
+        sourceEntityType: 'payment' as const,
+        sourceEntityId: paymentId,
+        externalDocument: null,
+        payloadVersion: 1,
+        paymentId,
+        paymentNumber: payment.paymentNumber,
+        reversalNumber,
+        customerId: payment.customerId,
+        amount: payment.amount,
+        treasuryAccountId: payment.treasuryAccountId,
+        glAccountCode,
+        reversalOf: paymentId,
+        reason: why,
+      });
+
+      for (const id of invoiceIds) await this.invoices.resyncStatusAfterReversal(id, actorUserId, m);
+
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'customer_finance.payment.reversed',
+          resource: 'customer_payment',
+          resourceId: paymentId,
+          result: 'success',
+          correlationId: reversal.id,
+          after: { reversalNumber, amount: payment.amount, reason: why, treasuryReversalTransactionId: reversalLeg.id, invoices: invoiceIds },
+        },
+        m,
+      );
+      return { reversalId: reversal.id, reversalNumber, paymentId, amount: payment.amount, invoicesReopened: invoiceIds };
+    };
+    const result = await runInTransaction(this.dataSource, manager, run);
+    await this.events.dispatchAfterCommit(manager);
+    return result;
   }
 
   /** CUS-01 — what is still UNAPPLIED on a payment: Σ(credit − debit) of its ledger rows that carry no invoice (derived, never stored; no status filter — same discipline as every balance here). */

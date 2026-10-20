@@ -63,6 +63,23 @@ export interface PaymentRecordedEvent extends ArEventBase {
 }
 
 /**
+ * T2 (2026-10-20) — published by `customer-finance` when a customer payment is REVERSED through its owning document: the exact mirror of
+ * `PaymentRecordedEvent` (Dr `ar` control / Cr the receiving account's own mapped GL account). Carries `reversalOf` = the original payment id.
+ */
+export interface PaymentReversedEvent extends ArEventBase {
+  paymentId: string;
+  paymentNumber: string;
+  reversalNumber: string;
+  customerId: string;
+  amount: string;
+  treasuryAccountId: string;
+  glAccountCode: string;
+  reversalOf: string;
+  reason: string;
+  arAccountCode?: string | null;
+}
+
+/**
  * D4 (2026-10-05) — published by `returns` when a Sales Return / Shipment Return of an INVOICED sale completes: the
  * Revenue reversal + AR credit (+ tax reversal) of the returned value. `netAmount`/`taxAmount`/`grossAmount` are derived
  * from the ORIGINAL invoice value (never from a return price). The inventory/COGS leg travels on its own
@@ -85,6 +102,8 @@ export const AR_EVENT_TOPICS = {
   invoicePosted: 'finance.invoice.posted',
   invoiceVoided: 'finance.invoice.voided',
   paymentRecorded: 'finance.payment.recorded',
+  /** T2 — a customer payment reversed through its owning document (Dr `ar` / Cr bank). */
+  paymentReversed: 'finance.payment.reversed',
   creditNoteIssued: 'finance.credit_note.issued',
   /** D4 — a completed return of an invoiced sale (Dr Sales Returns [+ Dr tax] / Cr AR). */
   salesReturnCredited: 'returns.sale_return.credited',
@@ -97,6 +116,7 @@ export const AR_EVENT_TOPICS_V1: readonly string[] = [
   AR_EVENT_TOPICS.invoicePosted,
   AR_EVENT_TOPICS.invoiceVoided,
   AR_EVENT_TOPICS.paymentRecorded,
+  AR_EVENT_TOPICS.paymentReversed,
 ] as const;
 
 /**

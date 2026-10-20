@@ -37,6 +37,7 @@ export type CustomerLedgerEntryTypeContract =
   | 'sales_invoice'
   | 'deposit'
   | 'payment'
+  | 'payment_reversal'
   | 'payment_application' // CUS-01
   | 'cod_collection'
   | 'return_credit_note'

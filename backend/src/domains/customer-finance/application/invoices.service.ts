@@ -432,6 +432,26 @@ export class InvoiceService implements FinanceInvoiceContract {
     return this.getStatus(invoiceId, manager);
   }
 
+  /**
+   * T2 — the downward counterpart of `recomputeStatus`: after a payment reversal (a debit on the invoice), move `paid -> partially_paid | posted` or
+   * `partially_paid -> posted` so the status always agrees with the derived remaining balance. Idempotent; a posted/void/draft invoice is untouched.
+   */
+  async resyncStatusAfterReversal(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
+    const state = await this.getStatus(invoiceId, manager);
+    if (state !== 'paid' && state !== 'partially_paid') return state;
+    const runner = manager ?? this.dataSource;
+    const invoice = await runner.getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
+    const remaining = Number(await this.getInvoiceRemaining(invoiceId, manager));
+    const gross = Number(this.grossAmountOf(invoice));
+    if (remaining >= gross) {
+      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'reopen', actorUserId, manager);
+    } else if (state === 'paid' && remaining > 0) {
+      await this.processEngine.transition(SALES_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'reopen_partial', actorUserId, manager);
+    }
+    return this.getStatus(invoiceId, manager);
+  }
+
   async getInvoice(invoiceId: string, actorUserId: string, manager?: EntityManager): Promise<SalesInvoice & { state: string; remaining: string; lines: SalesInvoiceLine[] }> {
     const invoice = await this.em(manager).getRepository(SalesInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
