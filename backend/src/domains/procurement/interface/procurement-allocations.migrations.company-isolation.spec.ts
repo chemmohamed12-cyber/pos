@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import { AddSupplierInvoiceApprovalAndPolicy1790020200000 } from '../../../database/migrations/procurement/1790020200000-AddSupplierInvoiceApprovalAndPolicy';
 import { CreateSupplierInvoiceLineReceipts1790020000000 } from '../../../database/migrations/procurement/1790020000000-CreateSupplierInvoiceLineReceipts';
 import { CreateSupplierPaymentAllocations1790020100000 } from '../../../database/migrations/procurement/1790020100000-CreateSupplierPaymentAllocations';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
@@ -120,11 +123,43 @@ describe('Procurement allocations migrations - backfill of legacy data on a real
       // ---- STOP case: a live invoice line beyond what was received -> the migration throws and writes nothing
       await m1.down(qr);
       await mkInvoice('SINV-M4', 5, 'posted'); // 7 + 3 + 5 = 15 > 10 received
+      // the read-only preflight predicts exactly this finding (check 1) and changes nothing
+      const preflight = fs.readFileSync(path.resolve(__dirname, '../../../../tools/preflight/procurement-allocations-preflight.sql'), 'utf8');
+      const sqlOnly = preflight.split(String.fromCharCode(10)).filter((l) => !l.trim().startsWith('--')).join(String.fromCharCode(10));
+      expect(sqlOnly).not.toMatch(/(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)/i);
+      const statements = sqlOnly.split(';').map((x) => x.trim()).filter(Boolean);
+      const findings: string[] = [];
+      for (const st of statements) for (const row of await ds.query(st)) findings.push(row.check);
+      expect(findings).toContain('1_invoiced_beyond_received');
+      expect(findings).toContain('3_aggregate_vs_live_lines'); // the aggregate (10) no longer equals the live lines (15) once the extra invoice exists
       const beforeStop = await fingerprint();
       await expect(m1.up(qr)).rejects.toThrow(/STOPPED.*inconsistent/is);
       const leftover = await ds.query(`SELECT count(*) AS n FROM supplier_invoice_line_receipts`);
       expect(Number(leftover[0].n)).toBe(0);
       expect(await fingerprint()).toEqual(beforeStop);
+    } finally {
+      await qr.release();
+    }
+  });
+
+  it('C-1 migration: up -> down -> up is idempotent, adds only nullable columns and the singleton policy table, and down removes exactly those', async () => {
+    const ds = await h.connections.getDataSource(h.companyBId);
+    const qr = ds.createQueryRunner();
+    try {
+      const mig = new AddSupplierInvoiceApprovalAndPolicy1790020200000();
+      const cols = async () => (await ds.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'supplier_invoices' AND column_name IN ('submittedByUserId','submittedAt','approvedByUserId','approvedAt','matchStatus','matchDetail','holdReason','exceptionReason','rejectedReason') ORDER BY 1`)).length;
+      const table = async () => (await ds.query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'procurement_invoice_policies'`)).length;
+      expect([await cols(), await table()]).toEqual([9, 1]);
+      await mig.down(qr);
+      expect([await cols(), await table()]).toEqual([0, 0]);
+      await mig.down(qr); // idempotent down
+      await mig.up(qr);
+      await mig.up(qr); // idempotent up
+      expect([await cols(), await table()]).toEqual([9, 1]);
+      await ds.query(`INSERT INTO procurement_invoice_policies ("approvalRequired") VALUES (true)`);
+      await expect(ds.query(`INSERT INTO procurement_invoice_policies ("approvalRequired") VALUES (false)`)).rejects.toThrow(/duplicate key|UQ_procurement_invoice_policies_singleton/);
+      await expect(ds.query(`UPDATE procurement_invoice_policies SET "priceTolerancePct" = -1`)).rejects.toThrow();
+      await ds.query(`DELETE FROM procurement_invoice_policies`);
     } finally {
       await qr.release();
     }

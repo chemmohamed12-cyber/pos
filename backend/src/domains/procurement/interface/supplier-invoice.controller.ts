@@ -28,8 +28,15 @@ class CreateSupplierInvoiceLineDto {
 }
 
 class CreateSupplierInvoiceDto {
+  @IsOptional()
   @IsUUID()
-  purchaseOrderId!: string;
+  purchaseOrderId?: string;
+
+  /** Phase E: several orders of the same supplier on one invoice */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  purchaseOrderIds?: string[];
 
   @IsOptional()
   @IsString()

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { SupplierInvoice } from '../infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from '../infrastructure/supplier-invoice-line.entity';
 import { SupplierLedgerEntry } from '../infrastructure/supplier-ledger-entry.entity';
@@ -32,7 +32,10 @@ export interface CreateSupplierInvoiceLineInput {
   unitCostBase: string;
 }
 export interface CreateSupplierInvoiceInput {
-  purchaseOrderId: string;
+  /** The primary order (kept on the invoice header for compatibility). Omit when `purchaseOrderIds` is given. */
+  purchaseOrderId?: string;
+  /** Phase E (D4): one invoice covering several orders of the SAME supplier. Every order must be used by at least one line; every line must belong to one of them. */
+  purchaseOrderIds?: string[];
   supplierReference?: string | null;
   lines: CreateSupplierInvoiceLineInput[];
   /** D5 — the EXPLICIT VAT amount stated by the supplier's invoice (the lines' total is NET). Omitted/0 = no VAT. Never derived or defaulted. */
@@ -137,11 +140,23 @@ export class SupplierInvoiceService {
   async createDraftInvoice(input: CreateSupplierInvoiceInput, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
     if (input.lines.length === 0) throw new BadRequestException('A Supplier Invoice needs at least one line.');
 
-    const po = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
-    if (!po) throw new NotFoundException(`Purchase Order "${input.purchaseOrderId}" not found.`);
-    const poState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id, manager);
-    if (poState !== 'partially_received' && poState !== 'received' && poState !== 'closed') {
-      throw new ConflictException(`Purchase Order is "${poState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
+    // Phase E (D4): the covered orders - the legacy single order, or several orders of one supplier. The first one is the "primary" order kept on the header.
+    const orderIds = [...new Set([...(input.purchaseOrderId ? [input.purchaseOrderId] : []), ...(input.purchaseOrderIds ?? [])])];
+    if (orderIds.length === 0) throw new BadRequestException('A Supplier Invoice needs a purchase order.');
+    const orders: PurchaseOrder[] = [];
+    for (const orderId of orderIds) {
+      const found = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: orderId } });
+      if (!found) throw new NotFoundException(`Purchase Order "${orderId}" not found.`);
+      const foundState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, found.id, manager);
+      if (foundState !== 'partially_received' && foundState !== 'received' && foundState !== 'closed') {
+        throw new ConflictException(`Purchase Order ${found.poNumber} is "${foundState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
+      }
+      orders.push(found);
+    }
+    const po = orders[0];
+    const foreign = orders.find((o) => o.supplierId !== po.supplierId);
+    if (foreign) {
+      throw new ConflictException(`Purchase orders ${po.poNumber} and ${foreign.poNumber} belong to different suppliers — one supplier invoice can only cover orders of the same supplier. / لا يجوز أن تغطي الفاتورة أوامر شراء لموردين مختلفين.`);
     }
 
     const supplier = await (manager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: po.supplierId } });
@@ -169,8 +184,13 @@ export class SupplierInvoiceService {
       }
     }
 
-    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
+    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: In(orders.map((o) => o.id)) } });
     const poLineById = new Map(poLines.map((l) => [l.id, l]));
+    const ordersUsed = new Set(input.lines.map((l) => poLineById.get(l.purchaseOrderLineId)?.purchaseOrderId).filter(Boolean));
+    const unused = orders.find((o) => !ordersUsed.has(o.id));
+    if (unused && input.lines.every((l) => poLineById.has(l.purchaseOrderLineId))) {
+      throw new BadRequestException(`Purchase order ${unused.poNumber} is listed on the invoice but no line belongs to it.`);
+    }
 
     let totalAmount = 0;
     let priceVarianceAmount = 0;
@@ -179,7 +199,7 @@ export class SupplierInvoiceService {
 
     for (const line of input.lines) {
       const poLine = poLineById.get(line.purchaseOrderLineId);
-      if (!poLine) throw new BadRequestException(`Purchase Order line "${line.purchaseOrderLineId}" does not belong to this order.`);
+      if (!poLine) throw new BadRequestException(`Purchase Order line "${line.purchaseOrderLineId}" does not belong to the order(s) of this invoice.`);
 
       const qty = Number(line.quantity);
       const cost = Number(line.unitCostBase);
@@ -490,7 +510,13 @@ export class SupplierInvoiceService {
   }
 
   async listForPurchaseOrder(purchaseOrderId: string, manager?: EntityManager): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
-    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
+    // Phase E: an invoice belongs to every order any of its lines belongs to (the header order is only the primary one)
+    const covered: Array<{ id: string }> = await (manager ?? this.dataSource).query(
+      `SELECT DISTINCT si."id" FROM "supplier_invoices" si LEFT JOIN "supplier_invoice_lines" sil ON sil."supplierInvoiceId" = si."id" LEFT JOIN "purchase_order_lines" pol ON pol."id" = sil."purchaseOrderLineId"
+        WHERE si."purchaseOrderId" = $1 OR pol."purchaseOrderId" = $1`,
+      [purchaseOrderId],
+    );
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { id: In(covered.map((c) => c.id)) }, order: { createdAt: 'DESC' } });
     return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id, manager), remaining: await this.getInvoiceRemaining(i.id, manager) })));
   }
 

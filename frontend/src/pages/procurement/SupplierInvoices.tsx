@@ -88,6 +88,9 @@ export function SupplierInvoices() {
   const [supplierReference, setSupplierReference] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
   const [poLines, setPoLines] = useState<PurchaseOrderLine[]>([]);
+  // phase E: other orders of the SAME supplier added to this one invoice, and which order each loaded line belongs to
+  const [extraOrderIds, setExtraOrderIds] = useState<string[]>([]);
+  const [lineOrder, setLineOrder] = useState<Record<string, string>>({});
   const [invoiceQty, setInvoiceQty] = useState<Record<string, string>>({});
   const [invoiceCost, setInvoiceCost] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
@@ -161,28 +164,39 @@ export function SupplierInvoices() {
   useEffect(() => {
     if (!purchaseOrderId) {
       setPoLines([]);
+      setLineOrder({});
       return;
     }
-    api
-      .get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${purchaseOrderId}`)
-      .then((d) => {
-        setPoLines(d.lines);
+    const orderIds = [purchaseOrderId, ...extraOrderIds];
+    Promise.all(orderIds.map((id) => api.get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${id}`).then((d) => ({ id, lines: d.lines }))))
+      .then((all) => {
+        const lines = all.flatMap((o) => o.lines);
+        const owner: Record<string, string> = {};
+        for (const o of all) for (const l of o.lines) owner[l.id] = o.id;
+        setPoLines(lines);
+        setLineOrder(owner);
+        // default quantity / price for every line with something left to invoice; whatever the user already typed on a line is kept
         const qty: Record<string, string> = {};
         const cost: Record<string, string> = {};
-        for (const l of d.lines) {
+        for (const l of lines) {
           const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
           if (remaining > 0) {
             qty[l.id] = String(remaining);
             cost[l.id] = l.unitCostBase;
           }
         }
-        setInvoiceQty(qty);
-        setInvoiceCost(cost);
+        setInvoiceQty((prev) => ({ ...qty, ...Object.fromEntries(Object.entries(prev).filter(([k]) => k in qty)) }));
+        setInvoiceCost((prev) => ({ ...cost, ...Object.fromEntries(Object.entries(prev).filter(([k]) => k in cost)) }));
       })
       .catch((err) => {
         // Foundation fix: no error handling — a failure silently left the PO-lines picker empty.
         setError(err instanceof ApiError ? err.message : 'Failed to load purchase order lines.');
       });
+  }, [purchaseOrderId, extraOrderIds]);
+
+  // changing the primary order resets the extra orders (they must belong to the same supplier)
+  useEffect(() => {
+    setExtraOrderIds([]);
   }, [purchaseOrderId]);
 
   useEffect(() => {
@@ -218,10 +232,18 @@ export function SupplierInvoices() {
       .filter((l) => Number(invoiceQty[l.id] ?? 0) > 0)
       .map((l) => ({ purchaseOrderLineId: l.id, quantity: invoiceQty[l.id], unitCostBase: invoiceCost[l.id] || l.unitCostBase }));
     if (!purchaseOrderId || lines.length === 0) return;
+    // only the orders that actually have an invoiced line are sent (the server refuses a listed order with no line)
+    const usedOrders = [purchaseOrderId, ...extraOrderIds].filter((oid) => lines.some((l) => lineOrder[l.purchaseOrderLineId] === oid));
     setCreating(true);
     setError(null);
     try {
-      await api.post('/procurement/supplier-invoices', { purchaseOrderId, supplierReference: supplierReference || undefined, taxAmount: taxAmount || undefined, lines });
+      await api.post('/procurement/supplier-invoices', {
+        purchaseOrderId,
+        purchaseOrderIds: usedOrders.length > 1 ? usedOrders : undefined,
+        supplierReference: supplierReference || undefined,
+        taxAmount: taxAmount || undefined,
+        lines,
+      });
       setPurchaseOrderId('');
       setSupplierReference('');
       setPoLines([]);
@@ -295,6 +317,25 @@ export function SupplierInvoices() {
                   ))}
                 </select>
               </div>
+              {purchaseOrderId && (
+                <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
+                  <label>{currentLang() === 'ar' ? 'أوامر شراء أخرى لنفس المورد في نفس الفاتورة' : 'Other orders of the same supplier on this invoice'}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
+                    {purchaseOrders
+                      .filter((p) => p.id !== purchaseOrderId && p.supplierId === purchaseOrders.find((x) => x.id === purchaseOrderId)?.supplierId)
+                      .map((p) => (
+                        <label key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 'normal' }}>
+                          <input
+                            type="checkbox"
+                            checked={extraOrderIds.includes(p.id)}
+                            onChange={(e) => setExtraOrderIds((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))}
+                          />
+                          {p.poNumber}
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              )}
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>{t('field.supplier_reference')}</label>
                 <input value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
@@ -309,6 +350,7 @@ export function SupplierInvoices() {
               <table className="data-table" style={{ marginBottom: 14 }}>
                 <thead>
                   <tr>
+                    {extraOrderIds.length > 0 && <th>{t('field.po_number')}</th>}
                     <th>{t('field.product')}</th>
                     <th>{t('field.quantity_received')}</th>
                     <th>{t('field.quantity')}</th>
@@ -321,6 +363,7 @@ export function SupplierInvoices() {
                     if (remaining <= 0) return null;
                     return (
                       <tr key={l.id}>
+                        {extraOrderIds.length > 0 && <td>{poNumber(lineOrder[l.id] ?? '')}</td>}
                         <td>{productName(l.productId)}</td>
                         <td>{remaining}</td>
                         <td>
