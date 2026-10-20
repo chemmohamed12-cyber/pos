@@ -80,6 +80,23 @@ export class NumberingService {
   }
 
   /**
+   * What the next number WOULD be, without issuing it (no lock, no counter change) — for a form that shows the default code. `ahead` looks further
+   * (0 = the next number, 1 = the one after …) so a caller can step over numbers a hand-typed code already took. `null` when no sequence is registered.
+   * It is only a preview: the number is really issued by `getNextNumber`, which is what makes a code unique.
+   */
+  async peekNextNumber(documentType: string, ahead = 0, manager?: EntityManager): Promise<string | null> {
+    const rows: SequenceRow[] = await (manager ?? this.dataSource).query('SELECT * FROM numbering_sequences WHERE "documentType" = $1', [documentType]);
+    if (rows.length === 0) return null;
+    const seq = rows[0];
+    const currentYear = new Date().getFullYear();
+    const rollover = seq.includeYear && seq.lastYear !== currentYear;
+    const next = (rollover ? 1 : seq.lastNumber + 1) + ahead;
+    const year = rollover ? currentYear : (seq.lastYear ?? currentYear);
+    const padded = String(next).padStart(6, '0');
+    return seq.includeYear ? `${seq.prefix}-${year}-${padded}` : `${seq.prefix}-${padded}`;
+  }
+
+  /**
    * The TD-29 fix: cross-checks the registry against an externally-known
    * maximum (e.g. after a bulk import or a restore that bypassed normal
    * issuance) and bumps the counter forward if the registry undercounts.

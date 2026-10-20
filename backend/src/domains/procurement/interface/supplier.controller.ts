@@ -277,6 +277,14 @@ export class SupplierController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier.view', 'read-only')
+  /** The default supplier code for the create form (a preview; nothing is issued). Same permission as creating a supplier. Declared before `:id`. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier.create', 'editable')
+  @Get('next-code')
+  async nextCode(@Req() req: CompanyScopedRequest) {
+    return { code: await this.suppliers.peekNextCode(req.companyContext!.dataSource.manager) };
+  }
+
   @Get('all')
   async listAllActive(@Req() req: CompanyScopedRequest) {
     return this.suppliers.listAllActive(req.companyContext!.dataSource.manager);

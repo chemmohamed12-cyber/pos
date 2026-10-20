@@ -16,9 +16,11 @@ import { RequirePermission } from '../../../foundation/permission/require-permis
 import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.service';
 
 class CreateProductDto {
+  /** Optional (2026-10-20): omitted or blank = the next default serial (`PRD-000001` …); a typed code is used as is if it is free. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  sku!: string;
+  @MaxLength(64)
+  sku?: string;
 
   @IsString()
   @MinLength(1)
@@ -228,6 +230,16 @@ export class ProductsController {
     };
   }
 
+  /** The default item code for the create form — the next serial that is not already taken (a preview; nothing is issued). Same permission as creating an item. Declared before `:id`. */
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.create', 'editable')
+  @Get('next-code')
+  async nextCode(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return { code: await this.products.peekNextCode(req.companyContext.dataSource.manager) };
+  }
+
   /** Master data step 1 (D-MD11) — resolve a scanned/typed code: exact SKU first, then exact barcode. Same read policy as `/products/all`. Declared before `:id`. */
   @UseGuards(JwtAuthGuard, CompanyContextGuard)
   @Get('lookup')
@@ -295,7 +307,7 @@ export class ProductsController {
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateProductDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    return this.products.createProduct(dto.sku, dto.name, dto.unitPrice, req.user.id, dto.unit ?? null, req.companyContext.dataSource.manager);
+    return this.products.createProduct(dto.sku ?? null, dto.name, dto.unitPrice, req.user.id, dto.unit ?? null, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)

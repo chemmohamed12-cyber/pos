@@ -6,6 +6,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { ExcelImportExport } from '../components/ExcelImportExport';
 import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate } from '../lib/formatDateTime';
+import { useDefaultCode } from '../lib/useDefaultCode';
+import { CodeField } from '../components/CodeField';
 
 const PAGE_SIZE = 50;
 
@@ -69,6 +71,8 @@ export function Customers() {
   const [reps, setReps] = useState<AdminUser[]>([]);
   const [assignSelections, setAssignSelections] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // Owner request 2026-10-20: the customer code starts as the next automatic serial (CUST-000001 …), editable; a duplicate is refused by the server.
+  const code = useDefaultCode('/customers/next-code');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [creating, setCreating] = useState(false);
@@ -170,7 +174,8 @@ export function Customers() {
     setCreating(true);
     setError(null);
     try {
-      await api.post('/customers', { name, phone: phone || undefined });
+      await api.post('/customers', { code: code.payloadCode(), name, phone: phone || undefined });
+      void code.reset();
       setName('');
       setPhone('');
       await load();
@@ -285,6 +290,14 @@ export function Customers() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <CodeField
+            label={currentLang() === 'ar' ? 'كود العميل' : 'Customer code'}
+            value={code.value}
+            onChange={code.setValue}
+            defaultCode={code.defaultCode}
+            isCustom={code.isCustom}
+            onUseDefault={code.restoreDefault}
+          />
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>{t('field.name')}</label>
             <input value={name} onChange={(e) => setName(e.target.value)} required />

@@ -8,13 +8,13 @@ import { canTransitionSupplierStatus, SupplierStatus } from '../domain/supplier-
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { SUPPLIER_CODE_KIND, assertEntityCodeFree, issueEntityCode, normalizeEntityCode, peekEntityCode, rethrowDuplicateCode } from '../../../foundation/numbering/entity-code';
 import { PROFILE_LANGUAGES, profileEmail, profileOneOf, profileText, profileWebsite } from '../../../foundation/profile/profile-validation';
 
 const SYSTEM_ACTOR = '00000000-0000-0000-0000-000000000000';
 
 /** D9 — supplier codes are issued by the numbering engine ("SUP-000001"); no year segment (a supplier is not a yearly document). */
 export const SUPPLIER_DOCUMENT_TYPE = 'supplier';
-const SUPPLIER_PREFIX = 'SUP';
 
 export interface CreateSupplierInput {
   /** D9 — optional: omitted = auto-numbered. An explicit code is still accepted (data migration) and must be unique. */
@@ -122,26 +122,19 @@ export class SupplierService implements OnModuleInit {
     return { supplier, contacts, addresses, bankAccounts };
   }
 
+  /** The default supplier code for the create form — the next `SUP-` serial that is not already taken. A preview only; nothing is issued. */
+  async peekNextCode(manager?: EntityManager): Promise<string> {
+    return peekEntityCode(this.numbering, this.em(manager), SUPPLIER_CODE_KIND);
+  }
+
   async create(input: CreateSupplierInput, actorUserId: string, manager?: EntityManager): Promise<Supplier> {
     const repo = this.em(manager).getRepository(Supplier);
-    const explicit = input.code?.trim();
-    let code: string;
-    if (explicit) {
-      if (await repo.findOne({ where: { code: explicit } })) {
-        throw new ConflictException(`Supplier code "${explicit}" is already in use.`);
-      }
-      code = explicit;
-    } else {
-      await this.numbering.registerDocumentType(SUPPLIER_DOCUMENT_TYPE, SUPPLIER_PREFIX, false, manager);
-      // A hand-typed legacy code may collide with the sequence — skip forward (bounded), never reuse.
-      code = '';
-      for (let i = 0; i < 20 && !code; i++) {
-        const candidate = await this.numbering.getNextNumber(SUPPLIER_DOCUMENT_TYPE, manager);
-        if (!(await repo.findOne({ where: { code: candidate } }))) code = candidate;
-      }
-      if (!code) throw new ConflictException('Could not issue a unique supplier code; contact an administrator.');
-    }
-    const saved = await repo.save(
+    // A typed code is validated and checked (case-insensitively) first; otherwise the next serial is issued, skipping any number a typed code already took.
+    const explicit = normalizeEntityCode(input.code, SUPPLIER_CODE_KIND, true);
+    if (explicit) await assertEntityCodeFree(this.em(manager), SUPPLIER_CODE_KIND, explicit);
+    const code = explicit ?? (await issueEntityCode(this.numbering, this.em(manager), SUPPLIER_CODE_KIND));
+    const saved = await repo
+      .save(
       repo.create({
         code,
         legalName: input.legalName,
@@ -156,7 +149,8 @@ export class SupplierService implements OnModuleInit {
         orgUnitId: input.orgUnitId ?? null,
         createdByUserId: actorUserId,
       }),
-    );
+      )
+      .catch((err) => rethrowDuplicateCode(err, SUPPLIER_CODE_KIND, code));
     await this.audit.record({
       actorUserId,
       organizationId: null,

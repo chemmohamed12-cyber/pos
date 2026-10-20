@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
 import { loadingLabel } from '../lib/displayNames';
+import { useDefaultCode } from '../lib/useDefaultCode';
+import { CodeField } from '../components/CodeField';
 
 interface Product {
   id: string;
@@ -25,7 +28,9 @@ export function Products() {
   const { can } = useAuth();
   const { t, preload } = useLanguage();
   const [products, setProducts] = useState<Product[] | null>(null);
-  const [sku, setSku] = useState('');
+  // Owner request 2026-10-20: the item code starts as the next automatic serial (PRD-000001 …), editable; a duplicate is refused by the server.
+  const code = useDefaultCode('/products/next-code', can('sales.catalog.create', 'editable'));
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [unit, setUnit] = useState('');
@@ -112,7 +117,7 @@ export function Products() {
     setCreating(true);
     setError(null);
     try {
-      const created = await api.post<{ id: string }>('/products', { sku, name, unitPrice, unit: unit || undefined });
+      const created = await api.post<{ id: string }>('/products', { sku: code.payloadCode(), name, unitPrice, unit: unit || undefined });
       if (defaultWarehouseId && created?.id) {
         try {
           await api.post(`/inventory/warehouses/${defaultWarehouseId}/items`, { productIds: [created.id] });
@@ -121,7 +126,7 @@ export function Products() {
         }
       }
       setDefaultWarehouseId('');
-      setSku('');
+      void code.reset();
       setName('');
       setUnitPrice('');
       setUnit('');
@@ -213,10 +218,7 @@ export function Products() {
       {can('sales.catalog.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label>{t('field.sku')}</label>
-              <input value={sku} onChange={(e) => setSku(e.target.value)} required />
-            </div>
+            <CodeField label={t('field.sku')} value={code.value} onChange={code.setValue} defaultCode={code.defaultCode} isCustom={code.isCustom} onUseDefault={code.restoreDefault} />
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>{t('field.name')}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -273,9 +275,17 @@ export function Products() {
               const next = NEXT_STATUS[p.status];
               const isEditing = editingId === p.id;
               return (
-                <tr key={p.id}>
-                  <td>{p.sku}</td>
-                  <td>{isEditing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} /> : p.name}</td>
+                <tr
+                  key={p.id}
+                  // Owner request 2026-10-20: a product row opens the item card (the page set up in the warehouse). Buttons, links and inputs inside the row keep their own behaviour.
+                  onClick={(e) => {
+                    if (isEditing || (e.target as HTMLElement).closest('button, a, input, select, label')) return;
+                    navigate(`/inventory/items/${p.id}`);
+                  }}
+                  style={isEditing ? undefined : { cursor: 'pointer' }}
+                >
+                  <td>{isEditing ? p.sku : <Link to={`/inventory/items/${p.id}`}>{p.sku}</Link>}</td>
+                  <td>{isEditing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} /> : <Link to={`/inventory/items/${p.id}`}>{p.name}</Link>}</td>
                   <td>
                     {isEditing ? (
                       <input type="number" min={0} step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />

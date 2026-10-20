@@ -15,6 +15,12 @@ import { ExcelService, ColumnSpec } from '../../../foundation/excel/excel.servic
 import { ORDER_WORKFLOW_POLICIES, OrderWorkflowPolicy } from '../domain/order-workflow-policy';
 
 class CreateCustomerDto {
+  /** Optional (2026-10-20): omitted or blank = the next default serial (`CUST-000001` …); a typed code is used if it is valid and free. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  code?: string;
+
   @IsString()
   @MinLength(1)
   name!: string;
@@ -241,6 +247,13 @@ export class CustomersController {
     private readonly profile: CustomerProfileService,
     private readonly excel: ExcelService,
   ) {}
+
+  /** The default customer code for the create form (a preview; nothing is issued). Declared before the `:id` routes. */
+  @Get('next-code')
+  async nextCode(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return { code: await this.customers.peekNextCode(req.companyContext.dataSource.manager) };
+  }
 
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateCustomerDto) {

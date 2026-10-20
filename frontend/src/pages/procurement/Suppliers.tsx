@@ -4,7 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
-import { loadingLabel } from '../../lib/displayNames';
+import { currentLang, loadingLabel } from '../../lib/displayNames';
+import { useDefaultCode } from '../../lib/useDefaultCode';
+import { CodeField } from '../../components/CodeField';
 
 interface Supplier {
   id: string;
@@ -68,6 +70,8 @@ export function Suppliers() {
   const emptyForm = { legalName: '', tradingName: '', supplierType: 'company' as 'company' | 'individual', taxRegistrationNumber: '', vatRegistrationNumber: '', commercialRegistrationNumber: '', paymentTermsDays: '0', creditLimitBase: '' };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Owner request 2026-10-20: when ADDING, the supplier code starts as the next automatic serial (SUP-000001 …), editable; a duplicate is refused by the server. The code of an existing supplier is never edited.
+  const code = useDefaultCode('/procurement/suppliers/next-code', can('procurement.supplier.create', 'editable'));
   const [creating, setCreating] = useState(false);
   const setField = (k: keyof typeof emptyForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -159,7 +163,8 @@ export function Suppliers() {
         await api.post(`/procurement/suppliers/${editingId}/update`, body);
         await loadDetail(editingId);
       } else {
-        await api.post('/procurement/suppliers', body); // no code — the server numbers it
+        await api.post('/procurement/suppliers', { ...body, code: code.payloadCode() }); // unchanged default → the server issues the next serial
+        void code.reset();
       }
       setEditingId(null);
       setForm(emptyForm);
@@ -226,6 +231,9 @@ export function Suppliers() {
       {can('procurement.supplier.create', 'editable') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <form onSubmit={onSubmitSupplier} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {!editingId && (
+              <CodeField label={t('field.supplier_code')} value={code.value} onChange={code.setValue} defaultCode={code.defaultCode} isCustom={code.isCustom} onUseDefault={code.restoreDefault} />
+            )}
             <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
               <label>{t('field.legal_name')}</label>
               <input value={form.legalName} onChange={(e) => setField('legalName', e.target.value)} required />
@@ -271,7 +279,7 @@ export function Suppliers() {
             )}
           </form>
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-            {t('panel.supplier_code_auto')} {t('panel.supplier_edit_note')}
+            {currentLang() === 'ar' ? 'يُقترح كود المورد تلقائيًا ويمكن تعديله عند الإضافة، ولا يمكن تغييره بعد الحفظ.' : 'The supplier code is suggested automatically and can be changed when adding; it cannot be changed after saving.'} {t('panel.supplier_edit_note')}
           </div>
         </div>
       )}

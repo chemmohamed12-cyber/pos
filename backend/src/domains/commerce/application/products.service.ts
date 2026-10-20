@@ -7,6 +7,8 @@ import { ProductSnapshot } from './product-snapshot.dto';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { SalesProductsContract } from '../../../foundation/module-registry/contracts/sales.contract';
+import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { PRODUCT_CODE_KIND, isEntityCodeTaken, issueEntityCode, peekEntityCode, rethrowDuplicateCode } from '../../../foundation/numbering/entity-code';
 
 /**
  * One item, one code (2026-10-19, owner): the comparison key of an item NAME — spaces trimmed and collapsed, case folded, Arabic
@@ -36,26 +38,50 @@ export class ProductsService implements SalesProductsContract {
     return { id: p.id, sku: p.sku, name: p.name, unitPrice: p.unitPrice, status: p.status };
   }
 
+  /** A getter, not a field: the constructor is unchanged (many specs build this service by hand). */
+  private get numbering(): NumberingService {
+    return new NumberingService(this.dataSource);
+  }
+
+  /** The default item code for the create form — the next `PRD-` serial that is not already taken. A preview only. */
+  async peekNextCode(manager?: EntityManager): Promise<string> {
+    return peekEntityCode(this.numbering, manager ?? this.dataSource.manager, PRODUCT_CODE_KIND);
+  }
+
   /** Area 21 Operational Company Scoping Retrofit (2026-09-27): `manager?` added, threaded into the transaction, `audit.record`, and `events.dispatchPending`. */
   async createProduct(
-    sku: string,
+    sku: string | null,
     name: string,
     unitPrice: string,
     actorUserId: string | null,
     unit: string | null = null,
     manager?: EntityManager,
   ): Promise<Product> {
-    const repo = (manager ?? this.dataSource).getRepository(Product);
-    const existing = await repo.findOne({ where: { sku } });
-    if (existing) throw new ConflictException(`Product with SKU "${sku}" already exists.`);
-    // Master data step 1 (D-MD11) — SKU and barcode share one lookup namespace, so a new SKU may not equal an existing barcode.
-    if (await (manager ?? this.dataSource).getRepository(ProductBarcode).findOne({ where: { barcode: sku } })) {
-      throw new ConflictException(`"${sku}" is already used as a barcode and cannot be an item code (SKU).`);
+    // Owner request 2026-10-20: no code (null / blank) = the next default serial (`PRD-000001` …), issued inside the transaction below so a refused creation never burns a number.
+    const explicit = sku?.trim() || null;
+    if (explicit) {
+      const repo = (manager ?? this.dataSource).getRepository(Product);
+      const existing = await repo.findOne({ where: { sku: explicit } });
+      if (existing) throw new ConflictException(`Product with SKU "${explicit}" already exists.`);
+      // Master data step 1 (D-MD11) — SKU and barcode share one lookup namespace, so a new SKU may not equal an existing barcode.
+      if (await (manager ?? this.dataSource).getRepository(ProductBarcode).findOne({ where: { barcode: explicit } })) {
+        throw new ConflictException(`"${explicit}" is already used as a barcode and cannot be an item code (SKU).`);
+      }
+      // The same code in another letter case is the same code.
+      if (await isEntityCodeTaken(manager ?? this.dataSource.manager, PRODUCT_CODE_KIND, explicit)) {
+        throw new ConflictException(`Product with SKU "${explicit}" already exists (codes are compared without regard to letter case). / رمز الصنف "${explicit}" مستخدم من قبل.`);
+      }
     }
 
     const product = await (manager ?? this.dataSource).transaction(async (txManager) => {
       await this.assertItemNameFree(txManager, name, null);
-      const saved = await txManager.getRepository(Product).save(txManager.getRepository(Product).create({ sku, name, unitPrice, unit, status: 'draft' }));
+      const finalSku = explicit ?? (await issueEntityCode(this.numbering, txManager, PRODUCT_CODE_KIND));
+      let saved: Product;
+      try {
+        saved = await txManager.getRepository(Product).save(txManager.getRepository(Product).create({ sku: finalSku, name, unitPrice, unit, status: 'draft' }));
+      } catch (err) {
+        rethrowDuplicateCode(err, PRODUCT_CODE_KIND, finalSku);
+      }
       // Outbox write in the SAME transaction as the insert (ADR-012) —
       // External Integrations (CTO handover directive: "Daii <-> QR Store
       // Integration") subscribes to this to auto-publish new products.
@@ -72,7 +98,7 @@ export class ProductsService implements SalesProductsContract {
         resourceId: product.id,
         result: 'success',
         correlationId: null,
-        after: { sku, name, unitPrice },
+        after: { sku: product.sku, name, unitPrice },
       },
       manager,
     );
