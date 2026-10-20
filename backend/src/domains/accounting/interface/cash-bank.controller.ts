@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { IsIn, IsISO8601, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { CashBankReconciliationService } from '../application/cash-bank-reconciliation.service';
+import { TreasuryPostingExceptionsService } from '../application/treasury-posting-exceptions.service';
 import { CashBankAdjustmentService } from '../application/cash-bank-adjustment.service';
 import { CASH_BANK_ADJUSTMENT_KINDS } from '../domain/cash-bank';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -95,6 +96,7 @@ export class CashBankController {
   constructor(
     private readonly reconciliation: CashBankReconciliationService,
     private readonly adjustments: CashBankAdjustmentService,
+    private readonly postingExceptions: TreasuryPostingExceptionsService,
   ) {}
 
   @UseGuards(PermissionGuard)
@@ -105,6 +107,14 @@ export class CashBankController {
     @Query('from') from?: string,
     @Query('to') to?: string,) {
     return this.reconciliation.listRuns({ treasuryAccountId, status, from, to }, req.companyContext!.dataSource.manager);
+  }
+
+  /** Treasury integrity T1: movements whose expected Financial Event is missing / rejected / not yet posted (read-only; remedy = the existing idempotent re-drive). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('accounting.cash.view', 'read-only')
+  @Get('posting-exceptions')
+  async listPostingExceptions(@Req() req: CompanyScopedRequest, @Query('limit') limit?: string) {
+    return this.postingExceptions.list({ limit: limit ? Number(limit) : undefined }, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

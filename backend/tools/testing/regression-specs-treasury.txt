@@ -1,0 +1,5 @@
+# Treasury program (T1+) — real-PG specs, run with: REGRESSION_NS=biz_t60_ node tools/testing/biz-run.js --regression tools/testing/regression-specs-treasury.txt
+src/domains/treasury/interface/treasury.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-posting-integrity.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-posting-recovery.company-isolation.spec.ts

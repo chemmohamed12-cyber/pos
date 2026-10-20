@@ -58,7 +58,7 @@ describe('TreasuryController Area 21 retrofit — real-Postgres Company isolatio
       `TAT-${code}`,
       `${code} Type`,
     ]);
-    await ds.query(`INSERT INTO "treasury_accounts" ("id","code","name","accountTypeId","status") VALUES ($1,$2,$3,$4,'active')`, [
+    await ds.query(`INSERT INTO "treasury_accounts" ("id","code","name","accountTypeId","status","glAccountCode") VALUES ($1,$2,$3,$4,'active','1101')`, [
       accountId,
       `TA-${code}`,
       `${code} Account`,

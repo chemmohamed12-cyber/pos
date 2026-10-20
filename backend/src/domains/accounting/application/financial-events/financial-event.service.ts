@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { utcBusinessDate } from '../../../../foundation/localization/business-date';
 import { DataSource, EntityManager } from 'typeorm';
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
@@ -31,6 +31,9 @@ export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
  * it with no Manufacturing-specific setup) — the retry lives here, in
  * F03's own generic posting gate, not in any calling domain.
  */
+/** Topics whose publisher owns the GL effect inside its own transaction — see `validateForPublish`. */
+const PUBLISH_GUARDED_TOPICS = ['treasury.cash.recorded', 'treasury.transfer.completed', 'finance.payment.recorded', 'finance.supplier_payment.recorded', 'deposit.verified', 'collection.remitted'] as const;
+
 const DEADLOCK_ERROR_CODE = '40P01';
 const MAX_POSTING_ATTEMPTS = 3;
 const DEADLOCK_RETRY_BASE_DELAY_MS = 50;
@@ -107,6 +110,11 @@ export class FinancialEventService implements OnModuleInit {
     for (const [eventType, handler] of Object.entries(V1_FINANCE_HANDLERS)) {
       if (!this.registry.get(eventType)) this.registry.register(eventType, handler);
     }
+    // Treasury integrity (T1): money-movement topics whose GL effect is owned by the publishing transaction are validated BEFORE the publisher commits.
+    // deposit.verified (published in the approval's own transaction since T1) and collection.remitted (always was, ADR-042 D3c) are guarded too.
+    for (const topic of PUBLISH_GUARDED_TOPICS) {
+      this.events.registerPublishGuard(topic, (payload, manager) => this.validateForPublish(topic, payload, manager));
+    }
     for (const topic of SUBSCRIBED_TOPICS) {
       // ADR-075 (D10): Company-scope — a Company outbox's event is ingested against THAT Company's
       // database (`ctx.manager`); under ambient dispatch `ctx.manager` is null and this falls back to
@@ -118,6 +126,36 @@ export class FinancialEventService implements OnModuleInit {
         },
         { scope: 'company' },
       );
+    }
+  }
+
+  /**
+   * Treasury integrity (T1) — "dry-run" of exactly what ingestion will do, run inside the publisher's transaction before the outbox row exists:
+   * (1) the accounting date must fall in an open fiscal period (the same gate `postEntry` applies), and (2) the registered handler, given the
+   * real payload, must produce a draft rather than a rejection (bank leg mapped to an active chart account, counter/clearing account configured,
+   * control accounts present...). A handler is pure for these topics, so nothing is written. Throws 409 with the handler's own reason, so the
+   * caller's whole transaction rolls back — a movement that could never post is never committed. Residual by design: a period closed or a chart
+   * edited between this check and the later dispatch is still caught by the normal REJECTED/redrive path.
+   */
+  async validateForPublish(eventType: string, rawPayload: Record<string, unknown>, manager: EntityManager): Promise<void> {
+    const handler = this.registry.get(eventType);
+    if (!handler) return;
+    const payload = rawPayload ?? {};
+    const businessDate = (str(payload.businessDate) ?? utcBusinessDate()).slice(0, 10); // some publishers send a full ISO timestamp; the period gate compares calendar dates
+    const orgUnitId = str(payload.orgUnitId);
+    await this.journals.assertPostingDateOpen(orgUnitId, businessDate, manager);
+    const base = await this.currencies.getBaseCurrency(manager);
+    const draftEvent = {
+      eventType,
+      payload,
+      businessDate,
+      orgUnitId,
+      sourceEntityId: str(payload.sourceEntityId) ?? 'preflight',
+      transactionCurrencyCode: str(payload.currency) ?? str(payload.transactionCurrencyCode) ?? base?.code ?? 'XXX',
+    } as unknown as FinancialEvent;
+    const result = await handler(draftEvent, await this.buildContext(manager));
+    if (result.kind === 'rejected') {
+      throw new ConflictException(`This movement cannot be posted to the general ledger — ${result.reason}. Nothing was recorded.`);
     }
   }
 

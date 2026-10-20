@@ -181,6 +181,14 @@ export class JournalEntryService implements OnModuleInit {
    * of its own. Every existing caller (nothing before F08 passes one) observes identical behavior.
    * The posting-gate validation logic below is byte-for-byte unchanged either way.
    */
+  /**
+   * Treasury integrity (T1) — the SAME fiscal-period gate `postEntry` applies, exposed as a read-only pre-check so a publisher can refuse a
+   * movement whose accounting date can never be posted BEFORE it commits. Delegates to `FiscalPeriodService.assertOpenForPosting` (no copy of the rule).
+   */
+  async assertPostingDateOpen(orgUnitId: string | null, businessDate: string, manager?: EntityManager): Promise<void> {
+    await this.fiscalPeriods.assertOpenForPosting(orgUnitId, businessDate, manager);
+  }
+
   async createEntry(input: CreateJournalEntryInput, actorUserId: string, manager?: EntityManager): Promise<JournalEntryView> {
     if (!isJournalSourceType(input.sourceType)) throw new BadRequestException(`Unknown journal source type "${input.sourceType}".`);
     if (input.financialEventId == null && !USER_CREATABLE_SOURCE_TYPES.has(input.sourceType)) {

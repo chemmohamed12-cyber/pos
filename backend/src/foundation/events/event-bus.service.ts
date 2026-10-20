@@ -18,6 +18,14 @@ export interface EventContext {
 export type EventHandler = (payload: Record<string, unknown>, ctx: EventContext) => Promise<void>;
 
 /**
+ * Treasury integrity (T1) — a PUBLISH-TIME guard: runs inside the publisher's own transaction, immediately before the outbox row is written.
+ * Throwing (a 409 with an actionable message) aborts the publisher's whole unit of work, so an event that could never be posted is rejected
+ * before ANY financial effect commits, instead of being committed and rejected later by the consumer. A guard is registered by the consumer
+ * of the topic (Accounting) — the publisher (Treasury) stays unaware of it, so no module cycle is introduced.
+ */
+export type PublishGuard = (payload: Record<string, unknown>, manager: EntityManager) => Promise<void>;
+
+/**
  * `'ambient'` (default, backward compatible): the handler uses its own
  * ambient `DataSource` and is therefore NEVER run against a Company outbox
  * (it would read/write the wrong database). `'company'`: the handler uses
@@ -64,6 +72,7 @@ const LEASE_MINUTES = 5;
 export class EventBusService {
   private readonly logger = new Logger(EventBusService.name);
   private readonly handlers = new Map<string, Subscription[]>();
+  private readonly publishGuards = new Map<string, PublishGuard[]>();
   private readonly warnedAmbientOnly = new Set<string>();
 
   constructor(
@@ -75,6 +84,12 @@ export class EventBusService {
     const existing = this.handlers.get(topic) ?? [];
     existing.push({ handler, scope: options?.scope ?? 'ambient' });
     this.handlers.set(topic, existing);
+  }
+
+  registerPublishGuard(topic: string, guard: PublishGuard): void {
+    const existing = this.publishGuards.get(topic) ?? [];
+    existing.push(guard);
+    this.publishGuards.set(topic, existing);
   }
 
   /**
@@ -89,6 +104,7 @@ export class EventBusService {
     payload: Record<string, unknown>,
     schemaVersion = 1,
   ): Promise<void> {
+    for (const guard of this.publishGuards.get(topic) ?? []) await guard(payload, manager);
     const repo = manager.getRepository(EventOutbox);
     await repo.save(repo.create({ topic, payload, schemaVersion, status: 'pending', attempts: 0 }));
   }

@@ -138,3 +138,41 @@ describe('EventBusService.dispatchPending — ambient vs Company dispatch', () =
     expect(ambientRepo.find).not.toHaveBeenCalled();
   });
 });
+
+describe('EventBusService.publish — publish guards (Treasury integrity T1)', () => {
+  const makeManager = () => {
+    const save = jest.fn(async (row: unknown) => row);
+    const repo = { save, create: jest.fn((row: unknown) => row) };
+    return { manager: { getRepository: jest.fn(() => repo) } as unknown as EntityManager, save };
+  };
+
+  it('with no guard registered for the topic, publish writes the outbox row exactly as before', async () => {
+    const service = new EventBusService({} as never);
+    const { manager, save } = makeManager();
+    await service.publish(manager, 'plain.topic', { a: 1 });
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('a guard runs BEFORE the row is written, receives the payload and the publisher\'s manager, and a throw aborts the publish (no row)', async () => {
+    const service = new EventBusService({} as never);
+    const { manager, save } = makeManager();
+    const guard = jest.fn(async () => {
+      throw new Error('cannot be posted');
+    });
+    service.registerPublishGuard('guarded.topic', guard);
+    await expect(service.publish(manager, 'guarded.topic', { amount: '1.00' })).rejects.toThrow('cannot be posted');
+    expect(guard).toHaveBeenCalledWith({ amount: '1.00' }, manager);
+    expect(save).not.toHaveBeenCalled();
+    // another topic is unaffected
+    await service.publish(manager, 'other.topic', {});
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('a passing guard lets the row through', async () => {
+    const service = new EventBusService({} as never);
+    const { manager, save } = makeManager();
+    service.registerPublishGuard('guarded.topic', async () => undefined);
+    await service.publish(manager, 'guarded.topic', {});
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+});

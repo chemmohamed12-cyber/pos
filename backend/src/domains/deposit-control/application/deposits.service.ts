@@ -155,13 +155,17 @@ export class DepositsService implements SalesDepositContract {
    * (non-`_xact`) would have.
    */
   async approveDeposit(depositId: string, actorUserId: string, treasuryAccountId: string, manager?: EntityManager): Promise<Deposit> {
-    const { saved, order, deposit } = await (manager ?? this.dataSource).transaction(async (txManager) => {
+    const { saved, deposit } = await (manager ?? this.dataSource).transaction(async (txManager) => {
       const repo = txManager.getRepository(Deposit);
       const lockedDeposit = await repo.findOne({ where: { id: depositId }, lock: { mode: 'pessimistic_write' } });
       if (!lockedDeposit) throw new NotFoundException(`Deposit "${depositId}" not found.`);
       if (!canTransitionDepositStatus(lockedDeposit.status, 'approved')) {
         throw new ConflictException(`Cannot approve a deposit in status "${lockedDeposit.status}".`);
       }
+
+      // Treasury integrity T1 (G-04): the receiving account must have a GL owner BEFORE any write — an unmapped account used to commit the leg and ledger
+      // credit, then have the event rejected afterwards (Treasury/GL drift). Rejects the whole approval with nothing changed.
+      const { glAccountCode } = await this.treasury.requireGlMappedAccount(treasuryAccountId, txManager);
 
       const resolvedOrder = await this.salesOrders.getOrder(lockedDeposit.salesOrderId, actorUserId, txManager);
       const orderStatus = await this.salesOrders.getOrderStatus(lockedDeposit.salesOrderId, txManager);
@@ -210,38 +214,28 @@ export class DepositsService implements SalesDepositContract {
       lockedDeposit.status = 'approved';
       lockedDeposit.reviewedByUserId = actorUserId;
       const savedDeposit = await repo.save(lockedDeposit);
-      return { saved: savedDeposit, order: resolvedOrder, deposit: lockedDeposit };
+
+      // Treasury integrity T1 (G-03): `deposit.verified` is now published INSIDE the same transaction as the Treasury leg, the Customer Ledger credit and the
+      // approval, so a leg without its event (crash between two transactions) or an event the GL can never post (publish guard: period, mapping, chart) cannot
+      // be committed. F09-H1 (ADR-042 D0/D1/D9): publisher-built idempotency key from the deposit's own id; the mapped GL code is resolved by THIS publisher.
+      await this.events.publish(txManager, 'deposit.verified', {
+        idempotencyKey: `deposit:${savedDeposit.id}:verified`,
+        depositId: savedDeposit.id,
+        salesOrderId: lockedDeposit.salesOrderId,
+        customerId: resolvedOrder.customerId,
+        amount: lockedDeposit.amount,
+        currency: CURRENCY,
+        method: lockedDeposit.method,
+        reference: lockedDeposit.reference,
+        verifiedByUserId: actorUserId,
+        businessDate: new Date().toISOString(),
+        glAccountCode,
+      });
+      return { saved: savedDeposit, deposit: lockedDeposit };
     });
 
     await this.salesOrders.releaseAfterDepositVerified(deposit.salesOrderId, actorUserId, manager);
 
-    // F09-H1 (ADR-042 D0/D1/D9) — resolve the approver-chosen Treasury account's mapped GL code
-    // via the EXISTING `getAllTreasuryBalances` read (no new contract method — ADR-042 D1). `null`
-    // when unmapped; the event is still published (never silently skipped) so F09's handler can
-    // reject with a specific, re-drivable reason rather than leaving no trail at all.
-    const { balances } = await this.treasury.getAllTreasuryBalances(undefined, manager);
-    const glAccountCode = balances.find((b) => b.treasuryAccountId === treasuryAccountId)?.glAccountCode ?? null;
-
-    await (manager ?? this.dataSource).transaction(async (txManager) => {
-      await this.events.publish(txManager, 'deposit.verified', {
-        // ADR-042 D0 — publisher-built, from this deposit's own real, stable, unique row id.
-        // Fixes RBW Gap 1: the previous payload had no field ingest()'s idempotency-key derivation
-        // recognized, so every occurrence collided on the SAME derived key.
-        idempotencyKey: `deposit:${saved.id}:verified`,
-        depositId: saved.id,
-        salesOrderId: deposit.salesOrderId,
-        customerId: order.customerId,
-        amount: deposit.amount,
-        currency: CURRENCY,
-        method: deposit.method,
-        reference: deposit.reference,
-        verifiedByUserId: actorUserId,
-        businessDate: new Date().toISOString(),
-        // ADR-042 D1 — the GL-account reference F09's handler needs; resolved by THIS publisher,
-        // never by the handler re-deriving it.
-        glAccountCode,
-      });
-    });
     // F09-H1 (RBW Gap 2) — every other financial-event publisher in this codebase calls this
     // immediately after publish(); `deposit.verified` previously did not.
     await this.events.dispatchAfterCommit(manager);

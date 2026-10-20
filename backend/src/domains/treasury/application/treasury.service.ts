@@ -28,8 +28,12 @@ const NUMBERING_SERIES: Record<TreasuryTransactionType, string> = {
 /** F06-H1 (ADR-038 D4) — the emit decision is structural: only the `*Direct` methods pass `true`. */
 interface GlEmitOpts {
   emitGlEvent: boolean;
+  /** Reversals only: when the account is unmapped skip the event (mirrors an original that never had one) instead of refusing. */
+  mirrorUnmapped?: boolean;
 }
 const NO_EMIT: GlEmitOpts = { emitGlEvent: false };
+/** Treasury integrity (T1, G-04): a reversal MIRRORS its original — a legacy leg on an unmapped account never had a GL effect, so its reversal must not invent one (and must not fail). */
+const EMIT_MIRROR: GlEmitOpts = { emitGlEvent: true, mirrorUnmapped: true };
 
 /**
  * Financial/Treasury Core — a real ledger-backed foundation (accounts +
@@ -330,6 +334,13 @@ export class TreasuryService implements FinanceTreasuryContract {
     await this.assertLedgerAccountAccess(txn.treasuryAccountId, requestingUserId, manager);
   }
 
+  /** T1 (G-04): a Treasury-owned movement (the `*Direct` paths) needs a GL owner — checked FIRST, before locks/balance/insert, so the user sees the real reason and nothing is touched. */
+  private assertGlOwnerMapped(account: TreasuryAccount, opts: GlEmitOpts): void {
+    if (opts.emitGlEvent && !opts.mirrorUnmapped && !account.glAccountCode?.trim()) {
+      throw new ConflictException(`Treasury account "${account.code}" is not GL-mapped — map it to a GL account before recording this movement. Nothing was recorded.`);
+    }
+  }
+
   private assertActive(account: TreasuryAccount): void {
     if (account.status !== 'active') {
       throw new ConflictException(`Treasury account "${account.code}" is inactive — no new transactions can target it.`);
@@ -384,7 +395,12 @@ export class TreasuryService implements FinanceTreasuryContract {
     args: { txn: TreasuryTransaction; account: TreasuryAccount; direction: 'in' | 'out'; reversalOf: string | null },
     opts: GlEmitOpts,
   ): Promise<void> {
-    if (!opts.emitGlEvent || !args.account.glAccountCode) return;
+    if (!opts.emitGlEvent) return;
+    if (!args.account.glAccountCode) {
+      // G-04: a Treasury-owned movement with no GL owner is refused (409) rather than silently skipping the event; only a reversal of a legacy unmapped leg mirrors "no GL".
+      if (opts.mirrorUnmapped) return;
+      throw new ConflictException(`Treasury account "${args.account.code}" is not GL-mapped — map it to a GL account before recording this movement. Nothing was recorded.`);
+    }
     const payload: CashRecordedEvent = {
       idempotencyKey: `treasury:txn:${args.txn.id}:recorded`,
       businessDate: (args.txn.movementDate instanceof Date ? args.txn.movementDate : new Date(args.txn.movementDate)).toISOString().slice(0, 10),
@@ -419,7 +435,12 @@ export class TreasuryService implements FinanceTreasuryContract {
     },
     opts: GlEmitOpts,
   ): Promise<void> {
-    if (!opts.emitGlEvent || !args.source.glAccountCode || !args.destination.glAccountCode) return;
+    if (!opts.emitGlEvent) return;
+    if (!args.source.glAccountCode || !args.destination.glAccountCode) {
+      if (opts.mirrorUnmapped) return;
+      const missing = !args.source.glAccountCode ? args.source.code : args.destination.code;
+      throw new ConflictException(`Treasury account "${missing}" is not GL-mapped — both accounts of a transfer must be mapped to a GL account. Nothing was recorded.`);
+    }
     const payload: TransferCompletedEvent = {
       idempotencyKey: `treasury:transfer:${args.transferGroupId}:completed`,
       businessDate: (args.out.movementDate instanceof Date ? args.out.movementDate : new Date(args.out.movementDate)).toISOString().slice(0, 10),
@@ -472,6 +493,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
     const account = await this.getAccount(accountId, manager);
     this.assertActive(account);
+    this.assertGlOwnerMapped(account, opts);
 
     const txn = await this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${accountId}`]);
@@ -538,6 +560,7 @@ export class TreasuryService implements FinanceTreasuryContract {
     if (Number(amount) <= 0) throw new BadRequestException('Amount must be positive.');
     const account = await this.getAccount(accountId, manager);
     this.assertActive(account);
+    this.assertGlOwnerMapped(account, opts);
 
     const txn = await this.run(manager, async (m) => {
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`treasury:${accountId}`]);
@@ -605,6 +628,8 @@ export class TreasuryService implements FinanceTreasuryContract {
     const [source, destination] = await Promise.all([this.getAccount(sourceAccountId, manager), this.getAccount(destinationAccountId, manager)]);
     this.assertActive(source);
     this.assertActive(destination);
+    this.assertGlOwnerMapped(source, opts);
+    this.assertGlOwnerMapped(destination, opts);
 
     const transferGroupId = randomUUID();
     const movementDate = new Date();
@@ -984,7 +1009,7 @@ export class TreasuryService implements FinanceTreasuryContract {
               transferGroupId: reversalGroupId,
               reversalOf: original.transferGroupId,
             },
-            { emitGlEvent: true },
+            EMIT_MIRROR,
           );
         }
       } else {
@@ -995,7 +1020,7 @@ export class TreasuryService implements FinanceTreasuryContract {
         await this.emitCashRecorded(
           txManager,
           { txn: reversalLeg, account, direction, reversalOf: original.id },
-          { emitGlEvent: true },
+          EMIT_MIRROR,
         );
       }
 

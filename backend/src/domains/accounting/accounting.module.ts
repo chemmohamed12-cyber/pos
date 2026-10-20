@@ -48,6 +48,7 @@ import { ArAdjustmentService } from './application/ar-adjustment.service';
 import { ApReconciliationService } from './application/ap-reconciliation.service';
 import { ApAdjustmentService } from './application/ap-adjustment.service';
 import { CashBankReconciliationService } from './application/cash-bank-reconciliation.service';
+import { TreasuryPostingExceptionsService } from './application/treasury-posting-exceptions.service';
 import { CashBankAdjustmentService } from './application/cash-bank-adjustment.service';
 import { InventoryReconciliationService } from './application/inventory-reconciliation.service';
 import { PostingStatusService } from './application/posting-status.service';
@@ -219,6 +220,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     ApReconciliationService,
     ApAdjustmentService,
     CashBankReconciliationService,
+    TreasuryPostingExceptionsService,
     CashBankAdjustmentService,
     InventoryReconciliationService,
     PostingStatusService,

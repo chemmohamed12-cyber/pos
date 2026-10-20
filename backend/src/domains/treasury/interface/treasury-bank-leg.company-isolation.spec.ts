@@ -236,12 +236,12 @@ describe('D2 — Treasury account → mapped GL bank leg (supplier + customer pa
     expect(await fingerprint('A')).toEqual(before);
   });
 
-  it('a mapped code that is NOT in the chart fails closed at the Financial Event (REJECTED, no journal) — never silently falls back to another bank account', async () => {
-    const p = await paySupplier('A', ctx.A.dangling, '5.00');
-    const event = await glLines('A', p.id);
-    expect(event).toEqual({ status: 'REJECTED', lines: [] });
-    const reason = (await (await dsOf('A')).query(`SELECT "rejectionReason" FROM "accounting_financial_events" WHERE "sourceEntityId" = $1`, [p.id]))[0].rejectionReason as string;
-    expect(reason).toMatch(/not GL-mapped to an active chart account/);
+  it('a mapped code that is NOT in the chart is refused BEFORE commit (T1 publish guard) — no REJECTED event left behind, zero rows, never a fallback to another bank account', async () => {
+    // Pre-T1 this was accepted, committed, and rejected later at the Financial Event (a REJECTED row next to a committed treasury leg = Treasury/GL drift).
+    const before = await fingerprint('A');
+    await expect(paySupplier('A', ctx.A.dangling, '5.00')).rejects.toThrow(/cannot be posted to the general ledger.*not GL-mapped to an active chart account.*Nothing was recorded/);
+    await expect(payCustomer('A', ctx.A.dangling, '5.00')).rejects.toThrow(/cannot be posted to the general ledger/);
+    expect(await fingerprint('A')).toEqual(before); // incl. financialEvents, journals, outbox: nothing, not even a REJECTED event
   });
 
   it('the Platform/control-plane DB was never used (no outbox rows there)', async () => {

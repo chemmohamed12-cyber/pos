@@ -115,6 +115,17 @@ describe('DepositsController Area 21 retrofit — real-Postgres Company isolatio
     expect(latest?.amount).toBe('100.00');
   });
 
+  it('T1: approving a deposit into an UNMAPPED Treasury account is refused before anything is written — deposit stays pending, no Treasury leg, no ledger credit, no outbox row', async () => {
+    const dsA = await h.connections.getDataSource(h.companyAId);
+    const latest = await service.getLatestDepositForOrder(seeded.A.salesOrderId, actorUserId, dsA.manager);
+    const count = async (sql: string) => Number((await dsA.query(sql))[0].n);
+    const before = [await count(`SELECT count(*) AS n FROM "treasury_transactions"`), await count(`SELECT count(*) AS n FROM "customer_ledger_entries"`), await count(`SELECT count(*) AS n FROM "event_outbox"`)];
+    await expect(service.approveDeposit(latest!.id, actorUserId, seeded.A.treasuryAccountId, dsA.manager)).rejects.toThrow(/not GL-mapped/);
+    expect([await count(`SELECT count(*) AS n FROM "treasury_transactions"`), await count(`SELECT count(*) AS n FROM "customer_ledger_entries"`), await count(`SELECT count(*) AS n FROM "event_outbox"`)]).toEqual(before);
+    expect((await service.getDeposit(latest!.id, actorUserId, dsA.manager)).status).not.toBe('approved');
+    await dsA.query(`UPDATE "treasury_accounts" SET "glAccountCode" = '1101' WHERE id = $1`, [seeded.A.treasuryAccountId]); // map it; the next test approves normally
+  });
+
   it("approveDeposit for Company A posts the Treasury deposit leg + Customer Ledger credit inside Company A's own database", async () => {
     const dsA = await h.connections.getDataSource(h.companyAId);
     const latest = await service.getLatestDepositForOrder(seeded.A.salesOrderId, actorUserId, dsA.manager);
