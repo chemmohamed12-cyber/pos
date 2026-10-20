@@ -71,6 +71,7 @@ src/domains/targets/interface/targets.company-isolation.spec.ts
 src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
 src/domains/treasury/interface/treasury.company-isolation.spec.ts
 src/foundation/approval-engine/approval-engine.company-isolation.spec.ts
+src/foundation/terminology/platform-role-names.real-pg.spec.ts
 src/foundation/audit/area14-company-audit.real-pg.spec.ts
 src/foundation/audit/audit-chain-concurrency.real-pg.spec.ts
 src/foundation/authentication/auth-me.contract.spec.ts

@@ -192,3 +192,10 @@ export function sourceDomainOf(sourceDomain: string, eventType: string): string 
 export function loadingLabel(): string {
   return currentLang() === 'ar' ? 'جارٍ التحميل…' : 'Loading…';
 }
+
+/** A user's role as shown in the page header and overviews: the registry name (`role.<key>`), or — for a role that has no registry entry — the key as readable words, never `role.some_key`. */
+export function roleLabel(t: (code: string) => string, role: string): string {
+  const code = `role.${role}`;
+  const label = t(code);
+  return label === code ? humanize(role) : label;
+}

@@ -1,0 +1,6 @@
+PASS known role: registry name, internal key unchanged
+PASS unknown role: readable words, never role.<key>
+PASS unknown dotted role: readable words
+PASS result never starts with the raw prefix
+PASS the key itself is not modified by the helper (input string identity)
+SUMMARY pass 5 fail 0

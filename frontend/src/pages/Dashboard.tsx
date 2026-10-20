@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { CommonTasks } from '../components/CommonTasks';
 import { DashboardSections } from '../components/DashboardSections';
 import { usePendingSources } from '../lib/pendingWork';
+import { roleLabel } from '../lib/displayNames';
 
 interface SalesOrder {
   id: string;
@@ -113,7 +114,7 @@ export function Dashboard() {
       </div>
       <div className="card" style={{ marginBottom: 20 }}>
         <p style={{ margin: 0 }}>
-          {user ? `${user.fullName} — ${user.roles.map((r) => t(`role.${r}`)).join(', ')}` : ''}
+          {user ? `${user.fullName} — ${user.roles.map((r) => roleLabel(t, r)).join(', ')}` : ''}
         </p>
       </div>
 
