@@ -1,0 +1,37 @@
+{
+  "testId": "T-16",
+  "runId": "T-16-20261019T220452Z-9ad69b",
+  "startedAt": "2026-10-19T22:04:52.947Z",
+  "commit": "280f7b80d36cced36c62f0500ce6044652dd08e5",
+  "branch": "integration/local-2026-10-16",
+  "dirtyPaths": [],
+  "applicationVersion": "1.1.10",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\integration",
+  "systemIdentifier": "7695619915229547252",
+  "databases": [
+    "daii_test_biz_t16_control_plane",
+    "daii_test_biz_t16_company_a",
+    "daii_test_biz_t16_company_b"
+  ],
+  "prefix": "biz_t16",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}

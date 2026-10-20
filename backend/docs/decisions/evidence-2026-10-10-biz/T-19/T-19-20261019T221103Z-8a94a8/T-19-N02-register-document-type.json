@@ -1,0 +1,12 @@
+{
+  "plain": {
+    "roundsWithErrors": 0,
+    "errors": {},
+    "rows": 10
+  },
+  "transaction": {
+    "roundsWithErrors": 0,
+    "errors": {},
+    "rows": 10
+  }
+}

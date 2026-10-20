@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-18T20:29:59.494Z",
+  "generatedAt": "2026-10-19T21:48:16.086Z",
   "allPass": true,
   "checks": [
     {
@@ -7,15 +7,15 @@
       "what": "valued positions",
       "expected": [
         {
-          "warehouseId": "28592c9d-377e-4bfe-8e0b-9c1b98b6fedb",
-          "productId": "fb8fb5e9-d9df-4874-b485-574071048777",
+          "warehouseId": "2eae9074-294e-4dbb-920b-ca821c0e61fe",
+          "productId": "03cecd04-ead0-42c1-b4cb-8c85358e0a1c",
           "quantity": 10,
           "totalValueBase": "50.0000",
           "averageCostBase": "5.0000"
         },
         {
-          "warehouseId": "e5307dcd-6a94-4b02-93a2-eae987ffd054",
-          "productId": "11e83159-3334-4e61-9c02-a951336381ba",
+          "warehouseId": "7f71baf6-3fa8-4580-b10d-ab09b64f9c58",
+          "productId": "40298ddc-37b4-4dca-8cac-9cc4c93a2528",
           "quantity": 4,
           "totalValueBase": "10.0000",
           "averageCostBase": "2.5000"
@@ -23,15 +23,15 @@
       ],
       "actual": [
         {
-          "warehouseId": "28592c9d-377e-4bfe-8e0b-9c1b98b6fedb",
-          "productId": "fb8fb5e9-d9df-4874-b485-574071048777",
+          "warehouseId": "2eae9074-294e-4dbb-920b-ca821c0e61fe",
+          "productId": "03cecd04-ead0-42c1-b4cb-8c85358e0a1c",
           "quantity": 10,
           "totalValueBase": "50.0000",
           "averageCostBase": "5.0000"
         },
         {
-          "warehouseId": "e5307dcd-6a94-4b02-93a2-eae987ffd054",
-          "productId": "11e83159-3334-4e61-9c02-a951336381ba",
+          "warehouseId": "7f71baf6-3fa8-4580-b10d-ab09b64f9c58",
+          "productId": "40298ddc-37b4-4dca-8cac-9cc4c93a2528",
           "quantity": 4,
           "totalValueBase": "10.0000",
           "averageCostBase": "2.5000"
@@ -218,14 +218,14 @@
       "what": "rounding attributed to the warehouse that issued",
       "expected": [
         {
-          "warehouseId": "e5307dcd-6a94-4b02-93a2-eae987ffd054",
+          "warehouseId": "7f71baf6-3fa8-4580-b10d-ab09b64f9c58",
           "amountBase": "0.0014",
           "postings": 1
         }
       ],
       "actual": [
         {
-          "warehouseId": "e5307dcd-6a94-4b02-93a2-eae987ffd054",
+          "warehouseId": "7f71baf6-3fa8-4580-b10d-ab09b64f9c58",
           "amountBase": "0.0014",
           "postings": 1
         }
@@ -512,7 +512,7 @@
     },
     {
       "step": "E",
-      "what": "valued positions as of 2026-10-13",
+      "what": "valued positions as of 2026-10-14",
       "expected": [
         {
           "quantity": 4,

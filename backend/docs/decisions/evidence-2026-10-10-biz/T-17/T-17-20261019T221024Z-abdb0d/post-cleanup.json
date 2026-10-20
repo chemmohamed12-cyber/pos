@@ -1,0 +1,125 @@
+{
+  "removed": [
+    "daii_test_biz_t17_control_plane",
+    "daii_test_biz_t17_company_a",
+    "daii_test_biz_t17_company_b"
+  ],
+  "allRemoved": true,
+  "otherDatabasesUnchanged": true,
+  "databasesAfter": [
+    {
+      "datname": "daii_test_biz_t90_area4_company_retry",
+      "oid": "11836689"
+    },
+    {
+      "datname": "daii_test_biz_t97_c1_co",
+      "oid": "8390178"
+    },
+    {
+      "datname": "daii_test_biz_t97_c1_cp",
+      "oid": "8390177"
+    },
+    {
+      "datname": "daii_test_biz_t98_fresh",
+      "oid": "7644439"
+    },
+    {
+      "datname": "daii_test_biz_t98_r273712one",
+      "oid": "7650659"
+    },
+    {
+      "datname": "daii_test_biz_t98_r273712two",
+      "oid": "7650660"
+    },
+    {
+      "datname": "daii_test_biz_t98_r458882one",
+      "oid": "7654877"
+    },
+    {
+      "datname": "daii_test_biz_t98_r458882two",
+      "oid": "7654878"
+    },
+    {
+      "datname": "daii_test_biz_t98_r630664one",
+      "oid": "7669947"
+    },
+    {
+      "datname": "daii_test_biz_t98_r630664two",
+      "oid": "7669948"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest",
+      "oid": "7650724"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest1",
+      "oid": "7662545"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest2",
+      "oid": "7666228"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co",
+      "oid": "7654407"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co2",
+      "oid": "7654408"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co3",
+      "oid": "7654409"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co_base",
+      "oid": "7643809"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_cp",
+      "oid": "7648398"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_cp_base",
+      "oid": "7643808"
+    },
+    {
+      "datname": "postgres",
+      "oid": "5"
+    },
+    {
+      "datname": "template0",
+      "oid": "4"
+    },
+    {
+      "datname": "template1",
+      "oid": "1"
+    }
+  ],
+  "teardownDropRecords": [
+    {
+      "database": "daii_test_biz_t17_control_plane",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    },
+    {
+      "database": "daii_test_biz_t17_company_a",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    },
+    {
+      "database": "daii_test_biz_t17_company_b",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    }
+  ]
+}

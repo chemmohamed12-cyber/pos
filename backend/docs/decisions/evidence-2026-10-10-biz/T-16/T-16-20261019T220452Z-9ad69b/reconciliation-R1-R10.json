@@ -1,0 +1,97 @@
+{
+  "declared": {
+    "nonGlTreasury": 8000000,
+    "notes": [
+      "8 x 1000000.00 opening funding cash-ins are deliberately non-emitting (Company A); Company B verified by the oracle above"
+    ]
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "status": "PASS",
+      "detail": {
+        "pairs": 40,
+        "differences": [],
+        "negativePairs": 0
+      }
+    },
+    {
+      "id": "R2",
+      "status": "PASS",
+      "detail": {
+        "valuationRows": 0,
+        "valuationTotal": 0,
+        "glInventory": 0,
+        "differences": [],
+        "explainedByDeclaredEvents": []
+      }
+    },
+    {
+      "id": "R3",
+      "status": "PASS",
+      "detail": {
+        "customerLedgerNet": -1792,
+        "glArNet": -1792
+      }
+    },
+    {
+      "id": "R4",
+      "status": "PASS",
+      "detail": {
+        "supplierLedgerNet": 0,
+        "glApNet": 0
+      }
+    },
+    {
+      "id": "R5",
+      "status": "PASS",
+      "detail": {
+        "treasuryNetMapped": 8001808,
+        "declaredNonGlTreasury": 8000000,
+        "expectedGl": 1808,
+        "glNet": 1808
+      }
+    },
+    {
+      "id": "R6",
+      "status": "PASS",
+      "detail": {
+        "unbalancedEntries": 0
+      }
+    },
+    {
+      "id": "R7",
+      "status": "PASS",
+      "detail": {
+        "events": 3118,
+        "notPosted": 0,
+        "unexplainedNotPosted": [],
+        "postedWithoutJournal": 0,
+        "duplicateIdempotencyKeys": 0,
+        "movementsWithoutEvent": 0,
+        "journalsWithoutEvent": 0,
+        "explained": []
+      }
+    },
+    {
+      "id": "R8",
+      "status": "PASS",
+      "detail": {
+        "taxNetCredit": 0,
+        "expectedTaxNetCredit": 0,
+        "grniWipPpvNonZero": [],
+        "accountsSeen": []
+      }
+    },
+    {
+      "id": "R9",
+      "status": "PASS",
+      "detail": "reversals/returns/adjustments: evaluated by the owning scenario (T-07 oracle); this run: 8 x 1000000.00 opening funding cash-ins are deliberately non-emitting (Company A); Company B verified by the oracle above"
+    },
+    {
+      "id": "R10",
+      "status": "PASS",
+      "detail": "refused operations: evaluated by the owning scenario through before/after table fingerprints (see its case results)"
+    }
+  ]
+}

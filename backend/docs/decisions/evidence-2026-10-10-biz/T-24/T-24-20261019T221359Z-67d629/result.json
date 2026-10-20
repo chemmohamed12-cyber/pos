@@ -1,0 +1,62 @@
+{
+  "testId": "T-24",
+  "runId": "T-24-20261019T221359Z-67d629",
+  "finishedAt": "2026-10-19T22:14:11.617Z",
+  "results": [
+    {
+      "id": "H1-plain-concurrent-consume-respects-cap",
+      "status": "PASS",
+      "note": "{\"cap\":10,\"allowed\":10,\"errors\":0,\"counter\":10,\"retryAllowed\":false,\"counterAfterRetry\":10}"
+    },
+    {
+      "id": "H1-transaction-concurrent-consume-respects-cap",
+      "status": "PASS",
+      "note": "{\"cap\":10,\"allowed\":10,\"errors\":0,\"counter\":10,\"retryAllowed\":false,\"counterAfterRetry\":10}"
+    },
+    {
+      "id": "H1-outer-rollback-restores-quota",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"counterAfterRollback\":0,\"consumeAfterRollbackAllowed\":true,\"counterEnd\":3}"
+    },
+    {
+      "id": "H1-concurrent-release-floors-at-zero",
+      "status": "PASS",
+      "note": "{\"consumed\":5,\"releases\":12,\"counterEnd\":0}"
+    },
+    {
+      "id": "H2-plain-concurrent-release-never-exceeds-reserved",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"callsOk\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":7},\"stillActive\":0,\"reservedAfter\":0,\"onHandDelta\":0,\"retryRefused\":true}"
+    },
+    {
+      "id": "H2-transaction-concurrent-release-never-exceeds-reserved",
+      "status": "PASS",
+      "note": "{\"reserved\":5,\"callsOk\":5,\"tally\":{\"OK\":5,\"ConflictException:409\":7},\"stillActive\":0,\"reservedAfter\":0,\"onHandDelta\":0,\"retryRefused\":true}"
+    },
+    {
+      "id": "H2-outer-rollback-restores-reservation",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"reservedAfterRollback\":5,\"retryOk\":true,\"reservedEnd\":2}"
+    },
+    {
+      "id": "H4-plain-concurrent-start-single-instance-no-error",
+      "status": "PASS",
+      "note": "{\"fulfilled\":10,\"rejected\":0,\"distinctInstanceIds\":1,\"rows\":1,\"state\":\"a\"}"
+    },
+    {
+      "id": "H4-transaction-concurrent-start-single-instance-no-error",
+      "status": "PASS",
+      "note": "{\"fulfilled\":10,\"rejected\":0,\"distinctInstanceIds\":1,\"rows\":1,\"state\":\"a\"}"
+    },
+    {
+      "id": "H4-rollback-then-retry-idempotent",
+      "status": "PASS",
+      "note": "{\"rolledBack\":true,\"rowsAfterRollback\":0,\"firstId\":\"2999b144-720d-4798-8dae-d85382d7f901\",\"secondSameId\":true}"
+    },
+    {
+      "id": "H5-shipment-transition",
+      "status": "BLOCKED",
+      "note": "NOT RUN: needs a full shipment fixture; never counted as a pass (unchanged from T-20)"
+    }
+  ]
+}

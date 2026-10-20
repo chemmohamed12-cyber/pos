@@ -1,0 +1,262 @@
+[
+  {
+    "round": 1,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 2,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 3,
+    "N": 50,
+    "tally": {
+      "ConflictException:409": 45,
+      "OK": 5
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 4,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 5,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 6,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 7,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 8,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 9,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 10,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 11,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 12,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 13,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 14,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 15,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 16,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 17,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 18,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 19,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  },
+  {
+    "round": 20,
+    "N": 50,
+    "tally": {
+      "OK": 5,
+      "ConflictException:409": 45
+    },
+    "movements": 1,
+    "activeReservations": 5,
+    "reservedQty": 5,
+    "onHand": 5,
+    "available": 0
+  }
+]
