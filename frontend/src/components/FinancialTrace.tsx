@@ -12,10 +12,20 @@ function rejectedLabel(ar: boolean): string {
 }
 function friendlyReason(reason: string | null | undefined, ar: boolean): string | null {
   if (!reason) return null;
-  if (/no (active )?`?inventory`? control account/i.test(reason)) {
+  const fiscal = /No fiscal year covers business date "?(\d{4}-\d{2}-\d{2})"?/i.exec(reason);
+  if (fiscal) {
     return ar
-      ? 'لا يوجد حساب مخزون في دليل الحسابات. البضاعة دخلت المخزن فعلًا، لكن القيد المحاسبي لم يُنشأ؛ أنشئ دليل الحسابات للشركة ثم أعد ترحيل الحدث.'
-      : 'There is no inventory account in the chart of accounts. The goods did enter the warehouse, but no accounting entry was created - set up the chart of accounts, then retry the posting.';
+      ? `لا توجد سنة مالية مفتوحة تغطي تاريخ ${fiscal[1]}، فلم يُنشأ القيد المحاسبي. أنشئ السنة المالية للشركة وفعّلها ثم أعد ترحيل الحدث.`
+      : `No open fiscal year covers ${fiscal[1]}, so no accounting entry was created. Create and activate the Company's fiscal year, then re-drive the event.`;
+  }
+  // both wordings: 'no inventory control account' (older) and 'no active postable inventory control account and GRNI control account' (current, may name both)
+  const noInventory = /no .*`?inventory`? control account/i.test(reason);
+  const noGrni = /no .*`?grni`? control account/i.test(reason);
+  if (noInventory || noGrni) {
+    const what = [noInventory ? (ar ? 'المخزون' : 'inventory') : null, noGrni ? (ar ? 'بضاعة مستلمة لم تُفوتر (GRNI)' : 'goods received not invoiced (GRNI)') : null].filter(Boolean).join(ar ? ' و' : ' and ');
+    return ar
+      ? `لا يوجد حساب رقابي نشط في دليل حسابات الشركة (${what}). البضاعة دخلت المخزن فعلًا، لكن القيد المحاسبي لم يُنشأ؛ استخدم «إكمال الحسابات الرقابية» في دليل الحسابات ثم أعد ترحيل الحدث.`
+      : `There is no active control account for ${what} in this Company's chart of accounts. The goods did enter the warehouse, but no accounting entry was created - use "Complete control accounts" in the chart of accounts, then re-drive the event.`;
   }
   if (/no .*account.* in the chart/i.test(reason)) {
     return ar ? 'حساب مطلوب غير موجود في دليل الحسابات، فلم يُنشأ القيد المحاسبي. (' + reason + ')' : 'A required account is missing from the chart of accounts, so no accounting entry was created. (' + reason + ')';
