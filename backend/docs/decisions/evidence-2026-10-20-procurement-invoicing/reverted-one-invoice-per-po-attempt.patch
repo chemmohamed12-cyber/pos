@@ -1,0 +1,214 @@
+diff --git a/backend/src/domains/procurement/application/goods-receipt.service.ts b/backend/src/domains/procurement/application/goods-receipt.service.ts
+index 7de1843..59a053c 100644
+--- a/backend/src/domains/procurement/application/goods-receipt.service.ts
++++ b/backend/src/domains/procurement/application/goods-receipt.service.ts
+@@ -71,6 +71,8 @@ export class GoodsReceiptService {
+       warehouseId: string;
+       uninvoicedQuantity: string;
+       uninvoicedValue: string;
++      /** the order already has a live (not void) supplier invoice - only one invoice per order is allowed, so no new one can be raised */
++      hasInvoice: boolean;
+       receipts: Array<{ id: string; grNumber: string; createdAt: string }>;
+     }>;
+   }> {
+@@ -92,8 +94,19 @@ export class GoodsReceiptService {
+     const receipts = ids.length
+       ? ((await m.query(`SELECT id, "grNumber", "purchaseOrderId", "createdAt" FROM "goods_receipts" WHERE "purchaseOrderId" = ANY($1::uuid[]) ORDER BY "createdAt"`, [ids])) as Array<{ id: string; grNumber: string; purchaseOrderId: string; createdAt: Date }>)
+       : [];
++    const invoiced = ids.length
++      ? new Set(
++          ((await m.query(
++            `SELECT DISTINCT si."purchaseOrderId" AS id FROM "supplier_invoices" si
++               LEFT JOIN "process_instances" pi ON pi."definitionKey" = 'supplier_invoice_lifecycle' AND pi."entityId" = si.id::text
++              WHERE si."purchaseOrderId" = ANY($1::uuid[]) AND COALESCE(pi."currentState", 'draft') <> 'void'`,
++            [ids],
++          )) as Array<{ id: string }>).map((r) => r.id),
++        )
++      : new Set<string>();
+     const out = orders.map((o) => ({
+       ...o,
++      hasInvoice: invoiced.has(o.purchaseOrderId),
+       receipts: receipts.filter((r) => r.purchaseOrderId === o.purchaseOrderId).map((r) => ({ id: r.id, grNumber: r.grNumber, createdAt: new Date(r.createdAt).toISOString() })),
+     }));
+     const totalValue = orders.reduce((sum, o) => sum + Math.round(Number(o.uninvoicedValue) * 10000), 0) / 10000;
+diff --git a/backend/src/domains/procurement/application/supplier-invoice.service.ts b/backend/src/domains/procurement/application/supplier-invoice.service.ts
+index e9028d4..849133c 100644
+--- a/backend/src/domains/procurement/application/supplier-invoice.service.ts
++++ b/backend/src/domains/procurement/application/supplier-invoice.service.ts
+@@ -122,6 +122,24 @@ export class SupplierInvoiceService {
+     }
+   }
+ 
++  /** Refuses when the purchase order already has a live (not void) supplier invoice. An invoice whose lifecycle has not started yet counts as live. */
++  private async assertNoLiveInvoiceForOrder(purchaseOrderId: string, poNumber: string, manager: EntityManager): Promise<void> {
++    const existing = await manager.getRepository(SupplierInvoice).find({ where: { purchaseOrderId }, order: { createdAt: 'ASC' } });
++    for (const inv of existing) {
++      let state = 'draft';
++      try {
++        state = await this.getStatus(inv.id, manager);
++      } catch {
++        /* no lifecycle row yet: a just-created invoice is live */
++      }
++      if (state !== 'void') {
++        throw new ConflictException(
++          `Purchase order ${poNumber} already has a supplier invoice (${inv.invoiceNumber}, state "${state}"). A purchase order can have only one invoice; void or cancel that invoice first if it must be reissued. / أمر الشراء ${poNumber} له فاتورة مورد بالفعل (${inv.invoiceNumber}) - لا يجوز أكثر من فاتورة لنفس أمر الشراء؛ ألغِ الفاتورة أولًا إن لزم إعادة إصدارها.`,
++        );
++      }
++    }
++  }
++
+   async createDraftInvoice(input: CreateSupplierInvoiceInput, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
+     if (input.lines.length === 0) throw new BadRequestException('A Supplier Invoice needs at least one line.');
+ 
+@@ -132,6 +150,9 @@ export class SupplierInvoiceService {
+       throw new ConflictException(`Purchase Order is "${poState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
+     }
+ 
++    // early, clear refusal (the authoritative, race-proof check runs again inside the creating transaction below)
++    await this.assertNoLiveInvoiceForOrder(po.id, po.poNumber, manager ?? this.dataSource.manager);
++
+     const supplier = await (manager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: po.supplierId } });
+     if (!supplier) throw new NotFoundException(`Supplier "${po.supplierId}" not found.`);
+     const dueDate = supplier.paymentTermsDays != null ? new Date(Date.now() + supplier.paymentTermsDays * 86400000) : null;
+@@ -207,6 +228,9 @@ export class SupplierInvoiceService {
+     await this.numbering.registerDocumentType(INVOICE_DOCUMENT_TYPE, INVOICE_PREFIX, true, manager);
+ 
+     const invoice = await (manager ?? this.dataSource).transaction(async (txManager) => {
++      // ONE supplier invoice per purchase order (CTO 2026-10-20): serialised per order so two simultaneous requests cannot both pass; a voided / cancelled invoice does not count, so an order can be re-invoiced after that.
++      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`supplier_invoice_po:${po.id}`]);
++      await this.assertNoLiveInvoiceForOrder(po.id, po.poNumber, txManager);
+       const invoiceNumber = await this.numbering.getNextNumber(INVOICE_DOCUMENT_TYPE, txManager);
+       const invoiceRepo = txManager.getRepository(SupplierInvoice);
+       const lineRepo = txManager.getRepository(SupplierInvoiceLine);
+diff --git a/backend/src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts b/backend/src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+index ed58051..08fb556 100644
+--- a/backend/src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
++++ b/backend/src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+@@ -262,17 +262,32 @@ describe('D5 — supplier invoice PPV + Input VAT (GRNI clearing, gross AP, atom
+     expect(await postedJournal(inv.id)).toEqual(['2101 C 100.00', '2115 D 100.00']);
+   });
+ 
+-  it('6. PARTIAL INVOICING (GR 10): 4 @10 then 6 @11 → #1 Dr GRNI 40 / Cr AP 40; #2 Dr GRNI 60 + Dr PPV 6 / Cr AP 66; quantityInvoiced = 10, GRNI left = 0; an 11th unit is rejected', async () => {
++  it('6. ONE INVOICE PER PURCHASE ORDER (CTO 2026-10-20): the first invoice posts; a second one for the same order is refused even for the remaining quantity; after the first is voided the order can be invoiced again; two simultaneous requests produce exactly one invoice; over-invoicing is still rejected', async () => {
++    const dsA = await dsOf('A');
+     const po = await receivedPo(ids.supplierVat, 10);
+     const i1 = await draft(po, 4, '10.00');
+     await post(i1.id);
+     expect(await postedJournal(i1.id)).toEqual(['2101 C 40.00', '2115 D 40.00']);
+     expect(await quantityInvoiced(po.poLineId)).toBe(4);
+-    const i2 = await draft(po, 6, '11.00');
+-    await post(i2.id);
+-    expect(await postedJournal(i2.id)).toEqual(['2101 C 66.00', '2115 D 60.00', '5301 D 6.00']); // PPV on the 6 invoiced units only
+-    expect(await quantityInvoiced(po.poLineId)).toBe(10);
+-    await expect(draft(po, 1, '10.00')).rejects.toThrow(/only 0 has been received but not yet invoiced/i);
++    await expect(draft(po, 6, '11.00')).rejects.toThrow(/already has a supplier invoice/i);
++    expect(await quantityInvoiced(po.poLineId)).toBe(4); // the refused attempt changed nothing
++
++    await invoices.voidInvoice(i1.id, 'reissue as one invoice', actor, dsA.manager);
++    await flush('A');
++    const whole = await draft(po, 10, '11.00'); // a void invoice does not count: the order can be invoiced again, in full
++    await post(whole.id);
++    expect(await postedJournal(whole.id)).toEqual(['2101 C 110.00', '2115 D 100.00', '5301 D 10.00']);
++    await expect(draft(po, 1, '10.00')).rejects.toThrow(/already has a supplier invoice/i);
++
++    const race = await receivedPo(ids.supplierVat, 5);
++    const results = await Promise.allSettled([draft(race, 5, '10.00'), draft(race, 5, '10.00'), draft(race, 5, '10.00')]);
++    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
++    expect(await quantityInvoiced(race.poLineId)).toBe(5);
++    const winner = results.find((r) => r.status === 'fulfilled') as PromiseFulfilledResult<{ id: string }>;
++    await invoices.voidInvoice(winner.value.id, 'cancel the draft', actor, dsA.manager); // keep the GL and the subledger in step for the reconciliation test below
++    expect(await quantityInvoiced(race.poLineId)).toBe(0);
++    const over = await receivedPo(ids.supplierVat, 3);
++    await expect(draft(over, 4, '10.00')).rejects.toThrow(/only 3 has been received but not yet invoiced/i);
+   });
+ 
+   it('7. VOID restores EVERYTHING atomically: ledger reversed, GL mirrored (GRNI, PPV, AP), state void, quantityInvoiced restored → the quantity can be invoiced again; CANCEL of a draft restores it too', async () => {
+diff --git a/frontend/src/pages/accounting/GeneralLedger.tsx b/frontend/src/pages/accounting/GeneralLedger.tsx
+index 5978235..409fe8a 100644
+--- a/frontend/src/pages/accounting/GeneralLedger.tsx
++++ b/frontend/src/pages/accounting/GeneralLedger.tsx
+@@ -11,6 +11,7 @@ interface UninvoicedOrderRef {
+   poNumber: string;
+   supplierName: string | null;
+   uninvoicedValue: string;
++  hasInvoice?: boolean;
+   receipts: Array<{ id: string; grNumber: string }>;
+ }
+ 
+@@ -74,7 +75,8 @@ function LedgerRowDetail({ line, ar, canInvoice, uninvoiced }: { line: LedgerLin
+             <span>
+               {L('بضاعة بلا فاتورة', 'Not invoiced')}: {order.uninvoicedValue}
+             </span>
+-            {canInvoice && (
++            {order.hasInvoice && <span style={{ opacity: 0.7 }}>{L('لهذا الأمر فاتورة بالفعل', 'Already invoiced')}</span>}
++            {canInvoice && !order.hasInvoice && (
+               <button className="btn btn-primary" onClick={() => navigate(`/supplier-invoices?purchaseOrderId=${order.purchaseOrderId}`)}>
+                 {L('إنشاء فاتورة', 'Create invoice')}
+               </button>
+diff --git a/frontend/src/pages/procurement/GoodsNotInvoiced.tsx b/frontend/src/pages/procurement/GoodsNotInvoiced.tsx
+index 895aa40..2b6ad3f 100644
+--- a/frontend/src/pages/procurement/GoodsNotInvoiced.tsx
++++ b/frontend/src/pages/procurement/GoodsNotInvoiced.tsx
+@@ -12,6 +12,7 @@ interface UninvoicedOrder {
+   supplierName: string | null;
+   uninvoicedQuantity: string;
+   uninvoicedValue: string;
++  hasInvoice: boolean;
+   receipts: Array<{ id: string; grNumber: string; createdAt: string }>;
+ }
+ interface UninvoicedResult {
+@@ -106,7 +107,8 @@ export function GoodsNotInvoiced() {
+                   <td>{Number(o.uninvoicedQuantity)}</td>
+                   <td>{o.uninvoicedValue}</td>
+                   <td>
+-                    {canInvoice && (
++                    {o.hasInvoice && <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>{L('لهذا الأمر فاتورة بالفعل', 'Already invoiced')}</span>}
++                    {canInvoice && !o.hasInvoice && (
+                       <button
+                         className="btn btn-primary"
+                         onClick={(e) => {
+diff --git a/frontend/src/pages/procurement/SupplierInvoices.tsx b/frontend/src/pages/procurement/SupplierInvoices.tsx
+index f341654..4156e14 100644
+--- a/frontend/src/pages/procurement/SupplierInvoices.tsx
++++ b/frontend/src/pages/procurement/SupplierInvoices.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState, type FormEvent } from 'react';
++import { useEffect, useMemo, useState, type FormEvent } from 'react';
+ import { api, ApiError } from '../../lib/api';
+ import { useAuth } from '../../context/AuthContext';
+ import { useLanguage } from '../../context/LanguageContext';
+@@ -69,7 +69,7 @@ export function SupplierInvoices() {
+   const { authz, can } = useAuth();
+   // F1.3 — `can()` consumer: the payment form follows the Company capability the server enforces (`procurement.supplier_payment.create`); legacy role gate only while the authorization view is unavailable.
+   const canPaySupplier = authz ? can('procurement.supplier_payment.create', 'editable') : false;
+-  const { t, preload } = useLanguage();
++  const { t, preload, lang } = useLanguage();
+   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+   const [purchaseOrders, setPurchaseOrders] = useState<Array<PurchaseOrderRow & { state: string }>>([]);
+   const [products, setProducts] = useState<ProductOption[]>([]);
+@@ -199,6 +199,16 @@ export function SupplierInvoices() {
+   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
+   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.legalName ?? id;
+   const poNumber = (id: string) => purchaseOrders.find((p) => p.id === id)?.poNumber ?? id;
++  // one invoice per purchase order: an order that already has a live (not void) invoice is no longer offered for a new one
++  const invoicedPoIds = useMemo(() => new Set((invoices ?? []).filter((i) => i.state !== 'void').map((i) => i.purchaseOrderId)), [invoices]);
++  const creatableOrders = purchaseOrders.filter((p) => !invoicedPoIds.has(p.id));
++  useEffect(() => {
++    // a link (?purchaseOrderId=) to an order that is already invoiced must not pre-select it
++    if (purchaseOrderId && invoices && invoicedPoIds.has(purchaseOrderId)) {
++      setPurchaseOrderId('');
++      setError(lang === 'ar' ? 'أمر الشراء هذا له فاتورة مورد بالفعل — لا يجوز أكثر من فاتورة لنفس أمر الشراء.' : 'This purchase order already has a supplier invoice - only one invoice per purchase order is allowed.');
++    }
++  }, [purchaseOrderId, invoices, invoicedPoIds, lang]);
+ 
+   async function onCreate(e: FormEvent) {
+     e.preventDefault();
+@@ -276,7 +286,7 @@ export function SupplierInvoices() {
+                 <label>{t('field.po_number')}</label>
+                 <select value={purchaseOrderId} onChange={(e) => setPurchaseOrderId(e.target.value)} required>
+                   <option value="">—</option>
+-                  {purchaseOrders.map((p) => (
++                  {creatableOrders.map((p) => (
+                     <option key={p.id} value={p.id}>
+                       {p.poNumber} — {supplierName(p.supplierId)}
+                     </option>
