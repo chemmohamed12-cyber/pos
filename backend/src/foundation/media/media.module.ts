@@ -19,6 +19,6 @@ import { AuthorizationModule } from '../authorization/authorization.module';
   imports: [TypeOrmModule.forFeature([MediaAsset]), ConfigurationModule, AuthenticationModule, AuthorizationModule],
   controllers: [MediaController],
   providers: [MediaService, { provide: OBJECT_STORAGE_PORT, useClass: LocalFilesystemStorageAdapter }],
-  exports: [MediaService],
+  exports: [MediaService, OBJECT_STORAGE_PORT],
 })
 export class MediaModule {}

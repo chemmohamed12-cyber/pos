@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -6,6 +6,7 @@ import type { Response } from 'express';
 import { IsBoolean, IsIn, IsNumberString, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ProductsService } from '../application/products.service';
 import { ProductMasterDataService } from '../application/product-master-data.service';
+import { PRODUCT_IMAGE_MAX_BYTES, ProductImageService } from '../application/product-image.service';
 import { ITEM_TYPES } from '../domain/item-type';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -130,6 +131,7 @@ export class ProductsController {
     private readonly products: ProductsService,
     private readonly excel: ExcelService,
     private readonly masterData: ProductMasterDataService,
+    private readonly images: ProductImageService,
   ) {}
 
   /**
@@ -232,6 +234,43 @@ export class ProductsController {
   async lookup(@Req() req: CompanyScopedRequest, @Query('code') code: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.masterData.lookup(code, req.companyContext.dataSource.manager);
+  }
+
+  /** The item's image (any authenticated user of the Company, like the rest of the catalog read); 404 when it has none. */
+  @UseGuards(JwtAuthGuard, CompanyContextGuard)
+  @Get(':id/image')
+  async getImage(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    if (!req.companyContext || !req.user) throw new UnauthorizedException();
+    await this.products.getProduct(id, req.companyContext.dataSource.manager); // 404 for an item of another Company
+    const image = await this.images.read(req.companyContext.companyId, id);
+    if (!image) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'This item has no image.' } });
+      return;
+    }
+    res.set({ 'Content-Type': image.contentType, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-cache' }).send(image.data);
+  }
+
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.edit', 'editable')
+  @Post(':id/image')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES } }))
+  async setImage(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    if (!file) throw new BadRequestException('No file uploaded - expected a multipart "file" field with the image.');
+    await this.products.getProduct(id, req.companyContext.dataSource.manager);
+    return this.images.save(req.companyContext.companyId, id, file.buffer, file.originalname, file.mimetype);
+  }
+
+  @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, PermissionGuard)
+  @RequireModule('sales')
+  @RequirePermission('sales.catalog.edit', 'editable')
+  @Post(':id/image/remove')
+  async removeImage(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.products.getProduct(id, req.companyContext.dataSource.manager);
+    await this.images.remove(req.companyContext.companyId, id);
+    return { removed: true };
   }
 
   /** Same finding/fix as `list()` above — was unauthenticated, and unlike `list()` this one didn't even filter to `status: 'active'`, so a draft/discontinued product was also disclosable by guessing its id. */

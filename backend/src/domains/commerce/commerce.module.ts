@@ -8,6 +8,8 @@ import { BomComponent } from './infrastructure/bom-component.entity';
 import { ProductCategory } from './infrastructure/product-category.entity';
 import { ProductBarcode } from './infrastructure/product-barcode.entity';
 import { ProductMasterDataService } from './application/product-master-data.service';
+import { ProductImageService } from './application/product-image.service';
+import { MediaModule } from '../../foundation/media/media.module';
 import { ProductCategoriesController } from './interface/product-categories.controller';
 import { ProductsService } from './application/products.service';
 import { PriceListsService } from './application/price-lists.service';
@@ -33,6 +35,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     AuthenticationModule,
     AuthorizationModule,
     ExcelModule,
+    MediaModule,
     NumberingModule,
     EventsModule,
     PermissionModule,
@@ -50,6 +53,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     PriceListsService,
     BomService,
     ProductMasterDataService,
+    ProductImageService,
     // P4 Tranche-2 (ADR-027) — the `sales` module's public contract for other
     // modules (today: `inventory`). Same concrete service, resolved via a
     // stable token instead of a direct cross-domain class import.

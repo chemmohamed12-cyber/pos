@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { ItemBasicPanel } from './item/ItemBasicPanel';
+import { ItemImage } from './item/ItemImage';
 import { ItemBarcodesPanel } from './item/ItemBarcodesPanel';
 import { ItemBomPanel } from './item/ItemBomPanel';
 import { ITEM_BARCODE_LABELS, ITEM_BASIC_LABELS, ITEM_BOM_LABELS, type Category } from './item/itemMaster';
@@ -108,7 +109,8 @@ function ItemDetails({ productId }: { productId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { can } = useAuth();
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
+  const L = (ar: string, en: string) => (lang === 'ar' ? ar : en);
 
   const originWarehouseId = searchParams.get('warehouseId') ?? '';
   const tab: Tab = (TABS as readonly string[]).includes(searchParams.get('tab') ?? '') ? (searchParams.get('tab') as Tab) : 'basic';
@@ -127,6 +129,8 @@ function ItemDetails({ productId }: { productId: string }) {
   const [mvError, setMvError] = useState<string | null>(null);
 
   const [costs, setCosts] = useState<Record<string, string | null>>({});
+  // valuation report rows of this item (exact quantity and total value per warehouse); empty when the caller may not see valuation
+  const [valued, setValued] = useState<Record<string, { quantity: number; totalValueBase: string }>>({});
   const [categories, setCategories] = useState<Category[]>([]);
 
   const canViewCost = can('inventory.valuation.view', 'read-only');
@@ -275,6 +279,14 @@ function ItemDetails({ productId }: { productId: string }) {
     })();
   }, [product, balances, canViewCost]);
 
+  useEffect(() => {
+    if (!product || !canViewCost) return;
+    api
+      .get<{ rows: Array<{ warehouseId: string; quantity: number; totalValueBase: string }> }>(`/inventory/valuation/report?productId=${product.id}`)
+      .then((r) => setValued(Object.fromEntries(r.rows.map((x) => [x.warehouseId, { quantity: x.quantity, totalValueBase: x.totalValueBase }]))))
+      .catch(() => setValued({}));
+  }, [product, balances, canViewCost]);
+
   async function reloadProduct() {
     setProduct(await api.get<Product>(`/products/${productId}`));
   }
@@ -300,6 +312,18 @@ function ItemDetails({ productId }: { productId: string }) {
     [movements, opening],
   );
   const closing = ledger.length ? ledger[ledger.length - 1].balance : opening;
+  // value of the stock at the approved (weighted-average) cost: sum over warehouses of on hand x unit cost; the unit price shown is that value / quantity of the costed warehouses
+  const stockValue = useMemo(() => {
+    let scaled = 0;
+    let qty = 0;
+    let any = false;
+    for (const v of Object.values(valued)) {
+      scaled += Math.round(Number(v.totalValueBase) * 10000);
+      qty += v.quantity;
+      any = true;
+    }
+    return { total: any ? (scaled / 10000).toFixed(4) : null, avgCost: any && qty !== 0 ? (scaled / 10000 / qty).toFixed(4) : null };
+  }, [valued]);
   const expectedOnHand = mvWarehouseId ? (balances ?? []).find((b) => b.warehouse.id === mvWarehouseId)?.onHand ?? 0 : totals.onHand;
 
   const warehouseLabel = (id: string) => {
@@ -361,10 +385,7 @@ function ItemDetails({ productId }: { productId: string }) {
       </div>
 
       <div className="card item-header">
-        <div className="item-image" role="img" aria-label={t('panel.item_no_image')}>
-          <span className="item-image-initials">{product.sku.slice(0, 2).toUpperCase()}</span>
-          <span className="item-image-caption">{t('panel.item_no_image')}</span>
-        </div>
+        <ItemImage productId={product.id} sku={product.sku} canEdit={canEdit} />
         <div className="item-header-main">
           <h2 className="item-title">{product.name}</h2>
           <div className="item-sku">{product.sku}</div>
@@ -432,7 +453,6 @@ function ItemDetails({ productId }: { productId: string }) {
                     <th>{t('field.preliminary_hold')}</th>
                     <th>{t('field.reserved')}</th>
                     <th>{t('field.available')}</th>
-                    {canViewCost && <th>{t('field.unit_cost')}</th>}
                     <th>{t('field.last_movement')}</th>
                   </tr>
                 </thead>
@@ -446,7 +466,6 @@ function ItemDetails({ productId }: { productId: string }) {
                       <td>{b.preliminaryHold}</td>
                       <td>{b.reserved}</td>
                       <td style={{ color: b.available < 0 ? '#a3262d' : undefined }}>{b.available}</td>
-                      {canViewCost && <td>{costs[b.warehouse.id] ?? '—'}</td>}
                       <td>{b.lastMovementAt ? fmtDate(b.lastMovementAt) : '—'}</td>
                     </tr>
                   ))}
@@ -568,28 +587,49 @@ function ItemDetails({ productId }: { productId: string }) {
               <Field label={t('nav.price_lists')} value={<Link to="/price-lists">{t('nav.price_lists')}</Link>} />
             </div>
             {canViewCost ? (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t('field.warehouse')}</th>
-                    <th>{t('field.on_hand')}</th>
-                    <th>{t('field.unit_cost')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(balances ?? [])
-                    .filter((b) => b.onHand !== 0)
-                    .map((b) => (
-                      <tr key={b.warehouse.id}>
-                        <td>
-                          {b.warehouse.code} — {b.warehouse.name}
-                        </td>
-                        <td>{b.onHand}</td>
-                        <td>{costs[b.warehouse.id] ?? '—'}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <>
+                <div className="detail-grid" style={{ marginTop: 12 }}>
+                  <Field label={L('الكمية المتاحة في المخازن', 'Available quantity in stock')} value={balances ? totals.available : '…'} />
+                  <Field label={L('الرصيد الفعلي', 'On hand')} value={balances ? totals.onHand : '…'} />
+                  <Field label={L('سعر الوحدة (متوسط التكلفة المعتمد)', 'Unit price (approved average cost)')} value={stockValue.avgCost ?? '—'} />
+                  <Field label={L('إجمالي قيمة الصنف في المخازن', 'Total value of the item in stock')} value={stockValue.total ?? '—'} />
+                </div>
+                <p className="item-note">
+                  {L(
+                    'سعر الوحدة هو متوسط التكلفة المرجّح المعتمد في النظام: يتحدّث مع كل استلام بضاعة / فاتورة شراء مرحَّلة، وتُحتسب به قيمة المخزون. إجمالي القيمة = الرصيد الفعلي × سعر الوحدة لكل مخزن.',
+                    'The unit price is the weighted average cost approved in the system: it is updated by every posted goods receipt / purchase invoice and values the stock. Total value = on hand x unit price per warehouse.',
+                  )}
+                </p>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t('field.warehouse')}</th>
+                      <th>{t('field.on_hand')}</th>
+                      <th>{L('المتاح', 'Available')}</th>
+                      <th>{L('سعر الوحدة', 'Unit price')}</th>
+                      <th>{L('إجمالي القيمة', 'Total value')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(balances ?? [])
+                      .filter((b) => b.onHand !== 0)
+                      .map((b) => {
+                        const cost = costs[b.warehouse.id];
+                        return (
+                          <tr key={b.warehouse.id}>
+                            <td>
+                              {b.warehouse.code} — {b.warehouse.name}
+                            </td>
+                            <td>{b.onHand}</td>
+                            <td>{b.available}</td>
+                            <td>{cost ?? '—'}</td>
+                            <td>{valued[b.warehouse.id]?.totalValueBase ?? '—'}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </>
             ) : (
               <p className="item-note">{t('panel.item_cost_restricted')}</p>
             )}
