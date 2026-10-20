@@ -38,7 +38,7 @@ describe('Default sequential codes — items, customers, suppliers — real-Post
   }
 
   beforeAll(async () => {
-    h = await setUpTwoCompanyHarness({ namePrefix: 'entity_codes', extraCompanyTags: ['sales', 'inventory', 'procurement'] });
+    h = await setUpTwoCompanyHarness({ namePrefix: 'entity_codes', extraCompanyTags: ['sales', 'finance', 'inventory', 'procurement'] });
     const inert = {} as never;
     const audit = new AuditService(h.controlPlane);
     const events = new EventBusService(inert, h.connections);
