@@ -20,6 +20,8 @@ import { ProductItemRequest } from './infrastructure/product-item-request.entity
 import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
 import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
 import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
+import { PurchaseReturn } from './infrastructure/purchase-return.entity';
+import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Procurement's own
@@ -57,4 +59,6 @@ export const PROCUREMENT_COMPANY_ENTITIES = [
   SupplierInvoiceLineReceipt,
   SupplierPaymentAllocation,
   ProcurementInvoicePolicy,
+  PurchaseReturn,
+  PurchaseReturnLine,
 ];

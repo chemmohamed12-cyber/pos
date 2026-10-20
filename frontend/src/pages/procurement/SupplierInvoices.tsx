@@ -26,6 +26,8 @@ interface PurchaseOrderLine {
   unitCostBase: string;
   quantityReceived: string;
   quantityInvoiced: string;
+  /** phase D-1: units returned to the supplier */
+  quantityReturned?: string;
 }
 interface SupplierInvoiceRow {
   id: string;
@@ -36,6 +38,11 @@ interface SupplierInvoiceRow {
   totalAmount: string;
   /** D5 — the explicit VAT stated by the supplier's invoice (totalAmount is NET). */
   taxAmount?: string;
+  /** phase C-2: discount (reduces cost), freight (capitalised unless freightTreatment is 'expense') and other charges (expensed) */
+  discountAmount?: string;
+  freightAmount?: string;
+  freightTreatment?: 'capitalize' | 'expense';
+  otherChargesAmount?: string;
   dueDate: string | null;
   priceVarianceAmount: string;
   state: string;
@@ -63,6 +70,11 @@ interface ProductOption {
 
 const CREATABLE_PO_STATES = new Set(['partially_received', 'received', 'closed']);
 
+function freightTreatmentLabel(treatment: 'capitalize' | 'expense' | undefined): string {
+  const ar = currentLang() === 'ar';
+  return treatment === 'expense' ? (ar ? 'مصروف' : 'expensed') : ar ? 'مرسمل على المخزون' : 'capitalised';
+}
+
 /**
  * ADR-048 — the `supplier-finance` bounded context's operational screen:
  * raise a Supplier Invoice against a received Purchase Order (3-way match
@@ -87,6 +99,10 @@ export function SupplierInvoices() {
   const [purchaseOrderId, setPurchaseOrderId] = useState(() => new URLSearchParams(window.location.search).get('purchaseOrderId') ?? '');
   const [supplierReference, setSupplierReference] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [freightAmount, setFreightAmount] = useState('');
+  const [freightTreatment, setFreightTreatment] = useState<'capitalize' | 'expense'>('capitalize');
+  const [otherChargesAmount, setOtherChargesAmount] = useState('');
   const [poLines, setPoLines] = useState<PurchaseOrderLine[]>([]);
   // phase E: other orders of the SAME supplier added to this one invoice, and which order each loaded line belongs to
   const [extraOrderIds, setExtraOrderIds] = useState<string[]>([]);
@@ -179,7 +195,7 @@ export function SupplierInvoices() {
         const qty: Record<string, string> = {};
         const cost: Record<string, string> = {};
         for (const l of lines) {
-          const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
+          const remaining = Number(l.quantityReceived) - Number(l.quantityReturned ?? 0) - Number(l.quantityInvoiced);
           if (remaining > 0) {
             qty[l.id] = String(remaining);
             cost[l.id] = l.unitCostBase;
@@ -242,6 +258,10 @@ export function SupplierInvoices() {
         purchaseOrderIds: usedOrders.length > 1 ? usedOrders : undefined,
         supplierReference: supplierReference || undefined,
         taxAmount: taxAmount || undefined,
+        discountAmount: discountAmount || undefined,
+        freightAmount: freightAmount || undefined,
+        freightTreatment: freightAmount ? freightTreatment : undefined,
+        otherChargesAmount: otherChargesAmount || undefined,
         lines,
       });
       setPurchaseOrderId('');
@@ -344,6 +364,27 @@ export function SupplierInvoices() {
                 <label>{t('field.vat_amount')}</label>
                 <input type="number" min={0} step="0.01" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} placeholder="0.00" />
               </div>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'خصم المشتريات' : 'Purchase discount'}</label>
+                <input type="number" min={0} step="0.01" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" style={{ width: 110 }} />
+              </div>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'الشحن' : 'Freight'}</label>
+                <input type="number" min={0} step="0.01" value={freightAmount} onChange={(e) => setFreightAmount(e.target.value)} placeholder="0.00" style={{ width: 110 }} />
+              </div>
+              {Number(freightAmount) > 0 && (
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label>{currentLang() === 'ar' ? 'معالجة الشحن' : 'Freight treatment'}</label>
+                  <select value={freightTreatment} onChange={(e) => setFreightTreatment(e.target.value as 'capitalize' | 'expense')}>
+                    <option value="capitalize">{currentLang() === 'ar' ? 'رسملة على تكلفة المخزون' : 'Capitalise into inventory cost'}</option>
+                    <option value="expense">{currentLang() === 'ar' ? 'مصروف' : 'Expense'}</option>
+                  </select>
+                </div>
+              )}
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'مصروفات أخرى (غير مرسملة)' : 'Other charges (expensed)'}</label>
+                <input type="number" min={0} step="0.01" value={otherChargesAmount} onChange={(e) => setOtherChargesAmount(e.target.value)} placeholder="0.00" style={{ width: 120 }} />
+              </div>
             </div>
 
             {poLines.length > 0 && (
@@ -359,7 +400,7 @@ export function SupplierInvoices() {
                 </thead>
                 <tbody>
                   {poLines.map((l) => {
-                    const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
+                    const remaining = Number(l.quantityReceived) - Number(l.quantityReturned ?? 0) - Number(l.quantityInvoiced);
                     if (remaining <= 0) return null;
                     return (
                       <tr key={l.id}>
@@ -451,6 +492,31 @@ export function SupplierInvoices() {
               <h3 style={{ margin: 0 }}>{detail.invoiceNumber}</h3>
               <StatusBadge code={`supplier_invoice_lifecycle.state.${detail.state}`} />
             </div>
+
+            {(Number(detail.discountAmount ?? 0) > 0 || Number(detail.freightAmount ?? 0) > 0 || Number(detail.otherChargesAmount ?? 0) > 0) && (
+              <div style={{ fontSize: 13, marginBottom: 10, lineHeight: 1.7 }}>
+                {Number(detail.discountAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'خصم المشتريات' : 'Purchase discount'}: −{Number(detail.discountAmount).toFixed(2)}
+                  </div>
+                )}
+                {Number(detail.freightAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'الشحن' : 'Freight'}: +{Number(detail.freightAmount).toFixed(2)} ({freightTreatmentLabel(detail.freightTreatment)})
+                  </div>
+                )}
+                {Number(detail.otherChargesAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'مصروفات أخرى' : 'Other charges'}: +{Number(detail.otherChargesAmount).toFixed(2)}
+                  </div>
+                )}
+                <div style={{ opacity: 0.7 }}>
+                  {currentLang() === 'ar'
+                    ? 'يظهر توزيع الخصم والشحن بين المخزون الحالي والوحدات المباعة/المستهلكة في قيد الفاتورة (التتبع المالي أدناه).'
+                    : 'The split of discount / freight between stock on hand and units already sold/consumed is shown in the invoice posting (financial trace below).'}
+                </div>
+              </div>
+            )}
 
             <InvoiceApprovalPanel
               invoice={detail as never}

@@ -29,4 +29,8 @@ export class PurchaseOrderLine {
   /** Sum of every posted `SupplierInvoiceLine.quantity` against this line — the 3-way-match over-invoicing guard (invoiced can never exceed received) reads this, never re-sums on every check. */
   @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
   quantityInvoiced!: string;
+
+  /** Phase D-1: units of this order line returned to the supplier by posted purchase returns (net received = quantityReceived - quantityReturned). */
+  @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
+  quantityReturned!: string;
 }

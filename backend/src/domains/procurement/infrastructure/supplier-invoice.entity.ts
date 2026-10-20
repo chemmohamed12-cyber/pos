@@ -61,6 +61,20 @@ export class SupplierInvoice {
   @Column({ type: 'varchar', length: 255, nullable: true })
   voidedReason!: string | null;
 
+  // ---- phase C-2 (D3 / E1): discount, freight and other charges. `totalAmount` stays the NET of the lines; gross = net - discount + freight + other charges + VAT ----
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  discountAmount!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  freightAmount!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  otherChargesAmount!: string;
+
+  /** 'capitalize' (default): freight is added to inventory cost; 'expense': freight is expensed with the other charges. */
+  @Column({ type: 'varchar', length: 12, default: 'capitalize' })
+  freightTreatment!: 'capitalize' | 'expense';
+
   // ---- phase C-1: approval trail and matching result (all nullable; legacy invoices keep NULL) ----
   @Column({ type: 'uuid', nullable: true })
   submittedByUserId!: string | null;

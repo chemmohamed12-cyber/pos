@@ -7,10 +7,11 @@ interface InvoicingRow {
   productId: string;
   ordered: string;
   received: string;
+  returned?: string;
   invoiced: string;
   remainingToReceive: string;
   remainingToInvoice: string;
-  receipts: Array<{ goodsReceiptLineId: string; grNumber: string; received: string; invoiced: string; free: string }>;
+  receipts: Array<{ goodsReceiptLineId: string; grNumber: string; received: string; returned?: string; invoiced: string; free: string }>;
 }
 
 /**
@@ -43,6 +44,7 @@ export function PoInvoicingTable({ purchaseOrderId, productName, refreshKey }: {
             <th>{L('الصنف', 'Item')}</th>
             <th>{L('المطلوب', 'Ordered')}</th>
             <th>{L('المستلم', 'Received')}</th>
+            <th>{L('المرتجع', 'Returned')}</th>
             <th>{L('المفوتر', 'Invoiced')}</th>
             <th>{L('متبقي للاستلام', 'Left to receive')}</th>
             <th>{L('متبقي للفوترة', 'Left to invoice')}</th>
@@ -65,6 +67,7 @@ export function PoInvoicingTable({ purchaseOrderId, productName, refreshKey }: {
               </td>
               <td>{Number(r.ordered)}</td>
               <td>{Number(r.received)}</td>
+              <td>{Number(r.returned ?? 0)}</td>
               <td>{Number(r.invoiced)}</td>
               <td>{Number(r.remainingToReceive)}</td>
               <td>{Number(r.remainingToInvoice)}</td>

@@ -85,7 +85,8 @@ export class InvoiceApprovalService {
   }
 
   private async run<T>(manager: EntityManager | undefined, fn: (m: EntityManager) => Promise<T>): Promise<T> {
-    return manager ? fn(manager) : this.dataSource.transaction(fn);
+    // ALWAYS a transaction (see PurchaseReturnService.run): every state change, trail column and audit row commits together or not at all
+    return (manager ?? this.dataSource).transaction(fn);
   }
 
   /** Draft -> Submitted, or Draft -> On Hold when the price match exceeds the Company's limits. Requires the approval workflow to be on. */

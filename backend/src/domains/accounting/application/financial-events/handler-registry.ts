@@ -109,6 +109,11 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   // ADR-048 — Procurement's Supplier Invoice/AP real handlers (AP_EVENT_TOPICS' first publisher)
   'finance.supplier_invoice.posted',
   'finance.supplier_invoice.voided',
+  // 2026-10-20 (owner decisions D3 / E1) - the discount / freight / charges leg of a supplier invoice; handled by the self-registering SupplierInvoiceCostAdjustmentHandlerService
+  'finance.supplier_invoice.cost_adjusted',
+  'finance.supplier_invoice.cost_adjustment_voided',
+  // Phase D-1 - a posted Purchase Return (GRNI path)
+  'procurement.purchase_return.posted',
   'finance.supplier_payment.recorded',
   // ADR-054/ADR-057 — GRNI (Goods Received Not Invoiced): the Goods Receipt leg, Dr Inventory / Cr GRNI
   'procurement.goods_receipt.posted',

@@ -52,6 +52,22 @@ class CreateSupplierInvoiceDto {
   @IsOptional()
   @IsNumberString()
   taxAmount?: string;
+  /** Phase C-2 (D3): purchase discount, freight (capitalised unless freightTreatment = 'expense') and other charges (expensed). */
+  @IsOptional()
+  @IsNumberString()
+  discountAmount?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  freightAmount?: string;
+
+  @IsOptional()
+  @IsIn(['capitalize', 'expense'])
+  freightTreatment?: 'capitalize' | 'expense';
+
+  @IsOptional()
+  @IsNumberString()
+  otherChargesAmount?: string;
 }
 
 class ReasonDto {

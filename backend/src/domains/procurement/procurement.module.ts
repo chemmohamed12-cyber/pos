@@ -15,6 +15,11 @@ import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-all
 import { InvoiceAllocationService } from './application/invoice-allocation.service';
 import { InvoiceApprovalService } from './application/invoice-approval.service';
 import { InvoicePolicyService } from './application/invoice-policy.service';
+import { PurchaseReturnService } from './application/purchase-return.service';
+import { PurchaseReturnController } from './interface/purchase-return.controller';
+import { PurchaseReturn } from './infrastructure/purchase-return.entity';
+import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
+import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
 import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
 import { SupplierLedgerEntry } from './infrastructure/supplier-ledger-entry.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
@@ -104,6 +109,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
       SupplierInvoiceLineReceipt,
       SupplierPaymentAllocation,
       ProcurementInvoicePolicy,
+      PurchaseReturn,
+      PurchaseReturnLine,
       SupplierLedgerEntry,
       SupplierPayment,
       PurchaseRequest,
@@ -123,6 +130,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     NumberingModule,
     EventsModule,
     InventoryWarehouseModule,
+    // phase D-1: the valuation contract (stock leaves at book cost) - Manufacturing's own precedent; the valuation module imports nothing from procurement
+    InventoryValuationModule,
     // D7 — the Sales product contract (SALES_PRODUCTS_CONTRACT) for the lifecycle gate and New Item Requests; acyclic (Commerce never imports Procurement).
     CommerceModule,
     TreasuryModule,
@@ -142,6 +151,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     GoodsReceiptController,
     SupplierInvoiceController,
     SupplierPaymentController,
+    PurchaseReturnController,
     PurchaseRequestController,
     RfqController,
     NewItemRequestController,
@@ -156,6 +166,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     InvoiceAllocationService,
     InvoicePolicyService,
     InvoiceApprovalService,
+    PurchaseReturnService,
     SupplierPaymentService,
     PurchaseRequestService,
     RfqService,

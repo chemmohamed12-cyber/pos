@@ -126,7 +126,7 @@ describe('Procurement allocations migrations - backfill of legacy data on a real
       // the read-only preflight predicts exactly this finding (check 1) and changes nothing
       const preflight = fs.readFileSync(path.resolve(__dirname, '../../../../tools/preflight/procurement-allocations-preflight.sql'), 'utf8');
       const sqlOnly = preflight.split(String.fromCharCode(10)).filter((l) => !l.trim().startsWith('--')).join(String.fromCharCode(10));
-      expect(sqlOnly).not.toMatch(/(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)/i);
+      expect(/(^|[^A-Za-z_"])(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)([^A-Za-z_"]|$)/i.test(sqlOnly)).toBe(false);
       const statements = sqlOnly.split(';').map((x) => x.trim()).filter(Boolean);
       const findings: string[] = [];
       for (const st of statements) for (const row of await ds.query(st)) findings.push(row.check);

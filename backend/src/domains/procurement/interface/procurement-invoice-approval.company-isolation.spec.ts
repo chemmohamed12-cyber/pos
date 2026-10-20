@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import { SupplierInvoiceService } from '../application/supplier-invoice.service';
-import { SupplierPaymentService } from '../application/supplier-payment.service';
 import { SupplierLedgerService } from '../application/supplier-ledger.service';
 import { InvoiceAllocationService } from '../application/invoice-allocation.service';
 import { InvoiceApprovalService } from '../application/invoice-approval.service';
@@ -29,6 +28,7 @@ import { ConfigurationEngineService } from '../../../foundation/configuration-en
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { setUpTwoCompanyHarness, TwoCompanyHarness, assertDataSourceNeverRequestedFor } from '../../../foundation/testing/two-company-real-pg-harness';
 import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
+import { seedCompanyProcurementDefaults } from '../../../foundation/company/company-procurement-defaults';
 
 /**
  * Procurement invoicing redesign, phases A and B (CTO-approved 2026-10-20) - real-Postgres proof, Company A with Company B as the untouched witness.
@@ -41,7 +41,6 @@ describe('Procurement invoicing phase C-1 - approval lifecycle, Company price to
   let h: TwoCompanyHarness;
   let events: EventBusService;
   let invoices: SupplierInvoiceService;
-  let payments: SupplierPaymentService;
   let allocations: InvoiceAllocationService;
   let approvals: InvoiceApprovalService;
   let policies: InvoicePolicyService;
@@ -116,7 +115,6 @@ describe('Procurement invoicing phase C-1 - approval lifecycle, Company price to
     invoices = new SupplierInvoiceService(h.controlPlane, numbering, processEngine, audit, ledger, events, policyRegistry, allocations, policies);
     approvals = new InvoiceApprovalService(h.controlPlane, processEngine, audit, policies);
     treasury = new TreasuryService(h.controlPlane, numbering, audit, inert, events);
-    payments = new SupplierPaymentService(h.controlPlane, numbering, audit, treasury, ledger, invoices, events);
 
     await seedCompany('A');
     await seedCompany('B');
@@ -343,6 +341,38 @@ describe('Procurement invoicing phase C-1 - approval lifecycle, Company price to
       await policies.get(await A());
       await approvals.computeMatch([], new Map(), await policies.get(await A()));
     });
+  });
+
+  it('C1-9. switching the Company workflow never overrides documents already in flight: a submitted invoice still approves and posts after the switch is turned OFF; a draft then posts directly; turning it ON again blocks direct posting', async () => {
+    await policies.update({ approvalRequired: true }, actor, await A());
+    const inFlight = await mkInvoice(4, unitCost);
+    await approvals.submit(inFlight.id, actor, await A());
+    const draftOnly = await mkInvoice(4, unitCost);
+    await policies.update({ approvalRequired: false }, actor, await A());
+    expect(await state(inFlight.id)).toBe('submitted'); // the switch did not touch it
+    await approvals.approve(inFlight.id, approver, await A());
+    await post(inFlight.id);
+    expect(await state(inFlight.id)).toBe('posted');
+    await post(draftOnly.id); // legacy direct post while OFF
+    expect(await state(draftOnly.id)).toBe('posted');
+    await policies.update({ approvalRequired: true }, actor, await A());
+    const another = await mkInvoice(2, unitCost);
+    await expect(post(another.id)).rejects.toThrow(/submitted and approved/i);
+    await policies.update({ approvalRequired: false }, actor, await A());
+  });
+
+  it('C1-10. new-Company default: provisioning seeds approval ON for Company B only when no row exists; Company A (existing, row off) is untouched; the seed never overwrites an administrator\'s choice and is repeatable', async () => {
+    const db = { host: process.env.DB_HOST ?? '127.0.0.1', port: Number(process.env.DB_PORT ?? 5432), username: process.env.DB_USER ?? 'daii', password: process.env.DB_PASSWORD ?? '', database: h.companyBDbName };
+    const dsB = await dsOf('B');
+    expect((await policies.get(dsB.manager)).approvalRequired).toBe(false); // existing Company behaviour: no row = OFF
+    expect(await seedCompanyProcurementDefaults(db)).toEqual({ policySeeded: true });
+    expect((await policies.get(dsB.manager)).approvalRequired).toBe(true);
+    expect((await policies.get(await A())).approvalRequired).toBe(false); // Company A unaffected
+    expect(await seedCompanyProcurementDefaults(db)).toEqual({ policySeeded: false }); // repeatable
+    expect(await count('B', 'procurement_invoice_policies')).toBe(1);
+    await policies.update({ approvalRequired: false }, actor, dsB.manager); // the Company administrator turns it off
+    expect(await seedCompanyProcurementDefaults(db)).toEqual({ policySeeded: false });
+    expect((await policies.get(dsB.manager)).approvalRequired).toBe(false); // the choice is kept
   });
 
   it('C1-Z. final reconciliation: allocations, aggregates, payments and ledger consistent; GL trial balance zero', async () => {

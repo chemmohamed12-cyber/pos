@@ -123,3 +123,6 @@ src/domains/procurement/interface/procurement-allocations.company-isolation.spec
 src/domains/procurement/interface/procurement-allocations.migrations.company-isolation.spec.ts
 src/domains/procurement/interface/procurement-invoice-approval.company-isolation.spec.ts
 src/domains/procurement/interface/procurement-multi-order-invoice.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts

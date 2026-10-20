@@ -78,12 +78,12 @@ export class GoodsReceiptService {
     const scope = visibleWarehouseIds ? 'AND po."warehouseId" = ANY($1::uuid[])' : '';
     const orders = (await m.query(
       `SELECT po.id AS "purchaseOrderId", po."poNumber", po."supplierId", s."legalName" AS "supplierName", po."warehouseId",
-              SUM(pol."quantityReceived" - pol."quantityInvoiced")::numeric(20,3)::text AS "uninvoicedQuantity",
-              SUM((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4)::text AS "uninvoicedValue"
+              SUM(pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced")::numeric(20,3)::text AS "uninvoicedQuantity",
+              SUM((pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4)::text AS "uninvoicedValue"
          FROM "purchase_order_lines" pol
          JOIN "purchase_orders" po ON po.id = pol."purchaseOrderId"
          LEFT JOIN "suppliers" s ON s.id = po."supplierId"
-        WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0 ${scope}
+        WHERE (pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") > 0 ${scope}
         GROUP BY po.id, po."poNumber", po."supplierId", s."legalName", po."warehouseId"
         ORDER BY po."poNumber"`,
       visibleWarehouseIds ? [visibleWarehouseIds] : [],

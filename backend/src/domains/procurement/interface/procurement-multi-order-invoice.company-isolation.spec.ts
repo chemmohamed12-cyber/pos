@@ -177,13 +177,6 @@ describe('Procurement invoicing phase E - one supplier invoice over several purc
     const grLines: Array<{ id: string }> = await m.query(`SELECT grl.id FROM goods_receipt_lines grl JOIN goods_receipts gr ON gr.id = grl."goodsReceiptId" WHERE gr."purchaseOrderId" = $1 ORDER BY gr."createdAt", grl.id`, [poId]);
     return { poId, poLineId, grLineIds: grLines.map((g) => g.id) };
   }
-  async function draft(po: { poId: string; poLineId: string }, qty: number, cost = '10.00', grLine?: string) {
-    return invoices.createDraftInvoice(
-      { purchaseOrderId: po.poId, lines: [{ purchaseOrderLineId: po.poLineId, quantity: String(qty), unitCostBase: cost, goodsReceiptLineId: grLine ?? null }] },
-      actor,
-      (await dsOf('A')).manager,
-    );
-  }
   async function post(invoiceId: string) {
     const r = await invoices.postInvoice(invoiceId, actor, (await dsOf('A')).manager);
     await flush('A');

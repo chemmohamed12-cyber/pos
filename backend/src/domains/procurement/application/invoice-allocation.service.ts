@@ -17,10 +17,12 @@ export interface PoLineInvoicingRow {
   productId: string;
   ordered: string;
   received: string;
+  /** phase D-1: units sent back to the supplier by posted purchase returns (net received = received - returned) */
+  returned: string;
   invoiced: string;
   remainingToReceive: string;
   remainingToInvoice: string;
-  receipts: Array<{ goodsReceiptLineId: string; grNumber: string; received: string; invoiced: string; free: string }>;
+  receipts: Array<{ goodsReceiptLineId: string; grNumber: string; received: string; returned: string; invoiced: string; free: string }>;
 }
 
 export interface InvoicingReconciliationIssue {
@@ -48,7 +50,7 @@ export class InvoiceAllocationService {
     const capacity = new Map<string, Array<{ id: string; free: number }>>();
     for (const poLineId of poLineIds) {
       const rows: Array<{ id: string; received: string; allocated: string }> = await m.query(
-        `SELECT grl."id", grl."quantityReceived"::text AS received,
+        `SELECT grl."id", (grl."quantityReceived" - grl."quantityReturned")::text AS received,
                 COALESCE((SELECT SUM(r."quantity") FROM "supplier_invoice_line_receipts" r WHERE r."goodsReceiptLineId" = grl."id"), 0)::text AS allocated
            FROM "goods_receipt_lines" grl JOIN "goods_receipts" gr ON gr."id" = grl."goodsReceiptId"
           WHERE grl."purchaseOrderLineId" = $1
@@ -98,12 +100,12 @@ export class InvoiceAllocationService {
   /** Per order line: ordered / received / invoiced / remaining, with the per-receipt breakdown. Read-only. */
   async getPurchaseOrderInvoicing(purchaseOrderId: string, manager?: EntityManager): Promise<PoLineInvoicingRow[]> {
     const run = manager ?? this.dataSource;
-    const lines: Array<{ id: string; productId: string; quantityOrdered: string; quantityReceived: string; quantityInvoiced: string }> = await run.query(
-      `SELECT "id", "productId", "quantity"::text AS "quantityOrdered", "quantityReceived"::text, "quantityInvoiced"::text FROM "purchase_order_lines" WHERE "purchaseOrderId" = $1 ORDER BY "id"`,
+    const lines: Array<{ id: string; productId: string; quantityOrdered: string; quantityReceived: string; quantityReturned: string; quantityInvoiced: string }> = await run.query(
+      `SELECT "id", "productId", "quantity"::text AS "quantityOrdered", "quantityReceived"::text, "quantityReturned"::text, "quantityInvoiced"::text FROM "purchase_order_lines" WHERE "purchaseOrderId" = $1 ORDER BY "id"`,
       [purchaseOrderId],
     );
-    const receipts: Array<{ poLineId: string; id: string; grNumber: string; received: string; invoiced: string }> = await run.query(
-      `SELECT grl."purchaseOrderLineId" AS "poLineId", grl."id", gr."grNumber", grl."quantityReceived"::text AS received,
+    const receipts: Array<{ poLineId: string; id: string; grNumber: string; received: string; returned: string; invoiced: string }> = await run.query(
+      `SELECT grl."purchaseOrderLineId" AS "poLineId", grl."id", gr."grNumber", grl."quantityReceived"::text AS received, grl."quantityReturned"::text AS returned,
               COALESCE((SELECT SUM(r."quantity") FROM "supplier_invoice_line_receipts" r WHERE r."goodsReceiptLineId" = grl."id"), 0)::text AS invoiced
          FROM "goods_receipt_lines" grl JOIN "goods_receipts" gr ON gr."id" = grl."goodsReceiptId"
         WHERE gr."purchaseOrderId" = $1 ORDER BY gr."createdAt", grl."id"`,
@@ -114,12 +116,13 @@ export class InvoiceAllocationService {
       productId: l.productId,
       ordered: l.quantityOrdered,
       received: l.quantityReceived,
+      returned: l.quantityReturned,
       invoiced: l.quantityInvoiced,
       remainingToReceive: q3(Number(l.quantityOrdered) - Number(l.quantityReceived)).toFixed(3),
-      remainingToInvoice: q3(Number(l.quantityReceived) - Number(l.quantityInvoiced)).toFixed(3),
+      remainingToInvoice: q3(Number(l.quantityReceived) - Number(l.quantityReturned) - Number(l.quantityInvoiced)).toFixed(3),
       receipts: receipts
         .filter((r) => r.poLineId === l.id)
-        .map((r) => ({ goodsReceiptLineId: r.id, grNumber: r.grNumber, received: r.received, invoiced: r.invoiced, free: q3(Number(r.received) - Number(r.invoiced)).toFixed(3) })),
+        .map((r) => ({ goodsReceiptLineId: r.id, grNumber: r.grNumber, received: r.received, returned: r.returned, invoiced: r.invoiced, free: q3(Number(r.received) - Number(r.returned) - Number(r.invoiced)).toFixed(3) })),
     }));
   }
 
@@ -157,9 +160,9 @@ export class InvoiceAllocationService {
     }
 
     const over: Array<{ id: string; received: string; allocated: string }> = await run.query(
-      `SELECT grl."id", grl."quantityReceived"::text AS received, SUM(r."quantity")::text AS allocated
+      `SELECT grl."id", (grl."quantityReceived" - grl."quantityReturned")::text AS received, SUM(r."quantity")::text AS allocated
          FROM "goods_receipt_lines" grl JOIN "supplier_invoice_line_receipts" r ON r."goodsReceiptLineId" = grl."id"
-        GROUP BY grl."id", grl."quantityReceived" HAVING SUM(r."quantity") > grl."quantityReceived"`,
+        GROUP BY grl."id", grl."quantityReceived", grl."quantityReturned" HAVING SUM(r."quantity") > grl."quantityReceived" - grl."quantityReturned"`,
     );
     for (const r of over) issues.push({ kind: 'receipt_over_allocated', detail: `Receipt line ${r.id}: received ${r.received}, allocated ${r.allocated}` });
 

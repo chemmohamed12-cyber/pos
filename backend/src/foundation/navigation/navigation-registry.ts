@@ -367,6 +367,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/rfqs', code: 'nav.rfqs', module: 'procurement', permissionNode: 'procurement.rfq' },
       { to: '/purchase-orders', code: 'nav.purchase_orders', module: 'procurement', permissionNode: 'procurement.purchase_order' },
       { to: '/supplier-invoices', code: 'nav.supplier_invoices', module: 'procurement', permissionNode: 'procurement.supplier_invoice' },
+      { to: '/purchase-returns', code: 'nav.purchase_returns', module: 'procurement', permissionNode: 'procurement.purchase_return' },
       // `GET :id/ledger` on `supplier.controller.ts` — same node as the supplier list/detail routes.
       { to: '/supplier-statement', code: 'nav.supplier_statement', module: 'procurement', permissionNode: 'procurement.supplier' },
       // `GET ap-aging` on `supplier-invoice.controller.ts` — same node as that controller's list route.

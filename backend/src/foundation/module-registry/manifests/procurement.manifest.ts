@@ -17,7 +17,7 @@ import { ModuleManifest } from '../module-manifest.type';
  */
 export const procurementManifest: ModuleManifest = {
   module_code: 'procurement',
-  manifest_version: '1.4.0',
+  manifest_version: '1.6.0',
   title_code: 'module.procurement',
   business_domains: ['procurement'],
   // 1.1.0 (Goods Receipt) added `inventory`: `GoodsReceiptService` calls
@@ -75,6 +75,14 @@ export const procurementManifest: ModuleManifest = {
     { node: 'procurement.supplier_invoice.override', title_code: 'perm.procurement.supplier_invoice.override', parent: 'procurement.supplier_invoice' },
     { node: 'procurement.invoice_policy', title_code: 'perm.procurement.invoice_policy', parent: 'procurement' },
     { node: 'procurement.invoice_policy.manage', title_code: 'perm.procurement.invoice_policy.manage', parent: 'procurement.invoice_policy' },
+
+    // phase D-1 (D7): purchase returns - create (maker) -> submit -> approve (independent person) -> post
+    { node: 'procurement.purchase_return', title_code: 'perm.procurement.purchase_return', parent: 'procurement' },
+    { node: 'procurement.purchase_return.view', title_code: 'perm.procurement.purchase_return.view', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.create', title_code: 'perm.procurement.purchase_return.create', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.submit', title_code: 'perm.procurement.purchase_return.submit', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.approve', title_code: 'perm.procurement.purchase_return.approve', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.post', title_code: 'perm.procurement.purchase_return.post', parent: 'procurement.purchase_return' },
 
     { node: 'procurement.supplier_payment', title_code: 'perm.procurement.supplier_payment', parent: 'procurement' },
     { node: 'procurement.supplier_payment.view', title_code: 'perm.procurement.supplier_payment.view', parent: 'procurement.supplier_payment' },
@@ -146,6 +154,6 @@ export const procurementManifest: ModuleManifest = {
       'GetRfq',
       'ListRfqs',
     ],
-    events: ['finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_payment.recorded'],
+    events: ['procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
   },
 };

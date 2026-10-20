@@ -90,9 +90,30 @@ export interface SupplierPaymentRecordedEvent extends ApEventBase {
   bankAccountCode?: string | null;
 }
 
+/**
+ * Phase C-2 (owner decisions D3 / E1, 2026-10-20) - the cost-adjustment leg of a supplier invoice that carries a discount, freight or other charges. Published in the SAME transaction as
+ * `finance.supplier_invoice.posted`, only when there is something to adjust; the main posted journal is unchanged (GRNI / PPV / VAT / AP for net + VAT), this one carries the rest:
+ * the on-hand share of discount / capitalised freight moves the inventory valuation, the share belonging to units already sold or consumed goes to the separate "purchase cost differences after
+ * receipt" account, non-capitalised charges go to the configured expense account, and AP takes the net of all three. The on-hand / consumed split is decided by the handler at posting time.
+ */
+export interface SupplierInvoiceCostAdjustedEvent extends ApEventBase {
+  supplierInvoiceId: string;
+  invoiceNumber: string;
+  supplierId: string;
+  discountAmount: string;
+  freightCapitalizedAmount: string;
+  expensedChargesAmount: string;
+  allocationBasis: 'line_value';
+  lines: Array<{ invoiceLineId: string; productId: string; warehouseId: string; quantity: string; discountShare: string; freightShare: string }>;
+}
+
 export const AP_EVENT_TOPICS = {
   supplierInvoicePosted: 'finance.supplier_invoice.posted',
   supplierInvoiceVoided: 'finance.supplier_invoice.voided',
+  supplierInvoiceCostAdjusted: 'finance.supplier_invoice.cost_adjusted',
+  /** Phase D-1 - a posted Purchase Return of goods received but not invoiced: Dr GRNI / Cr Inventory / supplier-return cost difference. */
+  purchaseReturnPosted: 'procurement.purchase_return.posted',
+  supplierInvoiceCostAdjustmentVoided: 'finance.supplier_invoice.cost_adjustment_voided',
   supplierPaymentRecorded: 'finance.supplier_payment.recorded',
   debitNoteIssued: 'finance.supplier_debit_note.issued',
   creditNoteReceived: 'finance.supplier_credit_note.received',

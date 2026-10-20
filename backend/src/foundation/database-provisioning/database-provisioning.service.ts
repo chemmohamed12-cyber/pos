@@ -5,6 +5,7 @@ import { DatabaseRegistryService } from '../database-registry/database-registry.
 import { DatabaseRegistry } from '../database-registry/database-registry.entity';
 import { runMigrationsForDatabase } from '../release-orchestration/company-migration-runner';
 import { seedCompanyRoleTemplates, seedCompanyAdminRole, seedCompanyAdministratorRole, CompanyRoleSeedResult } from '../company/company-role-seeding';
+import { seedCompanyProcurementDefaults } from '../company/company-procurement-defaults';
 import { COMPANY_ADMIN_ROLE_KEY } from '../module-registry/role-templates';
 import { applyCompanyAuthorizationSchemaAdjustment } from '../company/company-authorization-schema-adjustment';
 import { applyEntitlementManifestToCompany, CompanyEntitlementOptions } from '../company/company-entitlement-provisioning';
@@ -77,7 +78,7 @@ export interface ProvisionCompanyDatabaseResult {
 
 export class ProvisioningFailedError extends Error {
   constructor(
-    public readonly stage: 'migrations' | 'authorization-schema-adjustment' | 'role-seeding' | 'entitlement' | 'initial-admin' | 'health-check',
+    public readonly stage: 'migrations' | 'authorization-schema-adjustment' | 'role-seeding' | 'procurement-defaults' | 'entitlement' | 'initial-admin' | 'health-check',
     message: string,
   ) {
     super(message);
@@ -206,6 +207,14 @@ export class DatabaseProvisioningService {
     } catch (err) {
       await this.databaseRegistry.markStatus(registry.id, 'FAILED');
       throw new ProvisioningFailedError('role-seeding', err instanceof Error ? err.message : String(err));
+    }
+
+    // Owner decision 2026-10-20: a NEW Company starts with the supplier-invoice approval workflow ON (existing Companies are untouched and stay OFF). Insert-only, idempotent, skipped when procurement is not provisioned.
+    try {
+      await seedCompanyProcurementDefaults(databaseConfig);
+    } catch (err) {
+      await this.databaseRegistry.markStatus(registry.id, 'FAILED');
+      throw new ProvisioningFailedError('procurement-defaults', err instanceof Error ? err.message : String(err));
     }
 
     // Entitlement (Area 7) — optional, explicit provisioning input; skipped entirely if not supplied.

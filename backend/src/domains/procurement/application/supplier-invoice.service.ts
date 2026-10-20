@@ -40,6 +40,13 @@ export interface CreateSupplierInvoiceInput {
   lines: CreateSupplierInvoiceLineInput[];
   /** D5 — the EXPLICIT VAT amount stated by the supplier's invoice (the lines' total is NET). Omitted/0 = no VAT. Never derived or defaulted. */
   taxAmount?: string | null;
+  /** Phase C-2 (D3): a purchase discount that reduces the cost of the goods (allocated to the lines by value). Omitted/0 = none. */
+  discountAmount?: string | null;
+  /** Phase C-2 (D3): freight stated by the supplier; capitalised into inventory cost unless `freightTreatment` is 'expense'. */
+  freightAmount?: string | null;
+  freightTreatment?: 'capitalize' | 'expense';
+  /** Phase C-2 (D3): other charges that are NOT capitalised (expensed). */
+  otherChargesAmount?: string | null;
 }
 
 export interface ApAgingRow {
@@ -97,7 +104,30 @@ export class SupplierInvoiceService {
 
   /** D5 — gross = net (`totalAmount`, tax-exclusive) + the explicit VAT. What AP / the Supplier Ledger carry. */
   private grossOf(invoice: SupplierInvoice): number {
-    return Math.round((Number(invoice.totalAmount) + Number(invoice.taxAmount ?? 0)) * 100) / 100;
+    // phase C-2: gross = net - discount + freight + other charges + VAT (the three charge columns are 0 on every pre-C-2 invoice, so their gross is unchanged)
+    return (
+      Math.round(
+        (Number(invoice.totalAmount) - Number(invoice.discountAmount ?? 0) + Number(invoice.freightAmount ?? 0) + Number(invoice.otherChargesAmount ?? 0) + Number(invoice.taxAmount ?? 0)) * 100,
+      ) / 100
+    );
+  }
+
+  private parseCharge(raw: string | number | null | undefined, label: string): number {
+    if (raw == null || String(raw).trim() === '') return 0;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) throw new BadRequestException(`The ${label} must be a non-negative number.`);
+    return Math.round(n * 100) / 100;
+  }
+
+  /** Phase C-2: the amounts the cost-adjustment journal is built from (capitalised vs expensed split, by the invoice's own freight treatment). */
+  private chargesOf(invoice: SupplierInvoice): { discount: number; freightCapitalized: number; expensed: number } {
+    const freight = Number(invoice.freightAmount ?? 0);
+    const capitalize = (invoice.freightTreatment ?? 'capitalize') === 'capitalize';
+    return {
+      discount: Number(invoice.discountAmount ?? 0),
+      freightCapitalized: capitalize ? freight : 0,
+      expensed: Number(invoice.otherChargesAmount ?? 0) + (capitalize ? 0 : freight),
+    };
   }
 
   private parseVatAmount(raw: string | number | null | undefined): number {
@@ -166,6 +196,12 @@ export class SupplierInvoiceService {
     // D5 — explicit VAT as stated by the supplier's invoice; validated BEFORE any write.
     const taxAmount = this.parseVatAmount(input.taxAmount);
     this.assertVatAllowed(supplier, taxAmount);
+    // Phase C-2 (D3): discount / freight / other charges - validated BEFORE any write.
+    const discountAmount = this.parseCharge(input.discountAmount, 'discount amount');
+    const freightAmount = this.parseCharge(input.freightAmount, 'freight amount');
+    const otherChargesAmount = this.parseCharge(input.otherChargesAmount, 'other charges amount');
+    const freightTreatment = input.freightTreatment ?? 'capitalize';
+    if (freightTreatment !== 'capitalize' && freightTreatment !== 'expense') throw new BadRequestException('The freight treatment must be "capitalize" or "expense".');
 
     // 3-way match, duplicate-invoice leg: the same supplier's own reference number can't be billed
     // twice (a live, still-usable invoice — void doesn't count, matching how `findOpenInvoiceForOrder`
@@ -207,7 +243,7 @@ export class SupplierInvoiceService {
       if (!Number.isFinite(cost) || cost < 0) throw new BadRequestException('Every invoice line unit cost must be a non-negative number.');
 
       // 3-way match, quantity leg (hard guard): invoiced can never exceed received.
-      const receivedNotYetInvoiced = Number(poLine.quantityReceived) - Number(poLine.quantityInvoiced);
+      const receivedNotYetInvoiced = Number(poLine.quantityReceived) - Number(poLine.quantityReturned ?? 0) - Number(poLine.quantityInvoiced);
       if (qty > receivedNotYetInvoiced) {
         throw new ConflictException(
           `Cannot invoice ${qty} on this line — only ${receivedNotYetInvoiced} has been received but not yet invoiced (received ${poLine.quantityReceived}, already invoiced ${poLine.quantityInvoiced}). Post a Goods Receipt first, or invoice a smaller quantity.`,
@@ -232,6 +268,7 @@ export class SupplierInvoiceService {
     }
 
     const net = Number(totalAmount.toFixed(2));
+    if (discountAmount > net + 0.00001) throw new BadRequestException(`The discount (${discountAmount.toFixed(2)}) cannot exceed the invoice net amount (${net.toFixed(2)}).`);
     const receiptValueBase = this.r4(receiptValue);
     const ppvBase = this.r4(net - receiptValueBase);
 
@@ -252,6 +289,10 @@ export class SupplierInvoiceService {
           purchaseOrderId: po.id,
           totalAmount: net.toFixed(2),
           taxAmount: taxAmount.toFixed(2),
+          discountAmount: discountAmount.toFixed(2),
+          freightAmount: freightAmount.toFixed(2),
+          otherChargesAmount: otherChargesAmount.toFixed(2),
+          freightTreatment,
           receiptValueBase: receiptValueBase.toFixed(4),
           ppvBase: ppvBase.toFixed(4),
           dueDate,
@@ -323,10 +364,21 @@ export class SupplierInvoiceService {
     if (!supplier) throw new NotFoundException(`Supplier "${invoice.supplierId}" not found.`);
     this.assertVatAllowed(supplier, basis.tax);
 
-    if (basis.ppv !== 0 || basis.tax > 0) {
+    const charges = this.chargesOf(invoice);
+    const hasCharges = charges.discount > 0 || charges.freightCapitalized > 0 || charges.expensed > 0;
+    if (basis.ppv !== 0 || basis.tax > 0 || hasCharges) {
       const policy = this.postingPolicy?.get();
-      if (!policy) throw new ConflictException('This invoice has a price variance or VAT but the accounting posting policy is not available — nothing was changed.');
-      await policy.assertSupplierInvoicePostable({ ppvBase: basis.ppv.toFixed(4), taxAmount: basis.tax.toFixed(2) }, manager ?? this.dataSource.manager);
+      if (!policy) throw new ConflictException('This invoice has a price variance, VAT or charges but the accounting posting policy is not available — nothing was changed.');
+      await policy.assertSupplierInvoicePostable(
+        {
+          ppvBase: basis.ppv.toFixed(4),
+          taxAmount: basis.tax.toFixed(2),
+          discountAmount: charges.discount.toFixed(2),
+          capitalizedFreight: charges.freightCapitalized.toFixed(2),
+          expensedCharges: charges.expensed.toFixed(2),
+        },
+        manager ?? this.dataSource.manager,
+      );
     }
 
     const saved = await (manager ?? this.dataSource).transaction(async (m) => {
@@ -369,6 +421,46 @@ export class SupplierInvoiceService {
         ppvBase: basis.ppv.toFixed(4),
         dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
       });
+
+      if (hasCharges) {
+        // phase C-2: the cost-adjustment leg - same transaction, own idempotent event; shares allocated to the lines by invoice value (last line takes the rounding remainder)
+        const lineRows: Array<{ id: string; productId: string; quantity: string; lineTotalBase: string; warehouseId: string }> = await m.query(
+          `SELECT sil."id", sil."productId", sil."quantity"::text AS quantity, sil."lineTotalBase"::text AS "lineTotalBase", po."warehouseId"
+             FROM "supplier_invoice_lines" sil JOIN "purchase_order_lines" pol ON pol."id" = sil."purchaseOrderLineId" JOIN "purchase_orders" po ON po."id" = pol."purchaseOrderId"
+            WHERE sil."supplierInvoiceId" = $1 ORDER BY sil."id"`,
+          [invoice.id],
+        );
+        const totalValue = lineRows.reduce((s, l) => s + Number(l.lineTotalBase), 0);
+        let discountLeft = charges.discount;
+        let freightLeft = charges.freightCapitalized;
+        const shares = lineRows.map((l, i) => {
+          const last = i === lineRows.length - 1;
+          const ratio = totalValue > 0 ? Number(l.lineTotalBase) / totalValue : 1 / lineRows.length;
+          const d = last ? discountLeft : this.r4(charges.discount * ratio);
+          const f = last ? freightLeft : this.r4(charges.freightCapitalized * ratio);
+          discountLeft = this.r4(discountLeft - d);
+          freightLeft = this.r4(freightLeft - f);
+          return { invoiceLineId: l.id, productId: l.productId, warehouseId: l.warehouseId, quantity: l.quantity, discountShare: d.toFixed(4), freightShare: f.toFixed(4) };
+        });
+        await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjusted, {
+          idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjusted`,
+          businessDate: new Date().toISOString().slice(0, 10),
+          orgUnitId: null,
+          currency: 'EGP',
+          sourceEntityType: 'supplier_invoice' as const,
+          sourceEntityId: invoice.id,
+          externalDocument: null,
+          payloadVersion: 1,
+          supplierInvoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          supplierId: invoice.supplierId,
+          discountAmount: charges.discount.toFixed(2),
+          freightCapitalizedAmount: charges.freightCapitalized.toFixed(2),
+          expensedChargesAmount: charges.expensed.toFixed(2),
+          allocationBasis: 'line_value' as const,
+          lines: shares,
+        });
+      }
 
       await this.audit.record(
         {
@@ -433,6 +525,22 @@ export class SupplierInvoiceService {
           dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
           voidReason: reason,
         });
+        const voidCharges = this.chargesOf(invoice);
+        if (voidCharges.discount > 0 || voidCharges.freightCapitalized > 0 || voidCharges.expensed > 0) {
+          await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjustmentVoided, {
+            idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjustment_voided`,
+            businessDate: new Date().toISOString().slice(0, 10),
+            orgUnitId: null,
+            currency: 'EGP',
+            sourceEntityType: 'supplier_invoice' as const,
+            sourceEntityId: invoice.id,
+            externalDocument: null,
+            payloadVersion: 1,
+            supplierInvoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            voidReason: reason,
+          });
+        }
       } else {
         await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId, m);
       }

@@ -48,4 +48,6 @@ export type MovementType =
   | 'assembly_output'
   | 'work_order_material_issue'
   | 'work_order_material_return'
-  | 'work_order_finished_goods_output';
+  | 'work_order_finished_goods_output'
+  // phase D-1 (2026-10-20): goods returned to a supplier by a posted Purchase Return. Deliberately NOT in `glKindFor`: the return publishes its own `procurement.purchase_return.posted` event.
+  | 'purchase_return_out';

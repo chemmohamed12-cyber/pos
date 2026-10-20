@@ -71,6 +71,6 @@ export class InvoicePolicyService {
       );
       return after;
     };
-    return manager ? run(manager) : this.dataSource.transaction(run);
+    return (manager ?? this.dataSource).transaction(run);
   }
 }
