@@ -1,0 +1,1107 @@
+BEGIN
+SET
+SET
+== Q0 schema probe (every column used below must appear) ==
+         table_name          |                                                                                                                                     cols                                                                                                                                     
+-----------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ accounting_financial_events | businessDate,eventType,id,idempotencyKey,journalEntryId,orgUnitId,payload,payloadVersion,processedAt,receivedAt,rejectionReason,sourceDomain,sourceEntityId,sourceEntityType,status,transactionCurrencyCode
+ accounting_gl_accounts      | accountType,allowManualJournal,code,controlFunction,createdAt,currencyMode,description,id,isActive,isContra,isPostable,name,nameAr,normalBalance,orgUnitId,parentAccountId,restrictCurrencyCode,updatedAt
+ accounting_journal_entries  | businessDate,createdAt,createdBy,description,entryNumber,financialEventId,functionalCurrencyCode,id,orgUnitId,postedAt,postedBy,postingDate,reversalOfEntryId,sourceType,totalCreditBase,totalCreditTransaction,totalDebitBase,totalDebitTransaction,transactionCurrencyCode
+ accounting_journal_lines    | accountId,createdAt,creditBase,creditTransaction,debitBase,debitTransaction,description,exchangeRateDate,exchangeRateUsed,id,journalEntryId,lineNumber,orgUnitId
+ customer_payments           | amount,customerId,id,invoiceId,method,occurredAt,paymentNumber,recordedByUserId,reference,treasuryAccountId,treasuryTransactionId
+ deposits                    | amount,createdAt,evidenceMediaAssetId,id,method,reference,rejectionReason,reviewedByUserId,salesOrderId,status,submittedByUserId
+ event_outbox                | attempts,createdAt,dispatchedAt,id,payload,schemaVersion,status,topic
+ supplier_payments           | amount,id,method,occurredAt,paymentNumber,recordedByUserId,reference,supplierId,supplierInvoiceId,treasuryAccountId,treasuryTransactionId
+ treasury_accounts           | accountTypeId,code,createdAt,glAccountCode,id,name,orgUnitId,status,updatedAt
+ treasury_transactions       | amount,createdAt,createdByUserId,customerId,depositId,employeeId,id,movementDate,payrollRunId,reason,reference,reversalOfTransactionId,salesOrderId,status,supplierId,supplierInvoiceId,transactionNumber,transferGroupId,treasuryAccountId,type
+(10 rows)
+
+== Q1 treasury legs whose expected Financial Event is missing / not POSTED ==
+       category       |      account       | gl_code | event_status | legs |  sum_amount  | first_date | last_date  
+----------------------+--------------------+---------+--------------+------+--------------+------------+------------
+ deposit              | M0001              | 1101    | REJECTED     |    2 |        22.00 | 2026-09-17 | 2026-09-17
+ direct_cash          | E2EACC-04059566186 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-04062286570 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-05375509987 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-05378244777 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-06048827830 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-06067251220 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-06069977666 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-0653495727  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-06544085405 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-07397486266 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-07400244955 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-07807604544 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-07813236765 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-08882740594 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-0888583926  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-08989050294 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | E2EACC-08991817536 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | E2EACC-09148115586 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-09155358285 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-09439963985 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-09922331320 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-09929855402 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-1012127775  |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-10127772581 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-10809722881 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-10812324348 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-10834830161 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-10840645197 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-10850363724 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-10854840832 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-11201244236 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-11204311626 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-11475331130 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-11481160467 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-12113116614 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-12118893801 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-12920703640 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-12927981918 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-13123317633 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-13126366542 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-13722411405 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-13728907528 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-14368902252 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-14375086144 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-15276377761 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-15281636838 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-16106011901 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-16111741823 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-16958532462 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-1696559099  |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-17953253423 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-17960265842 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-19967688102 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-19974776146 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-21768403308 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-2177693720  |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-26789230686 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-26802467935 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-28140208139 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-28148124427 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-29459918300 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-2946715570  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-29796056109 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-29801199186 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-31891080470 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-31902991925 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-35580239426 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-35846094842 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-35847929128 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-36056791431 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-3605866075  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-36168460791 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-36170332470 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | E2EACC-37447006733 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-37448814899 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-40784078332 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-4078723562  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-44310556103 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-44314143429 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-44596844673 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-44627075163 |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | E2EACC-48167501244 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-48168570757 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-48220848512 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-48221864951 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-53101193981 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-53107410552 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-5762631697  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-57631159657 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-59705907777 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-59711557975 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-59984987188 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-59991677547 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-60328139298 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-60564826614 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-60569448398 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-60630522245 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-6063468673  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-62383590783 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-62386168774 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | E2EACC-69036129645 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-69037479916 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-69101786587 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-69103029529 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-69552501330 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-69553759448 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-70121295621 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-7012258083  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-70432130311 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-70433530415 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-70550418619 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-70551686450 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-75805431830 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-75808924837 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-76040712871 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-76042436453 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-76139556728 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-7614185421  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | E2EACC-88397089853 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-88400768453 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-89251040867 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | E2EACC-89253649372 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | E2EACC-89912048467 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-89917078300 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-90000080460 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90001485587 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90076375492 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90077673737 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90603946663 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90606296597 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90823684999 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-90825284808 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-95043448580 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-95045464250 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | E2EACC-95557421600 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-9555999646  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-96673141542 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-96675984127 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-9745571750  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-9745932058  |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | E2EACC-98518496615 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | E2EACC-98525086919 |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | M0001              | 1101    | REJECTED     |    1 |       200.00 | 2026-09-18 | 2026-09-18
+ direct_cash          | MAIN-CASH          |         | NO_EVENT     |    1 |      5000.00 | 2026-09-17 | 2026-09-17
+ direct_cash          | PACC-0402792612    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-04033060763   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-05312986733   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-05318029840   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-06013225214   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-06019047836   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-06098802861   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-06114680696   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-07335819409   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-07341447713   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-07703928374   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-07713415638   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-08831453416   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-08837810843   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-08955034748   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | PACC-08959606969   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | PACC-094832838     |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-0949941526    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-0957909312    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-0958636234    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-10168839754   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-10178509296   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-10743686404   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-10748719867   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-10841394317   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-10852022265   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-10876119772   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-10889035186   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-11514890576   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-1152589557    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-117777124     |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-11784332368   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-12154380636   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-12166738227   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-12886980922   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-1289252376    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-12960094579   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-12972748846   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-13764716749   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-13778067788   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-14412498329   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-14425811567   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-1478598327    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-14792819738   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-15324302382   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-15338418320   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-16149284555   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-16163402728   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-17006649787   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-17021489274   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-18002471644   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-18018031388   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-18345433771   |         | NO_EVENT     |    1 |    100000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-18346385865   |         | NO_EVENT     |    1 |    100000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-18691422129   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-18693333469   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-18788144538   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-18790680817   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-20019552128   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-20040734733   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-21834669161   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-2184835573    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-26847659168   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-26869460480   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-28011386870   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-28028417861   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-29493971629   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-29500564905   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-31981143945   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-31998066333   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-32101469274   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-32104291401   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-34689907397   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-34692976342   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-34806909801   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-34810126506   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-36197929111   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-36201609935   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-20 | 2026-09-20
+ direct_cash          | PACC-40793287981   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-40799788722   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-44295309383   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-44302040915   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-44698041943   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-44720199657   |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-4570733714    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-4571767561    |         | NO_EVENT     |    1 | 100000000.00 | 2026-10-04 | 2026-10-04
+ direct_cash          | PACC-482347955     |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-48236512510   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-53112962815   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-53119286880   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-57639918714   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-57647659947   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-59699069526   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | PACC-59709344785   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | PACC-60348807986   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-60357468660   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-62360797518   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | PACC-6236482743    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-25 | 2026-09-25
+ direct_cash          | PACC-691336125     |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-69135478426   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-69527470908   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-69529809753   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-70099578902   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-70101853873   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-70541699324   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-705438409     |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-75820207449   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-75827220520   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-75928277323   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-75933024959   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-76055999801   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-76063183692   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-22 | 2026-09-22
+ direct_cash          | PACC-88342555423   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-88348288445   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-89199508764   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | PACC-89204506293   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-26 | 2026-09-26
+ direct_cash          | PACC-89938026212   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-89948745379   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-90109608279   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-90111847848   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-90424010882   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-90429627258   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-90647998573   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-90651311725   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-90859958860   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-90862868752   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-9502874816    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-95032942221   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-21 | 2026-09-21
+ direct_cash          | PACC-9549570138    |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-95500492529   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-96604014900   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-96609312136   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-97406586915   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-97411848451   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-27 | 2026-09-27
+ direct_cash          | PACC-98585296663   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ direct_cash          | PACC-98596827827   |         | NO_EVENT     |    1 | 100000000.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-04059566186 |         | N/A_NO_KEY   |  393 |   1420200.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-04062286570 |         | N/A_NO_KEY   |  394 |   1421750.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-05375509987 |         | N/A_NO_KEY   |  403 |   1456250.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-05378244777 |         | N/A_NO_KEY   |  404 |   1457800.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-06067251220 |         | N/A_NO_KEY   |  413 |   1492300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-06069977666 |         | N/A_NO_KEY   |  414 |   1493850.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-0653495727  |         | N/A_NO_KEY   |  511 |   1847050.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-06544085405 |         | N/A_NO_KEY   |  512 |   1848600.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-07397486266 |         | N/A_NO_KEY   |  423 |   1528350.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-07400244955 |         | N/A_NO_KEY   |  424 |   1529900.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-07807604544 |         | N/A_NO_KEY   |  433 |   1564400.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-07813236765 |         | N/A_NO_KEY   |  434 |   1565950.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-08882740594 |         | N/A_NO_KEY   |  443 |   1600450.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-0888583926  |         | N/A_NO_KEY   |  444 |   1602000.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-08989050294 |         | N/A_NO_KEY   |  343 |   1239950.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | E2EACC-08991817536 |         | N/A_NO_KEY   |  344 |   1241500.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | E2EACC-09148115586 |         | N/A_NO_KEY   |  525 |   1888600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-09155358285 |         | N/A_NO_KEY   |  526 |   1890150.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-09439963985 |         | N/A_NO_KEY   |  516 |   1863350.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-09922331320 |         | N/A_NO_KEY   |  523 |   1888850.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-09929855402 |         | N/A_NO_KEY   |  524 |   1890400.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-1012127775  |         | N/A_NO_KEY   |  536 |   1930650.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-10127772581 |         | N/A_NO_KEY   |  538 |   1935200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-10809722881 |         | N/A_NO_KEY   |  453 |   1636500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-10812324348 |         | N/A_NO_KEY   |  454 |   1638050.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-10834830161 |         | N/A_NO_KEY   |  546 |   1966700.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-10840645197 |         | N/A_NO_KEY   |  548 |   1971250.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-11201244236 |         | N/A_NO_KEY   |  203 |    750300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-11204311626 |         | N/A_NO_KEY   |  204 |    751850.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-11475331130 |         | N/A_NO_KEY   |  556 |   2002750.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-11481160467 |         | N/A_NO_KEY   |  558 |   2007300.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-12113116614 |         | N/A_NO_KEY   |  566 |   2038800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-12118893801 |         | N/A_NO_KEY   |  568 |   2043350.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-12920703640 |         | N/A_NO_KEY   |  576 |   2074850.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-12927981918 |         | N/A_NO_KEY   |  578 |   2079400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-13123317633 |         | N/A_NO_KEY   |  471 |   1702850.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-13126366542 |         | N/A_NO_KEY   |  472 |   1704400.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-13722411405 |         | N/A_NO_KEY   |  585 |   2108400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-13728907528 |         | N/A_NO_KEY   |  587 |   2112950.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-14368902252 |         | N/A_NO_KEY   |  595 |   2144450.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-14375086144 |         | N/A_NO_KEY   |  597 |   2149000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-15276377761 |         | N/A_NO_KEY   |  612 |   2204800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-15281636838 |         | N/A_NO_KEY   |  615 |   2215350.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-16106011901 |         | N/A_NO_KEY   |  623 |   2246850.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-16111741823 |         | N/A_NO_KEY   |  625 |   2251400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-16958532462 |         | N/A_NO_KEY   |  633 |   2282900.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-1696559099  |         | N/A_NO_KEY   |  635 |   2287450.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-17953253423 |         | N/A_NO_KEY   |  643 |   2318950.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-17960265842 |         | N/A_NO_KEY   |  645 |   2323500.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-19967688102 |         | N/A_NO_KEY   |  653 |   2355000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-19974776146 |         | N/A_NO_KEY   |  655 |   2359550.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-21768403308 |         | N/A_NO_KEY   |  663 |   2391050.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-2177693720  |         | N/A_NO_KEY   |  665 |   2395600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-26789230686 |         | N/A_NO_KEY   |  672 |   2421100.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-26802467935 |         | N/A_NO_KEY   |  676 |   2435650.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-28140208139 |         | N/A_NO_KEY   |  690 |   2487450.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-28148124427 |         | N/A_NO_KEY   |  691 |   2489000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-2946715570  |         | N/A_NO_KEY   |  208 |    766600.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-29796056109 |         | N/A_NO_KEY   |  215 |    792100.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-29801199186 |         | N/A_NO_KEY   |  216 |    793650.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-31891080470 |         | N/A_NO_KEY   |  692 |   2493200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-31902991925 |         | N/A_NO_KEY   |  695 |   2503750.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-35846094842 |         | N/A_NO_KEY   |   81 |    319250.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | E2EACC-36056791431 |         | N/A_NO_KEY   |   83 |    325000.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | E2EACC-3605866075  |         | N/A_NO_KEY   |   84 |    326550.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | E2EACC-36168460791 |         | N/A_NO_KEY   |   85 |    330750.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | E2EACC-36170332470 |         | N/A_NO_KEY   |   86 |    332300.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | E2EACC-37447006733 |         | N/A_NO_KEY   |  217 |    797850.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-37448814899 |         | N/A_NO_KEY   |  218 |    799400.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-40784078332 |         | N/A_NO_KEY   |  222 |    816600.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-4078723562  |         | N/A_NO_KEY   |  224 |    820650.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-44310556103 |         | N/A_NO_KEY   |  237 |    869950.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-44314143429 |         | N/A_NO_KEY   |  238 |    871500.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-44596844673 |         | N/A_NO_KEY   |  702 |   2529250.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-44627075163 |         | N/A_NO_KEY   |  705 |   2539800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | E2EACC-48167501244 |         | N/A_NO_KEY   |   95 |    366800.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-48168570757 |         | N/A_NO_KEY   |   96 |    368350.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-48220848512 |         | N/A_NO_KEY   |   97 |    372550.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-48221864951 |         | N/A_NO_KEY   |   98 |    374100.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-53101193981 |         | N/A_NO_KEY   |  241 |    884700.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-53107410552 |         | N/A_NO_KEY   |  245 |    893750.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-5762631697  |         | N/A_NO_KEY   |  251 |    920750.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-57631159657 |         | N/A_NO_KEY   |  254 |    928800.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-59705907777 |         | N/A_NO_KEY   |  308 |   1120800.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-59984987188 |         | N/A_NO_KEY   |  311 |   1128350.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-59991677547 |         | N/A_NO_KEY   |  312 |   1129900.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-60328139298 |         | N/A_NO_KEY   |  262 |    958150.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-60564826614 |         | N/A_NO_KEY   |  269 |    983650.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-60569448398 |         | N/A_NO_KEY   |  270 |    985200.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-60630522245 |         | N/A_NO_KEY   |  313 |   1134100.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-6063468673  |         | N/A_NO_KEY   |  314 |   1135650.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-62383590783 |         | N/A_NO_KEY   |  323 |   1170150.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-62386168774 |         | N/A_NO_KEY   |  324 |   1171700.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | E2EACC-69036129645 |         | N/A_NO_KEY   |  107 |    408600.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-69037479916 |         | N/A_NO_KEY   |  108 |    410150.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-69101786587 |         | N/A_NO_KEY   |  109 |    414350.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-69103029529 |         | N/A_NO_KEY   |  110 |    415900.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-69552501330 |         | N/A_NO_KEY   |  127 |    480700.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-69553759448 |         | N/A_NO_KEY   |  128 |    482250.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-70121295621 |         | N/A_NO_KEY   |  137 |    516750.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-7012258083  |         | N/A_NO_KEY   |  138 |    518300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-70432130311 |         | N/A_NO_KEY   |  139 |    522500.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-70433530415 |         | N/A_NO_KEY   |  140 |    524050.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-70550418619 |         | N/A_NO_KEY   |  149 |    558550.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-70551686450 |         | N/A_NO_KEY   |  150 |    560100.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-75805431830 |         | N/A_NO_KEY   |  273 |    998400.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-75808924837 |         | N/A_NO_KEY   |  275 |   1003950.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-76042436453 |         | N/A_NO_KEY   |  293 |   1070300.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-76139556728 |         | N/A_NO_KEY   |  299 |   1091800.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-7614185421  |         | N/A_NO_KEY   |  300 |   1093350.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | E2EACC-88397089853 |         | N/A_NO_KEY   |  353 |   1276000.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-88400768453 |         | N/A_NO_KEY   |  354 |   1277550.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-89251040867 |         | N/A_NO_KEY   |  333 |   1203900.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | E2EACC-89253649372 |         | N/A_NO_KEY   |  334 |   1205450.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | E2EACC-89912048467 |         | N/A_NO_KEY   |  475 |   1717600.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-89917078300 |         | N/A_NO_KEY   |  477 |   1723150.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-90000080460 |         | N/A_NO_KEY   |  151 |    564300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90001485587 |         | N/A_NO_KEY   |  152 |    565850.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90076375492 |         | N/A_NO_KEY   |  153 |    570050.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90077673737 |         | N/A_NO_KEY   |  154 |    571600.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90603946663 |         | N/A_NO_KEY   |  163 |    606100.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90606296597 |         | N/A_NO_KEY   |  164 |    607650.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90823684999 |         | N/A_NO_KEY   |  173 |    642150.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-90825284808 |         | N/A_NO_KEY   |  174 |    643700.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-95043448580 |         | N/A_NO_KEY   |  191 |    708500.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-95045464250 |         | N/A_NO_KEY   |  192 |    710050.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | E2EACC-95557421600 |         | N/A_NO_KEY   |  363 |   1312050.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-9555999646  |         | N/A_NO_KEY   |  364 |   1313600.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-96673141542 |         | N/A_NO_KEY   |  373 |   1348100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-96675984127 |         | N/A_NO_KEY   |  374 |   1349650.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-9745571750  |         | N/A_NO_KEY   |  383 |   1384150.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-9745932058  |         | N/A_NO_KEY   |  384 |   1385700.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | E2EACC-98518496615 |         | N/A_NO_KEY   |  491 |   1774950.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | E2EACC-98525086919 |         | N/A_NO_KEY   |  492 |   1776500.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-0402792612    |         | N/A_NO_KEY   |  391 |   1411700.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-04033060763   |         | N/A_NO_KEY   |  392 |   1413500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-05312986733   |         | N/A_NO_KEY   |  401 |   1447500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-05318029840   |         | N/A_NO_KEY   |  402 |   1449300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-06013225214   |         | N/A_NO_KEY   |  411 |   1483300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-06019047836   |         | N/A_NO_KEY   |  412 |   1485100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-06098802861   |         | N/A_NO_KEY   |  509 |   1835800.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-06114680696   |         | N/A_NO_KEY   |  510 |   1837600.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-07335819409   |         | N/A_NO_KEY   |  421 |   1519100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-07341447713   |         | N/A_NO_KEY   |  422 |   1520900.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-07703928374   |         | N/A_NO_KEY   |  431 |   1554900.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-07713415638   |         | N/A_NO_KEY   |  432 |   1556700.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-08831453416   |         | N/A_NO_KEY   |  441 |   1590700.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-08837810843   |         | N/A_NO_KEY   |  442 |   1592500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-08955034748   |         | N/A_NO_KEY   |  341 |   1232700.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | PACC-08959606969   |         | N/A_NO_KEY   |  342 |   1234500.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | PACC-094832838     |         | N/A_NO_KEY   |  521 |   1877100.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-0949941526    |         | N/A_NO_KEY   |  522 |   1878900.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-0957909312    |         | N/A_NO_KEY   |  533 |   1918400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-0958636234    |         | N/A_NO_KEY   |  534 |   1920200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-10168839754   |         | N/A_NO_KEY   |  543 |   1954200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-10178509296   |         | N/A_NO_KEY   |  544 |   1956000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-10743686404   |         | N/A_NO_KEY   |  451 |   1626500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-10748719867   |         | N/A_NO_KEY   |  452 |   1628300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-10841394317   |         | N/A_NO_KEY   |  199 |    734300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-10852022265   |         | N/A_NO_KEY   |  201 |    740100.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-10876119772   |         | N/A_NO_KEY   |  553 |   1990000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-10889035186   |         | N/A_NO_KEY   |  554 |   1991800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-11514890576   |         | N/A_NO_KEY   |  563 |   2025800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-1152589557    |         | N/A_NO_KEY   |  564 |   2027600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-117777124     |         | N/A_NO_KEY   |  461 |   1662300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-11784332368   |         | N/A_NO_KEY   |  462 |   1664100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-12154380636   |         | N/A_NO_KEY   |  573 |   2061600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-12166738227   |         | N/A_NO_KEY   |  574 |   2063400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-12886980922   |         | N/A_NO_KEY   |  469 |   1692600.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-1289252376    |         | N/A_NO_KEY   |  470 |   1694400.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-12960094579   |         | N/A_NO_KEY   |  582 |   2094900.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-12972748846   |         | N/A_NO_KEY   |  583 |   2096700.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-13764716749   |         | N/A_NO_KEY   |  592 |   2130700.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-13778067788   |         | N/A_NO_KEY   |  593 |   2132500.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-14412498329   |         | N/A_NO_KEY   |  602 |   2166500.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-14425811567   |         | N/A_NO_KEY   |  603 |   2168300.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-1478598327    |         | N/A_NO_KEY   |  610 |   2196800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-14792819738   |         | N/A_NO_KEY   |  611 |   2198600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-15324302382   |         | N/A_NO_KEY   |  620 |   2232600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-15338418320   |         | N/A_NO_KEY   |  621 |   2234400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-16149284555   |         | N/A_NO_KEY   |  630 |   2268400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-16163402728   |         | N/A_NO_KEY   |  631 |   2270200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-17006649787   |         | N/A_NO_KEY   |  640 |   2304200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-17021489274   |         | N/A_NO_KEY   |  641 |   2306000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-18002471644   |         | N/A_NO_KEY   |  650 |   2340000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-18018031388   |         | N/A_NO_KEY   |  651 |   2341800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-18691422129   |         | N/A_NO_KEY   |   45 |    186300.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-18693333469   |         | N/A_NO_KEY   |   46 |    188100.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-18788144538   |         | N/A_NO_KEY   |   53 |    216600.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-18790680817   |         | N/A_NO_KEY   |   54 |    218400.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-20019552128   |         | N/A_NO_KEY   |  660 |   2375800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-20040734733   |         | N/A_NO_KEY   |  661 |   2377600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-21834669161   |         | N/A_NO_KEY   |  670 |   2411600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-2184835573    |         | N/A_NO_KEY   |  671 |   2413400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-26847659168   |         | N/A_NO_KEY   |  680 |   2447400.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-26869460480   |         | N/A_NO_KEY   |  681 |   2449200.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-28011386870   |         | N/A_NO_KEY   |  688 |   2477700.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-28028417861   |         | N/A_NO_KEY   |  689 |   2479500.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-29493971629   |         | N/A_NO_KEY   |  213 |    781100.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-29500564905   |         | N/A_NO_KEY   |  214 |    782900.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-31981143945   |         | N/A_NO_KEY   |  700 |   2519000.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-31998066333   |         | N/A_NO_KEY   |  701 |   2520800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-32101469274   |         | N/A_NO_KEY   |   61 |    246900.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-32104291401   |         | N/A_NO_KEY   |   62 |    248700.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-34689907397   |         | N/A_NO_KEY   |   69 |    277200.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-34692976342   |         | N/A_NO_KEY   |   70 |    279000.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-34806909801   |         | N/A_NO_KEY   |   77 |    307500.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-34810126506   |         | N/A_NO_KEY   |   78 |    309300.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-36197929111   |         | N/A_NO_KEY   |   93 |    359800.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-36201609935   |         | N/A_NO_KEY   |   94 |    361600.00 | 2026-09-20 | 2026-09-20
+ payroll_disbursement | PACC-40793287981   |         | N/A_NO_KEY   |  227 |    827900.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-40799788722   |         | N/A_NO_KEY   |  228 |    829700.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-44295309383   |         | N/A_NO_KEY   |  235 |    858200.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-44302040915   |         | N/A_NO_KEY   |  236 |    860000.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-44698041943   |         | N/A_NO_KEY   |  710 |   2554800.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-44720199657   |         | N/A_NO_KEY   |  711 |   2556600.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-4570733714    |         | N/A_NO_KEY   |  718 |   2585100.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-4571767561    |         | N/A_NO_KEY   |  719 |   2586900.00 | 2026-10-04 | 2026-10-04
+ payroll_disbursement | PACC-482347955     |         | N/A_NO_KEY   |  105 |    401100.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-48236512510   |         | N/A_NO_KEY   |  106 |    402900.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-53112962815   |         | N/A_NO_KEY   |  247 |    899500.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-53119286880   |         | N/A_NO_KEY   |  248 |    901300.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-57639918714   |         | N/A_NO_KEY   |  257 |    935300.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-57647659947   |         | N/A_NO_KEY   |  258 |    937100.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-59699069526   |         | N/A_NO_KEY   |  308 |   1118300.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | PACC-59709344785   |         | N/A_NO_KEY   |  309 |   1120100.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | PACC-60348807986   |         | N/A_NO_KEY   |  267 |    971100.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-60357468660   |         | N/A_NO_KEY   |  268 |    972900.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-62360797518   |         | N/A_NO_KEY   |  321 |   1161100.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | PACC-6236482743    |         | N/A_NO_KEY   |  322 |   1162900.00 | 2026-09-25 | 2026-09-25
+ payroll_disbursement | PACC-691336125     |         | N/A_NO_KEY   |  117 |    442400.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-69135478426   |         | N/A_NO_KEY   |  118 |    444200.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-69527470908   |         | N/A_NO_KEY   |  125 |    472700.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-69529809753   |         | N/A_NO_KEY   |  126 |    474500.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-70099578902   |         | N/A_NO_KEY   |  135 |    508500.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-70101853873   |         | N/A_NO_KEY   |  136 |    510300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-70541699324   |         | N/A_NO_KEY   |  147 |    549800.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-705438409     |         | N/A_NO_KEY   |  148 |    551600.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-75820207449   |         | N/A_NO_KEY   |  279 |   1012400.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-75827220520   |         | N/A_NO_KEY   |  280 |   1014200.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-75928277323   |         | N/A_NO_KEY   |  287 |   1042700.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-75933024959   |         | N/A_NO_KEY   |  288 |   1044500.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-76055999801   |         | N/A_NO_KEY   |  297 |   1078500.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-76063183692   |         | N/A_NO_KEY   |  298 |   1080300.00 | 2026-09-22 | 2026-09-22
+ payroll_disbursement | PACC-88342555423   |         | N/A_NO_KEY   |  351 |   1268500.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-88348288445   |         | N/A_NO_KEY   |  352 |   1270300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-89199508764   |         | N/A_NO_KEY   |  331 |   1196900.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | PACC-89204506293   |         | N/A_NO_KEY   |  332 |   1198700.00 | 2026-09-26 | 2026-09-26
+ payroll_disbursement | PACC-89938026212   |         | N/A_NO_KEY   |  481 |   1733900.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-89948745379   |         | N/A_NO_KEY   |  482 |   1735700.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-90109608279   |         | N/A_NO_KEY   |  161 |    596600.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-90111847848   |         | N/A_NO_KEY   |  162 |    598400.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-90424010882   |         | N/A_NO_KEY   |  489 |   1764200.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-90429627258   |         | N/A_NO_KEY   |  490 |   1766000.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-90647998573   |         | N/A_NO_KEY   |  171 |    632400.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-90651311725   |         | N/A_NO_KEY   |  172 |    634200.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-90859958860   |         | N/A_NO_KEY   |  181 |    668200.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-90862868752   |         | N/A_NO_KEY   |  182 |    670000.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-9502874816    |         | N/A_NO_KEY   |  189 |    698500.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-95032942221   |         | N/A_NO_KEY   |  190 |    700300.00 | 2026-09-21 | 2026-09-21
+ payroll_disbursement | PACC-9549570138    |         | N/A_NO_KEY   |  361 |   1304300.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-95500492529   |         | N/A_NO_KEY   |  362 |   1306100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-96604014900   |         | N/A_NO_KEY   |  371 |   1340100.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-96609312136   |         | N/A_NO_KEY   |  372 |   1341900.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-97406586915   |         | N/A_NO_KEY   |  381 |   1375900.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-97411848451   |         | N/A_NO_KEY   |  382 |   1377700.00 | 2026-09-27 | 2026-09-27
+ payroll_disbursement | PACC-98585296663   |         | N/A_NO_KEY   |  499 |   1800000.00 | 2026-09-28 | 2026-09-28
+ payroll_disbursement | PACC-98596827827   |         | N/A_NO_KEY   |  500 |   1801800.00 | 2026-09-28 | 2026-09-28
+(549 rows)
+
+== Q1b same, row level (first 200 offenders) ==
+ transactionNumber  |  type   |    amount    |        movementDate        |      account       | glAccountCode |                        expected_key                        | event_status |                                                                          rejectionReason                                                                           
+--------------------+---------+--------------+----------------------------+--------------------+---------------+------------------------------------------------------------+--------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ TRS-IN-2026-000030 | cash_in |        10.00 | 2026-09-17 17:37:00.589+03 | M0001              | 1101          | deposit:e3085681-e67e-4686-b9c6-6e78ac1f281f:verified      | REJECTED     | deposit.verified: treasury account is not GL-mapped
+ TRS-IN-2026-000031 | cash_in |        12.00 | 2026-09-17 17:49:07.793+03 | M0001              | 1101          | deposit:eb756ee0-d02d-44f4-8988-01e48d0d6cb5:verified      | REJECTED     | deposit.verified: treasury account is not GL-mapped
+ TRS-IN-2026-000032 | cash_in |      5000.00 | 2026-09-17 22:23:30.536+03 | MAIN-CASH          |               | treasury:txn:67167908-79d9-4342-9180-af2addf82ba9:recorded |              | 
+ TRS-IN-2026-000034 | cash_in |       200.00 | 2026-09-18 11:17:15.827+03 | M0001              | 1101          | treasury:txn:087d89b2-0289-4997-ac59-a65a0983bb1b:recorded | REJECTED     | cash.recorded: no counterAccountCode and the clearing account is unset — set accounting.cash_movement_clearing_account_code to a postable non-control GL account
+ TRS-IN-2026-000035 | cash_in |    100000.00 | 2026-09-20 18:32:25.503+03 | PACC-18345433771   |               | treasury:txn:0832a915-c522-49ee-89e7-d0c3ab853a38:recorded |              | 
+ TRS-IN-2026-000036 | cash_in |    100000.00 | 2026-09-20 18:32:26.398+03 | PACC-18346385865   |               | treasury:txn:1dc66244-ff4c-499d-9ca1-c7232ec82a3c:recorded |              | 
+ TRS-IN-2026-000037 | cash_in | 100000000.00 | 2026-09-20 18:38:11.454+03 | PACC-18691422129   |               | treasury:txn:899257dd-eda1-483f-bc14-4ff4f6218202:recorded |              | 
+ TRS-IN-2026-000038 | cash_in | 100000000.00 | 2026-09-20 18:38:13.352+03 | PACC-18693333469   |               | treasury:txn:624521c4-e1aa-4b2d-b7c0-12da02110672:recorded |              | 
+ TRS-IN-2026-000039 | cash_in | 100000000.00 | 2026-09-20 18:39:48.183+03 | PACC-18788144538   |               | treasury:txn:a9749829-0d70-4962-b5b0-52789da166c6:recorded |              | 
+ TRS-IN-2026-000040 | cash_in | 100000000.00 | 2026-09-20 18:39:50.705+03 | PACC-18790680817   |               | treasury:txn:98e89d85-1f8a-4495-ad38-b5e0707ecac6:recorded |              | 
+ TRS-IN-2026-000041 | cash_in | 100000000.00 | 2026-09-20 22:21:41.616+03 | PACC-32101469274   |               | treasury:txn:e10554ac-2ea6-4f38-86b3-9ec54f99b229:recorded |              | 
+ TRS-IN-2026-000042 | cash_in | 100000000.00 | 2026-09-20 22:21:44.316+03 | PACC-32104291401   |               | treasury:txn:1aa415e8-9419-4ef7-9241-a3b450d88ab6:recorded |              | 
+ TRS-IN-2026-000043 | cash_in | 100000000.00 | 2026-09-20 23:04:49.964+03 | PACC-34689907397   |               | treasury:txn:e8ae30a1-37a8-4b22-9eb6-9e8ad04102f0:recorded |              | 
+ TRS-IN-2026-000044 | cash_in | 100000000.00 | 2026-09-20 23:04:53.005+03 | PACC-34692976342   |               | treasury:txn:be660d07-ba4f-4625-a097-10c370b6cd8e:recorded |              | 
+ TRS-IN-2026-000045 | cash_in | 100000000.00 | 2026-09-20 23:06:46.971+03 | PACC-34806909801   |               | treasury:txn:688e9f22-b551-489c-89cd-2b59f2502ce5:recorded |              | 
+ TRS-IN-2026-000046 | cash_in | 100000000.00 | 2026-09-20 23:06:50.151+03 | PACC-34810126506   |               | treasury:txn:d31c1642-f7f0-4aff-863e-e0e5c18453ef:recorded |              | 
+ TRS-IN-2026-000047 | cash_in | 100000000.00 | 2026-09-20 23:19:40.29+03  | E2EACC-35580239426 |               | treasury:txn:76bb973b-6177-40d9-a550-1278cc7ea397:recorded |              | 
+ TRS-IN-2026-000048 | cash_in | 100000000.00 | 2026-09-20 23:24:06.144+03 | E2EACC-35846094842 |               | treasury:txn:5aae130d-d26a-42d6-82d3-60c8404b7375:recorded |              | 
+ TRS-IN-2026-000049 | cash_in | 100000000.00 | 2026-09-20 23:24:07.955+03 | E2EACC-35847929128 |               | treasury:txn:f8725744-812a-4556-804b-7498389015f6:recorded |              | 
+ TRS-IN-2026-000050 | cash_in | 100000000.00 | 2026-09-20 23:27:36.842+03 | E2EACC-36056791431 |               | treasury:txn:c029adb5-dedb-43b5-8545-5f25d11c1647:recorded |              | 
+ TRS-IN-2026-000051 | cash_in | 100000000.00 | 2026-09-20 23:27:38.688+03 | E2EACC-3605866075  |               | treasury:txn:0b79d336-ca2d-4e97-a10f-509fc4260ac5:recorded |              | 
+ TRS-IN-2026-000052 | cash_in | 100000000.00 | 2026-09-20 23:29:28.525+03 | E2EACC-36168460791 |               | treasury:txn:3845e24f-46aa-46a4-991c-cde5fd5e9bc0:recorded |              | 
+ TRS-IN-2026-000053 | cash_in | 100000000.00 | 2026-09-20 23:29:30.359+03 | E2EACC-36170332470 |               | treasury:txn:e9d00695-8853-47a2-bc25-09c66754dd68:recorded |              | 
+ TRS-IN-2026-000054 | cash_in | 100000000.00 | 2026-09-20 23:29:57.972+03 | PACC-36197929111   |               | treasury:txn:161dc2d3-b42b-4da6-8cdc-e4df971dff73:recorded |              | 
+ TRS-IN-2026-000055 | cash_in | 100000000.00 | 2026-09-20 23:30:01.634+03 | PACC-36201609935   |               | treasury:txn:f16dacb4-f697-4aaf-8c1e-5e0c9f410135:recorded |              | 
+ TRS-IN-2026-000056 | cash_in | 100000000.00 | 2026-09-21 02:49:27.579+03 | E2EACC-48167501244 |               | treasury:txn:63717902-591d-4a39-aae8-10c77e2498da:recorded |              | 
+ TRS-IN-2026-000057 | cash_in | 100000000.00 | 2026-09-21 02:49:28.587+03 | E2EACC-48168570757 |               | treasury:txn:48864ed0-cd02-4d41-a00c-13312574d54b:recorded |              | 
+ TRS-IN-2026-000058 | cash_in | 100000000.00 | 2026-09-21 02:50:20.87+03  | E2EACC-48220848512 |               | treasury:txn:ebcc1c7b-c921-4ba6-9a3b-b6767d3b3cea:recorded |              | 
+ TRS-IN-2026-000059 | cash_in | 100000000.00 | 2026-09-21 02:50:21.877+03 | E2EACC-48221864951 |               | treasury:txn:8692b5df-422b-4474-95a1-48b68a4c0fe2:recorded |              | 
+ TRS-IN-2026-000060 | cash_in | 100000000.00 | 2026-09-21 02:50:34.819+03 | PACC-482347955     |               | treasury:txn:999204e0-8375-4305-95f7-0275a4ee4a26:recorded |              | 
+ TRS-IN-2026-000061 | cash_in | 100000000.00 | 2026-09-21 02:50:36.527+03 | PACC-48236512510   |               | treasury:txn:f162617b-59cd-46c1-a546-fc33ccd1779d:recorded |              | 
+ TRS-IN-2026-000062 | cash_in | 100000000.00 | 2026-09-21 08:37:16.378+03 | E2EACC-69036129645 |               | treasury:txn:f311f61d-7e98-4623-a207-71c8a5dd4828:recorded |              | 
+ TRS-IN-2026-000063 | cash_in | 100000000.00 | 2026-09-21 08:37:17.491+03 | E2EACC-69037479916 |               | treasury:txn:4c4a3589-db42-41d0-a740-65ca7c020704:recorded |              | 
+ TRS-IN-2026-000064 | cash_in | 100000000.00 | 2026-09-21 08:38:21.809+03 | E2EACC-69101786587 |               | treasury:txn:e9ba37ed-0c6b-450d-918b-58608713a908:recorded |              | 
+ TRS-IN-2026-000065 | cash_in | 100000000.00 | 2026-09-21 08:38:23.041+03 | E2EACC-69103029529 |               | treasury:txn:d8810329-25e1-4347-b520-31075d7ecd71:recorded |              | 
+ TRS-IN-2026-000066 | cash_in | 100000000.00 | 2026-09-21 08:38:53.631+03 | PACC-691336125     |               | treasury:txn:777b620a-28bd-4a18-aa59-c25dc6511b38:recorded |              | 
+ TRS-IN-2026-000067 | cash_in | 100000000.00 | 2026-09-21 08:38:55.491+03 | PACC-69135478426   |               | treasury:txn:d351b6fe-8621-4ce3-8f48-0ed953eda671:recorded |              | 
+ TRS-IN-2026-000068 | cash_in | 100000000.00 | 2026-09-21 08:45:27.499+03 | PACC-69527470908   |               | treasury:txn:87b6d52c-0c7d-4e11-a156-d4cceaf04dd1:recorded |              | 
+ TRS-IN-2026-000069 | cash_in | 100000000.00 | 2026-09-21 08:45:29.822+03 | PACC-69529809753   |               | treasury:txn:0f0bb4ac-8294-4663-a01e-3a58e9041e0b:recorded |              | 
+ TRS-IN-2026-000070 | cash_in | 100000000.00 | 2026-09-21 08:45:52.523+03 | E2EACC-69552501330 |               | treasury:txn:1882c5f7-2b64-457c-a916-0135e96d0be9:recorded |              | 
+ TRS-IN-2026-000071 | cash_in | 100000000.00 | 2026-09-21 08:45:53.777+03 | E2EACC-69553759448 |               | treasury:txn:eb7b735b-3695-49da-a87e-cf4bda3c048c:recorded |              | 
+ TRS-IN-2026-000072 | cash_in | 100000000.00 | 2026-09-21 08:54:59.601+03 | PACC-70099578902   |               | treasury:txn:102c2642-9950-49cf-ade1-de6066c7dbf7:recorded |              | 
+ TRS-IN-2026-000073 | cash_in | 100000000.00 | 2026-09-21 08:55:01.871+03 | PACC-70101853873   |               | treasury:txn:aee5cba1-cbb8-42e8-8fd8-5be6f68cf730:recorded |              | 
+ TRS-IN-2026-000074 | cash_in | 100000000.00 | 2026-09-21 08:55:21.319+03 | E2EACC-70121295621 |               | treasury:txn:175c122c-d6a5-4fd7-982b-b910ec1423db:recorded |              | 
+ TRS-IN-2026-000075 | cash_in | 100000000.00 | 2026-09-21 08:55:22.595+03 | E2EACC-7012258083  |               | treasury:txn:6fe48d43-439f-47cd-a991-6606122e28af:recorded |              | 
+ TRS-IN-2026-000076 | cash_in | 100000000.00 | 2026-09-21 09:00:32.156+03 | E2EACC-70432130311 |               | treasury:txn:c4c61443-3423-47c8-9756-c69bcb0fa92a:recorded |              | 
+ TRS-IN-2026-000077 | cash_in | 100000000.00 | 2026-09-21 09:00:33.543+03 | E2EACC-70433530415 |               | treasury:txn:6805806c-ea8f-454e-9f24-49120f991e9b:recorded |              | 
+ TRS-IN-2026-000078 | cash_in | 100000000.00 | 2026-09-21 09:02:21.72+03  | PACC-70541699324   |               | treasury:txn:ff61e411-8079-4583-ba32-4d7fc2ff7d9a:recorded |              | 
+ TRS-IN-2026-000079 | cash_in | 100000000.00 | 2026-09-21 09:02:23.851+03 | PACC-705438409     |               | treasury:txn:5e4d15fe-b079-4558-83f6-26b45152e2e6:recorded |              | 
+ TRS-IN-2026-000080 | cash_in | 100000000.00 | 2026-09-21 09:02:30.44+03  | E2EACC-70550418619 |               | treasury:txn:58dbc18c-432d-4925-b8c7-60b37fcdd943:recorded |              | 
+ TRS-IN-2026-000081 | cash_in | 100000000.00 | 2026-09-21 09:02:31.7+03   | E2EACC-70551686450 |               | treasury:txn:9d441524-bafd-44e6-8003-610e40fa86ad:recorded |              | 
+ TRS-IN-2026-000082 | cash_in | 100000000.00 | 2026-09-21 14:26:40.134+03 | E2EACC-90000080460 |               | treasury:txn:461dba39-f610-442b-82e9-224aa21164c9:recorded |              | 
+ TRS-IN-2026-000083 | cash_in | 100000000.00 | 2026-09-21 14:26:41.498+03 | E2EACC-90001485587 |               | treasury:txn:aca68080-139c-4fcb-b8c1-8088bd65fb24:recorded |              | 
+ TRS-IN-2026-000084 | cash_in | 100000000.00 | 2026-09-21 14:27:56.398+03 | E2EACC-90076375492 |               | treasury:txn:e6520de3-de3e-442a-bdfe-b7700caf7705:recorded |              | 
+ TRS-IN-2026-000085 | cash_in | 100000000.00 | 2026-09-21 14:27:57.684+03 | E2EACC-90077673737 |               | treasury:txn:36a22a75-3d7d-4dac-a35f-cf5742bc1494:recorded |              | 
+ TRS-IN-2026-000086 | cash_in | 100000000.00 | 2026-09-21 14:28:29.631+03 | PACC-90109608279   |               | treasury:txn:0077b55e-9290-4a30-887d-bb696e6d3b25:recorded |              | 
+ TRS-IN-2026-000087 | cash_in | 100000000.00 | 2026-09-21 14:28:31.857+03 | PACC-90111847848   |               | treasury:txn:b13e696a-6b25-4b95-aabb-6eee5e7e7ee9:recorded |              | 
+ TRS-IN-2026-000088 | cash_in | 100000000.00 | 2026-09-21 14:36:43.983+03 | E2EACC-90603946663 |               | treasury:txn:f43801c2-b329-47a0-bc83-77374679d88f:recorded |              | 
+ TRS-IN-2026-000089 | cash_in | 100000000.00 | 2026-09-21 14:36:46.319+03 | E2EACC-90606296597 |               | treasury:txn:3399b3f0-ea3a-474a-9b74-e021dfa5a2f5:recorded |              | 
+ TRS-IN-2026-000090 | cash_in | 100000000.00 | 2026-09-21 14:37:28.023+03 | PACC-90647998573   |               | treasury:txn:97dea690-c4ea-4c5c-857d-c33d7ad9f39c:recorded |              | 
+ TRS-IN-2026-000091 | cash_in | 100000000.00 | 2026-09-21 14:37:31.326+03 | PACC-90651311725   |               | treasury:txn:28acb275-74ff-4128-99bf-1dd8b87fe05b:recorded |              | 
+ TRS-IN-2026-000092 | cash_in | 100000000.00 | 2026-09-21 14:40:23.71+03  | E2EACC-90823684999 |               | treasury:txn:43603329-ba57-49e1-a02b-f628cd0c2b37:recorded |              | 
+ TRS-IN-2026-000093 | cash_in | 100000000.00 | 2026-09-21 14:40:25.3+03   | E2EACC-90825284808 |               | treasury:txn:d530dcdf-cedb-4123-a4c9-1f6b0f811ca0:recorded |              | 
+ TRS-IN-2026-000094 | cash_in | 100000000.00 | 2026-09-21 14:40:59.977+03 | PACC-90859958860   |               | treasury:txn:812f843e-650f-44eb-ac04-7e269a91a573:recorded |              | 
+ TRS-IN-2026-000095 | cash_in | 100000000.00 | 2026-09-21 14:41:02.88+03  | PACC-90862868752   |               | treasury:txn:bd24b231-afba-437b-8d9e-cf1cc038f985:recorded |              | 
+ TRS-IN-2026-000096 | cash_in | 100000000.00 | 2026-09-21 15:50:28.822+03 | PACC-9502874816    |               | treasury:txn:91d3e7be-c6b3-4c42-b147-1e872bce260d:recorded |              | 
+ TRS-IN-2026-000097 | cash_in | 100000000.00 | 2026-09-21 15:50:32.954+03 | PACC-95032942221   |               | treasury:txn:e0b39a97-f36a-407c-8ae7-c919cacfd95d:recorded |              | 
+ TRS-IN-2026-000098 | cash_in | 100000000.00 | 2026-09-21 15:50:43.472+03 | E2EACC-95043448580 |               | treasury:txn:3a5b7c4d-eda6-4f8e-8493-29f7116ef4e4:recorded |              | 
+ TRS-IN-2026-000099 | cash_in | 100000000.00 | 2026-09-21 15:50:45.478+03 | E2EACC-95045464250 |               | treasury:txn:69402005-88f2-472d-aa59-d450cda38481:recorded |              | 
+ TRS-IN-2026-000100 | cash_in | 100000000.00 | 2026-09-21 20:14:01.454+03 | PACC-10841394317   |               | treasury:txn:e466d9d9-e379-4deb-915d-e98f64a64fc3:recorded |              | 
+ TRS-IN-2026-000101 | cash_in | 100000000.00 | 2026-09-21 20:14:10.414+03 | E2EACC-10850363724 |               | treasury:txn:65e98a24-718a-4767-a973-5ab4b0b315ba:recorded |              | 
+ TRS-IN-2026-000102 | cash_in | 100000000.00 | 2026-09-21 20:14:12.045+03 | PACC-10852022265   |               | treasury:txn:e00cdd8a-3a11-4a64-a807-7fe2a08515d2:recorded |              | 
+ TRS-IN-2026-000103 | cash_in | 100000000.00 | 2026-09-21 20:14:14.862+03 | E2EACC-10854840832 |               | treasury:txn:4ee6eb3a-6524-4600-bd34-5322e8cfb673:recorded |              | 
+ TRS-IN-2026-000104 | cash_in | 100000000.00 | 2026-09-21 20:20:01.28+03  | E2EACC-11201244236 |               | treasury:txn:7e82317a-c4ad-49f6-aa9d-a26c265c9b74:recorded |              | 
+ TRS-IN-2026-000105 | cash_in | 100000000.00 | 2026-09-21 20:20:04.339+03 | E2EACC-11204311626 |               | treasury:txn:b9bb0c78-a474-4bde-957f-daae6a9e34e7:recorded |              | 
+ TRS-IN-2026-000106 | cash_in | 100000000.00 | 2026-09-22 01:24:19.993+03 | E2EACC-29459918300 |               | treasury:txn:0c3c371f-6c47-487f-a971-e650587188a7:recorded |              | 
+ TRS-IN-2026-000107 | cash_in | 100000000.00 | 2026-09-22 01:24:27.183+03 | E2EACC-2946715570  |               | treasury:txn:31b451bb-f885-484f-a1e6-eefb290080d1:recorded |              | 
+ TRS-IN-2026-000108 | cash_in | 100000000.00 | 2026-09-22 01:24:54.011+03 | PACC-29493971629   |               | treasury:txn:ff8c874d-e9fc-4ab9-8318-35779bbc8427:recorded |              | 
+ TRS-IN-2026-000109 | cash_in | 100000000.00 | 2026-09-22 01:25:00.588+03 | PACC-29500564905   |               | treasury:txn:60c76cd7-201e-4e22-bcea-c26fed019e8e:recorded |              | 
+ TRS-IN-2026-000110 | cash_in | 100000000.00 | 2026-09-22 01:29:56.126+03 | E2EACC-29796056109 |               | treasury:txn:e511ddee-fb76-4e0a-99fd-0c8d3b861190:recorded |              | 
+ TRS-IN-2026-000111 | cash_in | 100000000.00 | 2026-09-22 01:30:01.233+03 | E2EACC-29801199186 |               | treasury:txn:b71ca233-1551-4e7f-9f6e-6a18f0d35307:recorded |              | 
+ TRS-IN-2026-000112 | cash_in | 100000000.00 | 2026-09-22 03:37:27.065+03 | E2EACC-37447006733 |               | treasury:txn:bb4648c2-df3d-4622-9db4-3e150747db36:recorded |              | 
+ TRS-IN-2026-000113 | cash_in | 100000000.00 | 2026-09-22 03:37:28.825+03 | E2EACC-37448814899 |               | treasury:txn:8f0ac717-2f04-4c87-8e1e-7b4a865ff3f7:recorded |              | 
+ TRS-IN-2026-000114 | cash_in | 100000000.00 | 2026-09-22 04:33:04.119+03 | E2EACC-40784078332 |               | treasury:txn:8d46cfb3-b849-4ae5-b6b0-00e796ecf90b:recorded |              | 
+ TRS-IN-2026-000115 | cash_in | 100000000.00 | 2026-09-22 04:33:07.256+03 | E2EACC-4078723562  |               | treasury:txn:277b4519-a494-4bbd-84f9-cb9ccb32521b:recorded |              | 
+ TRS-IN-2026-000116 | cash_in | 100000000.00 | 2026-09-22 04:33:13.321+03 | PACC-40793287981   |               | treasury:txn:f1418b61-b3fe-47be-8963-64333c8c8957:recorded |              | 
+ TRS-IN-2026-000117 | cash_in | 100000000.00 | 2026-09-22 04:33:19.805+03 | PACC-40799788722   |               | treasury:txn:8a181f5f-77a1-46e4-922f-6a0d7b034935:recorded |              | 
+ TRS-IN-2026-000118 | cash_in | 100000000.00 | 2026-09-22 05:31:35.49+03  | PACC-44295309383   |               | treasury:txn:d40f0b5c-7216-4e57-aaa4-d7e221a7684c:recorded |              | 
+ TRS-IN-2026-000119 | cash_in | 100000000.00 | 2026-09-22 05:31:42.063+03 | PACC-44302040915   |               | treasury:txn:94131b5c-c79e-4ece-ab9a-1275d8366d7c:recorded |              | 
+ TRS-IN-2026-000120 | cash_in | 100000000.00 | 2026-09-22 05:31:50.599+03 | E2EACC-44310556103 |               | treasury:txn:8bd740e0-d8f1-4417-b6d7-601307525279:recorded |              | 
+ TRS-IN-2026-000121 | cash_in | 100000000.00 | 2026-09-22 05:31:54.166+03 | E2EACC-44314143429 |               | treasury:txn:6e550e9c-3d0c-4a5b-b40e-b90f543d2670:recorded |              | 
+ TRS-IN-2026-000122 | cash_in | 100000000.00 | 2026-09-22 07:58:21.554+03 | E2EACC-53101193981 |               | treasury:txn:94cdd081-61f6-469a-b14a-a6dc7af5d94f:recorded |              | 
+ TRS-IN-2026-000123 | cash_in | 100000000.00 | 2026-09-22 07:58:27.433+03 | E2EACC-53107410552 |               | treasury:txn:46401517-7670-409e-a887-85701d83d42d:recorded |              | 
+ TRS-IN-2026-000124 | cash_in | 100000000.00 | 2026-09-22 07:58:33.003+03 | PACC-53112962815   |               | treasury:txn:cbd93c8d-b92a-4723-931f-762b0a791d37:recorded |              | 
+ TRS-IN-2026-000125 | cash_in | 100000000.00 | 2026-09-22 07:58:39.305+03 | PACC-53119286880   |               | treasury:txn:e235ce3f-e967-4532-b5de-07e86451b67f:recorded |              | 
+ TRS-IN-2026-000126 | cash_in | 100000000.00 | 2026-09-22 09:13:46.816+03 | E2EACC-5762631697  |               | treasury:txn:5a4e19c5-b569-4184-aa98-945368abbea1:recorded |              | 
+ TRS-IN-2026-000127 | cash_in | 100000000.00 | 2026-09-22 09:13:51.188+03 | E2EACC-57631159657 |               | treasury:txn:02daaa58-4c3b-4e3c-b75b-b7d183b4c148:recorded |              | 
+ TRS-IN-2026-000128 | cash_in | 100000000.00 | 2026-09-22 09:13:59.961+03 | PACC-57639918714   |               | treasury:txn:1cbc27c3-13fe-4540-bef6-d15c14697db0:recorded |              | 
+ TRS-IN-2026-000129 | cash_in | 100000000.00 | 2026-09-22 09:14:07.693+03 | PACC-57647659947   |               | treasury:txn:bb220895-a09f-465a-91e3-badf3cb18adf:recorded |              | 
+ TRS-IN-2026-000130 | cash_in | 100000000.00 | 2026-09-22 09:58:48.567+03 | E2EACC-60328139298 |               | treasury:txn:c6243018-3917-438b-82e4-8a5bde92e9a5:recorded |              | 
+ TRS-IN-2026-000131 | cash_in | 100000000.00 | 2026-09-22 09:59:08.873+03 | PACC-60348807986   |               | treasury:txn:b11277b2-ea66-4b26-a533-28036f382646:recorded |              | 
+ TRS-IN-2026-000132 | cash_in | 100000000.00 | 2026-09-22 09:59:17.489+03 | PACC-60357468660   |               | treasury:txn:dffeefa0-be2f-4cf6-aca2-6c1b5a29d609:recorded |              | 
+ TRS-IN-2026-000133 | cash_in | 100000000.00 | 2026-09-22 10:02:44.87+03  | E2EACC-60564826614 |               | treasury:txn:406126c6-4d03-4c54-9c9a-dca7e23349f0:recorded |              | 
+ TRS-IN-2026-000134 | cash_in | 100000000.00 | 2026-09-22 10:02:49.471+03 | E2EACC-60569448398 |               | treasury:txn:3bed1ab8-c1fd-41fd-8154-413c3e436bca:recorded |              | 
+ TRS-IN-2026-000135 | cash_in | 100000000.00 | 2026-09-22 14:16:45.473+03 | E2EACC-75805431830 |               | treasury:txn:b7dd4daf-aa80-4406-a514-7d64aff61c95:recorded |              | 
+ TRS-IN-2026-000136 | cash_in | 100000000.00 | 2026-09-22 14:16:48.943+03 | E2EACC-75808924837 |               | treasury:txn:939ed0b7-2c42-4068-a3ff-927877de663f:recorded |              | 
+ TRS-IN-2026-000137 | cash_in | 100000000.00 | 2026-09-22 14:17:00.237+03 | PACC-75820207449   |               | treasury:txn:8f4e8b02-235a-4d19-8198-c5d12a85e56c:recorded |              | 
+ TRS-IN-2026-000138 | cash_in | 100000000.00 | 2026-09-22 14:17:07.24+03  | PACC-75827220520   |               | treasury:txn:ae52d711-bcc8-4ed8-95a2-18256b0f7ecf:recorded |              | 
+ TRS-IN-2026-000139 | cash_in | 100000000.00 | 2026-09-22 14:18:48.3+03   | PACC-75928277323   |               | treasury:txn:e5a8c003-b984-47e0-b497-ddc0cd1ed07d:recorded |              | 
+ TRS-IN-2026-000140 | cash_in | 100000000.00 | 2026-09-22 14:18:53.039+03 | PACC-75933024959   |               | treasury:txn:835051e1-7fa6-4454-a774-f297c4f62fc4:recorded |              | 
+ TRS-IN-2026-000141 | cash_in | 100000000.00 | 2026-09-22 14:20:40.849+03 | E2EACC-76040712871 |               | treasury:txn:2e8f3211-e404-4a2e-9345-bc807d477d40:recorded |              | 
+ TRS-IN-2026-000142 | cash_in | 100000000.00 | 2026-09-22 14:20:42.508+03 | E2EACC-76042436453 |               | treasury:txn:c049f8fe-14d1-417f-bafb-09822a2a38d1:recorded |              | 
+ TRS-IN-2026-000143 | cash_in | 100000000.00 | 2026-09-22 14:20:56.03+03  | PACC-76055999801   |               | treasury:txn:058d6f07-979a-417f-96ea-3a11da7188b7:recorded |              | 
+ TRS-IN-2026-000144 | cash_in | 100000000.00 | 2026-09-22 14:21:03.205+03 | PACC-76063183692   |               | treasury:txn:af56d1d5-660f-4dc9-a822-27a44918c060:recorded |              | 
+ TRS-IN-2026-000145 | cash_in | 100000000.00 | 2026-09-22 14:22:19.579+03 | E2EACC-76139556728 |               | treasury:txn:c00abd0b-fe1a-4960-9ee1-21b0a2c1c89c:recorded |              | 
+ TRS-IN-2026-000146 | cash_in | 100000000.00 | 2026-09-22 14:22:21.865+03 | E2EACC-7614185421  |               | treasury:txn:1deacab0-4bab-4210-824f-cf1364520648:recorded |              | 
+ TRS-IN-2026-000147 | cash_in | 100000000.00 | 2026-09-25 21:08:19.165+03 | PACC-59699069526   |               | treasury:txn:667724f9-a54c-4d3e-9517-7b20f84d62a9:recorded |              | 
+ TRS-IN-2026-000148 | cash_in | 100000000.00 | 2026-09-25 21:08:25.96+03  | E2EACC-59705907777 |               | treasury:txn:f03e0492-f260-4579-b1ee-3e6691854ea2:recorded |              | 
+ TRS-IN-2026-000149 | cash_in | 100000000.00 | 2026-09-25 21:08:29.37+03  | PACC-59709344785   |               | treasury:txn:6829f139-9a8e-4071-9b78-4f4ae7a03ba3:recorded |              | 
+ TRS-IN-2026-000150 | cash_in | 100000000.00 | 2026-09-25 21:08:31.578+03 | E2EACC-59711557975 |               | treasury:txn:65623116-2152-407d-b156-2297a37336d1:recorded |              | 
+ TRS-IN-2026-000151 | cash_in | 100000000.00 | 2026-09-25 21:13:05.053+03 | E2EACC-59984987188 |               | treasury:txn:18e2b127-7500-4e08-9a0d-6586ea8143ae:recorded |              | 
+ TRS-IN-2026-000152 | cash_in | 100000000.00 | 2026-09-25 21:13:11.708+03 | E2EACC-59991677547 |               | treasury:txn:0898838c-a93c-4c73-8ef6-adf01432ef94:recorded |              | 
+ TRS-IN-2026-000153 | cash_in | 100000000.00 | 2026-09-25 21:23:50.558+03 | E2EACC-60630522245 |               | treasury:txn:1e7db98d-8504-447e-818a-9b2aa0872a4b:recorded |              | 
+ TRS-IN-2026-000154 | cash_in | 100000000.00 | 2026-09-25 21:23:54.705+03 | E2EACC-6063468673  |               | treasury:txn:baf64f82-f7e4-4474-8fa0-fd386bb7c3a9:recorded |              | 
+ TRS-IN-2026-000155 | cash_in | 100000000.00 | 2026-09-25 21:52:40.817+03 | PACC-62360797518   |               | treasury:txn:e0f9c52d-a229-4681-aba0-0b1fa7f436ba:recorded |              | 
+ TRS-IN-2026-000156 | cash_in | 100000000.00 | 2026-09-25 21:52:44.841+03 | PACC-6236482743    |               | treasury:txn:9bbcc884-1bb5-4d14-9e09-53fe00848e31:recorded |              | 
+ TRS-IN-2026-000157 | cash_in | 100000000.00 | 2026-09-25 21:53:03.611+03 | E2EACC-62383590783 |               | treasury:txn:c26fced0-354d-4222-b636-ed1b1803f89c:recorded |              | 
+ TRS-IN-2026-000158 | cash_in | 100000000.00 | 2026-09-25 21:53:06.181+03 | E2EACC-62386168774 |               | treasury:txn:8ce46022-5498-4beb-be10-9f5e35ca6903:recorded |              | 
+ TRS-IN-2026-000159 | cash_in | 100000000.00 | 2026-09-26 05:19:59.544+03 | PACC-89199508764   |               | treasury:txn:9ca2f77b-190c-44f3-b301-d100b1af4c25:recorded |              | 
+ TRS-IN-2026-000160 | cash_in | 100000000.00 | 2026-09-26 05:20:04.539+03 | PACC-89204506293   |               | treasury:txn:8dc6e63e-ba82-4e50-8049-e21ee185693e:recorded |              | 
+ TRS-IN-2026-000161 | cash_in | 100000000.00 | 2026-09-26 05:20:51.062+03 | E2EACC-89251040867 |               | treasury:txn:d385d41a-cf2b-434d-87f2-14133def6fbf:recorded |              | 
+ TRS-IN-2026-000162 | cash_in | 100000000.00 | 2026-09-26 05:20:53.663+03 | E2EACC-89253649372 |               | treasury:txn:eda2a1db-4705-438e-9862-db56c08cc528:recorded |              | 
+ TRS-IN-2026-000163 | cash_in | 100000000.00 | 2026-09-26 10:49:15.093+03 | PACC-08955034748   |               | treasury:txn:8e9725b2-c856-43e9-8152-75b95ed29516:recorded |              | 
+ TRS-IN-2026-000164 | cash_in | 100000000.00 | 2026-09-26 10:49:19.619+03 | PACC-08959606969   |               | treasury:txn:7e5dd57e-94af-4b2a-b2d2-cb372a39edf3:recorded |              | 
+ TRS-IN-2026-000165 | cash_in | 100000000.00 | 2026-09-26 10:49:49.07+03  | E2EACC-08989050294 |               | treasury:txn:0fce0f76-d5e9-4191-a254-c343fcfe7d58:recorded |              | 
+ TRS-IN-2026-000166 | cash_in | 100000000.00 | 2026-09-26 10:49:51.835+03 | E2EACC-08991817536 |               | treasury:txn:6a0ae67d-962f-4951-b7af-10efe7e23fa9:recorded |              | 
+ TRS-IN-2026-000167 | cash_in | 100000000.00 | 2026-09-27 08:52:22.626+03 | PACC-88342555423   |               | treasury:txn:81ec6dd4-7863-47ae-919b-35e213a4bb5d:recorded |              | 
+ TRS-IN-2026-000168 | cash_in | 100000000.00 | 2026-09-27 08:52:28.304+03 | PACC-88348288445   |               | treasury:txn:ef5d9e46-7c64-4796-b023-3911de313a5a:recorded |              | 
+ TRS-IN-2026-000169 | cash_in | 100000000.00 | 2026-09-27 08:53:17.111+03 | E2EACC-88397089853 |               | treasury:txn:ab58868b-e99d-470e-a98d-f5bcfcec140c:recorded |              | 
+ TRS-IN-2026-000170 | cash_in | 100000000.00 | 2026-09-27 08:53:20.79+03  | E2EACC-88400768453 |               | treasury:txn:b9c65c10-d7e5-48a7-81e2-7abbcf2b0eb0:recorded |              | 
+ TRS-IN-2026-000171 | cash_in | 100000000.00 | 2026-09-27 10:51:35.788+03 | PACC-9549570138    |               | treasury:txn:aef1c75a-a3ec-41c9-b8a2-bc4028ba6c35:recorded |              | 
+ TRS-IN-2026-000172 | cash_in | 100000000.00 | 2026-09-27 10:51:40.516+03 | PACC-95500492529   |               | treasury:txn:8c2afdc6-2be6-4b37-a7f9-9ae55e10c18a:recorded |              | 
+ TRS-IN-2026-000173 | cash_in | 100000000.00 | 2026-09-27 10:52:37.443+03 | E2EACC-95557421600 |               | treasury:txn:6fe1f233-8a31-4a97-87d7-dfb99316ebc0:recorded |              | 
+ TRS-IN-2026-000174 | cash_in | 100000000.00 | 2026-09-27 10:52:40.006+03 | E2EACC-9555999646  |               | treasury:txn:e3da92d5-e291-4ed6-82de-1386d9afb4d2:recorded |              | 
+ TRS-IN-2026-000175 | cash_in | 100000000.00 | 2026-09-27 11:10:04.036+03 | PACC-96604014900   |               | treasury:txn:3570897d-ddbf-49ad-9762-917cc0f33b89:recorded |              | 
+ TRS-IN-2026-000176 | cash_in | 100000000.00 | 2026-09-27 11:10:09.323+03 | PACC-96609312136   |               | treasury:txn:c866a94c-e6a4-4842-b246-7e4fada2292a:recorded |              | 
+ TRS-IN-2026-000177 | cash_in | 100000000.00 | 2026-09-27 11:11:13.162+03 | E2EACC-96673141542 |               | treasury:txn:f20529c8-6d96-4d2b-a51d-3c2c01bf937b:recorded |              | 
+ TRS-IN-2026-000178 | cash_in | 100000000.00 | 2026-09-27 11:11:15.996+03 | E2EACC-96675984127 |               | treasury:txn:c835acd9-66fa-4a70-8bb2-a5fbf75f8ba6:recorded |              | 
+ TRS-IN-2026-000179 | cash_in | 100000000.00 | 2026-09-27 11:23:26.606+03 | PACC-97406586915   |               | treasury:txn:673c61c3-1970-457c-8814-79d8b6248704:recorded |              | 
+ TRS-IN-2026-000180 | cash_in | 100000000.00 | 2026-09-27 11:23:31.858+03 | PACC-97411848451   |               | treasury:txn:253e3da6-4181-4a6c-8c38-2f07290d10f1:recorded |              | 
+ TRS-IN-2026-000181 | cash_in | 100000000.00 | 2026-09-27 11:24:15.746+03 | E2EACC-9745571750  |               | treasury:txn:4952009c-bc46-4e87-a15a-52df0b29e789:recorded |              | 
+ TRS-IN-2026-000182 | cash_in | 100000000.00 | 2026-09-27 11:24:19.335+03 | E2EACC-9745932058  |               | treasury:txn:f2d1d92f-56c9-4651-b3de-3afbad1491af:recorded |              | 
+ TRS-IN-2026-000183 | cash_in | 100000000.00 | 2026-09-27 13:13:47.947+03 | PACC-0402792612    |               | treasury:txn:9fc6331e-11ae-46f5-830f-c99f0390eace:recorded |              | 
+ TRS-IN-2026-000184 | cash_in | 100000000.00 | 2026-09-27 13:13:53.07+03  | PACC-04033060763   |               | treasury:txn:cf9a4c5b-c366-4d79-b163-971bef6a4355:recorded |              | 
+ TRS-IN-2026-000185 | cash_in | 100000000.00 | 2026-09-27 13:14:19.586+03 | E2EACC-04059566186 |               | treasury:txn:259e8a66-a819-4d11-bb2c-3e8639ee6130:recorded |              | 
+ TRS-IN-2026-000186 | cash_in | 100000000.00 | 2026-09-27 13:14:22.296+03 | E2EACC-04062286570 |               | treasury:txn:eca8985b-c979-421b-a5c4-f083ede6f8fb:recorded |              | 
+ TRS-IN-2026-000187 | cash_in | 100000000.00 | 2026-09-27 13:35:13.008+03 | PACC-05312986733   |               | treasury:txn:b0635654-a5e0-4595-905f-07a295e44673:recorded |              | 
+ TRS-IN-2026-000188 | cash_in | 100000000.00 | 2026-09-27 13:35:18.039+03 | PACC-05318029840   |               | treasury:txn:d8462a00-c50f-43d1-9909-69646e9306ed:recorded |              | 
+ TRS-IN-2026-000189 | cash_in | 100000000.00 | 2026-09-27 13:36:15.53+03  | E2EACC-05375509987 |               | treasury:txn:823cc9ea-6c8b-4128-8ab8-acf065e67bfb:recorded |              | 
+ TRS-IN-2026-000190 | cash_in | 100000000.00 | 2026-09-27 13:36:18.254+03 | E2EACC-05378244777 |               | treasury:txn:c015b3de-8146-430b-817e-452d352af56e:recorded |              | 
+ TRS-IN-2026-000191 | cash_in | 100000000.00 | 2026-09-27 13:46:53.246+03 | PACC-06013225214   |               | treasury:txn:ff46e431-eeef-4b7c-bbac-fceca335e4fd:recorded |              | 
+ TRS-IN-2026-000192 | cash_in | 100000000.00 | 2026-09-27 13:46:59.059+03 | PACC-06019047836   |               | treasury:txn:0d316381-eaf7-460c-9fc7-cedc2ca039b4:recorded |              | 
+ TRS-IN-2026-000193 | cash_in | 100000000.00 | 2026-09-27 13:47:47.269+03 | E2EACC-06067251220 |               | treasury:txn:70bf9da5-69aa-41ee-8e5a-a5088d4772dc:recorded |              | 
+ TRS-IN-2026-000194 | cash_in | 100000000.00 | 2026-09-27 13:47:49.988+03 | E2EACC-06069977666 |               | treasury:txn:63238c8d-735e-4160-9cb7-fcd340164e64:recorded |              | 
+ TRS-IN-2026-000195 | cash_in | 100000000.00 | 2026-09-27 14:08:55.843+03 | PACC-07335819409   |               | treasury:txn:7389a54c-7421-408b-bca9-5c1c16265272:recorded |              | 
+ TRS-IN-2026-000196 | cash_in | 100000000.00 | 2026-09-27 14:09:01.457+03 | PACC-07341447713   |               | treasury:txn:5f2b3754-7a57-4b11-b6cb-b1a3c4a975d0:recorded |              | 
+ TRS-IN-2026-000197 | cash_in | 100000000.00 | 2026-09-27 14:09:57.504+03 | E2EACC-07397486266 |               | treasury:txn:d6b96e3b-1306-480d-98fa-d071e890e3fe:recorded |              | 
+ TRS-IN-2026-000198 | cash_in | 100000000.00 | 2026-09-27 14:10:00.253+03 | E2EACC-07400244955 |               | treasury:txn:6282ae67-65f6-4494-8b9e-0b02950effdc:recorded |              | 
+ TRS-IN-2026-000199 | cash_in | 100000000.00 | 2026-09-27 14:15:03.96+03  | PACC-07703928374   |               | treasury:txn:d56913a7-eae9-48d5-b73e-20e68fa5365c:recorded |              | 
+ TRS-IN-2026-000200 | cash_in | 100000000.00 | 2026-09-27 14:15:13.434+03 | PACC-07713415638   |               | treasury:txn:14790cfe-d8c1-4799-b08f-d755755c149e:recorded |              | 
+ TRS-IN-2026-000201 | cash_in | 100000000.00 | 2026-09-27 14:16:47.642+03 | E2EACC-07807604544 |               | treasury:txn:b0127c51-2c50-493f-a928-1357448b414e:recorded |              | 
+ TRS-IN-2026-000202 | cash_in | 100000000.00 | 2026-09-27 14:16:53.254+03 | E2EACC-07813236765 |               | treasury:txn:b34ef499-3773-4e48-b892-e35ea8954682:recorded |              | 
+ TRS-IN-2026-000203 | cash_in | 100000000.00 | 2026-09-27 14:33:51.476+03 | PACC-08831453416   |               | treasury:txn:704129fe-1324-4364-8d7d-182d4be69b51:recorded |              | 
+ TRS-IN-2026-000204 | cash_in | 100000000.00 | 2026-09-27 14:33:57.822+03 | PACC-08837810843   |               | treasury:txn:eac6485e-179a-4f76-a325-8b4a624eb289:recorded |              | 
+ TRS-IN-2026-000205 | cash_in | 100000000.00 | 2026-09-27 14:34:42.761+03 | E2EACC-08882740594 |               | treasury:txn:4390dd6c-02ac-4694-a481-f82ffe82a510:recorded |              | 
+ TRS-IN-2026-000206 | cash_in | 100000000.00 | 2026-09-27 14:34:45.85+03  | E2EACC-0888583926  |               | treasury:txn:d43f9d73-2aa1-4824-9210-3af8f049af4b:recorded |              | 
+ TRS-IN-2026-000207 | cash_in | 100000000.00 | 2026-09-27 15:05:43.706+03 | PACC-10743686404   |               | treasury:txn:77a51a2e-e271-4917-a3d8-aae0ff6b36b1:recorded |              | 
+ TRS-IN-2026-000208 | cash_in | 100000000.00 | 2026-09-27 15:05:48.729+03 | PACC-10748719867   |               | treasury:txn:41aa31ba-e4e8-426f-a99f-93cf5fbf46b9:recorded |              | 
+ TRS-IN-2026-000209 | cash_in | 100000000.00 | 2026-09-27 15:06:49.741+03 | E2EACC-10809722881 |               | treasury:txn:d0aea9a8-e330-4ff6-bc3c-7fada10cfa7d:recorded |              | 
+ TRS-IN-2026-000210 | cash_in | 100000000.00 | 2026-09-27 15:06:52.334+03 | E2EACC-10812324348 |               | treasury:txn:fb05c223-dd4e-4798-ad88-2f258d88c8b9:recorded |              | 
+ TRS-IN-2026-000211 | cash_in | 100000000.00 | 2026-09-27 15:22:57.732+03 | PACC-117777124     |               | treasury:txn:c3ac7926-2cea-439e-b0ee-5b1a2b0821ca:recorded |              | 
+ TRS-IN-2026-000212 | cash_in | 100000000.00 | 2026-09-27 15:23:04.342+03 | PACC-11784332368   |               | treasury:txn:34cedb19-fdd2-4992-8647-9c911bdc5291:recorded |              | 
+ TRS-IN-2026-000213 | cash_in | 100000000.00 | 2026-09-27 15:41:27.001+03 | PACC-12886980922   |               | treasury:txn:0d5a2dc6-2a3b-4e82-b9dc-a455298b9195:recorded |              | 
+ TRS-IN-2026-000214 | cash_in | 100000000.00 | 2026-09-27 15:41:32.534+03 | PACC-1289252376    |               | treasury:txn:fc167df9-7af5-4d8d-983e-db98f01bec07:recorded |              | 
+ TRS-IN-2026-000215 | cash_in | 100000000.00 | 2026-09-27 15:45:23.342+03 | E2EACC-13123317633 |               | treasury:txn:a0d2b273-8cba-4fb7-ba58-9a8ced5f5730:recorded |              | 
+ TRS-IN-2026-000216 | cash_in | 100000000.00 | 2026-09-27 15:45:26.379+03 | E2EACC-13126366542 |               | treasury:txn:3ad89669-7be7-4f79-871b-048abbff8de4:recorded |              | 
+ TRS-IN-2026-000217 | cash_in | 100000000.00 | 2026-09-28 13:05:12.15+03  | E2EACC-89912048467 |               | treasury:txn:74a20eae-d386-4990-9d90-c7334dcf654a:recorded |              | 
+ TRS-IN-2026-000218 | cash_in | 100000000.00 | 2026-09-28 13:05:17.095+03 | E2EACC-89917078300 |               | treasury:txn:0c35c47b-012d-4515-9a31-1f1e12d903ca:recorded |              | 
+ TRS-IN-2026-000219 | cash_in | 100000000.00 | 2026-09-28 13:05:38.072+03 | PACC-89938026212   |               | treasury:txn:9ee74f17-a37a-4d08-b0f8-37acd4028cff:recorded |              | 
+ TRS-IN-2026-000220 | cash_in | 100000000.00 | 2026-09-28 13:05:48.763+03 | PACC-89948745379   |               | treasury:txn:309c7b64-f97a-4235-86ed-73e133e57e18:recorded |              | 
+ TRS-IN-2026-000221 | cash_in | 100000000.00 | 2026-09-28 13:13:44.037+03 | PACC-90424010882   |               | treasury:txn:c4190d0f-606b-426d-9cf3-72139872b0df:recorded |              | 
+ TRS-IN-2026-000222 | cash_in | 100000000.00 | 2026-09-28 13:13:49.637+03 | PACC-90429627258   |               | treasury:txn:df78e757-17e0-4a07-ab05-1b40cbc53c86:recorded |              | 
+ TRS-IN-2026-000223 | cash_in | 100000000.00 | 2026-09-28 15:28:38.556+03 | E2EACC-98518496615 |               | treasury:txn:1a8ec576-4ccf-4764-8082-ba83911a766d:recorded |              | 
+ TRS-IN-2026-000224 | cash_in | 100000000.00 | 2026-09-28 15:28:45.103+03 | E2EACC-98525086919 |               | treasury:txn:2d0be0c8-73f7-490a-bd99-08b0a63ea4df:recorded |              | 
+ TRS-IN-2026-000225 | cash_in | 100000000.00 | 2026-09-28 15:29:45.346+03 | PACC-98585296663   |               | treasury:txn:14231853-76df-4f53-b2e0-22f47d081caa:recorded |              | 
+ TRS-IN-2026-000226 | cash_in | 100000000.00 | 2026-09-28 15:29:56.85+03  | PACC-98596827827   |               | treasury:txn:95313068-0e4b-49d8-9459-4bfe37bdb08a:recorded |              | 
+ TRS-IN-2026-000227 | cash_in | 100000000.00 | 2026-09-28 17:34:08.882+03 | E2EACC-06048827830 |               | treasury:txn:a4c8bd30-dab6-4685-ba7c-c6cd88b53749:recorded |              | 
+ TRS-IN-2026-000228 | cash_in | 100000000.00 | 2026-09-28 17:34:58.847+03 | PACC-06098802861   |               | treasury:txn:706fdcc7-00db-416e-be59-1cd21ef2f11e:recorded |              | 
+ TRS-IN-2026-000229 | cash_in | 100000000.00 | 2026-09-28 17:35:14.793+03 | PACC-06114680696   |               | treasury:txn:85b5a75a-510a-4644-b9ba-049371b19e8b:recorded |              | 
+ TRS-IN-2026-000230 | cash_in | 100000000.00 | 2026-09-28 17:42:15.043+03 | E2EACC-0653495727  |               | treasury:txn:62d563b6-15af-446a-8617-ba6794ef67af:recorded |              | 
+(200 rows)
+
+== Q1c outbox rows for treasury/payment topics that did not dispatch ==
+ topic | status | count | oldest | max_attempts 
+-------+--------+-------+--------+--------------
+(0 rows)
+
+== Q2 treasury accounts without a valid GL mapping, with their movement footprint ==
+        code        |                  name                  | account_status | glAccountCode | mapping_state | legs | treasury_balance | first_move | last_move  
+--------------------+----------------------------------------+----------------+---------------+---------------+------+------------------+------------+------------
+ CUST-000008        | البريد المصرى — عهدة | active         |               | UNMAPPED      |    0 |             0.00 |            | 
+ E2EACC-04059566186 | E2E Test Account 04059566186           | active         |               | UNMAPPED      |  394 |      98579800.00 | 2026-09-27 | 2026-09-27
+ E2EACC-04062286570 | E2E Test Account 04062286570           | active         |               | UNMAPPED      |  395 |      98578250.00 | 2026-09-27 | 2026-09-27
+ E2EACC-05375509987 | E2E Test Account 05375509987           | active         |               | UNMAPPED      |  404 |      98543750.00 | 2026-09-27 | 2026-09-27
+ E2EACC-05378244777 | E2E Test Account 05378244777           | active         |               | UNMAPPED      |  405 |      98542200.00 | 2026-09-27 | 2026-09-27
+ E2EACC-06048827830 | E2E Test Account 06048827830           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-28 | 2026-09-28
+ E2EACC-06067251220 | E2E Test Account 06067251220           | active         |               | UNMAPPED      |  414 |      98507700.00 | 2026-09-27 | 2026-09-27
+ E2EACC-06069977666 | E2E Test Account 06069977666           | active         |               | UNMAPPED      |  415 |      98506150.00 | 2026-09-27 | 2026-09-27
+ E2EACC-0653495727  | E2E Test Account 0653495727            | active         |               | UNMAPPED      |  512 |      98152950.00 | 2026-09-28 | 2026-09-28
+ E2EACC-06544085405 | E2E Test Account 06544085405           | active         |               | UNMAPPED      |  513 |      98151400.00 | 2026-09-28 | 2026-09-28
+ E2EACC-07397486266 | E2E Test Account 07397486266           | active         |               | UNMAPPED      |  424 |      98471650.00 | 2026-09-27 | 2026-09-27
+ E2EACC-07400244955 | E2E Test Account 07400244955           | active         |               | UNMAPPED      |  425 |      98470100.00 | 2026-09-27 | 2026-09-27
+ E2EACC-07807604544 | E2E Test Account 07807604544           | active         |               | UNMAPPED      |  434 |      98435600.00 | 2026-09-27 | 2026-09-27
+ E2EACC-07813236765 | E2E Test Account 07813236765           | active         |               | UNMAPPED      |  435 |      98434050.00 | 2026-09-27 | 2026-09-27
+ E2EACC-08882740594 | E2E Test Account 08882740594           | active         |               | UNMAPPED      |  444 |      98399550.00 | 2026-09-27 | 2026-09-27
+ E2EACC-0888583926  | E2E Test Account 0888583926            | active         |               | UNMAPPED      |  445 |      98398000.00 | 2026-09-27 | 2026-09-27
+ E2EACC-08989050294 | E2E Test Account 08989050294           | active         |               | UNMAPPED      |  344 |      98760050.00 | 2026-09-26 | 2026-09-26
+ E2EACC-08991817536 | E2E Test Account 08991817536           | active         |               | UNMAPPED      |  345 |      98758500.00 | 2026-09-26 | 2026-09-26
+ E2EACC-09148115586 | E2E Test Account 09148115586           | active         |               | UNMAPPED      |  526 |      98111400.00 | 2026-10-04 | 2026-10-04
+ E2EACC-09155358285 | E2E Test Account 09155358285           | active         |               | UNMAPPED      |  527 |      98109850.00 | 2026-10-04 | 2026-10-04
+ E2EACC-09439963985 | E2E Test Account 09439963985           | active         |               | UNMAPPED      |  517 |      98136650.00 | 2026-09-28 | 2026-09-28
+ E2EACC-09922331320 | E2E Test Account 09922331320           | active         |               | UNMAPPED      |  524 |      98111150.00 | 2026-09-28 | 2026-09-28
+ E2EACC-09929855402 | E2E Test Account 09929855402           | active         |               | UNMAPPED      |  525 |      98109600.00 | 2026-09-28 | 2026-09-28
+ E2EACC-1012127775  | E2E Test Account 1012127775            | active         |               | UNMAPPED      |  537 |      98069350.00 | 2026-10-04 | 2026-10-04
+ E2EACC-10127772581 | E2E Test Account 10127772581           | active         |               | UNMAPPED      |  539 |      98064800.00 | 2026-10-04 | 2026-10-04
+ E2EACC-10809722881 | E2E Test Account 10809722881           | active         |               | UNMAPPED      |  454 |      98363500.00 | 2026-09-27 | 2026-09-27
+ E2EACC-10812324348 | E2E Test Account 10812324348           | active         |               | UNMAPPED      |  455 |      98361950.00 | 2026-09-27 | 2026-09-27
+ E2EACC-10834830161 | E2E Test Account 10834830161           | active         |               | UNMAPPED      |  547 |      98033300.00 | 2026-10-04 | 2026-10-04
+ E2EACC-10840645197 | E2E Test Account 10840645197           | active         |               | UNMAPPED      |  549 |      98028750.00 | 2026-10-04 | 2026-10-04
+ E2EACC-10850363724 | E2E Test Account 10850363724           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-21 | 2026-09-21
+ E2EACC-10854840832 | E2E Test Account 10854840832           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-21 | 2026-09-21
+ E2EACC-11201244236 | E2E Test Account 11201244236           | active         |               | UNMAPPED      |  204 |      99249700.00 | 2026-09-21 | 2026-09-21
+ E2EACC-11204311626 | E2E Test Account 11204311626           | active         |               | UNMAPPED      |  205 |      99248150.00 | 2026-09-21 | 2026-09-21
+ E2EACC-11475331130 | E2E Test Account 11475331130           | active         |               | UNMAPPED      |  557 |      97997250.00 | 2026-10-04 | 2026-10-04
+ E2EACC-11481160467 | E2E Test Account 11481160467           | active         |               | UNMAPPED      |  559 |      97992700.00 | 2026-10-04 | 2026-10-04
+ E2EACC-12113116614 | E2E Test Account 12113116614           | active         |               | UNMAPPED      |  567 |      97961200.00 | 2026-10-04 | 2026-10-04
+ E2EACC-12118893801 | E2E Test Account 12118893801           | active         |               | UNMAPPED      |  569 |      97956650.00 | 2026-10-04 | 2026-10-04
+ E2EACC-12920703640 | E2E Test Account 12920703640           | active         |               | UNMAPPED      |  577 |      97925150.00 | 2026-10-04 | 2026-10-04
+ E2EACC-12927981918 | E2E Test Account 12927981918           | active         |               | UNMAPPED      |  579 |      97920600.00 | 2026-10-04 | 2026-10-04
+ E2EACC-13123317633 | E2E Test Account 13123317633           | active         |               | UNMAPPED      |  472 |      98297150.00 | 2026-09-27 | 2026-09-27
+ E2EACC-13126366542 | E2E Test Account 13126366542           | active         |               | UNMAPPED      |  473 |      98295600.00 | 2026-09-27 | 2026-09-27
+ E2EACC-13722411405 | E2E Test Account 13722411405           | active         |               | UNMAPPED      |  586 |      97891600.00 | 2026-10-04 | 2026-10-04
+ E2EACC-13728907528 | E2E Test Account 13728907528           | active         |               | UNMAPPED      |  588 |      97887050.00 | 2026-10-04 | 2026-10-04
+ E2EACC-14368902252 | E2E Test Account 14368902252           | active         |               | UNMAPPED      |  596 |      97855550.00 | 2026-10-04 | 2026-10-04
+ E2EACC-14375086144 | E2E Test Account 14375086144           | active         |               | UNMAPPED      |  598 |      97851000.00 | 2026-10-04 | 2026-10-04
+ E2EACC-15276377761 | E2E Test Account 15276377761           | active         |               | UNMAPPED      |  613 |      97795200.00 | 2026-10-04 | 2026-10-04
+ E2EACC-15281636838 | E2E Test Account 15281636838           | active         |               | UNMAPPED      |  616 |      97784650.00 | 2026-10-04 | 2026-10-04
+ E2EACC-16106011901 | E2E Test Account 16106011901           | active         |               | UNMAPPED      |  624 |      97753150.00 | 2026-10-04 | 2026-10-04
+ E2EACC-16111741823 | E2E Test Account 16111741823           | active         |               | UNMAPPED      |  626 |      97748600.00 | 2026-10-04 | 2026-10-04
+ E2EACC-16958532462 | E2E Test Account 16958532462           | active         |               | UNMAPPED      |  634 |      97717100.00 | 2026-10-04 | 2026-10-04
+ E2EACC-1696559099  | E2E Test Account 1696559099            | active         |               | UNMAPPED      |  636 |      97712550.00 | 2026-10-04 | 2026-10-04
+ E2EACC-17953253423 | E2E Test Account 17953253423           | active         |               | UNMAPPED      |  644 |      97681050.00 | 2026-10-04 | 2026-10-04
+ E2EACC-17960265842 | E2E Test Account 17960265842           | active         |               | UNMAPPED      |  646 |      97676500.00 | 2026-10-04 | 2026-10-04
+ E2EACC-19967688102 | E2E Test Account 19967688102           | active         |               | UNMAPPED      |  654 |      97645000.00 | 2026-10-04 | 2026-10-04
+ E2EACC-19974776146 | E2E Test Account 19974776146           | active         |               | UNMAPPED      |  656 |      97640450.00 | 2026-10-04 | 2026-10-04
+ E2EACC-21768403308 | E2E Test Account 21768403308           | active         |               | UNMAPPED      |  664 |      97608950.00 | 2026-10-04 | 2026-10-04
+ E2EACC-2177693720  | E2E Test Account 2177693720            | active         |               | UNMAPPED      |  666 |      97604400.00 | 2026-10-04 | 2026-10-04
+ E2EACC-26789230686 | E2E Test Account 26789230686           | active         |               | UNMAPPED      |  673 |      97578900.00 | 2026-10-04 | 2026-10-04
+ E2EACC-26802467935 | E2E Test Account 26802467935           | active         |               | UNMAPPED      |  677 |      97564350.00 | 2026-10-04 | 2026-10-04
+ E2EACC-28140208139 | E2E Test Account 28140208139           | active         |               | UNMAPPED      |  691 |      97512550.00 | 2026-10-04 | 2026-10-04
+ E2EACC-28148124427 | E2E Test Account 28148124427           | active         |               | UNMAPPED      |  692 |      97511000.00 | 2026-10-04 | 2026-10-04
+ E2EACC-29459918300 | E2E Test Account 29459918300           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-22 | 2026-09-22
+ E2EACC-2946715570  | E2E Test Account 2946715570            | active         |               | UNMAPPED      |  209 |      99233400.00 | 2026-09-22 | 2026-09-22
+ E2EACC-29796056109 | E2E Test Account 29796056109           | active         |               | UNMAPPED      |  216 |      99207900.00 | 2026-09-22 | 2026-09-22
+ E2EACC-29801199186 | E2E Test Account 29801199186           | active         |               | UNMAPPED      |  217 |      99206350.00 | 2026-09-22 | 2026-09-22
+ E2EACC-31891080470 | E2E Test Account 31891080470           | active         |               | UNMAPPED      |  693 |      97506800.00 | 2026-10-04 | 2026-10-04
+ E2EACC-31902991925 | E2E Test Account 31902991925           | active         |               | UNMAPPED      |  696 |      97496250.00 | 2026-10-04 | 2026-10-04
+ E2EACC-35580239426 | E2E Test Account 35580239426           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-20 | 2026-09-20
+ E2EACC-35846094842 | E2E Test Account 35846094842           | active         |               | UNMAPPED      |   82 |      99680750.00 | 2026-09-20 | 2026-09-20
+ E2EACC-35847929128 | E2E Test Account 35847929128           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-20 | 2026-09-20
+ E2EACC-36056791431 | E2E Test Account 36056791431           | active         |               | UNMAPPED      |   84 |      99675000.00 | 2026-09-20 | 2026-09-20
+ E2EACC-3605866075  | E2E Test Account 3605866075            | active         |               | UNMAPPED      |   85 |      99673450.00 | 2026-09-20 | 2026-09-20
+ E2EACC-36168460791 | E2E Test Account 36168460791           | active         |               | UNMAPPED      |   86 |      99669250.00 | 2026-09-20 | 2026-09-20
+ E2EACC-36170332470 | E2E Test Account 36170332470           | active         |               | UNMAPPED      |   87 |      99667700.00 | 2026-09-20 | 2026-09-20
+ E2EACC-37447006733 | E2E Test Account 37447006733           | active         |               | UNMAPPED      |  218 |      99202150.00 | 2026-09-22 | 2026-09-22
+ E2EACC-37448814899 | E2E Test Account 37448814899           | active         |               | UNMAPPED      |  219 |      99200600.00 | 2026-09-22 | 2026-09-22
+ E2EACC-40784078332 | E2E Test Account 40784078332           | active         |               | UNMAPPED      |  223 |      99183400.00 | 2026-09-22 | 2026-09-22
+ E2EACC-4078723562  | E2E Test Account 4078723562            | active         |               | UNMAPPED      |  225 |      99179350.00 | 2026-09-22 | 2026-09-22
+ E2EACC-44310556103 | E2E Test Account 44310556103           | active         |               | UNMAPPED      |  238 |      99130050.00 | 2026-09-22 | 2026-09-22
+ E2EACC-44314143429 | E2E Test Account 44314143429           | active         |               | UNMAPPED      |  239 |      99128500.00 | 2026-09-22 | 2026-09-22
+ E2EACC-44596844673 | E2E Test Account 44596844673           | active         |               | UNMAPPED      |  703 |      97470750.00 | 2026-10-04 | 2026-10-04
+ E2EACC-44627075163 | E2E Test Account 44627075163           | active         |               | UNMAPPED      |  706 |      97460200.00 | 2026-10-04 | 2026-10-04
+ E2EACC-48167501244 | E2E Test Account 48167501244           | active         |               | UNMAPPED      |   96 |      99633200.00 | 2026-09-21 | 2026-09-21
+ E2EACC-48168570757 | E2E Test Account 48168570757           | active         |               | UNMAPPED      |   97 |      99631650.00 | 2026-09-21 | 2026-09-21
+ E2EACC-48220848512 | E2E Test Account 48220848512           | active         |               | UNMAPPED      |   98 |      99627450.00 | 2026-09-21 | 2026-09-21
+ E2EACC-48221864951 | E2E Test Account 48221864951           | active         |               | UNMAPPED      |   99 |      99625900.00 | 2026-09-21 | 2026-09-21
+ E2EACC-53101193981 | E2E Test Account 53101193981           | active         |               | UNMAPPED      |  242 |      99115300.00 | 2026-09-22 | 2026-09-22
+ E2EACC-53107410552 | E2E Test Account 53107410552           | active         |               | UNMAPPED      |  246 |      99106250.00 | 2026-09-22 | 2026-09-22
+ E2EACC-5762631697  | E2E Test Account 5762631697            | active         |               | UNMAPPED      |  252 |      99079250.00 | 2026-09-22 | 2026-09-22
+ E2EACC-57631159657 | E2E Test Account 57631159657           | active         |               | UNMAPPED      |  255 |      99071200.00 | 2026-09-22 | 2026-09-22
+ E2EACC-59705907777 | E2E Test Account 59705907777           | active         |               | UNMAPPED      |  309 |      98879200.00 | 2026-09-25 | 2026-09-25
+ E2EACC-59711557975 | E2E Test Account 59711557975           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-25 | 2026-09-25
+ E2EACC-59984987188 | E2E Test Account 59984987188           | active         |               | UNMAPPED      |  312 |      98871650.00 | 2026-09-25 | 2026-09-25
+ E2EACC-59991677547 | E2E Test Account 59991677547           | active         |               | UNMAPPED      |  313 |      98870100.00 | 2026-09-25 | 2026-09-25
+ E2EACC-60328139298 | E2E Test Account 60328139298           | active         |               | UNMAPPED      |  263 |      99041850.00 | 2026-09-22 | 2026-09-22
+ E2EACC-60564826614 | E2E Test Account 60564826614           | active         |               | UNMAPPED      |  270 |      99016350.00 | 2026-09-22 | 2026-09-22
+ E2EACC-60569448398 | E2E Test Account 60569448398           | active         |               | UNMAPPED      |  271 |      99014800.00 | 2026-09-22 | 2026-09-22
+ E2EACC-60630522245 | E2E Test Account 60630522245           | active         |               | UNMAPPED      |  314 |      98865900.00 | 2026-09-25 | 2026-09-25
+ E2EACC-6063468673  | E2E Test Account 6063468673            | active         |               | UNMAPPED      |  315 |      98864350.00 | 2026-09-25 | 2026-09-25
+ E2EACC-62383590783 | E2E Test Account 62383590783           | active         |               | UNMAPPED      |  324 |      98829850.00 | 2026-09-25 | 2026-09-25
+ E2EACC-62386168774 | E2E Test Account 62386168774           | active         |               | UNMAPPED      |  325 |      98828300.00 | 2026-09-25 | 2026-09-25
+ E2EACC-69036129645 | E2E Test Account 69036129645           | active         |               | UNMAPPED      |  108 |      99591400.00 | 2026-09-21 | 2026-09-21
+ E2EACC-69037479916 | E2E Test Account 69037479916           | active         |               | UNMAPPED      |  109 |      99589850.00 | 2026-09-21 | 2026-09-21
+ E2EACC-69101786587 | E2E Test Account 69101786587           | active         |               | UNMAPPED      |  110 |      99585650.00 | 2026-09-21 | 2026-09-21
+ E2EACC-69103029529 | E2E Test Account 69103029529           | active         |               | UNMAPPED      |  111 |      99584100.00 | 2026-09-21 | 2026-09-21
+ E2EACC-69552501330 | E2E Test Account 69552501330           | active         |               | UNMAPPED      |  128 |      99519300.00 | 2026-09-21 | 2026-09-21
+ E2EACC-69553759448 | E2E Test Account 69553759448           | active         |               | UNMAPPED      |  129 |      99517750.00 | 2026-09-21 | 2026-09-21
+ E2EACC-70121295621 | E2E Test Account 70121295621           | active         |               | UNMAPPED      |  138 |      99483250.00 | 2026-09-21 | 2026-09-21
+ E2EACC-7012258083  | E2E Test Account 7012258083            | active         |               | UNMAPPED      |  139 |      99481700.00 | 2026-09-21 | 2026-09-21
+ E2EACC-70432130311 | E2E Test Account 70432130311           | active         |               | UNMAPPED      |  140 |      99477500.00 | 2026-09-21 | 2026-09-21
+ E2EACC-70433530415 | E2E Test Account 70433530415           | active         |               | UNMAPPED      |  141 |      99475950.00 | 2026-09-21 | 2026-09-21
+ E2EACC-70550418619 | E2E Test Account 70550418619           | active         |               | UNMAPPED      |  150 |      99441450.00 | 2026-09-21 | 2026-09-21
+ E2EACC-70551686450 | E2E Test Account 70551686450           | active         |               | UNMAPPED      |  151 |      99439900.00 | 2026-09-21 | 2026-09-21
+ E2EACC-75805431830 | E2E Test Account 75805431830           | active         |               | UNMAPPED      |  274 |      99001600.00 | 2026-09-22 | 2026-09-22
+ E2EACC-75808924837 | E2E Test Account 75808924837           | active         |               | UNMAPPED      |  276 |      98996050.00 | 2026-09-22 | 2026-09-22
+ E2EACC-76040712871 | E2E Test Account 76040712871           | active         |               | UNMAPPED      |    1 |     100000000.00 | 2026-09-22 | 2026-09-22
+ E2EACC-76042436453 | E2E Test Account 76042436453           | active         |               | UNMAPPED      |  294 |      98929700.00 | 2026-09-22 | 2026-09-22
+ E2EACC-76139556728 | E2E Test Account 76139556728           | active         |               | UNMAPPED      |  300 |      98908200.00 | 2026-09-22 | 2026-09-22
+ E2EACC-7614185421  | E2E Test Account 7614185421            | active         |               | UNMAPPED      |  301 |      98906650.00 | 2026-09-22 | 2026-09-22
+ E2EACC-88397089853 | E2E Test Account 88397089853           | active         |               | UNMAPPED      |  354 |      98724000.00 | 2026-09-27 | 2026-09-27
+ E2EACC-88400768453 | E2E Test Account 88400768453           | active         |               | UNMAPPED      |  355 |      98722450.00 | 2026-09-27 | 2026-09-27
+ E2EACC-89251040867 | E2E Test Account 89251040867           | active         |               | UNMAPPED      |  334 |      98796100.00 | 2026-09-26 | 2026-09-26
+ E2EACC-89253649372 | E2E Test Account 89253649372           | active         |               | UNMAPPED      |  335 |      98794550.00 | 2026-09-26 | 2026-09-26
+ E2EACC-89912048467 | E2E Test Account 89912048467           | active         |               | UNMAPPED      |  476 |      98282400.00 | 2026-09-28 | 2026-09-28
+ E2EACC-89917078300 | E2E Test Account 89917078300           | active         |               | UNMAPPED      |  478 |      98276850.00 | 2026-09-28 | 2026-09-28
+ E2EACC-90000080460 | E2E Test Account 90000080460           | active         |               | UNMAPPED      |  152 |      99435700.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90001485587 | E2E Test Account 90001485587           | active         |               | UNMAPPED      |  153 |      99434150.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90076375492 | E2E Test Account 90076375492           | active         |               | UNMAPPED      |  154 |      99429950.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90077673737 | E2E Test Account 90077673737           | active         |               | UNMAPPED      |  155 |      99428400.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90603946663 | E2E Test Account 90603946663           | active         |               | UNMAPPED      |  164 |      99393900.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90606296597 | E2E Test Account 90606296597           | active         |               | UNMAPPED      |  165 |      99392350.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90823684999 | E2E Test Account 90823684999           | active         |               | UNMAPPED      |  174 |      99357850.00 | 2026-09-21 | 2026-09-21
+ E2EACC-90825284808 | E2E Test Account 90825284808           | active         |               | UNMAPPED      |  175 |      99356300.00 | 2026-09-21 | 2026-09-21
+ E2EACC-95043448580 | E2E Test Account 95043448580           | active         |               | UNMAPPED      |  192 |      99291500.00 | 2026-09-21 | 2026-09-21
+ E2EACC-95045464250 | E2E Test Account 95045464250           | active         |               | UNMAPPED      |  193 |      99289950.00 | 2026-09-21 | 2026-09-21
+ E2EACC-95557421600 | E2E Test Account 95557421600           | active         |               | UNMAPPED      |  364 |      98687950.00 | 2026-09-27 | 2026-09-27
+ E2EACC-9555999646  | E2E Test Account 9555999646            | active         |               | UNMAPPED      |  365 |      98686400.00 | 2026-09-27 | 2026-09-27
+ E2EACC-96673141542 | E2E Test Account 96673141542           | active         |               | UNMAPPED      |  374 |      98651900.00 | 2026-09-27 | 2026-09-27
+ E2EACC-96675984127 | E2E Test Account 96675984127           | active         |               | UNMAPPED      |  375 |      98650350.00 | 2026-09-27 | 2026-09-27
+ E2EACC-9745571750  | E2E Test Account 9745571750            | active         |               | UNMAPPED      |  384 |      98615850.00 | 2026-09-27 | 2026-09-27
+ E2EACC-9745932058  | E2E Test Account 9745932058            | active         |               | UNMAPPED      |  385 |      98614300.00 | 2026-09-27 | 2026-09-27
+ E2EACC-98518496615 | E2E Test Account 98518496615           | active         |               | UNMAPPED      |  492 |      98225050.00 | 2026-09-28 | 2026-09-28
+ E2EACC-98525086919 | E2E Test Account 98525086919           | active         |               | UNMAPPED      |  493 |      98223500.00 | 2026-09-28 | 2026-09-28
+ MAIN-CASH          | Main Cash                              | active         |               | UNMAPPED      |    6 |          3080.00 | 2026-09-17 | 2026-09-18
+ PACC-0402792612    | Payroll Test Account 0402792612        | active         |               | UNMAPPED      |  392 |      98588300.00 | 2026-09-27 | 2026-09-27
+ PACC-04033060763   | Payroll Test Account 04033060763       | active         |               | UNMAPPED      |  393 |      98586500.00 | 2026-09-27 | 2026-09-27
+ PACC-05312986733   | Payroll Test Account 05312986733       | active         |               | UNMAPPED      |  402 |      98552500.00 | 2026-09-27 | 2026-09-27
+ PACC-05318029840   | Payroll Test Account 05318029840       | active         |               | UNMAPPED      |  403 |      98550700.00 | 2026-09-27 | 2026-09-27
+ PACC-06013225214   | Payroll Test Account 06013225214       | active         |               | UNMAPPED      |  412 |      98516700.00 | 2026-09-27 | 2026-09-27
+ PACC-06019047836   | Payroll Test Account 06019047836       | active         |               | UNMAPPED      |  413 |      98514900.00 | 2026-09-27 | 2026-09-27
+ PACC-06098802861   | Payroll Test Account 06098802861       | active         |               | UNMAPPED      |  510 |      98164200.00 | 2026-09-28 | 2026-09-28
+ PACC-06114680696   | Payroll Test Account 06114680696       | active         |               | UNMAPPED      |  511 |      98162400.00 | 2026-09-28 | 2026-09-28
+ PACC-07335819409   | Payroll Test Account 07335819409       | active         |               | UNMAPPED      |  422 |      98480900.00 | 2026-09-27 | 2026-09-27
+ PACC-07341447713   | Payroll Test Account 07341447713       | active         |               | UNMAPPED      |  423 |      98479100.00 | 2026-09-27 | 2026-09-27
+ PACC-07703928374   | Payroll Test Account 07703928374       | active         |               | UNMAPPED      |  432 |      98445100.00 | 2026-09-27 | 2026-09-27
+ PACC-07713415638   | Payroll Test Account 07713415638       | active         |               | UNMAPPED      |  433 |      98443300.00 | 2026-09-27 | 2026-09-27
+ PACC-08831453416   | Payroll Test Account 08831453416       | active         |               | UNMAPPED      |  442 |      98409300.00 | 2026-09-27 | 2026-09-27
+ PACC-08837810843   | Payroll Test Account 08837810843       | active         |               | UNMAPPED      |  443 |      98407500.00 | 2026-09-27 | 2026-09-27
+ PACC-08955034748   | Payroll Test Account 08955034748       | active         |               | UNMAPPED      |  342 |      98767300.00 | 2026-09-26 | 2026-09-26
+ PACC-08959606969   | Payroll Test Account 08959606969       | active         |               | UNMAPPED      |  343 |      98765500.00 | 2026-09-26 | 2026-09-26
+ PACC-094832838     | Payroll Test Account 094832838         | active         |               | UNMAPPED      |  522 |      98122900.00 | 2026-09-28 | 2026-09-28
+ PACC-0949941526    | Payroll Test Account 0949941526        | active         |               | UNMAPPED      |  523 |      98121100.00 | 2026-09-28 | 2026-09-28
+ PACC-0957909312    | Payroll Test Account 0957909312        | active         |               | UNMAPPED      |  534 |      98081600.00 | 2026-10-04 | 2026-10-04
+ PACC-0958636234    | Payroll Test Account 0958636234        | active         |               | UNMAPPED      |  535 |      98079800.00 | 2026-10-04 | 2026-10-04
+ PACC-10168839754   | Payroll Test Account 10168839754       | active         |               | UNMAPPED      |  544 |      98045800.00 | 2026-10-04 | 2026-10-04
+ PACC-10178509296   | Payroll Test Account 10178509296       | active         |               | UNMAPPED      |  545 |      98044000.00 | 2026-10-04 | 2026-10-04
+ PACC-10743686404   | Payroll Test Account 10743686404       | active         |               | UNMAPPED      |  452 |      98373500.00 | 2026-09-27 | 2026-09-27
+ PACC-10748719867   | Payroll Test Account 10748719867       | active         |               | UNMAPPED      |  453 |      98371700.00 | 2026-09-27 | 2026-09-27
+ PACC-10841394317   | Payroll Test Account 10841394317       | active         |               | UNMAPPED      |  200 |      99265700.00 | 2026-09-21 | 2026-09-21
+ PACC-10852022265   | Payroll Test Account 10852022265       | active         |               | UNMAPPED      |  202 |      99259900.00 | 2026-09-21 | 2026-09-21
+ PACC-10876119772   | Payroll Test Account 10876119772       | active         |               | UNMAPPED      |  554 |      98010000.00 | 2026-10-04 | 2026-10-04
+ PACC-10889035186   | Payroll Test Account 10889035186       | active         |               | UNMAPPED      |  555 |      98008200.00 | 2026-10-04 | 2026-10-04
+ PACC-11514890576   | Payroll Test Account 11514890576       | active         |               | UNMAPPED      |  564 |      97974200.00 | 2026-10-04 | 2026-10-04
+ PACC-1152589557    | Payroll Test Account 1152589557        | active         |               | UNMAPPED      |  565 |      97972400.00 | 2026-10-04 | 2026-10-04
+ PACC-117777124     | Payroll Test Account 117777124         | active         |               | UNMAPPED      |  462 |      98337700.00 | 2026-09-27 | 2026-09-27
+ PACC-11784332368   | Payroll Test Account 11784332368       | active         |               | UNMAPPED      |  463 |      98335900.00 | 2026-09-27 | 2026-09-27
+ PACC-12154380636   | Payroll Test Account 12154380636       | active         |               | UNMAPPED      |  574 |      97938400.00 | 2026-10-04 | 2026-10-04
+ PACC-12166738227   | Payroll Test Account 12166738227       | active         |               | UNMAPPED      |  575 |      97936600.00 | 2026-10-04 | 2026-10-04
+ PACC-12886980922   | Payroll Test Account 12886980922       | active         |               | UNMAPPED      |  470 |      98307400.00 | 2026-09-27 | 2026-09-27
+ PACC-1289252376    | Payroll Test Account 1289252376        | active         |               | UNMAPPED      |  471 |      98305600.00 | 2026-09-27 | 2026-09-27
+ PACC-12960094579   | Payroll Test Account 12960094579       | active         |               | UNMAPPED      |  583 |      97905100.00 | 2026-10-04 | 2026-10-04
+ PACC-12972748846   | Payroll Test Account 12972748846       | active         |               | UNMAPPED      |  584 |      97903300.00 | 2026-10-04 | 2026-10-04
+ PACC-13764716749   | Payroll Test Account 13764716749       | active         |               | UNMAPPED      |  593 |      97869300.00 | 2026-10-04 | 2026-10-04
+ PACC-13778067788   | Payroll Test Account 13778067788       | active         |               | UNMAPPED      |  594 |      97867500.00 | 2026-10-04 | 2026-10-04
+ PACC-14412498329   | Payroll Test Account 14412498329       | active         |               | UNMAPPED      |  603 |      97833500.00 | 2026-10-04 | 2026-10-04
+ PACC-14425811567   | Payroll Test Account 14425811567       | active         |               | UNMAPPED      |  604 |      97831700.00 | 2026-10-04 | 2026-10-04
+ PACC-1478598327    | Payroll Test Account 1478598327        | active         |               | UNMAPPED      |  611 |      97803200.00 | 2026-10-04 | 2026-10-04
+ PACC-14792819738   | Payroll Test Account 14792819738       | active         |               | UNMAPPED      |  612 |      97801400.00 | 2026-10-04 | 2026-10-04
+ PACC-15324302382   | Payroll Test Account 15324302382       | active         |               | UNMAPPED      |  621 |      97767400.00 | 2026-10-04 | 2026-10-04
+ PACC-15338418320   | Payroll Test Account 15338418320       | active         |               | UNMAPPED      |  622 |      97765600.00 | 2026-10-04 | 2026-10-04
+ PACC-16149284555   | Payroll Test Account 16149284555       | active         |               | UNMAPPED      |  631 |      97731600.00 | 2026-10-04 | 2026-10-04
+ PACC-16163402728   | Payroll Test Account 16163402728       | active         |               | UNMAPPED      |  632 |      97729800.00 | 2026-10-04 | 2026-10-04
+ PACC-17006649787   | Payroll Test Account 17006649787       | active         |               | UNMAPPED      |  641 |      97695800.00 | 2026-10-04 | 2026-10-04
+ PACC-17021489274   | Payroll Test Account 17021489274       | active         |               | UNMAPPED      |  642 |      97694000.00 | 2026-10-04 | 2026-10-04
+ PACC-18002471644   | Payroll Test Account 18002471644       | active         |               | UNMAPPED      |  651 |      97660000.00 | 2026-10-04 | 2026-10-04
+ PACC-18018031388   | Payroll Test Account 18018031388       | active         |               | UNMAPPED      |  652 |      97658200.00 | 2026-10-04 | 2026-10-04
+ PACC-18345433771   | Payroll Test Account 18345433771       | active         |               | UNMAPPED      |    1 |        100000.00 | 2026-09-20 | 2026-09-20
+ PACC-18346385865   | Payroll Test Account 18346385865       | active         |               | UNMAPPED      |    1 |        100000.00 | 2026-09-20 | 2026-09-20
+ PACC-18691422129   | Payroll Test Account 18691422129       | active         |               | UNMAPPED      |   46 |      99813700.00 | 2026-09-20 | 2026-09-20
+ PACC-18693333469   | Payroll Test Account 18693333469       | active         |               | UNMAPPED      |   47 |      99811900.00 | 2026-09-20 | 2026-09-20
+ PACC-18788144538   | Payroll Test Account 18788144538       | active         |               | UNMAPPED      |   54 |      99783400.00 | 2026-09-20 | 2026-09-20
+ PACC-18790680817   | Payroll Test Account 18790680817       | active         |               | UNMAPPED      |   55 |      99781600.00 | 2026-09-20 | 2026-09-20
+ PACC-20019552128   | Payroll Test Account 20019552128       | active         |               | UNMAPPED      |  661 |      97624200.00 | 2026-10-04 | 2026-10-04
+ PACC-20040734733   | Payroll Test Account 20040734733       | active         |               | UNMAPPED      |  662 |      97622400.00 | 2026-10-04 | 2026-10-04
+ PACC-21834669161   | Payroll Test Account 21834669161       | active         |               | UNMAPPED      |  671 |      97588400.00 | 2026-10-04 | 2026-10-04
+ PACC-2184835573    | Payroll Test Account 2184835573        | active         |               | UNMAPPED      |  672 |      97586600.00 | 2026-10-04 | 2026-10-04
+ PACC-26847659168   | Payroll Test Account 26847659168       | active         |               | UNMAPPED      |  681 |      97552600.00 | 2026-10-04 | 2026-10-04
+ PACC-26869460480   | Payroll Test Account 26869460480       | active         |               | UNMAPPED      |  682 |      97550800.00 | 2026-10-04 | 2026-10-04
+ PACC-28011386870   | Payroll Test Account 28011386870       | active         |               | UNMAPPED      |  689 |      97522300.00 | 2026-10-04 | 2026-10-04
+ PACC-28028417861   | Payroll Test Account 28028417861       | active         |               | UNMAPPED      |  690 |      97520500.00 | 2026-10-04 | 2026-10-04
+ PACC-29493971629   | Payroll Test Account 29493971629       | active         |               | UNMAPPED      |  214 |      99218900.00 | 2026-09-22 | 2026-09-22
+ PACC-29500564905   | Payroll Test Account 29500564905       | active         |               | UNMAPPED      |  215 |      99217100.00 | 2026-09-22 | 2026-09-22
+ PACC-31981143945   | Payroll Test Account 31981143945       | active         |               | UNMAPPED      |  701 |      97481000.00 | 2026-10-04 | 2026-10-04
+ PACC-31998066333   | Payroll Test Account 31998066333       | active         |               | UNMAPPED      |  702 |      97479200.00 | 2026-10-04 | 2026-10-04
+ PACC-32101469274   | Payroll Test Account 32101469274       | active         |               | UNMAPPED      |   62 |      99753100.00 | 2026-09-20 | 2026-09-20
+ PACC-32104291401   | Payroll Test Account 32104291401       | active         |               | UNMAPPED      |   63 |      99751300.00 | 2026-09-20 | 2026-09-20
+ PACC-34689907397   | Payroll Test Account 34689907397       | active         |               | UNMAPPED      |   70 |      99722800.00 | 2026-09-20 | 2026-09-20
+ PACC-34692976342   | Payroll Test Account 34692976342       | active         |               | UNMAPPED      |   71 |      99721000.00 | 2026-09-20 | 2026-09-20
+ PACC-34806909801   | Payroll Test Account 34806909801       | active         |               | UNMAPPED      |   78 |      99692500.00 | 2026-09-20 | 2026-09-20
+ PACC-34810126506   | Payroll Test Account 34810126506       | active         |               | UNMAPPED      |   79 |      99690700.00 | 2026-09-20 | 2026-09-20
+ PACC-36197929111   | Payroll Test Account 36197929111       | active         |               | UNMAPPED      |   94 |      99640200.00 | 2026-09-20 | 2026-09-20
+ PACC-36201609935   | Payroll Test Account 36201609935       | active         |               | UNMAPPED      |   95 |      99638400.00 | 2026-09-20 | 2026-09-20
+ PACC-40793287981   | Payroll Test Account 40793287981       | active         |               | UNMAPPED      |  228 |      99172100.00 | 2026-09-22 | 2026-09-22
+ PACC-40799788722   | Payroll Test Account 40799788722       | active         |               | UNMAPPED      |  229 |      99170300.00 | 2026-09-22 | 2026-09-22
+ PACC-44295309383   | Payroll Test Account 44295309383       | active         |               | UNMAPPED      |  236 |      99141800.00 | 2026-09-22 | 2026-09-22
+ PACC-44302040915   | Payroll Test Account 44302040915       | active         |               | UNMAPPED      |  237 |      99140000.00 | 2026-09-22 | 2026-09-22
+ PACC-44698041943   | Payroll Test Account 44698041943       | active         |               | UNMAPPED      |  711 |      97445200.00 | 2026-10-04 | 2026-10-04
+ PACC-44720199657   | Payroll Test Account 44720199657       | active         |               | UNMAPPED      |  712 |      97443400.00 | 2026-10-04 | 2026-10-04
+ PACC-4570733714    | Payroll Test Account 4570733714        | active         |               | UNMAPPED      |  719 |      97414900.00 | 2026-10-04 | 2026-10-04
+ PACC-4571767561    | Payroll Test Account 4571767561        | active         |               | UNMAPPED      |  720 |      97413100.00 | 2026-10-04 | 2026-10-04
+ PACC-482347955     | Payroll Test Account 482347955         | active         |               | UNMAPPED      |  106 |      99598900.00 | 2026-09-21 | 2026-09-21
+ PACC-48236512510   | Payroll Test Account 48236512510       | active         |               | UNMAPPED      |  107 |      99597100.00 | 2026-09-21 | 2026-09-21
+ PACC-53112962815   | Payroll Test Account 53112962815       | active         |               | UNMAPPED      |  248 |      99100500.00 | 2026-09-22 | 2026-09-22
+ PACC-53119286880   | Payroll Test Account 53119286880       | active         |               | UNMAPPED      |  249 |      99098700.00 | 2026-09-22 | 2026-09-22
+ PACC-57639918714   | Payroll Test Account 57639918714       | active         |               | UNMAPPED      |  258 |      99064700.00 | 2026-09-22 | 2026-09-22
+ PACC-57647659947   | Payroll Test Account 57647659947       | active         |               | UNMAPPED      |  259 |      99062900.00 | 2026-09-22 | 2026-09-22
+ PACC-59699069526   | Payroll Test Account 59699069526       | active         |               | UNMAPPED      |  309 |      98881700.00 | 2026-09-25 | 2026-09-25
+ PACC-59709344785   | Payroll Test Account 59709344785       | active         |               | UNMAPPED      |  310 |      98879900.00 | 2026-09-25 | 2026-09-25
+ PACC-60348807986   | Payroll Test Account 60348807986       | active         |               | UNMAPPED      |  268 |      99028900.00 | 2026-09-22 | 2026-09-22
+ PACC-60357468660   | Payroll Test Account 60357468660       | active         |               | UNMAPPED      |  269 |      99027100.00 | 2026-09-22 | 2026-09-22
+ PACC-62360797518   | Payroll Test Account 62360797518       | active         |               | UNMAPPED      |  322 |      98838900.00 | 2026-09-25 | 2026-09-25
+ PACC-6236482743    | Payroll Test Account 6236482743        | active         |               | UNMAPPED      |  323 |      98837100.00 | 2026-09-25 | 2026-09-25
+ PACC-691336125     | Payroll Test Account 691336125         | active         |               | UNMAPPED      |  118 |      99557600.00 | 2026-09-21 | 2026-09-21
+ PACC-69135478426   | Payroll Test Account 69135478426       | active         |               | UNMAPPED      |  119 |      99555800.00 | 2026-09-21 | 2026-09-21
+ PACC-69527470908   | Payroll Test Account 69527470908       | active         |               | UNMAPPED      |  126 |      99527300.00 | 2026-09-21 | 2026-09-21
+ PACC-69529809753   | Payroll Test Account 69529809753       | active         |               | UNMAPPED      |  127 |      99525500.00 | 2026-09-21 | 2026-09-21
+ PACC-70099578902   | Payroll Test Account 70099578902       | active         |               | UNMAPPED      |  136 |      99491500.00 | 2026-09-21 | 2026-09-21
+ PACC-70101853873   | Payroll Test Account 70101853873       | active         |               | UNMAPPED      |  137 |      99489700.00 | 2026-09-21 | 2026-09-21
+ PACC-70541699324   | Payroll Test Account 70541699324       | active         |               | UNMAPPED      |  148 |      99450200.00 | 2026-09-21 | 2026-09-21
+ PACC-705438409     | Payroll Test Account 705438409         | active         |               | UNMAPPED      |  149 |      99448400.00 | 2026-09-21 | 2026-09-21
+ PACC-75820207449   | Payroll Test Account 75820207449       | active         |               | UNMAPPED      |  280 |      98987600.00 | 2026-09-22 | 2026-09-22
+ PACC-75827220520   | Payroll Test Account 75827220520       | active         |               | UNMAPPED      |  281 |      98985800.00 | 2026-09-22 | 2026-09-22
+ PACC-75928277323   | Payroll Test Account 75928277323       | active         |               | UNMAPPED      |  288 |      98957300.00 | 2026-09-22 | 2026-09-22
+ PACC-75933024959   | Payroll Test Account 75933024959       | active         |               | UNMAPPED      |  289 |      98955500.00 | 2026-09-22 | 2026-09-22
+ PACC-76055999801   | Payroll Test Account 76055999801       | active         |               | UNMAPPED      |  298 |      98921500.00 | 2026-09-22 | 2026-09-22
+ PACC-76063183692   | Payroll Test Account 76063183692       | active         |               | UNMAPPED      |  299 |      98919700.00 | 2026-09-22 | 2026-09-22
+ PACC-88342555423   | Payroll Test Account 88342555423       | active         |               | UNMAPPED      |  352 |      98731500.00 | 2026-09-27 | 2026-09-27
+ PACC-88348288445   | Payroll Test Account 88348288445       | active         |               | UNMAPPED      |  353 |      98729700.00 | 2026-09-27 | 2026-09-27
+ PACC-89199508764   | Payroll Test Account 89199508764       | active         |               | UNMAPPED      |  332 |      98803100.00 | 2026-09-26 | 2026-09-26
+ PACC-89204506293   | Payroll Test Account 89204506293       | active         |               | UNMAPPED      |  333 |      98801300.00 | 2026-09-26 | 2026-09-26
+ PACC-89938026212   | Payroll Test Account 89938026212       | active         |               | UNMAPPED      |  482 |      98266100.00 | 2026-09-28 | 2026-09-28
+ PACC-89948745379   | Payroll Test Account 89948745379       | active         |               | UNMAPPED      |  483 |      98264300.00 | 2026-09-28 | 2026-09-28
+ PACC-90109608279   | Payroll Test Account 90109608279       | active         |               | UNMAPPED      |  162 |      99403400.00 | 2026-09-21 | 2026-09-21
+ PACC-90111847848   | Payroll Test Account 90111847848       | active         |               | UNMAPPED      |  163 |      99401600.00 | 2026-09-21 | 2026-09-21
+ PACC-90424010882   | Payroll Test Account 90424010882       | active         |               | UNMAPPED      |  490 |      98235800.00 | 2026-09-28 | 2026-09-28
+ PACC-90429627258   | Payroll Test Account 90429627258       | active         |               | UNMAPPED      |  491 |      98234000.00 | 2026-09-28 | 2026-09-28
+ PACC-90647998573   | Payroll Test Account 90647998573       | active         |               | UNMAPPED      |  172 |      99367600.00 | 2026-09-21 | 2026-09-21
+ PACC-90651311725   | Payroll Test Account 90651311725       | active         |               | UNMAPPED      |  173 |      99365800.00 | 2026-09-21 | 2026-09-21
+ PACC-90859958860   | Payroll Test Account 90859958860       | active         |               | UNMAPPED      |  182 |      99331800.00 | 2026-09-21 | 2026-09-21
+ PACC-90862868752   | Payroll Test Account 90862868752       | active         |               | UNMAPPED      |  183 |      99330000.00 | 2026-09-21 | 2026-09-21
+ PACC-9502874816    | Payroll Test Account 9502874816        | active         |               | UNMAPPED      |  190 |      99301500.00 | 2026-09-21 | 2026-09-21
+ PACC-95032942221   | Payroll Test Account 95032942221       | active         |               | UNMAPPED      |  191 |      99299700.00 | 2026-09-21 | 2026-09-21
+ PACC-9549570138    | Payroll Test Account 9549570138        | active         |               | UNMAPPED      |  362 |      98695700.00 | 2026-09-27 | 2026-09-27
+ PACC-95500492529   | Payroll Test Account 95500492529       | active         |               | UNMAPPED      |  363 |      98693900.00 | 2026-09-27 | 2026-09-27
+ PACC-96604014900   | Payroll Test Account 96604014900       | active         |               | UNMAPPED      |  372 |      98659900.00 | 2026-09-27 | 2026-09-27
+ PACC-96609312136   | Payroll Test Account 96609312136       | active         |               | UNMAPPED      |  373 |      98658100.00 | 2026-09-27 | 2026-09-27
+ PACC-97406586915   | Payroll Test Account 97406586915       | active         |               | UNMAPPED      |  382 |      98624100.00 | 2026-09-27 | 2026-09-27
+ PACC-97411848451   | Payroll Test Account 97411848451       | active         |               | UNMAPPED      |  383 |      98622300.00 | 2026-09-27 | 2026-09-27
+ PACC-98585296663   | Payroll Test Account 98585296663       | active         |               | UNMAPPED      |  500 |      98200000.00 | 2026-09-28 | 2026-09-28
+ PACC-98596827827   | Payroll Test Account 98596827827       | active         |               | UNMAPPED      |  501 |      98198200.00 | 2026-09-28 | 2026-09-28
+ M0001              | ابراهيم                         | active         | 1101          | OK            |    4 |           142.00 | 2026-09-17 | 2026-09-18
+(281 rows)
+
+== Q3a Treasury balance vs GL balance, per GL account code (a GL account may serve several treasury accounts) ==
+ gl_code | treasury_accounts | treasury_balance | gl_balance |  drift  | gl_lines 
+---------+-------------------+------------------+------------+---------+----------
+ 1101    | M0001             |           142.00 |   -2000.00 | 2142.00 |        6
+(1 row)
+
+== Q3b same, per company-wide total and per day of the last 30 days movement (spot timing) ==
+    day     | legs  |      net      
+------------+-------+---------------
+ 2026-10-04 | 47305 | 7429977600.00
+ 2026-09-28 |  9544 | 1965638550.00
+ 2026-09-27 | 20565 | 4925960000.00
+ 2026-09-26 |  2708 |  790246400.00
+ 2026-09-25 |  3477 | 1187446950.00
+ 2026-09-22 |  9895 | 4064029300.00
+ 2026-09-21 |  7123 | 4973582900.00
+ 2026-09-20 |  1038 | 1495976150.00
+(8 rows)
+
+== Q4 clearing account: balance and originating transactions (pass -v clearing_code=...) ==
+ code | name | controlFunction | isActive | balance | lines 
+------+------+-----------------+----------+---------+-------
+(0 rows)
+
+ businessDate | entryNumber | eventType | sourceEntityType | sourceEntityId | transactionNumber | leg_type | reason | reference | customerId | salesOrderId | debitBase | creditBase | age_days 
+--------------+-------------+-----------+------------------+----------------+-------------------+----------+--------+-----------+------------+--------------+-----------+------------+----------
+(0 rows)
+
+== Q5 stop-condition probes: unbalanced / duplicate / orphan postings (all entries, not only treasury) ==
+ probe | ref | entryNumber | a | b 
+-------+-----+-------------+---+---
+(0 rows)
+
+== Q6 treasury legs that are reversed but whose subledger/invoice effect remains (G-06 evidence) ==
+ probe | paymentNumber | amount | transactionNumber | status 
+-------+---------------+--------+-------------------+--------
+(0 rows)
+
+ROLLBACK

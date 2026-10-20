@@ -1,0 +1,4 @@
+254ebd73-7897-4b4a-bb55-9cf13cff9c04|Alpha Trading Co|READY|company_f3ea8a2e75814dd4b3f708e606a434f9
+8965629d-6e03-4f2a-8e9b-897eecbd0280|Beta Trading Co|READY|company_0894c2a717f34fceaf6a299530ccf61f
+fd072876-89f1-4470-9f67-c87ebdc6606e|Gamma Trading Co|READY|company_98d3391ce5464c63a3e9fab11e55263c
+24ab7c08-0e4f-4ef0-bb7b-db0d7b37113e|Delta Trading Co|READY|company_dfa1105448b84ad8b8ae8d7bd8719353

@@ -1,0 +1,110 @@
+BEGIN
+-- A. legs by account family and mapping (summary of Q2)
+          family          | mapped | accounts | legs  |      net       
+--------------------------+--------+----------+-------+----------------
+ PACC-* (test fixtures)   | f      |      136 | 51994 | 13212558600.00
+ E2EACC-* (test fixtures) | f      |      142 | 49865 | 14019689850.00
+ MAIN-CASH                | f      |        1 |     6 |        3080.00
+ M0001                    | t      |        1 |     4 |         142.00
+ CUST-000008              | f      |        1 |     0 |           0.00
+(5 rows)
+
+-- B. event status for every GL-owned treasury leg expected event (not only offenders)
+  status  |                    eventType                     | count 
+----------+--------------------------------------------------+-------
+ IGNORED  | return.completed                                 |     1
+ POSTED   | accounting.fixed_asset.adjustment.approved       |     3
+ POSTED   | accounting.fixed_asset.depreciation.calculated   |     5
+ POSTED   | finance.invoice.posted                           |   737
+ POSTED   | finance.payment.recorded                         |     1
+ POSTED   | finance.supplier_invoice.posted                  |   106
+ POSTED   | finance.supplier_payment.recorded                |     5
+ POSTED   | inventory.movement.recorded                      |     2
+ POSTED   | manufacturing.work_order.finished_goods_received |   636
+ POSTED   | manufacturing.work_order.material_issued         |  3111
+ POSTED   | manufacturing.work_order.material_returned       |   320
+ POSTED   | payroll.run.posted                               |   411
+ POSTED   | procurement.goods_receipt.posted                 |   104
+ REJECTED | accounting.fixed_asset.adjustment.approved       |     2
+ REJECTED | accounting.fixed_asset.depreciation.calculated   |     5
+ REJECTED | collection.remitted                              |     1
+ REJECTED | deposit.verified                                 |     2
+ REJECTED | inventory.movement.recorded                      |    22
+ REJECTED | manufacturing.work_order.finished_goods_received |    10
+ REJECTED | manufacturing.work_order.material_issued         |    17
+ REJECTED | manufacturing.work_order.material_returned       |     7
+ REJECTED | payroll.run.posted                               |     6
+ REJECTED | treasury.cash.recorded                           |     1
+(23 rows)
+
+-- C. REJECTED/RECEIVED events, reasons
+                    eventType                     |  status  |                                                                     reason                                                                     | count |  first_bd  |  last_bd   
+--------------------------------------------------+----------+------------------------------------------------------------------------------------------------------------------------------------------------+-------+------------+------------
+ inventory.movement.recorded                      | REJECTED | negative_on_hand                                                                                                                               |    18 | 2026-09-12 | 2026-09-12
+ manufacturing.work_order.material_issued         | REJECTED | manufacturing.work_order.material_issued: no active postable account has controlFunction "wip" — assign one first                            |    16 | 2026-09-19 | 2026-09-19
+ manufacturing.work_order.finished_goods_received | REJECTED | manufacturing.work_order.finished_goods_received: no active postable account has controlFunction "wip"                                         |     9 | 2026-09-19 | 2026-09-19
+ payroll.run.posted                               | REJECTED | payroll run posted: no Wages Payable control account in the chart (assign controlFunction "wages_payable" to an account)                       |     6 | 2026-09-20 | 2026-10-04
+ manufacturing.work_order.material_returned       | REJECTED | manufacturing.work_order.material_returned: no active postable account has controlFunction "wip"                                               |     6 | 2026-09-19 | 2026-09-19
+ accounting.fixed_asset.depreciation.calculated   | REJECTED | draft build failed: Currency "F14" not found.                                                                                                  |     5 | 2027-02-28 | 2027-02-28
+ inventory.movement.recorded                      | REJECTED | no_valuation_source                                                                                                                            |     4 | 2026-09-12 | 2026-09-12
+ accounting.fixed_asset.adjustment.approved       | REJECTED | fixed asset disposal: gain-on-disposal account unresolved (unset)                                                                              |     2 | 2027-01-12 | 2027-01-12
+ deposit.verified                                 | REJECTED | deposit.verified: treasury account is not GL-mapped                                                                                            |     2 | 2026-09-17 | 2026-09-17
+ treasury.cash.recorded                           | REJECTED | cash.recorded: no counterAccountCode and the clearing account is unset — set accounting.cash_movement_clearing_account_code to a postable no |     1 | 2026-09-18 | 2026-09-18
+ collection.remitted                              | REJECTED | collection.remitted: treasury account is not GL-mapped                                                                                         |     1 | 2026-09-20 | 2026-09-20
+ manufacturing.work_order.finished_goods_received | REJECTED | posting gate rejected: deadlock detected                                                                                                       |     1 | 2026-09-20 | 2026-09-20
+ manufacturing.work_order.material_issued         | REJECTED | posting gate rejected: deadlock detected                                                                                                       |     1 | 2026-09-20 | 2026-09-20
+ manufacturing.work_order.material_returned       | REJECTED | posting gate rejected: deadlock detected                                                                                                       |     1 | 2026-09-20 | 2026-09-20
+(14 rows)
+
+-- D. M0001 and MAIN-CASH legs
+   code    |  transactionNumber  |   type   | amount  | status |                       reason                       | movementDate | dep | is_rev 
+-----------+---------------------+----------+---------+--------+----------------------------------------------------+--------------+-----+--------
+ M0001     | TRS-IN-2026-000030  | cash_in  |   10.00 | posted | Customer deposit                                   | 2026-09-17   | t   | f
+ M0001     | TRS-IN-2026-000031  | cash_in  |   12.00 | posted | Customer deposit                                   | 2026-09-17   | t   | f
+ M0001     | TRS-IN-2026-000034  | cash_in  |  200.00 | posted | GRNI E2E test top-up                               | 2026-09-18   | f   | f
+ M0001     | TRS-OUT-2026-000005 | cash_out |   80.00 | posted | supplier_payment                                   | 2026-09-18   | f   | f
+ MAIN-CASH | TRS-IN-2026-000032  | cash_in  | 5000.00 | posted | Test funding for supplier payment E2E verification | 2026-09-17   | f   | f
+ MAIN-CASH | TRS-OUT-2026-000001 | cash_out |  500.00 | posted | supplier_payment                                   | 2026-09-17   | f   | f
+ MAIN-CASH | TRS-OUT-2026-000002 | cash_out |  775.00 | posted | supplier_payment                                   | 2026-09-17   | f   | f
+ MAIN-CASH | TRS-IN-2026-000033  | cash_in  |  125.00 | posted | customer_payment                                   | 2026-09-17   | f   | f
+ MAIN-CASH | TRS-OUT-2026-000003 | cash_out |  195.00 | posted | supplier_payment                                   | 2026-09-18   | f   | f
+ MAIN-CASH | TRS-OUT-2026-000004 | cash_out |  575.00 | posted | supplier_payment                                   | 2026-09-18   | f   | f
+(10 rows)
+
+-- E. GL lines on 1101 (what makes -2000)
+  entryNumber   | businessDate |             eventType             | sourceEntityType | debitBase | creditBase |                 descr                  
+----------------+--------------+-----------------------------------+------------------+-----------+------------+----------------------------------------
+ JV-2026-000544 | 2026-09-17   | finance.supplier_payment.recorded | supplier_payment |    0.0000 |   500.0000 | Supplier payment SPAY-2026-000001 paid
+ JV-2026-000545 | 2026-09-17   | finance.supplier_payment.recorded | supplier_payment |    0.0000 |   775.0000 | Supplier payment SPAY-2026-000002 paid
+ JV-2026-000549 | 2026-09-17   | finance.payment.recorded          | payment          |  125.0000 |     0.0000 | Payment PAY-2026-000001 received
+ JV-2026-000551 | 2026-09-17   | finance.supplier_payment.recorded | supplier_payment |    0.0000 |   195.0000 | Supplier payment SPAY-2026-000003 paid
+ JV-2026-000553 | 2026-09-18   | finance.supplier_payment.recorded | supplier_payment |    0.0000 |   575.0000 | Supplier payment SPAY-2026-000004 paid
+ JV-2026-000560 | 2026-09-18   | finance.supplier_payment.recorded | supplier_payment |    0.0000 |    80.0000 | Supplier payment SPAY-2026-000005 paid
+(6 rows)
+
+-- F. 1102 and any other bank-control balance vs treasury (all bank-control GL accounts)
+ code | gl_balance | lines 
+------+------------+-------
+ 1101 |   -2000.00 |     6
+(1 row)
+
+-- G. payments / deposits linked to treasury legs and their events
+        src        | n |   amt   
+-------------------+---+---------
+ customer_payments | 1 |  125.00
+ supplier_payments | 5 | 2125.00
+ deposits          | 2 |   22.00
+(3 rows)
+
+-- H. treasury legs that are status=reversed, and reversal rows
+ status | type | count 
+--------+------+-------
+(0 rows)
+
+-- I. distinct posted-entry sourceTypes vs events
+   sourceType    | count 
+-----------------+-------
+ FINANCIAL_EVENT |  5674
+(1 row)
+
+ROLLBACK
