@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNumber, IsNumberString, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SupplierInvoiceService } from '../application/supplier-invoice.service';
 import { InvoiceAllocationService } from '../application/invoice-allocation.service';
+import { InvoiceApprovalService } from '../application/invoice-approval.service';
+import { InvoicePolicyService } from '../application/invoice-policy.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -45,6 +47,20 @@ class CreateSupplierInvoiceDto {
   taxAmount?: string;
 }
 
+class ReasonDto {
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+class InvoicePolicyDto {
+  @IsOptional() @IsBoolean() approvalRequired?: boolean;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) priceTolerancePct?: number;
+  // null clears the amount limit
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber() @Min(0) priceToleranceAmount?: number | null;
+  @IsOptional() @IsIn(['both', 'over_only']) toleranceDirection?: 'both' | 'over_only';
+}
+
 class VoidInvoiceDto {
   @IsString()
   @MaxLength(255)
@@ -67,6 +83,8 @@ export class SupplierInvoiceController {
   constructor(
     private readonly invoices: SupplierInvoiceService,
     private readonly allocations: InvoiceAllocationService,
+    private readonly approvals: InvoiceApprovalService,
+    private readonly policies: InvoicePolicyService,
   ) {}
 
   @UseGuards(PermissionGuard)
@@ -102,6 +120,22 @@ export class SupplierInvoiceController {
   async invoicingForPurchaseOrder(@Req() req: CompanyScopedRequest, @Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.allocations.getPurchaseOrderInvoicing(purchaseOrderId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.view', 'read-only')
+  @Get('policy')
+  async getPolicy(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.policies.get(req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.invoice_policy.manage', 'editable')
+  @Post('policy')
+  async updatePolicy(@Body() dto: InvoicePolicyDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.policies.update(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -142,6 +176,46 @@ export class SupplierInvoiceController {
   async create(@Body() dto: CreateSupplierInvoiceDto, @Req() req: CompanyScopedRequest) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.invoices.createDraftInvoice(dto, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.submit', 'editable')
+  @Post(':id/submit')
+  async submit(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.approvals.submit(id, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.approve', 'editable')
+  @Post(':id/approve')
+  async approve(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.approvals.approve(id, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.override', 'editable')
+  @Post(':id/approve-exception')
+  async approveException(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.approvals.approveException(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.approve', 'editable')
+  @Post(':id/reject')
+  async reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.approvals.reject(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.create', 'editable')
+  @Post(':id/reopen')
+  async reopen(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.approvals.reopen(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

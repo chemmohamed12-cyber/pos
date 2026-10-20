@@ -17,7 +17,7 @@ import { ModuleManifest } from '../module-manifest.type';
  */
 export const procurementManifest: ModuleManifest = {
   module_code: 'procurement',
-  manifest_version: '1.3.0',
+  manifest_version: '1.4.0',
   title_code: 'module.procurement',
   business_domains: ['procurement'],
   // 1.1.0 (Goods Receipt) added `inventory`: `GoodsReceiptService` calls
@@ -69,6 +69,12 @@ export const procurementManifest: ModuleManifest = {
     { node: 'procurement.supplier_invoice.create', title_code: 'perm.procurement.supplier_invoice.create', parent: 'procurement.supplier_invoice' },
     { node: 'procurement.supplier_invoice.post', title_code: 'perm.procurement.supplier_invoice.post', parent: 'procurement.supplier_invoice' },
     { node: 'procurement.supplier_invoice.void', title_code: 'perm.procurement.supplier_invoice.void', parent: 'procurement.supplier_invoice' },
+    // phase C-1 (D5 / D2 / D1): submit -> approve (independent person) -> post; `override` approves a price exception; `invoice_policy.manage` sets the Company approval switch and tolerance limits
+    { node: 'procurement.supplier_invoice.submit', title_code: 'perm.procurement.supplier_invoice.submit', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.supplier_invoice.approve', title_code: 'perm.procurement.supplier_invoice.approve', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.supplier_invoice.override', title_code: 'perm.procurement.supplier_invoice.override', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.invoice_policy', title_code: 'perm.procurement.invoice_policy', parent: 'procurement' },
+    { node: 'procurement.invoice_policy.manage', title_code: 'perm.procurement.invoice_policy.manage', parent: 'procurement.invoice_policy' },
 
     { node: 'procurement.supplier_payment', title_code: 'perm.procurement.supplier_payment', parent: 'procurement' },
     { node: 'procurement.supplier_payment.view', title_code: 'perm.procurement.supplier_payment.view', parent: 'procurement.supplier_payment' },

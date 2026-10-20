@@ -15,6 +15,7 @@ import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
 import { InvoiceAllocationService } from './invoice-allocation.service';
+import { InvoicePolicyService } from './invoice-policy.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 const ENTITY_TYPE = 'supplier_invoice';
@@ -74,11 +75,14 @@ export class SupplierInvoiceService {
     // D5 — the accounting pre-flight (PPV / Input VAT accounts), bound by `accounting` through the foundation holder.
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
     @Optional() allocations?: InvoiceAllocationService,
+    @Optional() policies?: InvoicePolicyService,
   ) {
     this.allocations = allocations ?? new InvoiceAllocationService(dataSource);
+    this.policies = policies ?? new InvoicePolicyService(dataSource);
   }
 
   private readonly allocations: InvoiceAllocationService;
+  private readonly policies: InvoicePolicyService;
 
   async getStatus(invoiceId: string, manager?: EntityManager): Promise<string> {
     return this.processEngine.getState(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, manager);
@@ -285,7 +289,13 @@ export class SupplierInvoiceService {
     const invoice = await (manager ?? this.dataSource).getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
     const state = await this.getStatus(invoiceId, manager);
-    if (state !== 'draft') throw new ConflictException(`Cannot post an invoice in state "${state}".`);
+    // Phase C-1 (D5): with the Company's approval workflow ON an invoice posts only from "approved"; OFF keeps the legacy direct draft -> posted path. (The transition below re-checks the state under the row lock.)
+    const policy = await this.policies.get(manager);
+    if (state !== 'approved' && !(state === 'draft' && !policy.approvalRequired)) {
+      throw new ConflictException(
+        state === 'draft' ? 'This Company requires supplier invoices to be submitted and approved before posting.' : `Cannot post an invoice in state "${state}".`,
+      );
+    }
 
     const lines = await (manager ?? this.dataSource).getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } });
     const basis = this.invoiceBasis(invoice, lines);
@@ -300,7 +310,7 @@ export class SupplierInvoiceService {
     }
 
     const saved = await (manager ?? this.dataSource).transaction(async (m) => {
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'post', actorUserId, m);
+      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, state === 'approved' ? 'post_approved' : 'post', actorUserId, m);
       invoice.postedByUserId = actorUserId;
       const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);
 

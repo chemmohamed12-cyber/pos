@@ -13,6 +13,9 @@ import { SupplierInvoiceLine } from './infrastructure/supplier-invoice-line.enti
 import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
 import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
 import { InvoiceAllocationService } from './application/invoice-allocation.service';
+import { InvoiceApprovalService } from './application/invoice-approval.service';
+import { InvoicePolicyService } from './application/invoice-policy.service';
+import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
 import { SupplierLedgerEntry } from './infrastructure/supplier-ledger-entry.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
 import { PurchaseRequest } from './infrastructure/purchase-request.entity';
@@ -100,6 +103,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
       SupplierInvoiceLine,
       SupplierInvoiceLineReceipt,
       SupplierPaymentAllocation,
+      ProcurementInvoicePolicy,
       SupplierLedgerEntry,
       SupplierPayment,
       PurchaseRequest,
@@ -150,6 +154,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     SupplierLedgerService,
     SupplierInvoiceService,
     InvoiceAllocationService,
+    InvoicePolicyService,
+    InvoiceApprovalService,
     SupplierPaymentService,
     PurchaseRequestService,
     RfqService,

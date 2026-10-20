@@ -12,8 +12,22 @@ export const SUPPLIER_INVOICE_PROCESS: ProcessDefinition = {
   key: 'supplier_invoice_lifecycle',
   initialState: 'draft',
   transitions: [
+    // legacy direct path - used only while the Company's approval workflow is off
     { from: 'draft', to: 'posted', action: 'post' },
     { from: 'draft', to: 'void', action: 'cancel_draft' },
+    // phase C-1 (D5): Draft -> Submitted -> Approved -> Posted, with On Hold (matching exception) and Rejected
+    { from: 'draft', to: 'submitted', action: 'submit' },
+    { from: 'draft', to: 'on_hold', action: 'submit_hold' },
+    { from: 'submitted', to: 'approved', action: 'approve' },
+    { from: 'on_hold', to: 'approved', action: 'approve_exception' },
+    { from: 'submitted', to: 'rejected', action: 'reject' },
+    { from: 'on_hold', to: 'rejected', action: 'reject' },
+    { from: 'rejected', to: 'draft', action: 'reopen' },
+    { from: 'approved', to: 'posted', action: 'post_approved' },
+    { from: 'submitted', to: 'void', action: 'cancel_draft' },
+    { from: 'on_hold', to: 'void', action: 'cancel_draft' },
+    { from: 'approved', to: 'void', action: 'cancel_draft' },
+    { from: 'rejected', to: 'void', action: 'cancel_draft' },
     { from: 'posted', to: 'partially_paid', action: 'record_partial_payment' },
     { from: 'posted', to: 'paid', action: 'mark_paid' },
     { from: 'partially_paid', to: 'paid', action: 'mark_paid' },

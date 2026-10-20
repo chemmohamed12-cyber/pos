@@ -5,6 +5,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FinancialTrace } from '../../components/FinancialTrace';
 import { MultiInvoicePayment } from './MultiInvoicePayment';
+import { InvoiceApprovalPanel } from './InvoiceApprovalPanel';
+import { InvoicePolicyPanel, type InvoicePolicy } from './InvoicePolicyPanel';
 import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 
 interface Supplier {
@@ -96,6 +98,8 @@ export function SupplierInvoices() {
   const [paying, setPaying] = useState(false);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // phase C-1: the Company's approval / tolerance policy (legacy = direct posting until an administrator turns approval on)
+  const [policy, setPolicy] = useState<InvoicePolicy>({ approvalRequired: false, priceTolerancePct: 0, priceToleranceAmount: null, toleranceDirection: 'both' });
   const [error, setError] = useState<string | null>(null);
 
   preload([
@@ -180,6 +184,13 @@ export function SupplierInvoices() {
         setError(err instanceof ApiError ? err.message : 'Failed to load purchase order lines.');
       });
   }, [purchaseOrderId]);
+
+  useEffect(() => {
+    api
+      .get<InvoicePolicy>('/procurement/supplier-invoices/policy')
+      .then(setPolicy)
+      .catch(() => undefined);
+  }, []);
 
   async function loadDetail(id: string) {
     setSelectedId(id);
@@ -347,6 +358,8 @@ export function SupplierInvoices() {
         </div>
       )}
 
+      <InvoicePolicyPanel policy={policy} onSaved={setPolicy} />
+
       {error && <div className="error-text">{error}</div>}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -396,17 +409,27 @@ export function SupplierInvoices() {
               <StatusBadge code={`supplier_invoice_lifecycle.state.${detail.state}`} />
             </div>
 
+            <InvoiceApprovalPanel
+              invoice={detail as never}
+              approvalRequired={policy.approvalRequired}
+              onChanged={async () => {
+                await load();
+                await loadDetail(detail.id);
+              }}
+              onError={setError}
+            />
+
             {can('procurement.supplier_invoice.post', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {detail.state === 'draft' && (
-                  <>
-                    <button className="btn btn-primary" disabled={busyAction === 'post'} onClick={() => doAction('post')}>
-                      {t('action.post_invoice')}
-                    </button>
-                    <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
-                      {t('action.void_invoice')}
-                    </button>
-                  </>
+                {((detail.state === 'draft' && !policy.approvalRequired) || detail.state === 'approved') && (
+                  <button className="btn btn-primary" disabled={busyAction === 'post'} onClick={() => doAction('post')}>
+                    {t('action.post_invoice')}
+                  </button>
+                )}
+                {['draft', 'submitted', 'on_hold', 'approved', 'rejected'].includes(detail.state) && (
+                  <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
+                    {t('action.void_invoice')}
+                  </button>
                 )}
                 {(detail.state === 'posted' || detail.state === 'partially_paid') && (
                   <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
