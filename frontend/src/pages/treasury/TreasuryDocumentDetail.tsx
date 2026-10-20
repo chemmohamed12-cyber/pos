@@ -36,7 +36,9 @@ export function TreasuryDocumentDetail() {
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/treasury/documents/${id}/${path}`, { expectedVersion: doc?.version, ...payload }, opts);
+      // only submit / execute carry the optimistic version (the other actions' DTOs do not accept it — the API rejects unknown fields)
+      const versioned = path === 'submit' || path === 'execute' ? { expectedVersion: doc?.version } : {};
+      await api.post(`/treasury/documents/${id}/${path}`, { ...versioned, ...payload }, opts);
       setReason('');
       setNote('');
       setExecuteKey(newIdempotencyKey());
@@ -101,7 +103,7 @@ export function TreasuryDocumentDetail() {
             <tbody>
               {doc.allocations.map((a) => (
                 <tr key={a.id}>
-                  <td>{a.invoiceId}</td>
+                  <td>{a.invoiceNumber ?? a.invoiceId}</td>
                   <td style={{ textAlign: 'end' }}>{money(a.amount)}</td>
                 </tr>
               ))}
@@ -145,10 +147,10 @@ export function TreasuryDocumentDetail() {
               {can('finance.cash_document.approve', 'editable') && !isPreparer ? (
                 <>
                   <input placeholder={tr('ملاحظة (اختياري)', 'Note (optional)')} value={note} onChange={(e) => setNote(e.target.value)} />
-                  <button className="btn btn-primary" type="button" disabled={busy} onClick={() => act('decide', { decision: 'approved', note: note || undefined, expectedVersion: undefined })}>
+                  <button className="btn btn-primary" type="button" disabled={busy} onClick={() => act('decide', { decision: 'approved', note: note || undefined })}>
                     {tr('اعتماد', 'Approve')}
                   </button>
-                  <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => act('decide', { decision: 'rejected', note: note || undefined, expectedVersion: undefined })}>
+                  <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => act('decide', { decision: 'rejected', note: note || undefined })}>
                     {tr('رفض', 'Reject')}
                   </button>
                 </>

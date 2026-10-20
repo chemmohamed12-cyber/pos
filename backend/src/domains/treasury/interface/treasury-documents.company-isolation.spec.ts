@@ -210,6 +210,7 @@ describe('T3 — Treasury Documents (real-Postgres, A/B)', () => {
     const d = await fullFlow({ kind: 'customer_collection', treasuryAccountId: acc.A.bank, customerId: acc.A.customerId, method: 'bank_transfer', reference: 'CHQ-77', purpose: 'Settlement', allocations: [{ invoiceId: i1, amount: '300.00' }, { invoiceId: i2, amount: '400.00' }], unappliedAmount: '50.00' });
     expect(d.status).toBe('executed');
     expect(d.amount).toBe('750.00');
+    expect((await docs.get(d.id, m)).allocations.map((a) => a.invoiceNumber).sort()).toEqual([expect.stringMatching(/^T3-INV-A-/), expect.stringMatching(/^T3-INV-A-/)]); // human invoice numbers, not ids
     const after = await fingerprint('A');
     expect(after.treasuryTxns - before.treasuryTxns).toBe(1);
     expect(after.payments - before.payments).toBe(1);

@@ -49,7 +49,8 @@ export interface TreasuryDocumentInput {
 }
 
 export interface TreasuryDocumentView extends TreasuryDocument {
-  allocations: TreasuryDocumentAllocation[];
+  /** each allocation carries the human invoice number (UI review finding: a raw id is not something a user can act on). */
+  allocations: Array<TreasuryDocumentAllocation & { invoiceNumber: string | null }>;
 }
 
 export interface EffectLine {
@@ -108,7 +109,13 @@ export class TreasuryDocumentService implements OnModuleInit {
     const em = this.em(manager);
     const doc = await em.getRepository(TreasuryDocument).findOne({ where: { id } });
     if (!doc) throw new NotFoundException(`Treasury document "${id}" not found.`);
-    const allocations = await em.getRepository(TreasuryDocumentAllocation).find({ where: { documentId: id }, order: { createdAt: 'ASC' } });
+    const rows = await em.getRepository(TreasuryDocumentAllocation).find({ where: { documentId: id }, order: { createdAt: 'ASC' } });
+    const numbers = new Map<string, string>();
+    if (rows.length > 0) {
+      const found: Array<{ id: string; invoiceNumber: string }> = await em.query(`SELECT id, "invoiceNumber" FROM sales_invoices WHERE id = ANY($1::uuid[])`, [rows.map((r) => r.invoiceId)]);
+      for (const f of found) numbers.set(f.id, f.invoiceNumber);
+    }
+    const allocations = rows.map((r) => Object.assign(r, { invoiceNumber: numbers.get(r.invoiceId) ?? null }));
     return Object.assign(doc, { allocations }) as TreasuryDocumentView;
   }
 

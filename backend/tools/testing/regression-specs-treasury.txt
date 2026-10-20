@@ -5,3 +5,4 @@ src/domains/treasury/interface/treasury-posting-integrity.company-isolation.spec
 src/domains/treasury/interface/treasury-posting-recovery.company-isolation.spec.ts
 src/domains/customer-finance/interface/payment-reversal.company-isolation.spec.ts
 src/domains/treasury/interface/treasury-documents.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-documents.http.company-isolation.spec.ts

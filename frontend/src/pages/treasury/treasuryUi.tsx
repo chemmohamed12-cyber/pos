@@ -42,7 +42,7 @@ export interface TreasuryDocumentRow {
   cancelReason: string | null;
   version: number;
   createdAt: string;
-  allocations?: Array<{ id: string; invoiceId: string; amount: string }>;
+  allocations?: Array<{ id: string; invoiceId: string; invoiceNumber?: string | null; amount: string }>;
 }
 
 const KIND_LABEL: Record<DocKind, [string, string]> = {
