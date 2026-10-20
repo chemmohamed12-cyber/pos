@@ -14,6 +14,7 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { InvoiceAllocationService } from './invoice-allocation.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 const ENTITY_TYPE = 'supplier_invoice';
@@ -24,6 +25,8 @@ const INVOICE_PREFIX = 'SINV';
 export interface CreateSupplierInvoiceLineInput {
   purchaseOrderLineId: string;
   quantity: string;
+  /** Optional: bill this goods-receipt line first (it must have free quantity); otherwise receipts are allocated first-in-first-out. */
+  goodsReceiptLineId?: string | null;
   /** The supplier's own billed unit cost — cross-checked against the PO line's unitCostBase for the price-variance signal; NOT required to match exactly (variance is informational, never blocking). */
   unitCostBase: string;
 }
@@ -70,7 +73,12 @@ export class SupplierInvoiceService {
     private readonly events: EventBusService,
     // D5 — the accounting pre-flight (PPV / Input VAT accounts), bound by `accounting` through the foundation holder.
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
-  ) {}
+    @Optional() allocations?: InvoiceAllocationService,
+  ) {
+    this.allocations = allocations ?? new InvoiceAllocationService(dataSource);
+  }
+
+  private readonly allocations: InvoiceAllocationService;
 
   async getStatus(invoiceId: string, manager?: EntityManager): Promise<string> {
     return this.processEngine.getState(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, manager);
@@ -229,7 +237,17 @@ export class SupplierInvoiceService {
           voidedReason: null,
         }),
       );
-      await lineRepo.save(lineEntities.map((l) => lineRepo.create({ ...l, supplierInvoiceId: savedInvoice.id })));
+      const savedLines = await lineRepo.save(lineEntities.map((l) => lineRepo.create({ ...l, supplierInvoiceId: savedInvoice.id })));
+      // Phase A: bill specific goods receipts (race-safe per order line; the whole creation rolls back if the received-and-not-invoiced quantity is not there).
+      await this.allocations.allocate(
+        savedLines.map((sl, i) => ({
+          supplierInvoiceLineId: sl.id,
+          purchaseOrderLineId: sl.purchaseOrderLineId,
+          quantity: Number(sl.quantity),
+          goodsReceiptLineId: input.lines[i].goodsReceiptLineId ?? null,
+        })),
+        txManager,
+      );
       for (const line of input.lines) {
         await poLineRepo.increment({ id: line.purchaseOrderLineId }, 'quantityInvoiced', Number(line.quantity));
       }
@@ -389,6 +407,7 @@ export class SupplierInvoiceService {
         await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId, m);
       }
       await this.restoreInvoicedQuantities(lines, m);
+      await this.allocations.release(lines.map((l) => l.id), m);
 
       invoice.voidedReason = reason;
       const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);

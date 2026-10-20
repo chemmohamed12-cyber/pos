@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedExc
 import { IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SupplierInvoiceService } from '../application/supplier-invoice.service';
+import { InvoiceAllocationService } from '../application/invoice-allocation.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -17,6 +18,11 @@ class CreateSupplierInvoiceLineDto {
 
   @IsNumberString()
   unitCostBase!: string;
+
+  /** optional: bill this goods-receipt line first; otherwise receipts are allocated first-in-first-out */
+  @IsOptional()
+  @IsUUID()
+  goodsReceiptLineId?: string;
 }
 
 class CreateSupplierInvoiceDto {
@@ -58,7 +64,10 @@ class VoidInvoiceDto {
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('procurement')
 export class SupplierInvoiceController {
-  constructor(private readonly invoices: SupplierInvoiceService) {}
+  constructor(
+    private readonly invoices: SupplierInvoiceService,
+    private readonly allocations: InvoiceAllocationService,
+  ) {}
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.supplier_invoice.view', 'read-only')
@@ -74,6 +83,25 @@ export class SupplierInvoiceController {
   async apAgingAll(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.invoices.getApAgingForAllSuppliers(req.companyContext.dataSource.manager);
+  }
+
+  /** Read-only consistency check of receipt allocations, PO-line aggregates and payment allocations; an empty list means consistent. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.view', 'read-only')
+  @Get('reconciliation')
+  async reconciliation(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const issues = await this.allocations.reconcile(req.companyContext.dataSource.manager);
+    return { consistent: issues.length === 0, issues };
+  }
+
+  /** Per purchase-order line: ordered / received / invoiced / remaining, with the per-goods-receipt breakdown. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_invoice.view', 'read-only')
+  @Get('invoicing-by-purchase-order/:purchaseOrderId')
+  async invoicingForPurchaseOrder(@Req() req: CompanyScopedRequest, @Param('purchaseOrderId', ParseUUIDPipe) purchaseOrderId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.allocations.getPurchaseOrderInvoicing(purchaseOrderId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

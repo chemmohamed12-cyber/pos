@@ -17,6 +17,8 @@ import { Rfq } from './infrastructure/rfq.entity';
 import { RfqSupplierInvite } from './infrastructure/rfq-supplier-invite.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
 import { ProductItemRequest } from './infrastructure/product-item-request.entity';
+import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
+import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Procurement's own
@@ -51,4 +53,6 @@ export const PROCUREMENT_COMPANY_ENTITIES = [
   SupplierQuotation,
   SupplierQuotationLine,
   ProductItemRequest,
+  SupplierInvoiceLineReceipt,
+  SupplierPaymentAllocation,
 ];

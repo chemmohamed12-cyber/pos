@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FinancialTrace } from '../../components/FinancialTrace';
+import { MultiInvoicePayment } from './MultiInvoicePayment';
 import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 
 interface Supplier {
@@ -467,6 +468,21 @@ export function SupplierInvoices() {
                   {t('action.record_payment')}
                 </button>
               </form>
+            )}
+
+            {(detail.state === 'posted' || detail.state === 'partially_paid') && canPaySupplier && (
+              <MultiInvoicePayment
+                supplierId={detail.supplierId}
+                invoices={invoices ?? []}
+                treasuryAccounts={treasuryAccounts}
+                method={paymentMethod}
+                treasuryAccountId={paymentTreasuryAccountId}
+                onError={setError}
+                onDone={async () => {
+                  await load();
+                  await loadDetail(detail.id);
+                }}
+              />
             )}
           </div>
         )}

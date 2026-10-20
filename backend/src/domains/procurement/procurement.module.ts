@@ -10,6 +10,9 @@ import { GoodsReceipt } from './infrastructure/goods-receipt.entity';
 import { GoodsReceiptLine } from './infrastructure/goods-receipt-line.entity';
 import { SupplierInvoice } from './infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from './infrastructure/supplier-invoice-line.entity';
+import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
+import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
+import { InvoiceAllocationService } from './application/invoice-allocation.service';
 import { SupplierLedgerEntry } from './infrastructure/supplier-ledger-entry.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
 import { PurchaseRequest } from './infrastructure/purchase-request.entity';
@@ -95,6 +98,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
       GoodsReceiptLine,
       SupplierInvoice,
       SupplierInvoiceLine,
+      SupplierInvoiceLineReceipt,
+      SupplierPaymentAllocation,
       SupplierLedgerEntry,
       SupplierPayment,
       PurchaseRequest,
@@ -144,6 +149,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     GoodsReceiptService,
     SupplierLedgerService,
     SupplierInvoiceService,
+    InvoiceAllocationService,
     SupplierPaymentService,
     PurchaseRequestService,
     RfqService,
