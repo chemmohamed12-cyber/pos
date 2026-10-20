@@ -7,7 +7,8 @@ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/c
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
-import { WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
+import { WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
+import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
 
 class PostGoodsReceiptLineDto {
@@ -43,7 +44,22 @@ class PostGoodsReceiptDto {
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard, WarehouseScopeGuard)
 @RequireModule('procurement')
 export class GoodsReceiptController {
-  constructor(private readonly goodsReceipts: GoodsReceiptService) {}
+  constructor(
+    private readonly goodsReceipts: GoodsReceiptService,
+    private readonly scopes: AccessScopeService,
+  ) {}
+
+  /** Goods received and not yet invoiced (the work-list behind "create supplier invoice"), limited to the caller's visible warehouses. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.goods_receipt.view', 'read-only')
+  @WarehouseScopeFiltered('purchase orders of the caller\'s visible warehouses only')
+  @Get('uninvoiced')
+  async listUninvoiced(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const scope = await this.scopes.forRequest(req);
+    const visible = await this.scopes.visibleWarehouseIds(scope, req.companyContext.dataSource.manager);
+    return this.goodsReceipts.listUninvoiced(req.companyContext.dataSource.manager, visible === 'ALL' ? undefined : visible);
+  }
 
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.goods_receipt.view', 'read-only')

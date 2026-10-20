@@ -162,6 +162,10 @@ export function PurchaseOrders() {
 
   useEffect(() => {
     load();
+    // deep link: /purchase-orders?id=<purchase order id> opens that order (from "goods received, not invoiced" and the general ledger)
+    const linked = new URLSearchParams(window.location.search).get('id');
+    if (linked) void loadDetail(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadDetail(id: string) {

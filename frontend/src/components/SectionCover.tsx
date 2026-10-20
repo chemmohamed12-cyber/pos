@@ -8,6 +8,8 @@ export interface SectionShortcut {
 
 export interface SectionKpi {
   labelCode: string;
+  /** a ready label (already in the page language) for a tile that has no terminology entry yet; wins over `labelCode` */
+  label?: string;
   value: string | number;
   to?: string;
   tone?: 'default' | 'warning' | 'danger' | 'positive';
@@ -60,7 +62,7 @@ export function SectionCover({
             const tileClass = `kpi-tile${kpi.tone && kpi.tone !== 'default' ? ` tone-${kpi.tone}` : ''}`;
             const content = (
               <>
-                <div className="label">{t(kpi.labelCode)}</div>
+                <div className="label">{kpi.label ?? t(kpi.labelCode)}</div>
                 <div className="value">{kpi.value}</div>
               </>
             );

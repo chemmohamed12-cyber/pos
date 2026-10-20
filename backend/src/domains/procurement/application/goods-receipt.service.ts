@@ -53,6 +53,53 @@ export class GoodsReceiptService {
     private readonly lifecycleGate: ProductLifecycleGate,
   ) {}
 
+  /**
+   * Goods received but not yet invoiced: every purchase order with a positive (received - invoiced) balance - the SAME columns the GRNI ledger and the 3-way-match guard use, never a second
+   * calculation - with the goods receipts it received and the uninvoiced value. `visibleWarehouseIds` (F6) narrows it to the caller's warehouses. Read-only.
+   */
+  async listUninvoiced(
+    manager?: EntityManager,
+    visibleWarehouseIds?: string[],
+  ): Promise<{
+    totalReceipts: number;
+    totalValue: string;
+    orders: Array<{
+      purchaseOrderId: string;
+      poNumber: string;
+      supplierId: string;
+      supplierName: string | null;
+      warehouseId: string;
+      uninvoicedQuantity: string;
+      uninvoicedValue: string;
+      receipts: Array<{ id: string; grNumber: string; createdAt: string }>;
+    }>;
+  }> {
+    const m = manager ?? this.dataSource;
+    const scope = visibleWarehouseIds ? 'AND po."warehouseId" = ANY($1::uuid[])' : '';
+    const orders = (await m.query(
+      `SELECT po.id AS "purchaseOrderId", po."poNumber", po."supplierId", s."legalName" AS "supplierName", po."warehouseId",
+              SUM(pol."quantityReceived" - pol."quantityInvoiced")::numeric(20,3)::text AS "uninvoicedQuantity",
+              SUM((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4)::text AS "uninvoicedValue"
+         FROM "purchase_order_lines" pol
+         JOIN "purchase_orders" po ON po.id = pol."purchaseOrderId"
+         LEFT JOIN "suppliers" s ON s.id = po."supplierId"
+        WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0 ${scope}
+        GROUP BY po.id, po."poNumber", po."supplierId", s."legalName", po."warehouseId"
+        ORDER BY po."poNumber"`,
+      visibleWarehouseIds ? [visibleWarehouseIds] : [],
+    )) as Array<{ purchaseOrderId: string; poNumber: string; supplierId: string; supplierName: string | null; warehouseId: string; uninvoicedQuantity: string; uninvoicedValue: string }>;
+    const ids = orders.map((o) => o.purchaseOrderId);
+    const receipts = ids.length
+      ? ((await m.query(`SELECT id, "grNumber", "purchaseOrderId", "createdAt" FROM "goods_receipts" WHERE "purchaseOrderId" = ANY($1::uuid[]) ORDER BY "createdAt"`, [ids])) as Array<{ id: string; grNumber: string; purchaseOrderId: string; createdAt: Date }>)
+      : [];
+    const out = orders.map((o) => ({
+      ...o,
+      receipts: receipts.filter((r) => r.purchaseOrderId === o.purchaseOrderId).map((r) => ({ id: r.id, grNumber: r.grNumber, createdAt: new Date(r.createdAt).toISOString() })),
+    }));
+    const totalValue = orders.reduce((sum, o) => sum + Math.round(Number(o.uninvoicedValue) * 10000), 0) / 10000;
+    return { totalReceipts: out.reduce((n, o) => n + o.receipts.length, 0), totalValue: totalValue.toFixed(4), orders: out };
+  }
+
   async listForPurchaseOrder(purchaseOrderId: string, manager?: EntityManager): Promise<GoodsReceipt[]> {
     return (manager ?? this.dataSource).getRepository(GoodsReceipt).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
   }

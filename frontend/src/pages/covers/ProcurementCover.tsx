@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { SectionCover } from '../../components/SectionCover';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Supplier {
   id: string;
@@ -14,7 +15,10 @@ interface SupplierInvoiceRow {
 
 /** Navigation Batch 2 (2026-09-26) added `nav_group.procurement` with `coverTo: '/procurement'`, but no route/page existed for it — confirmed via a live sidebar click silently bouncing to Dashboard through the catch-all route. Same shape as `CatalogCover`/`AttendanceCover`. */
 export function ProcurementCover() {
+  const { lang } = useLanguage();
   const [kpis, setKpis] = useState<{ suppliers: number; purchaseOrders: number; supplierInvoices: number } | null>(null);
+  // goods receipts whose goods have not been invoiced yet (undefined when the caller may not see them)
+  const [notInvoiced, setNotInvoiced] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +32,10 @@ export function ProcurementCover() {
       } catch {
         // Foundation fix: degrade to no-KPIs rather than an unhandled rejection.
       }
+      api
+        .get<{ totalReceipts: number }>('/procurement/goods-receipts/uninvoiced')
+        .then((r) => setNotInvoiced(r.totalReceipts))
+        .catch(() => setNotInvoiced(undefined));
     })();
   }, []);
 
@@ -49,6 +57,9 @@ export function ProcurementCover() {
               { labelCode: 'nav.suppliers', value: kpis.suppliers, to: '/suppliers' },
               { labelCode: 'nav.purchase_orders', value: kpis.purchaseOrders, to: '/purchase-orders' },
               { labelCode: 'nav.supplier_invoices', value: kpis.supplierInvoices, to: '/supplier-invoices' },
+              ...(notInvoiced === undefined
+                ? []
+                : [{ labelCode: 'nav.supplier_invoices', label: lang === 'ar' ? 'بضاعة مستلمة لم تُفوتر' : 'Goods received, not invoiced', value: notInvoiced, to: '/goods-not-invoiced', tone: notInvoiced > 0 ? ('warning' as const) : ('default' as const) }]),
             ]
           : undefined
       }

@@ -80,7 +80,8 @@ export function SupplierInvoices() {
   // NAV-07 — ids of this invoice's supplier payments (their financial events are keyed by payment id)
   const [paymentIds, setPaymentIds] = useState<string[]>([]);
 
-  const [purchaseOrderId, setPurchaseOrderId] = useState('');
+  // /supplier-invoices?purchaseOrderId=<id> opens the form with that order already chosen ("Create invoice" buttons elsewhere)
+  const [purchaseOrderId, setPurchaseOrderId] = useState(() => new URLSearchParams(window.location.search).get('purchaseOrderId') ?? '');
   const [supplierReference, setSupplierReference] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
   const [poLines, setPoLines] = useState<PurchaseOrderLine[]>([]);

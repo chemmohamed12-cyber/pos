@@ -162,4 +162,22 @@ describe('GoodsReceiptController Area 21 retrofit — real-Postgres Company isol
     await service.post({ purchaseOrderId: seeded.A.purchaseOrderId, lines: [{ purchaseOrderLineId: seeded.A.poLineId, quantityReceived: '1' }] }, actorUserId, dsA.manager);
     expect(await count('goods_receipts')).toBe(receipts + 1);
   });
+  it('goods received, not invoiced: lists the own-Company orders with their receipts and the uninvoiced value (same columns as the GRNI ledger), narrows by visible warehouse, and drops an order once it is invoiced', async () => {
+    const dsA = await h.connections.getDataSource(h.companyAId);
+    const dsB = await h.connections.getDataSource(h.companyBId);
+    const a = await service.listUninvoiced(dsA.manager);
+    expect(a.orders.map((o) => o.purchaseOrderId)).toEqual([seeded.A.purchaseOrderId]);
+    expect(a.orders[0].receipts.length).toBe(a.totalReceipts);
+    expect(a.totalReceipts).toBeGreaterThan(0);
+    const [expected] = await dsA.query(`SELECT COALESCE(SUM((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase"), 0)::numeric(20,4)::text AS v FROM purchase_order_lines pol WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0`);
+    expect(a.totalValue).toBe(expected.v); // never a second calculation
+    const b = await service.listUninvoiced(dsB.manager);
+    expect(b.orders.map((o) => o.purchaseOrderId)).toEqual([seeded.B.purchaseOrderId]); // each Company sees only its own
+    const [po] = await dsA.query(`SELECT "warehouseId" FROM purchase_orders WHERE id = $1`, [seeded.A.purchaseOrderId]);
+    expect((await service.listUninvoiced(dsA.manager, [])).orders).toHaveLength(0); // a caller who sees no warehouse sees nothing
+    expect((await service.listUninvoiced(dsA.manager, [po.warehouseId])).orders).toHaveLength(1);
+    await dsA.query(`UPDATE purchase_order_lines SET "quantityInvoiced" = "quantityReceived" WHERE "purchaseOrderId" = $1`, [seeded.A.purchaseOrderId]);
+    const done = await service.listUninvoiced(dsA.manager);
+    expect([done.orders.length, done.totalReceipts, done.totalValue]).toEqual([0, 0, '0.0000']);
+  });
 });

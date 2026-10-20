@@ -137,6 +137,7 @@ import { AdminCover } from './pages/covers/AdminCover';
 import { FulfillmentCover } from './pages/covers/FulfillmentCover';
 import { CustomersAccountsCover } from './pages/covers/CustomersAccountsCover';
 import { ProcurementCover } from './pages/covers/ProcurementCover';
+import { GoodsNotInvoiced } from './pages/procurement/GoodsNotInvoiced';
 import { CompanyRegistry } from './pages/control-plane/CompanyRegistry';
 import { CreateCompany } from './pages/control-plane/CreateCompany';
 import { CompanyDetails } from './pages/control-plane/CompanyDetails';
@@ -216,6 +217,7 @@ function AppRoutes() {
         <Route path="suppliers/:id" element={<SupplierProfile />} />
         <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="supplier-invoices" element={<SupplierInvoices />} />
+        <Route path="goods-not-invoiced" element={<GoodsNotInvoiced />} />
         <Route path="ap-aging" element={<ApAging />} />
         <Route path="supplier-statement" element={<SupplierStatement />} />
         <Route path="purchase-requests" element={<PurchaseRequests />} />

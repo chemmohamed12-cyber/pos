@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Fragment, useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import { useAutoRefresh } from '../../lib/useAutoRefresh';
 import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+
+interface UninvoicedOrderRef {
+  purchaseOrderId: string;
+  poNumber: string;
+  supplierName: string | null;
+  uninvoicedValue: string;
+  receipts: Array<{ id: string; grNumber: string }>;
+}
 
 interface GLAccount {
   id: string;
@@ -36,6 +45,48 @@ interface AccountLedger {
   lines: LedgerLineRow[];
 }
 
+/**
+ * What opens under a ledger row: the journal entry, and - for a goods receipt - its purchase order and goods receipt with a blue "Create invoice" button that opens the supplier-invoice form on
+ * that order. The receipt is found in the goods-received-not-invoiced list (scope-filtered by the server); a receipt that is already fully invoiced simply has no button.
+ */
+function LedgerRowDetail({ line, ar, canInvoice, uninvoiced }: { line: LedgerLineRow; ar: boolean; canInvoice: boolean; uninvoiced: UninvoicedOrderRef[] | null | undefined }) {
+  const navigate = useNavigate();
+  const L = (a: string, e: string) => (ar ? a : e);
+  const order = line.referenceType === 'goods_receipt' && line.referenceId ? (uninvoiced ?? []).find((o) => o.receipts.some((r) => r.id === line.referenceId)) : undefined;
+  const receipt = order?.receipts.find((r) => r.id === line.referenceId);
+  return (
+    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', padding: '6px 4px' }}>
+      <Link to={`/accounting/journals/${line.journalEntryId}`}>
+        {L('فتح القيد', 'Open journal entry')} {line.entryNumber ?? ''}
+      </Link>
+      {line.referenceType === 'goods_receipt' &&
+        (uninvoiced === undefined ? (
+          <span style={{ opacity: 0.6 }}>…</span>
+        ) : order ? (
+          <>
+            <Link to={`/purchase-orders?id=${order.purchaseOrderId}`}>
+              {L('أمر الشراء', 'Purchase order')} {order.poNumber}
+            </Link>
+            <Link to={`/purchase-orders?id=${order.purchaseOrderId}`}>
+              {L('إذن الاستلام', 'Goods receipt')} {receipt?.grNumber}
+            </Link>
+            <span>{order.supplierName ?? ''}</span>
+            <span>
+              {L('بضاعة بلا فاتورة', 'Not invoiced')}: {order.uninvoicedValue}
+            </span>
+            {canInvoice && (
+              <button className="btn btn-primary" onClick={() => navigate(`/supplier-invoices?purchaseOrderId=${order.purchaseOrderId}`)}>
+                {L('إنشاء فاتورة', 'Create invoice')}
+              </button>
+            )}
+          </>
+        ) : (
+          <span style={{ opacity: 0.7 }}>{L('هذا الاستلام مفوتر بالكامل أو غير متاح لك.', 'This receipt is fully invoiced or not available to you.')}</span>
+        ))}
+    </div>
+  );
+}
+
 const PRELOAD = [
   'nav.general_ledger',
   'field.account_code',
@@ -55,8 +106,22 @@ const PRELOAD = [
 
 /** F03 — General Ledger read model. Account picker + date range, mirrors `TreasuryLedger.tsx`'s own filter shape. */
 export function GeneralLedger() {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   preload(PRELOAD);
+  const { authz, can } = useAuth();
+  const canInvoice = authz ? can('procurement.supplier_invoice.create', 'editable') : false;
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  // goods received, not invoiced (loaded the first time a row is opened; null = the caller may not see it)
+  const [uninvoiced, setUninvoiced] = useState<UninvoicedOrderRef[] | null | undefined>(undefined);
+  function toggleRow(key: string) {
+    setOpenRow((cur) => (cur === key ? null : key));
+    if (uninvoiced === undefined) {
+      api
+        .get<{ orders: UninvoicedOrderRef[] }>('/procurement/goods-receipts/uninvoiced')
+        .then((r) => setUninvoiced(r.orders))
+        .catch(() => setUninvoiced(null));
+    }
+  }
   const [searchParams] = useSearchParams();
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
   const [accountId, setAccountId] = useState(searchParams.get('accountId') ?? '');
@@ -160,8 +225,11 @@ export function GeneralLedger() {
               </tr>
             </thead>
             <tbody>
-              {ledger.lines.map((l, idx) => (
-                <tr key={`${l.journalEntryId}-${idx}`}>
+              {ledger.lines.map((l, idx) => {
+                const rowKey = `${l.journalEntryId}-${idx}`;
+                return (
+                <Fragment key={rowKey}>
+                <tr style={{ cursor: 'pointer' }} onClick={() => toggleRow(rowKey)} title={lang === 'ar' ? 'اضغط لعرض التفاصيل' : 'Click for details'}>
                   <td>{l.entryNumber ?? '—'}</td>
                   <td>{l.businessDate}</td>
                   <td>{l.lineDescription ?? l.description ?? '—'}</td>
@@ -171,7 +239,16 @@ export function GeneralLedger() {
                   <td>{Number(l.creditBase) > 0 ? l.creditBase : ''}</td>
                   <td>{l.runningBalanceBase}</td>
                 </tr>
-              ))}
+                {openRow === rowKey && (
+                  <tr>
+                    <td colSpan={8} style={{ background: 'var(--surface-2, #f7f8fa)' }}>
+                      <LedgerRowDetail line={l} ar={lang === 'ar'} canInvoice={canInvoice} uninvoiced={uninvoiced === null ? [] : uninvoiced} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </>
