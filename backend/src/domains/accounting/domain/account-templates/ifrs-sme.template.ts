@@ -67,6 +67,7 @@ export const IFRS_SME_TEMPLATE: AccountTemplate = {
     { code: '2', nameEn: 'Liabilities', nameAr: 'الالتزامات', accountType: 'liability', isPostable: false },
     { code: '21', nameEn: 'Current Liabilities', nameAr: 'الالتزامات المتداولة', accountType: 'liability', isPostable: false, parentCode: '2' },
     { code: '2101', nameEn: 'Accounts Payable', nameAr: 'الموردون (الدائنون)', accountType: 'liability', parentCode: '21', controlFunction: 'ap' },
+    { code: '2105', nameEn: 'Goods Received Not Invoiced (GRNI)', nameAr: 'بضاعة مستلمة لم تُفوتر (GRNI)', accountType: 'liability', parentCode: '21', controlFunction: 'grni' },
     { code: '2110', nameEn: 'Accrued Expenses', nameAr: 'مصروفات مستحقة', accountType: 'liability', parentCode: '21' },
     { code: '2120', nameEn: 'Output VAT / Tax Payable', nameAr: 'ضريبة القيمة المضافة — المبيعات', accountType: 'liability', parentCode: '21', controlFunction: 'tax_payable' },
     { code: '2130', nameEn: 'Short-Term Loans', nameAr: 'قروض قصيرة الأجل', accountType: 'liability', parentCode: '21' },

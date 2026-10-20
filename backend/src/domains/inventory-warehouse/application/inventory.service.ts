@@ -330,6 +330,28 @@ export class InventoryService implements InventoryReservationContract, Inventory
    * ADR-INV-04 / CTO 2026-10-19 - the direct `POST /inventory/movements` receipt path must not bypass the approval workflow: when `inventory.receipt_approval_required` is `on`, a manual receipt
    * has to be a receipt DOCUMENT that is submitted and approved. Called FIRST by the route (before any read or write), so a refusal changes nothing. `off` = today's behaviour.
    */
+  /**
+   * Display numbers of the documents behind a list of movements: the goods receipt number (GR-...) and the warehouse transaction number. Read-only, on the caller's own Company connection; a reference
+   * that cannot be resolved (unknown type, table not installed, record missing) simply stays without a number. Keys are `<referenceType>:<referenceId>`.
+   */
+  async referenceNumbers(movements: Array<{ referenceType: string | null; referenceId: string | null }>, manager?: EntityManager): Promise<Map<string, string>> {
+    const m = manager ?? this.dataSource.manager;
+    const out = new Map<string, string>();
+    const resolve = async (type: string, table: string, column: string) => {
+      const ids = [...new Set(movements.filter((x) => x.referenceType === type && x.referenceId).map((x) => x.referenceId as string))];
+      if (ids.length === 0) return;
+      try {
+        const rows = (await m.query(`SELECT id, "${column}" AS number FROM "${table}" WHERE id = ANY($1::uuid[])`, [ids])) as Array<{ id: string; number: string | null }>;
+        for (const r of rows) if (r.number) out.set(`${type}:${r.id}`, r.number);
+      } catch {
+        /* the owning module is not installed in this Company: leave the reference unnumbered */
+      }
+    };
+    await resolve('goods_receipt', 'goods_receipts', 'grNumber');
+    await resolve('warehouse_transaction', 'warehouse_transactions', 'transactionNumber');
+    return out;
+  }
+
   assertDirectManualReceiptAllowed(): void {
     if (this.config?.get<unknown>('inventory.receipt_approval_required') === 'on') {
       throw new ConflictException('A manual receipt requires approval: create a receipt document (Movement Center), submit it, and have it approved - the direct movement endpoint cannot be used while receipt approval is required.');

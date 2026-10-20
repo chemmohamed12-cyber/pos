@@ -420,7 +420,11 @@ export class InventoryController {
   ) {
     if (!req.companyContext) throw new UnauthorizedException();
     const visible = await this.visibleWarehouses(req);
-    return this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo, visibleWarehouseIds: visible === 'ALL' ? undefined : visible }, req.companyContext.dataSource.manager);
+    const manager = req.companyContext.dataSource.manager;
+    const movements = await this.inventory.listMovements({ warehouseId, productId, movementType, dateFrom, dateTo, visibleWarehouseIds: visible === 'ALL' ? undefined : visible }, manager);
+    // each movement also carries the human document number (goods receipt / warehouse transaction) so screens show GR-2026-000001, not a short id
+    const numbers = await this.inventory.referenceNumbers(movements, manager);
+    return movements.map((mv) => ({ ...mv, referenceNumber: numbers.get(`${mv.referenceType}:${mv.referenceId}`) ?? null }));
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // S7 — see warehouseExport's own comment

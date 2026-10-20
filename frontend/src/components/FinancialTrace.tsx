@@ -3,11 +3,32 @@ import { useLanguage } from '../context/LanguageContext';
 import { overallState, traceStateOf, useTraceEvents } from '../lib/financialTrace';
 
 /**
+ * A rejected financial event means the ACCOUNTING entry was not created - the operational document itself (stock movement, receipt ...) is unaffected. These helpers say that in plain
+ * language and translate the engine's known reasons; an unknown reason is shown as it is.
+ */
+function rejectedLabel(ar: boolean): string {
+  return ar ? 'لم يُرحَّل محاسبيًا' : 'Not posted to accounts';
+}
+function friendlyReason(reason: string | null | undefined, ar: boolean): string | null {
+  if (!reason) return null;
+  if (/no (active )?`?inventory`? control account/i.test(reason)) {
+    return ar
+      ? 'لا يوجد حساب مخزون في دليل الحسابات. البضاعة دخلت المخزن فعلًا، لكن القيد المحاسبي لم يُنشأ؛ أنشئ دليل الحسابات للشركة ثم أعد ترحيل الحدث.'
+      : 'There is no inventory account in the chart of accounts. The goods did enter the warehouse, but no accounting entry was created - set up the chart of accounts, then retry the posting.';
+  }
+  if (/no .*account.* in the chart/i.test(reason)) {
+    return ar ? 'حساب مطلوب غير موجود في دليل الحسابات، فلم يُنشأ القيد المحاسبي. (' + reason + ')' : 'A required account is missing from the chart of accounts, so no accounting entry was created. (' + reason + ')';
+  }
+  return reason;
+}
+
+/**
  * NAV-07 — the financial consequence of an operational document, shown where the document lives:
  * Document → Financial status (Pending / Posted / Rejected) → Financial event → Journal (Open Journal). Read-only.
  */
 export function FinancialTrace({ ids }: { ids: string[] }) {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
+  const ar = lang === 'ar';
   const events = useTraceEvents(ids);
   preload([
     'panel.financial_trace_title',
@@ -44,9 +65,9 @@ export function FinancialTrace({ ids }: { ids: string[] }) {
                 </td>
                 <td>
                   <span className={`status-badge${traceStateOf(e) === 'posted' ? '' : traceStateOf(e) === 'rejected' ? ' negative' : ''}`} data-testid={`trace-${traceStateOf(e)}`}>
-                    {t(`value.financial_trace.${traceStateOf(e)}`)}
+                    {traceStateOf(e) === 'rejected' ? rejectedLabel(ar) : t(`value.financial_trace.${traceStateOf(e)}`)}
                   </span>
-                  {e.rejectionReason && <div className="error-text">{e.rejectionReason}</div>}
+                  {e.rejectionReason && <div className="error-text">{friendlyReason(e.rejectionReason, ar)}</div>}
                 </td>
                 <td>
                   {e.journalEntryId && (
@@ -66,17 +87,27 @@ export function FinancialTrace({ ids }: { ids: string[] }) {
 
 /** Compact one-cell variant for list tables (status badge only; the detail view carries the full trace). */
 export function FinancialStatusCell({ id }: { id: string }) {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
+  const ar = lang === 'ar';
   const events = useTraceEvents([id]);
   preload(['value.financial_trace.pending', 'value.financial_trace.posted', 'value.financial_trace.rejected']);
   if (!events || events.length === 0) return <span style={{ opacity: 0.5 }}>—</span>;
   const state = overallState(events);
   if (state === 'none' || state === 'ignored') return <span style={{ opacity: 0.5 }}>—</span>;
   const journal = events.find((e) => e.journalEntryId)?.journalEntryId;
+  const reason = state === 'rejected' ? friendlyReason(events.find((e) => e.rejectionReason)?.rejectionReason, ar) : null;
   const badge = (
-    <span className={`status-badge${state === 'posted' ? '' : state === 'rejected' ? ' negative' : ''}`} data-testid={`trace-${state}`}>
-      {t(`value.financial_trace.${state}`)}
+    <span className={`status-badge${state === 'posted' ? '' : state === 'rejected' ? ' negative' : ''}`} data-testid={`trace-${state}`} title={reason ?? undefined}>
+      {state === 'rejected' ? rejectedLabel(ar) : t(`value.financial_trace.${state}`)}
     </span>
   );
-  return journal && state === 'posted' ? <Link to={`/accounting/journals/${journal}`}>{badge}</Link> : badge;
+  if (journal && state === 'posted') return <Link to={`/accounting/journals/${journal}`}>{badge}</Link>;
+  return reason ? (
+    <>
+      {badge}
+      <div style={{ fontSize: '0.75rem', opacity: 0.75, maxWidth: 360 }}>{reason}</div>
+    </>
+  ) : (
+    badge
+  );
 }

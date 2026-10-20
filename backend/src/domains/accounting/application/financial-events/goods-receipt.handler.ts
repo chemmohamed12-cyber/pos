@@ -42,8 +42,14 @@ export async function handleGoodsReceiptPosted(event: FinancialEvent, ctx: Handl
 
   const inventoryAcc = await resolveAccount(ctx, p.inventoryAccountCode, 'inventory');
   const grni = await resolveAccount(ctx, p.grniAccountCode, 'grni');
-  if (!inventoryAcc) return { kind: 'rejected', reason: 'goods_receipt.posted: no inventory control account in the chart' };
-  if (!grni) return { kind: 'rejected', reason: 'goods_receipt.posted: no GRNI control account in the chart — assign controlFunction "grni" to an account first' };
+  if (!inventoryAcc || !grni) {
+    // one message for everything this Company's chart lacks, with the way out; nothing was posted (a rejected event creates no journal)
+    const missing = [!inventoryAcc ? 'inventory control account' : null, !grni ? 'GRNI control account' : null].filter(Boolean).join(' and ');
+    return {
+      kind: 'rejected',
+      reason: `goods_receipt.posted: no active postable ${missing} in this Company's chart - run Chart of accounts > Complete control accounts (or mark an active postable account with the control function ${!inventoryAcc ? '"inventory"' : ''}${!inventoryAcc && !grni ? ' / ' : ''}${!grni ? '"grni"' : ''}), then re-drive this event`,
+    };
+  }
 
   const lines: JournalDraftLine[] = [
     { accountId: inventoryAcc, debit: total, description: 'Inventory (goods received)' },

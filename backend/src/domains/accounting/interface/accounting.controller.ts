@@ -809,6 +809,13 @@ export class AccountingController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('accounting.account.create', 'editable')
+  @Post('chart/ensure-control-accounts')
+  async ensureControlAccounts(@Body() dto: ImportTemplateDto, @Req() req: CompanyScopedRequest) {
+    return this.glAccounts.ensureControlAccounts(dto.templateKey, dto.dryRun ?? false, req.user.id, req.companyContext!.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('accounting.account.create', 'editable')
   @Post('chart/import-template')
   async importAccountTemplate(@Body() dto: ImportTemplateDto, @Req() req: CompanyScopedRequest) {
     return this.glAccounts.importTemplate(dto.templateKey, dto.dryRun ?? false, req.user.id, req.companyContext!.dataSource.manager);

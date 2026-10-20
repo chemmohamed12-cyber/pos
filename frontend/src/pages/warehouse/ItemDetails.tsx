@@ -48,6 +48,8 @@ interface Movement {
   movementType: string;
   referenceType: string | null;
   referenceId: string | null;
+  /** the human document number resolved by the server (e.g. GR-2026-000001); null when the reference has none */
+  referenceNumber?: string | null;
   createdAt: string;
 }
 interface UnitCost {
@@ -518,7 +520,7 @@ function ItemDetails({ productId }: { productId: string }) {
                     {ledger.map(({ m, incoming, outgoing, balance }) => {
                       const route = documentRoute(m.referenceType, m.referenceId);
                       const refLabel = m.referenceType ? labelOr(`reference_type.${m.referenceType}`, m.referenceType) : '—';
-                      const number = m.referenceId ? docNumbers[m.referenceId] ?? m.referenceId.slice(0, 8) : '';
+                      const number = m.referenceNumber ?? (m.referenceId ? docNumbers[m.referenceId] ?? m.referenceId.slice(0, 8) : '');
                       return (
                         <tr key={m.id}>
                           <td style={{ whiteSpace: 'nowrap' }}>{new Date(m.createdAt).toLocaleString()}</td>

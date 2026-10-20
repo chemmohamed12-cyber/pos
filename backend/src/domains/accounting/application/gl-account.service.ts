@@ -74,6 +74,19 @@ export interface GLAccountTreeNode extends GLAccount {
   children: GLAccountTreeNode[];
 }
 
+export interface EnsureControlAccountsResult {
+  templateKey: string;
+  dryRun: boolean;
+  created: number;
+  /** the accounts that are (dry run) / were created */
+  accounts: Array<{ code: string; name: string; nameAr: string; controlFunction: string }>;
+  /** control functions that are missing but cannot be created safely - each says why and what to do by hand */
+  skipped: Array<{ controlFunction: string; code: string; reason: string }>;
+}
+
+/** The control functions that need exactly one live (active, postable) account for the posting paths to work; `bank` and `fixed_asset` are per-instance and never auto-created. */
+const ENSURE_CONTROL_FUNCTIONS: ReadonlySet<string> = new Set(['ar', 'ap', 'inventory', 'grni', 'wip', 'wages_payable', 'tax_payable', 'tax_receivable', 'retained_earnings', 'fx_gain_loss', 'rounding']);
+
 export interface ImportTemplateResult {
   templateKey: string;
   dryRun: boolean;
@@ -614,6 +627,96 @@ export class GLAccountService {
   // ---------------------------------------------------------------------------
   // Template import (opt-in, empty chart only)
   // ---------------------------------------------------------------------------
+
+  /**
+   * A chart imported before a control account existed in the template (or edited since) can lack the account a posting path needs - e.g. GRNI for goods receipts. This adds ONLY the missing control
+   * accounts of the template to a NON-empty chart: never changes or re-uses an existing account, never duplicates (a code that is taken, or an inactive / unmarked account, is reported in `skipped`
+   * for a manual decision), and is idempotent - a second run creates nothing. `dryRun` returns the plan without writing.
+   */
+  async ensureControlAccounts(templateKey: string, dryRun: boolean, actorUserId: string, manager?: EntityManager): Promise<EnsureControlAccountsResult> {
+    const template = getAccountTemplate(templateKey);
+    if (!template) throw new NotFoundException(`Account template "${templateKey}" not found.`);
+    const repoOf = (m?: EntityManager) => this.em(m).getRepository(GLAccount);
+    const accounts = await repoOf(manager).find();
+    if (accounts.length === 0) {
+      throw new ConflictException('The chart of accounts is empty - import the template first (Chart of accounts > import template); there is nothing to complete.');
+    }
+    const byCode = new Map(accounts.map((a) => [a.code, a]));
+    const plan: Array<(typeof template.accounts)[number]> = [];
+    const skipped: EnsureControlAccountsResult['skipped'] = [];
+    for (const entry of template.accounts) {
+      const fn = entry.controlFunction;
+      if (!fn || !ENSURE_CONTROL_FUNCTIONS.has(fn)) continue;
+      if (accounts.some((a) => a.controlFunction === fn && a.isActive && a.isPostable)) continue; // already served
+      const clash = byCode.get(entry.code);
+      if (clash) {
+        skipped.push({
+          controlFunction: fn,
+          code: entry.code,
+          reason:
+            clash.controlFunction === fn
+              ? `account ${entry.code} ("${clash.name}") is marked "${fn}" but is ${!clash.isActive ? 'inactive' : 'not postable'} - reactivate it / make it postable by hand`
+              : clash.controlFunction
+            ? `account ${entry.code} already exists and is marked "${clash.controlFunction}"`
+            : `account ${entry.code} ("${clash.name}") already exists without the control function "${fn}"${clash.isActive ? '' : ' and is inactive'} - mark / reactivate it, or pick another account, by hand`,
+        });
+        continue;
+      }
+      if (entry.parentCode && !byCode.get(entry.parentCode)) {
+        skipped.push({ controlFunction: fn, code: entry.code, reason: `its parent group ${entry.parentCode} is missing from this chart` });
+        continue;
+      }
+      plan.push(entry);
+    }
+    const summary = plan.map((e) => ({ code: e.code, name: e.nameEn, nameAr: e.nameAr, controlFunction: e.controlFunction as string }));
+    if (dryRun || plan.length === 0) return { templateKey, dryRun, created: 0, accounts: summary, skipped };
+
+    const gate = await this.limits.check(MAX_GL_ACCOUNTS_LIMIT_KEY, plan.length, manager);
+    if (!gate.allowed) throw new ConflictException(`Completing the control accounts needs ${plan.length} more account(s) but the GL account limit (${gate.max}) would be exceeded.`);
+
+    await this.em(manager).transaction(async (tx) => {
+      const repo = tx.getRepository(GLAccount);
+      for (const entry of plan) {
+        // re-checked inside the transaction: a concurrent run must not create the same code twice (code is unique at the database as well)
+        if (await repo.findOne({ where: { code: entry.code } })) continue;
+        const parent = entry.parentCode ? await repo.findOne({ where: { code: entry.parentCode } }) : null;
+        const isContra = entry.isContra ?? false;
+        const saved = await repo.save(
+          repo.create({
+            code: entry.code,
+            name: entry.nameEn,
+            nameAr: entry.nameAr,
+            accountType: entry.accountType,
+            normalBalance: deriveNormalBalance(entry.accountType, isContra),
+            isContra,
+            parentAccountId: parent?.id ?? null,
+            isPostable: entry.isPostable ?? true,
+            controlFunction: entry.controlFunction ?? null,
+            currencyMode: 'functional_only',
+            restrictCurrencyCode: null,
+            allowManualJournal: false,
+            orgUnitId: null,
+            isActive: true,
+            description: null,
+          }),
+        );
+        await this.events.publish(tx, 'accounting.gl_account.created', {
+          accountId: saved.id,
+          code: saved.code,
+          accountType: saved.accountType,
+          isPostable: saved.isPostable,
+          controlFunction: saved.controlFunction,
+          actorUserId,
+        });
+      }
+      await this.limits.consume(MAX_GL_ACCOUNTS_LIMIT_KEY, plan.length, tx);
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'accounting.gl_account.control_accounts_ensured', resource: 'chart_of_accounts', resourceId: templateKey, result: 'success', correlationId: null, after: { templateKey, created: summary.map((s) => s.code), skipped } },
+        tx,
+      );
+    });
+    return { templateKey, dryRun: false, created: plan.length, accounts: summary, skipped };
+  }
 
   async importTemplate(templateKey: string, dryRun: boolean, actorUserId: string, manager?: EntityManager): Promise<ImportTemplateResult> {
     const template = getAccountTemplate(templateKey);

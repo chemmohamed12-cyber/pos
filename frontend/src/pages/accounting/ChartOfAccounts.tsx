@@ -157,7 +157,7 @@ function AccountDetailsEditor({ account, busy, onSave }: { account: GLAccount; b
 
 /** F02 — Chart of Accounts (ADR-034). Recovered/integrated frontend source — a recursive tree with a detail/edit panel for the selected node. */
 export function ChartOfAccounts() {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   preload(PRELOAD);
 
   const [accounts, setAccounts] = useState<GLAccount[] | null>(null);
@@ -283,6 +283,33 @@ export function ChartOfAccounts() {
     }
   }
 
+  /** Adds only the control accounts the starter chart has and this chart lacks (e.g. GRNI) - previews first, never changes or duplicates an existing account. */
+  async function completeControlAccounts(templateKey: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      type Plan = { created: number; accounts: Array<{ code: string; name: string; nameAr: string }>; skipped: Array<{ code: string; reason: string }> };
+      const NL = String.fromCharCode(10);
+      const plan = await api.post<Plan>('/accounting/chart/ensure-control-accounts', { templateKey, dryRun: true });
+      const skipped = plan.skipped.map((x) => `${x.code}: ${x.reason}`).join(NL);
+      const tail = skipped ? NL + NL + skipped : '';
+      if (plan.accounts.length === 0) {
+        window.alert((lang === 'ar' ? 'كل الحسابات الرقابية المطلوبة موجودة.' : 'All required control accounts already exist.') + tail);
+      } else {
+        const list = plan.accounts.map((a) => `${a.code} — ${lang === 'ar' ? a.nameAr : a.name}`).join(NL);
+        const head = lang === 'ar' ? 'ستُضاف هذه الحسابات الرقابية الناقصة:' : 'These missing control accounts will be added:';
+        if (window.confirm(head + NL + list + tail)) {
+          await api.post('/accounting/chart/ensure-control-accounts', { templateKey, dryRun: false });
+          await loadAccounts();
+        }
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to complete control accounts.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveRules() {
     if (!selected || !rules) return;
     setBusy(true);
@@ -331,6 +358,11 @@ export function ChartOfAccounts() {
       <div className="page-header">
         <h1>{t('nav.chart_of_accounts')}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
+          {templates.length > 0 && (accounts?.length ?? 0) > 0 && (
+            <button className="btn btn-secondary" disabled={busy} onClick={() => completeControlAccounts(templates[0].key)}>
+              {lang === 'ar' ? 'إكمال الحسابات الرقابية' : 'Complete control accounts'}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => { setCreateForm(emptyCreateForm(null)); setShowCreate(true); }}>
             {t('action.add_account')}
           </button>

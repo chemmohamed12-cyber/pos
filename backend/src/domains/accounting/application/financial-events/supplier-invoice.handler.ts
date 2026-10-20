@@ -61,7 +61,7 @@ export async function handleSupplierInvoicePosted(event: FinancialEvent, ctx: Ha
   // field for an override path nothing currently exercises.
   const grni = await resolveAccount(ctx, p.expenseAccountCode, 'grni');
   const ap = await resolveAccount(ctx, p.apAccountCode, 'ap');
-  if (!grni) return { kind: 'rejected', reason: 'supplier_invoice.posted: no GRNI control account in the chart — assign controlFunction "grni" to an account first' };
+  if (!grni) return { kind: 'rejected', reason: 'supplier_invoice.posted: no active postable GRNI control account in this Company chart - run Chart of accounts > Complete control accounts (or mark an account with the control function "grni"), then re-drive this event' };
   if (!ap) return { kind: 'rejected', reason: 'supplier_invoice.posted: no AP control account in the chart' };
 
   let lines: JournalDraftLine[] = [
