@@ -7,7 +7,7 @@ import { CompanySwitcher } from './CompanySwitcher';
 import { ErrorState } from './ErrorState';
 import { companyRemountKey } from '../lib/companyScope';
 import './Layout.css';
-import { loadingLabel } from '../lib/displayNames';
+import { loadingLabel, roleLabel } from '../lib/displayNames';
 
 interface NavItem {
   to: string;
@@ -185,7 +185,7 @@ export function Layout() {
             {user && (
               <>
                 <span className="user-name">{user.fullName}</span>
-                <span className="user-roles">{user.roles.map((r) => t(`role.${r}`)).join(', ')}</span>
+                <span className="user-roles">{user.roles.map((r) => roleLabel(t, r)).join(', ')}</span>
               </>
             )}
             <CompanySwitcher />

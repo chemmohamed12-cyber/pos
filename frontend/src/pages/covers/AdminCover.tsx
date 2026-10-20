@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { SectionCover } from '../../components/SectionCover';
 import { MiniBarChart } from '../../components/MiniBarChart';
+import { roleLabel } from '../../lib/displayNames';
 
 interface AdminUser {
   roles: string[];
@@ -36,7 +37,7 @@ export function AdminCover() {
         for (const u of users) {
           for (const role of u.roles) counts.set(role, (counts.get(role) ?? 0) + 1);
         }
-        setRoleBreakdown([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([role, count]) => ({ label: t(`role.${role}`), value: count })));
+        setRoleBreakdown([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([role, count]) => ({ label: roleLabel(t, role), value: count })));
       } catch {
         // Foundation fix: a Cover's KPI widget failing to load degrades to
         // "no numbers shown" (SectionCover already renders fine with
