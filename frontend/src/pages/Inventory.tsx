@@ -8,6 +8,7 @@ import { ExcelImportExport } from '../components/ExcelImportExport';
 import { ProductCombobox } from '../components/ProductCombobox';
 import type { ProductOption } from '../components/ProductCombobox';
 import { ErrorState } from '../components/ErrorState';
+import { fmtDate } from '../lib/formatDateTime';
 
 interface Warehouse {
   id: string;
@@ -380,7 +381,7 @@ export function Inventory() {
                     <td>
                       <StatusBadge code={`product_status.${r.status}`} />
                     </td>
-                    <td>{r.lastMovementAt ? new Date(r.lastMovementAt).toLocaleDateString() : '—'}</td>
+                    <td>{r.lastMovementAt ? fmtDate(r.lastMovementAt) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

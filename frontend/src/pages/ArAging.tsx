@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { fmtDate } from '../lib/formatDateTime';
 
 interface ArAgingRow {
   invoiceId: string;
@@ -107,7 +108,7 @@ export function ArAging() {
                   </a>
                 </td>
                 <td>{r.invoiceNumber}</td>
-                <td>{r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '—'}</td>
+                <td>{r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
                 <td>{r.originalAmount}</td>
                 <td>{r.remaining}</td>
                 <td>{r.daysOverdue}</td>

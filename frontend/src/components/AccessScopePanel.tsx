@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
+import { nameOf, currentLang, ORG_UNIT_TYPES } from '../lib/displayNames';
 
 interface Unit {
   id: string;
@@ -142,7 +143,7 @@ export function AccessScopePanel({ userId, name, ar, canWrite, onClose }: { user
             <select value={addUnit} onChange={(e) => setAddUnit(e.target.value)}>
               <option value="">{ar ? '— اختر —' : '— choose —'}</option>
               {available.map((u) => (
-                <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                <option key={u.id} value={u.id}>{u.name} ({nameOf(ORG_UNIT_TYPES, u.type, currentLang())})</option>
               ))}
             </select>
           </div>

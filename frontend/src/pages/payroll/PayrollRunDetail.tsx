@@ -5,6 +5,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 import { ErrorState } from '../../components/ErrorState';
+import { currentLang } from '../../lib/displayNames';
+import { translateRejectionReason } from '../../lib/financialReason';
 
 interface Employee {
   id: string;
@@ -260,7 +262,7 @@ export function PayrollRunDetail() {
           <div style={{ fontSize: 12, opacity: 0.7 }}>{t('field.financial_event_status')}</div>
           <StatusBadge code={`value.financial_event_status.${financialEventStatusCode}`} />
           {isGap && <div className="error-text" style={{ marginTop: 4 }}>⚠ Reconciliation gap</div>}
-          {financialEvent?.rejectionReason && <div style={{ fontSize: 12, opacity: 0.7 }}>{financialEvent.rejectionReason}</div>}
+          {financialEvent?.rejectionReason && <div style={{ fontSize: 12, opacity: 0.7 }}>{translateRejectionReason(financialEvent.rejectionReason, currentLang())}</div>}
         </div>
         <div>
           <div style={{ fontSize: 12, opacity: 0.7 }}>{t('field.disbursement_status')} (Treasury)</div>

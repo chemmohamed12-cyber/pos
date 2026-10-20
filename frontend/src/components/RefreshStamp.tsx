@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import type { AutoRefresh } from '../lib/useAutoRefresh';
+import { fmtDateTime, fmtTime } from '../lib/formatDateTime';
 
 /** "Updated hh:mm:ss" + a manual refresh button; a failed refresh says so and keeps the last good data on screen. */
 export function RefreshStamp({ refresh }: { refresh: AutoRefresh }) {
@@ -12,7 +13,7 @@ export function RefreshStamp({ refresh }: { refresh: AutoRefresh }) {
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: '0.8rem', color: '#6b7280' }}>
       {refresh.updatedAt && (
         <span>
-          {t('panel.updated_at')} {refresh.updatedAt.toLocaleTimeString()}
+          {t('panel.updated_at')} {fmtTime(refresh.updatedAt)}
         </span>
       )}
       {refresh.stale && <span className="error-text" style={{ margin: 0 }}>{t('panel.refresh_failed')}</span>}
@@ -63,7 +64,7 @@ export function PostingStatusChip() {
   return (
     <span
       className={`status-badge ${tone}`}
-      title={`${t('panel.posting_counts')}: ${status.pendingEvents + status.inFlightEvents} / ${status.rejectedEvents + status.failedOutbox}${status.lastPostedAt ? ` — ${t('panel.posting_last')}: ${new Date(status.lastPostedAt).toLocaleString()}` : ''}`}
+      title={`${t('panel.posting_counts')}: ${status.pendingEvents + status.inFlightEvents} / ${status.rejectedEvents + status.failedOutbox}${status.lastPostedAt ? ` — ${t('panel.posting_last')}: ${fmtDateTime(status.lastPostedAt)}` : ''}`}
     >
       {status.state !== 'current' ? (
         <Link to="/accounting/financial-events" style={{ color: 'inherit', textDecoration: 'none' }}>

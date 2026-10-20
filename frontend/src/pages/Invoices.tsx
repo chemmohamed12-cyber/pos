@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { fmtDate } from '../lib/formatDateTime';
 
 interface InvoiceRow {
   id: string;
@@ -102,7 +103,7 @@ export function Invoices() {
                 <td>{r.customerCode} — {r.customerName}</td>
                 <td>{r.totalAmount}</td>
                 <td>{r.remaining}</td>
-                <td>{r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '—'}</td>
+                <td>{r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
                 <td>
                   <StatusBadge code={`sales_invoice_lifecycle.state.${r.state}`} />
                 </td>

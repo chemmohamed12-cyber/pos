@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { nameOf, currentLang, STATUS_NAMES } from '../../lib/displayNames';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Supplier {
   id: string;
@@ -192,13 +194,13 @@ export function SupplierStatement() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} style={{ opacity: r.status === 'reversed' ? 0.5 : 1 }}>
-                <td>{new Date(r.entryDate).toLocaleString()}</td>
+                <td>{fmtDateTime(r.entryDate)}</td>
                 <td>{r.entryType}</td>
                 <td>{r.entryNumber}</td>
                 <td>{r.direction === 'debit' ? r.amount : '—'}</td>
                 <td>{r.direction === 'credit' ? r.amount : '—'}</td>
                 <td>{r.runningBalance}</td>
-                <td>{r.status}</td>
+                <td>{nameOf(STATUS_NAMES, r.status, currentLang())}</td>
               </tr>
             ))}
           </tbody>

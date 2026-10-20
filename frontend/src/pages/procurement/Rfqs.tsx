@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { StockCell, useStockAvailability } from '../../components/StockAvailability';
+import { nameOf, currentLang, STATUS_NAMES } from '../../lib/displayNames';
 
 interface Supplier {
   id: string;
@@ -286,7 +287,7 @@ export function Rfqs() {
                 )}
                 {(award.state === 'rejected' || award.state === 'withdrawn' || award.state === 'expired') && (
                   <>
-                    <strong>{award.state}</strong>
+                    <strong>{nameOf(STATUS_NAMES, award.state, currentLang())}</strong>
                     <div style={{ fontSize: '0.85rem', marginTop: 4 }}>{t('panel.award_rejected_hint')}</div>
                   </>
                 )}

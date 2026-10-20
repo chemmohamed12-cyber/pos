@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, api, downloadBlob, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface BiometricImportRow {
   acNo: string;
@@ -306,7 +307,7 @@ export function AttendanceBiometricImport() {
             {history.map((b) => (
               <tr key={b.id}>
                 <td>{b.fileName}</td>
-                <td>{new Date(b.importedAt).toLocaleString()}</td>
+                <td>{fmtDateTime(b.importedAt)}</td>
                 <td>{b.totalRows}</td>
                 <td>{b.succeededCount}</td>
                 <td>{b.rejectedCount}</td>

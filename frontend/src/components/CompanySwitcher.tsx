@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ApiError } from '../lib/api';
+import { nameOf, currentLang, STATUS_NAMES } from '../lib/displayNames';
 
 /**
  * Company Switcher — renders strictly from `AuthContext`'s
@@ -66,7 +67,7 @@ export function CompanySwitcher() {
         {memberships.map((m) => (
           <option key={m.companyId} value={m.companyId} disabled={m.status !== 'READY'}>
             {m.companyName}
-            {m.status !== 'READY' ? ` (${m.status})` : ''}
+            {m.status !== 'READY' ? ` (${nameOf(STATUS_NAMES, m.status.toLowerCase(), currentLang())})` : ''}
           </option>
         ))}
       </select>

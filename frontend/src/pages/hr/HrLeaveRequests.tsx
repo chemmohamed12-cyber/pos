@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Employee {
   id: string;
@@ -202,7 +203,7 @@ export function HrLeaveRequests() {
                 <td>
                   <StatusBadge code={`value.leave_request_status.${displayStatus(r)}`} />
                 </td>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>{fmtDateTime(r.createdAt)}</td>
                 <td>
                   {r.status === 'submitted' && r.approvalState === 'pending' && (
                     <button className="btn btn-secondary" disabled={busyId === r.id} onClick={() => cancelRequest(r.id)}>

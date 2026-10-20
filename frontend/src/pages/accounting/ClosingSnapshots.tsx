@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface ClosingSnapshotRun {
   id: string;
@@ -129,7 +130,7 @@ export function ClosingSnapshots() {
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{s.contentHash ? s.contentHash.slice(0, 20) + '…' : '—'}</td>
                 <td>{s.signingKeyId ?? '—'}</td>
-                <td>{s.generatedAt ? new Date(s.generatedAt).toLocaleString() : '—'}</td>
+                <td>{s.generatedAt ? fmtDateTime(s.generatedAt) : '—'}</td>
                 <td>
                   {s.status === 'complete' && (
                     <button className="btn btn-secondary" disabled={busyId === s.id} onClick={() => verify(s.id)}>

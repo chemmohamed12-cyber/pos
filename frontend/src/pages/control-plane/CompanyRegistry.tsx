@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface CompanyView {
   id: string;
@@ -143,7 +144,7 @@ export function CompanyRegistry() {
                     <StatusBadge code={`value.company_status.${c.status.toLowerCase()}`} />
                   </td>
                   <td>{c.databaseStatus ?? '—'}</td>
-                  <td>{new Date(c.createdAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(c.createdAt)}</td>
                   <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn btn-secondary" disabled={busy || c.status !== 'READY'} onClick={() => onOpen(c)}>
                       {t('action.open_company')}

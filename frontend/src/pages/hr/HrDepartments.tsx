@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { fmtDate } from '../../lib/formatDateTime';
 
 interface Department {
   id: string;
@@ -125,7 +126,7 @@ export function HrDepartments() {
                     d.name
                   )}
                 </td>
-                <td>{new Date(d.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(d.createdAt)}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   {editingId === d.id ? (
                     <>

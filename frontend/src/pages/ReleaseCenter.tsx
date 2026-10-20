@@ -3,6 +3,7 @@ import { api, ApiError, getAccessToken } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { fmtDateTime } from '../lib/formatDateTime';
 
 type ReleasePackageType = 'full' | 'delta';
 type ReleaseStatus =
@@ -332,7 +333,7 @@ export function ReleaseCenter() {
                     <td>
                       <StatusBadge code={`release_status.${r.status}`} />
                     </td>
-                    <td>{new Date(r.uploadedAt).toLocaleString()}</td>
+                    <td>{fmtDateTime(r.uploadedAt)}</td>
                     <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button className="btn btn-secondary" onClick={() => toggleExpand(r)}>
                         {t('action.view_migrations')}
@@ -373,7 +374,7 @@ export function ReleaseCenter() {
                                   </option>
                                   {(backups ?? []).map((b) => (
                                     <option key={b.id} value={b.id}>
-                                      {b.sourceAppVersion} — {new Date(b.startedAt).toLocaleString()} — {t(`backup_run_status.${b.status}`)}
+                                      {b.sourceAppVersion} — {fmtDateTime(b.startedAt)} — {t(`backup_run_status.${b.status}`)}
                                     </option>
                                   ))}
                                 </select>
@@ -489,7 +490,7 @@ export function ReleaseCenter() {
                   <td>
                     <StatusBadge code={`backup_run_status.${b.status}`} />
                   </td>
-                  <td>{new Date(b.startedAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(b.startedAt)}</td>
                 </tr>
               ))}
             </tbody>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDate } from '../../lib/formatDateTime';
 
 interface SalesOrder {
   id: string;
@@ -198,7 +199,7 @@ export function SalesOrdersList() {
                 <td>
                   <StatusBadge code={`sales_order_approval.state.${o.status}`} />
                 </td>
-                <td>{new Date(o.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(o.createdAt)}</td>
               </tr>
             ))}
           </tbody>

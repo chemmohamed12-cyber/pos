@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { usePendingSources } from '../lib/pendingWork';
+import { fmtDate } from '../lib/formatDateTime';
 
 /**
  * NAV-03 — "Pending work": everything waiting for a decision, across the Approval Engine AND the Process-Engine approvals that live inside their
@@ -53,7 +54,7 @@ export function PendingWork() {
                   <td>
                     <strong>{s.count}</strong>
                   </td>
-                  <td>{s.oldest ? new Date(s.oldest).toLocaleDateString() : '—'}</td>
+                  <td>{s.oldest ? fmtDate(s.oldest) : '—'}</td>
                   <td>
                     <Link className="btn btn-secondary" to={s.to}>
                       {t('action.open_resource')}

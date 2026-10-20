@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { nameOf, currentLang, STATUS_NAMES } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -330,7 +331,7 @@ export function CommissionPolicies() {
                   <td>{t(`value.commission_basis.${p.basis}`)}</td>
                   <td>{t(`value.commission_rate_model.${p.rateModel}`)}</td>
                   <td>{p.flatRate ?? '—'}</td>
-                  <td>{p.status}</td>
+                  <td>{nameOf(STATUS_NAMES, p.status, currentLang())}</td>
                   <td>
                     {p.rateModel === 'target_tiered' && (
                       <button className="btn btn-secondary" onClick={() => toggleTiers(p.id)}>

@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Collection {
   id: string;
@@ -109,7 +110,7 @@ export function CollectionReceiptPrint() {
       { label: t('field.payment_method'), value: collection.method },
       ...(company ? [{ label: t('field.shipping_company'), value: company.name }] : []),
       ...(vehicle ? [{ label: t('field.vehicle'), value: vehicle.plateNumber }] : []),
-      ...(collection.remittedAt ? [{ label: t('field.remitted_at'), value: new Date(collection.remittedAt).toLocaleString() }] : []),
+      ...(collection.remittedAt ? [{ label: t('field.remitted_at'), value: fmtDateTime(collection.remittedAt) }] : []),
     ],
     totals: [{ label: t('field.collected_amount'), value: collection.amount }],
   };

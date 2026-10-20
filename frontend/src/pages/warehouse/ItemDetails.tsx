@@ -9,6 +9,7 @@ import { ItemBasicPanel } from './item/ItemBasicPanel';
 import { ItemBarcodesPanel } from './item/ItemBarcodesPanel';
 import { ItemBomPanel } from './item/ItemBomPanel';
 import { ITEM_BARCODE_LABELS, ITEM_BASIC_LABELS, ITEM_BOM_LABELS, type Category } from './item/itemMaster';
+import { fmtDate, fmtDateTime } from '../../lib/formatDateTime';
 
 interface Product {
   id: string;
@@ -443,7 +444,7 @@ function ItemDetails({ productId }: { productId: string }) {
                       <td>{b.reserved}</td>
                       <td style={{ color: b.available < 0 ? '#a3262d' : undefined }}>{b.available}</td>
                       {canViewCost && <td>{costs[b.warehouse.id] ?? '—'}</td>}
-                      <td>{b.lastMovementAt ? new Date(b.lastMovementAt).toLocaleDateString() : '—'}</td>
+                      <td>{b.lastMovementAt ? fmtDate(b.lastMovementAt) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -521,7 +522,7 @@ function ItemDetails({ productId }: { productId: string }) {
                       const number = m.referenceId ? docNumbers[m.referenceId] ?? m.referenceId.slice(0, 8) : '';
                       return (
                         <tr key={m.id}>
-                          <td style={{ whiteSpace: 'nowrap' }}>{new Date(m.createdAt).toLocaleString()}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(m.createdAt)}</td>
                           <td>{labelOr(`movement_type.${m.movementType}`, m.movementType)}</td>
                           <td>
                             {refLabel}

@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDate } from '../../lib/formatDateTime';
 
 interface InvoiceLine {
   productId: string;
@@ -102,7 +103,7 @@ export function InvoicePrint() {
     fields: [
       { label: t('field.customer'), value: `${customer.code} — ${customer.name}` },
       { label: t('field.sales_order'), value: order.orderNumber },
-      { label: t('field.due_date'), value: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—' },
+      { label: t('field.due_date'), value: inv.dueDate ? fmtDate(inv.dueDate) : '—' },
     ],
     lines: inv.lines.map((l) => {
       const product = products.find((p) => p.id === l.productId);

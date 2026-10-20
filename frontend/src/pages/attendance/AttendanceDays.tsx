@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { fmtTime } from '../../lib/formatDateTime';
 
 interface Employee {
   id: string;
@@ -253,8 +254,8 @@ export function AttendanceDays() {
                 <tr key={d.id}>
                   <td>{employeeLabel(d.employeeId)}</td>
                   <td>{d.calendarDate}</td>
-                  <td>{d.checkIn ? new Date(d.checkIn).toLocaleTimeString() : '—'}</td>
-                  <td>{d.checkOut ? new Date(d.checkOut).toLocaleTimeString() : '—'}</td>
+                  <td>{d.checkIn ? fmtTime(d.checkIn) : '—'}</td>
+                  <td>{d.checkOut ? fmtTime(d.checkOut) : '—'}</td>
                   <td>{d.hoursWorked ?? '—'}</td>
                   <td>
                     <StatusBadge code={`value.attendance_day_status.${d.status}`} />

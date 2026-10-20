@@ -4,6 +4,8 @@ import { api, ApiError, getAccessToken } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { nameOf, currentLang, PAYMENT_METHODS } from '../lib/displayNames';
+import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
 interface SalesOrderReportRow {
   id: string;
@@ -343,7 +345,7 @@ function SalesOrdersReport({ setError }: { setError: (e: string | null) => void 
                 <td>
                   <span style={{ color: '#2563eb', fontWeight: 600 }}>{r.orderNumber}</span>
                 </td>
-                <td>{new Date(r.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(r.createdAt)}</td>
                 <td>{r.customerName}</td>
                 <td>{r.salesRepName}</td>
                 <td>
@@ -684,7 +686,7 @@ function MovementsReport({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>{fmtDateTime(r.createdAt)}</td>
                 <td>{warehouseName(r.warehouseId)}</td>
                 <td>{productLabel(r.productId)}</td>
                 <td>
@@ -849,7 +851,7 @@ function DeliveryReport({ setError }: { setError: (e: string | null) => void }) 
               <StatusBadge code={`shipment_lifecycle.state.${shipment.state}`} />
             </td>
             <td>{outcome ? t(`delivery_outcome.${outcome.outcome}`) : '—'}</td>
-            <td>{collection ? `${collection.amount} (${collection.method})` : '—'}</td>
+            <td>{collection ? `${collection.amount} (${nameOf(PAYMENT_METHODS, collection.method, currentLang())})` : '—'}</td>
           </tr>
         ))}
       </tbody>

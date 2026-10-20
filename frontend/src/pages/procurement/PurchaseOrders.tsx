@@ -6,6 +6,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { FinancialStatusCell } from '../../components/FinancialTrace';
 import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Supplier {
   id: string;
@@ -527,7 +528,7 @@ export function PurchaseOrders() {
               <ul style={{ paddingInlineStart: 18 }}>
                 {receipts.map((r) => (
                   <li key={r.id}>
-                    {r.grNumber} — {new Date(r.createdAt).toLocaleString()} <FinancialStatusCell id={r.id} />
+                    {r.grNumber} — {fmtDateTime(r.createdAt)} <FinancialStatusCell id={r.id} />
                   </li>
                 ))}
               </ul>

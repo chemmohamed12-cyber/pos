@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { nameOf, currentLang, STATUS_NAMES } from '../lib/displayNames';
 
 interface Warehouse {
   id: string;
@@ -134,7 +135,7 @@ export function ReserveStockPanel({ salesOrderId, orderStatus, lines }: { salesO
                 <td>{line.quantity}</td>
                 <td>
                   {reservation ? (
-                    <span className="status-badge positive">{reservation.status}</span>
+                    <span className="status-badge positive">{nameOf(STATUS_NAMES, reservation.status, currentLang())}</span>
                   ) : (
                     <span className="status-badge">{t('action.not_reserved')}</span>
                   )}

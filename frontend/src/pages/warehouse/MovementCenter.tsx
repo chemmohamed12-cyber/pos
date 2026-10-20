@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Transaction {
   id: string;
@@ -241,7 +242,7 @@ export function MovementCenter() {
                   <td>
                     <StatusBadge code={`warehouse_txn_state.${tx.state}`} />
                   </td>
-                  <td>{new Date(tx.createdAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(tx.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

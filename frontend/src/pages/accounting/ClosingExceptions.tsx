@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface ClosingException {
   id: string;
@@ -156,7 +157,7 @@ export function ClosingExceptions() {
                     <StatusBadge code={`value.closing_exception_status.${e.status}`} />
                     {e.annotation && (
                       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                        {e.annotation.reason} — {new Date(e.annotation.at).toLocaleString()}
+                        {e.annotation.reason} — {fmtDateTime(e.annotation.at)}
                       </div>
                     )}
                   </td>

@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { overallState, traceStateOf, useTraceEvents } from '../lib/financialTrace';
+import { nameOf, currentLang, FINANCIAL_EVENT_TYPES } from '../lib/displayNames';
+import { translateRejectionReason } from '../lib/financialReason';
 
 /**
  * NAV-07 — the financial consequence of an operational document, shown where the document lives:
@@ -40,13 +42,13 @@ export function FinancialTrace({ ids }: { ids: string[] }) {
             {events.map((e) => (
               <tr key={e.id}>
                 <td>
-                  <code>{e.eventType}</code>
+                  {nameOf(FINANCIAL_EVENT_TYPES, e.eventType, currentLang())}
                 </td>
                 <td>
                   <span className={`status-badge${traceStateOf(e) === 'posted' ? '' : traceStateOf(e) === 'rejected' ? ' negative' : ''}`} data-testid={`trace-${traceStateOf(e)}`}>
                     {t(`value.financial_trace.${traceStateOf(e)}`)}
                   </span>
-                  {e.rejectionReason && <div className="error-text">{e.rejectionReason}</div>}
+                  {e.rejectionReason && <div className="error-text">{translateRejectionReason(e.rejectionReason, currentLang())}</div>}
                 </td>
                 <td>
                   {e.journalEntryId && (

@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { CompanyMembers } from './CompanyMembers';
 import { CompanyPackage } from './CompanyPackage';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface CompanyView {
   id: string;
@@ -118,7 +119,7 @@ export function CompanyDetails() {
         </div>
         <div>
           <label>{t('field.created_at')}</label>
-          <div>{new Date(company.createdAt).toLocaleString()}</div>
+          <div>{fmtDateTime(company.createdAt)}</div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>

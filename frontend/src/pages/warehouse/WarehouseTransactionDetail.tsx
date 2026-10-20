@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDate } from '../../lib/formatDateTime';
 
 interface Transaction {
   id: string;
@@ -173,7 +174,7 @@ export function WarehouseTransactionDetail() {
           </div>
           <div className="detail-field">
             <div className="label">{t('field.movement_date')}</div>
-            <div className="value">{new Date(txn.movementDate).toLocaleDateString()}</div>
+            <div className="value">{fmtDate(txn.movementDate)}</div>
           </div>
           {txn.destinationWarehouseId && (
             <div className="detail-field">

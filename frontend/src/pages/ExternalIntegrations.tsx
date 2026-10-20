@@ -3,6 +3,8 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { PasswordInput } from '../components/PasswordInput';
+import { nameOf, currentLang, STATUS_NAMES, DIRECTIONS, EVENT_AND_ACTION_NAMES } from '../lib/displayNames';
+import { fmtDateTime } from '../lib/formatDateTime';
 
 interface Connector {
   id: string;
@@ -351,12 +353,12 @@ export function ExternalIntegrations() {
                             <tbody>
                               {logs.map((l) => (
                                 <tr key={l.id}>
-                                  <td>{new Date(l.createdAt).toLocaleString()}</td>
-                                  <td>{l.direction}</td>
-                                  <td>{l.eventType}</td>
+                                  <td>{fmtDateTime(l.createdAt)}</td>
+                                  <td>{nameOf(DIRECTIONS, l.direction, currentLang())}</td>
+                                  <td>{nameOf(EVENT_AND_ACTION_NAMES, l.eventType, currentLang())}</td>
                                   <td>
                                     <span className={`status-badge ${l.status === 'success' ? 'positive' : l.status === 'failed' ? 'negative' : ''}`}>
-                                      {l.status}
+                                      {nameOf(STATUS_NAMES, l.status, currentLang())}
                                     </span>
                                   </td>
                                   <td>{l.detail ?? '—'}</td>

@@ -4,6 +4,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAutoRefresh } from '../../lib/useAutoRefresh';
 import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+import { nameOf, SOURCE_DOMAINS, FINANCIAL_EVENT_TYPES, sourceDomainOf } from '../../lib/displayNames';
+import { translateRejectionReason } from '../../lib/financialReason';
 
 interface FinancialEvent {
   id: string;
@@ -34,7 +36,7 @@ const PRELOAD = [
 
 /** F03 — Financial Event Engine (ADR-035). List + redrive for a REJECTED event. */
 export function FinancialEvents() {
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   preload(PRELOAD);
   const [status, setStatus] = useState('');
   const [events, setEvents] = useState<FinancialEvent[] | null>(null);
@@ -115,13 +117,13 @@ export function FinancialEvents() {
             {events.map((ev) => (
               <tr key={ev.id}>
                 <td>
-                  {ev.sourceDomain} / {ev.eventType}
+                  {nameOf(SOURCE_DOMAINS, sourceDomainOf(ev.sourceDomain, ev.eventType), lang)} / {nameOf(FINANCIAL_EVENT_TYPES, ev.eventType, lang)}
                 </td>
                 <td>{ev.businessDate}</td>
                 <td>
                   <StatusBadge code={`value.financial_event_status.${ev.status.toLowerCase()}`} />
                 </td>
-                <td>{ev.rejectionReason ?? '—'}</td>
+                <td>{translateRejectionReason(ev.rejectionReason, lang)}</td>
                 <td>
                   {ev.status === 'REJECTED' && (
                     <button className="btn btn-secondary" disabled={busyId === ev.id} onClick={() => redrive(ev.id)}>

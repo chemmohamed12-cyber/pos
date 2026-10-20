@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { FinancialStatusCell } from '../components/FinancialTrace';
+import { nameOf, currentLang, PAYMENT_METHODS } from '../lib/displayNames';
+import { fmtDateTime } from '../lib/formatDateTime';
 
 interface PaymentRow {
   id: string;
@@ -108,8 +110,8 @@ export function Payments() {
                 </td>
                 <td>{r.invoiceId ? (r.invoiceNumber ?? '—') : t('panel.customer_advance_unapplied')}</td>
                 <td>{r.amount}</td>
-                <td>{r.method}</td>
-                <td>{new Date(r.occurredAt).toLocaleString()}</td>
+                <td>{nameOf(PAYMENT_METHODS, r.method, currentLang())}</td>
+                <td>{fmtDateTime(r.occurredAt)}</td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <FinancialStatusCell id={r.id} />
                 </td>

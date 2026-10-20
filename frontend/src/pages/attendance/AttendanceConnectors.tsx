@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Employee {
   id: string;
@@ -357,7 +358,7 @@ export function AttendanceConnectors() {
             {unmapped.map((r) => (
               <tr key={r.id}>
                 <td>{r.deviceEmployeeRef}</td>
-                <td>{new Date(r.punchTimestamp).toLocaleString()}</td>
+                <td>{fmtDateTime(r.punchTimestamp)}</td>
                 <td>{t(`value.punch_type.${r.punchType}`)}</td>
               </tr>
             ))}

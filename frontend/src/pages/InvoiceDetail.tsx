@@ -4,6 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { FinancialTrace } from '../components/FinancialTrace';
+import { fmtDate } from '../lib/formatDateTime';
 
 interface InvoiceLine {
   id: string;
@@ -142,7 +143,7 @@ export function InvoiceDetail() {
           </div>
           <div className="detail-field">
             <div className="label">{t('field.due_date')}</div>
-            <div className="value">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '—'}</div>
+            <div className="value">{invoice.dueDate ? fmtDate(invoice.dueDate) : '—'}</div>
           </div>
           <div className="detail-field">
             <div className="label">{t('field.total_amount')}</div>

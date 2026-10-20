@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { nameOf, currentLang, STATUS_NAMES } from '../../lib/displayNames';
+import { fmtDate } from '../../lib/formatDateTime';
 
 interface Employee {
   id: string;
@@ -170,9 +172,9 @@ export function PayrollCompensation() {
             {compensations.map((c) => (
               <tr key={c.id}>
                 <td>{employeeLabel(c.employeeId)}</td>
-                <td>{new Date(c.effectiveFrom).toLocaleDateString()}</td>
-                <td>{c.effectiveTo ? new Date(c.effectiveTo).toLocaleDateString() : '—'}</td>
-                <td>{c.status}</td>
+                <td>{fmtDate(c.effectiveFrom)}</td>
+                <td>{c.effectiveTo ? fmtDate(c.effectiveTo) : '—'}</td>
+                <td>{nameOf(STATUS_NAMES, c.status, currentLang())}</td>
               </tr>
             ))}
           </tbody>
