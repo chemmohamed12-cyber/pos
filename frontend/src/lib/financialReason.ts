@@ -9,6 +9,14 @@ import { FINANCIAL_EVENT_TYPES, humanize, type NamePair } from './displayNames';
  */
 const pick = (pair: NamePair, lang: Lang) => pair[lang === 'ar' ? 0 : 1];
 
+/**
+ * A code (account number, control function …) inside an Arabic sentence: wrapped as a left-to-right isolate so the right-to-left
+ * display cannot reorder its characters (4000-A/1 must not read A/1-4000). The characters themselves are unchanged.
+ */
+const LRI = '\u2066';
+const PDI = '\u2069';
+const code = (value: string, lang: Lang) => (lang === 'ar' ? `${LRI}${value}${PDI}` : value);
+
 const CONTROL_FUNCTIONS: Record<string, NamePair> = {
   ar: ['العملاء (الذمم المدينة)', 'receivables (AR)'],
   ap: ['الموردين (الذمم الدائنة)', 'payables (AP)'],
@@ -83,7 +91,7 @@ function translateProblem(problem: string, lang: Lang): string | null {
   if ((m = /^no ([\w]+) control account in the chart(?: — assign controlFunction "([\w]+)" to an account first)?/i.exec(problem))) {
     const fn = CONTROL_FUNCTIONS[m[1].toLowerCase()];
     const name = fn ? pick(fn, lang) : humanize(m[1]);
-    const hint = m[2] ? (ar ? ` — عيّن وظيفة الرقابة «${m[2]}» لأحد الحسابات أولاً` : ` — assign the control function “${m[2]}” to an account first`) : '';
+    const hint = m[2] ? (ar ? ` — عيّن وظيفة الرقابة «${code(m[2], lang)}» لأحد الحسابات أولاً` : ` — assign the control function “${m[2]}” to an account first`) : '';
     return (ar ? `لا يوجد حساب رقابة لـ ${name} في دليل الحسابات` : `No ${name} control account in the chart of accounts`) + hint;
   }
   if ((m = /^missing\/invalid ([\w]+)(?: or ([\w]+))?$/i.exec(problem))) {
@@ -95,7 +103,7 @@ function translateProblem(problem: string, lang: Lang): string | null {
   }
   if ((m = /^(?:([a-z]+) )?account "([^"]+)" not found/i.exec(problem)) || (m = /^(?:[a-z_ ]+: )?(?:([a-z]+) )?account "([^"]+)" not found/i.exec(problem))) {
     const role = m[1] && ACCOUNT_ROLES[m[1].toLowerCase()] ? pick(ACCOUNT_ROLES[m[1].toLowerCase()], lang) : '';
-    return ar ? `حساب${role ? ` ${role}` : ''} «${m[2]}» غير موجود في دليل الحسابات` : `${role ? `${role[0].toUpperCase()}${role.slice(1)} account` : 'Account'} “${m[2]}” not found in the chart of accounts`;
+    return ar ? `حساب${role ? ` ${role}` : ''} «${code(m[2], lang)}» غير موجود في دليل الحسابات` : `${role ? `${role[0].toUpperCase()}${role.slice(1)} account` : 'Account'} “${m[2]}” not found in the chart of accounts`;
   }
   if ((m = /^an? ([\w]+) is required$/i.exec(problem))) {
     return ar ? `${fieldName(m[1], lang)} مطلوب` : `${fieldName(m[1], lang)} is required`;
