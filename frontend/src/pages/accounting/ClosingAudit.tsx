@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface ClosingAuditRun {
   id: string;
@@ -118,7 +119,7 @@ export function ClosingAudit() {
       {error && <div className="error-text">{error}</div>}
 
       {auditRuns === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : auditRuns.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_audit_runs_yet')}</div>
       ) : (
@@ -145,7 +146,7 @@ export function ClosingAudit() {
       )}
 
       {workflowRuns === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : workflowRuns.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_workflow_runs_yet')}</div>
       ) : (

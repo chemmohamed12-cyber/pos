@@ -6,6 +6,7 @@ import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument, DocumentLine } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface LedgerEntry {
   entryNumber: string;
@@ -62,7 +63,7 @@ export function CustomerStatementPrint() {
   }, [id, searchParams]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { customer, entries } = data;
   const from = searchParams.get('from');
   const to = searchParams.get('to');

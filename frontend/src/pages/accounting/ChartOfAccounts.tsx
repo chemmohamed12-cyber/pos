@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { loadingLabel } from '../../lib/displayNames';
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
 const CURRENCY_MODES = ['functional_only', 'single_foreign', 'any'] as const;
@@ -407,7 +408,7 @@ export function ChartOfAccounts() {
       <div style={{ display: 'flex', gap: 20 }}>
         <div className="card" style={{ flex: '1 1 55%', maxHeight: 640, overflowY: 'auto' }}>
           {accounts === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : tree.length === 0 ? (
             <div className="empty-state">{t('panel.no_accounts_yet')}</div>
           ) : (

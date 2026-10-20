@@ -7,7 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ProfileFieldsCard, type ProfileField } from '../../components/profile/ProfileFieldsCard';
 import { ProfileContactsPanel, type ProfileContact } from '../../components/profile/ProfileContactsPanel';
 import { ProfileAddressesPanel, type ProfileAddress } from '../../components/profile/ProfileAddressesPanel';
-import { nameOf, currentLang, PAYMENT_METHODS } from '../../lib/displayNames';
+import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 import { fmtDate } from '../../lib/formatDateTime';
 
 /**
@@ -142,7 +142,7 @@ export function SupplierProfile() {
   }, [tab, id, orders]);
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!detail) return <div className="empty-state">Loading…</div>;
+  if (!detail) return <div className="empty-state">{loadingLabel()}</div>;
 
   const base = `/procurement/suppliers/${id}`;
   const s = detail.supplier;
@@ -257,7 +257,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.purchase_orders')}</h3>
             {orders === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : orders.length === 0 ? (
               empty
             ) : (
@@ -288,7 +288,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.supplier_invoices')}</h3>
             {invoices === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : invoices.length === 0 ? (
               empty
             ) : (
@@ -321,7 +321,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.supplier_payments')}</h3>
             {payments === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : payments.length === 0 ? (
               empty
             ) : (

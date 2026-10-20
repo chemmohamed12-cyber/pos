@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
-import { nameOf, currentLang, ORG_UNIT_TYPES } from '../lib/displayNames';
+import { ORG_UNIT_TYPES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate } from '../lib/formatDateTime';
 
 interface Warehouse {
@@ -207,7 +207,7 @@ export function Warehouses() {
       {error && <div className="error-text">{error}</div>}
 
       {warehouses === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : warehouses.length === 0 ? (
         <div className="empty-state">{t('panel.no_warehouses_yet')}</div>
       ) : (

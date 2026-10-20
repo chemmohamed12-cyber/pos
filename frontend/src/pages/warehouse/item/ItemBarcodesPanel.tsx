@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { useLanguage } from '../../../context/LanguageContext';
+import { loadingLabel } from '../../../lib/displayNames';
 
 interface Barcode {
   id: string;
@@ -100,7 +101,7 @@ export function ItemBarcodesPanel({ productId, unit, canEdit }: { productId: str
         </form>
       )}
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.item_no_barcodes')}</div>
       ) : (

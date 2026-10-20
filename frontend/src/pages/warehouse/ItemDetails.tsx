@@ -10,6 +10,7 @@ import { ItemBarcodesPanel } from './item/ItemBarcodesPanel';
 import { ItemBomPanel } from './item/ItemBomPanel';
 import { ITEM_BARCODE_LABELS, ITEM_BASIC_LABELS, ITEM_BOM_LABELS, type Category } from './item/itemMaster';
 import { fmtDate, fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Product {
   id: string;
@@ -328,7 +329,7 @@ function ItemDetails({ productId }: { productId: string }) {
       </div>
     );
   }
-  if (!product) return <div className="empty-state">Loading…</div>;
+  if (!product) return <div className="empty-state">{loadingLabel()}</div>;
 
   // All six tabs are always shown (the committed Item Details contract); the BOM tab itself explains when an item type has no BOM.
   const visibleTabs = TABS;
@@ -416,7 +417,7 @@ function ItemDetails({ productId }: { productId: string }) {
 
         {activeTab === 'balances' &&
           (balances === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : balances.length === 0 ? (
             <div className="empty-state">{t('panel.item_no_balances')}</div>
           ) : (
@@ -489,7 +490,7 @@ function ItemDetails({ productId }: { productId: string }) {
             <p className="item-note">{t('panel.item_dates_posting_time')}</p>
             {mvError && <div className="error-text">{mvError}</div>}
             {movements === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table item-ledger">

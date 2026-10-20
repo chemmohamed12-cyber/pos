@@ -4,7 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ExcelImportExport } from '../components/ExcelImportExport';
-import { nameOf, currentLang, STATUS_NAMES } from '../lib/displayNames';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate } from '../lib/formatDateTime';
 
 const PAGE_SIZE = 50;
@@ -302,7 +302,7 @@ export function Customers() {
       {error && <div className="error-text">{error}</div>}
 
       {customers === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : customers.length === 0 ? (
         <div className="empty-state">{t('panel.no_customers_yet')}</div>
       ) : (

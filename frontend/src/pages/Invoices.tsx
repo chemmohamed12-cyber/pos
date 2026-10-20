@@ -4,6 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { fmtDate } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 interface InvoiceRow {
   id: string;
@@ -81,7 +82,7 @@ export function Invoices() {
       </div>
 
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('panel.no_invoices_yet')}</div>
       ) : (

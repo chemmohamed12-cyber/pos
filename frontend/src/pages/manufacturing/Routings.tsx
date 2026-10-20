@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface RoutingListEntry {
   finishedProductId: string;
@@ -299,13 +300,13 @@ export function Routings() {
               </table>
             </>
           ) : (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           )}
         </div>
       )}
 
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('mfg.panel.no_routings')}</div>
       ) : (

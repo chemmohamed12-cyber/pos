@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { currentLang, loadingLabel } from '../../lib/displayNames';
 
 interface PayrollPeriod {
   id: string;
@@ -98,7 +99,7 @@ export function PayrollRuns() {
         <h3>{t('action.calculate_run')}</h3>
         <form onSubmit={onCalculate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 200 }}>
-            <label>Payroll Period</label>
+            <label>{currentLang() === 'ar' ? 'فترة الرواتب' : 'Payroll Period'}</label>
             <select value={payrollPeriodId} onChange={(e) => setPayrollPeriodId(e.target.value)} required>
               <option value="">—</option>
               {periods.map((p) => (
@@ -115,7 +116,7 @@ export function PayrollRuns() {
       </div>
 
       {runs === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : runs.length === 0 ? (
         <div className="empty-state">{t('panel.no_runs_yet')}</div>
       ) : (

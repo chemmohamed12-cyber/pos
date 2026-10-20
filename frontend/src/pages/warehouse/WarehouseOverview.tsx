@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { ErrorState } from '../../components/ErrorState';
 import { useAutoRefresh } from '../../lib/useAutoRefresh';
 import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Overview {
   totalWarehouses: number;
@@ -103,7 +104,7 @@ export function WarehouseOverview() {
     );
   }
 
-  if (!overview) return <div className="empty-state">Loading…</div>;
+  if (!overview) return <div className="empty-state">{loadingLabel()}</div>;
 
   const warehouseCode = (id: string) => warehouses.find((w) => w.id === id)?.code ?? id;
   const productLabel = (id: string) => {

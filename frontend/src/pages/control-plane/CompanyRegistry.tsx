@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface CompanyView {
   id: string;
@@ -117,7 +118,7 @@ export function CompanyRegistry() {
       {actionError && <div className="error-text">{actionError}</div>}
 
       {companies === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : companies.length === 0 ? (
         <div className="empty-state">{t('panel.no_companies_yet')}</div>
       ) : (

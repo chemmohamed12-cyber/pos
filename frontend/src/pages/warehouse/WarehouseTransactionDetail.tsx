@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Transaction {
   id: string;
@@ -128,7 +129,7 @@ export function WarehouseTransactionDetail() {
   }
 
   if (loadError) return <ErrorState error={loadError} onRetry={load} />;
-  if (!txn) return <div className="empty-state">Loading…</div>;
+  if (!txn) return <div className="empty-state">{loadingLabel()}</div>;
 
   const warehouseName = (whId: string | null) => {
     if (!whId) return '—';

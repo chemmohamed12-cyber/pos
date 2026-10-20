@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { ProfileFieldsCard, type ProfileField } from '../components/profile/ProfileFieldsCard';
 import { ProfileContactsPanel, type ProfileContact } from '../components/profile/ProfileContactsPanel';
 import { ProfileAddressesPanel, type ProfileAddress } from '../components/profile/ProfileAddressesPanel';
+import { loadingLabel } from '../lib/displayNames';
 
 /**
  * Customer profile tab (master-data gap matrix §5) — shown inside the existing Customer Account screen, so the customer record, its orders
@@ -72,7 +73,7 @@ export function CustomerProfileTab({ customerId, onChanged }: { customerId: stri
   }, [load]);
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
 
   const base = `/customers/${customerId}`;
   return (

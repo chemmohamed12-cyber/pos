@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface BomListEntry {
   finishedProductId: string;
@@ -292,13 +293,13 @@ export function ManufacturingBoms() {
               </table>
             </>
           ) : (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           )}
         </div>
       )}
 
       {boms === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('mfg.panel.no_boms')}</div>
       ) : (

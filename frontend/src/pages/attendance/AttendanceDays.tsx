@@ -4,6 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 import { fmtTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -181,7 +182,7 @@ export function AttendanceDays() {
       <ApprovalsPanel requestTypeCodes={ATTENDANCE_REQUEST_TYPE_CODES} decidePath={(id) => `/attendance/approvals/${id}/decide`} onDecided={() => { loadDays(); loadBatches(); }} />
 
       {batches === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : batches.length === 0 ? (
         <div className="empty-state">{t('panel.no_batches_yet')}</div>
       ) : (
@@ -208,7 +209,7 @@ export function AttendanceDays() {
       )}
 
       {days === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : days.length === 0 ? (
         <div className="empty-state">{t('panel.no_days_yet')}</div>
       ) : (

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
-import { nameOf, currentLang, STATUS_NAMES } from '../lib/displayNames';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDateTime } from '../lib/formatDateTime';
 
 interface Customer {
@@ -205,7 +205,7 @@ export function CustomerStatement() {
       {!customerId ? (
         <div className="empty-state">{t('panel.select_customer_to_view_statement')}</div>
       ) : entries === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_ledger_entries_yet')}</div>
       ) : (

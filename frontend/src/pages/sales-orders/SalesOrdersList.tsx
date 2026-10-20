@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface SalesOrder {
   id: string;
@@ -149,7 +150,7 @@ export function SalesOrdersList() {
       )}
 
       {orders === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : bucket === null ? (
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
           {TILES.map((tile) => (
@@ -173,7 +174,7 @@ export function SalesOrdersList() {
           </button>
         </div>
       ) : bucket === 'all' && allOrdersPage === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : visibleOrders.length === 0 ? (
         <div className="empty-state">{t('panel.no_sales_orders_yet')}</div>
       ) : (

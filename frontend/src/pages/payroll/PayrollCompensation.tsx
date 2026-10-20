@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
-import { nameOf, currentLang, STATUS_NAMES } from '../../lib/displayNames';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 import { fmtDate } from '../../lib/formatDateTime';
 
 interface Employee {
@@ -155,7 +155,7 @@ export function PayrollCompensation() {
       </div>
 
       {compensations === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : compensations.length === 0 ? (
         <div className="empty-state">{t('panel.no_compensations_yet')}</div>
       ) : (
@@ -163,8 +163,8 @@ export function PayrollCompensation() {
           <thead>
             <tr>
               <th>{t('field.employee')}</th>
-              <th>Effective From</th>
-              <th>Effective To</th>
+              <th>{currentLang() === 'ar' ? 'ساري من' : 'Effective From'}</th>
+              <th>{currentLang() === 'ar' ? 'ساري حتى' : 'Effective To'}</th>
               <th>{t('field.status')}</th>
             </tr>
           </thead>

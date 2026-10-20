@@ -6,6 +6,7 @@ import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Collection {
   id: string;
@@ -94,7 +95,7 @@ export function CollectionReceiptPrint() {
   }, [shipmentId]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { collection, shipment, order, company, vehicle } = data;
 
   const doc: BusinessDocument = {

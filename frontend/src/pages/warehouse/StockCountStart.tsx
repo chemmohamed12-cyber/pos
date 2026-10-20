@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Warehouse {
   id: string;
@@ -75,7 +76,7 @@ export function StockCountStart() {
         <div className="page-header">
           <h1>{t('action.start_count')}</h1>
         </div>
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       </div>
     );
   }

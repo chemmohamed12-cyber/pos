@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { loadingLabel } from '../../lib/displayNames';
 
 const ROUNDING_MODES = ['half_up', 'half_even', 'half_down'] as const;
 
@@ -263,7 +264,7 @@ export function AccountingSettings() {
         </form>
 
         {currencies === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : currencies.length === 0 ? (
           <div className="empty-state">{t('panel.no_currencies_yet')}</div>
         ) : (
@@ -349,7 +350,7 @@ export function AccountingSettings() {
         </form>
 
         {taxCodes === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : taxCodes.length === 0 ? (
           <div className="empty-state">{t('panel.no_tax_codes_yet')}</div>
         ) : (

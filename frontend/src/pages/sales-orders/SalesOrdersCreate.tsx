@@ -4,6 +4,7 @@ import { api, ApiError, uploadFile } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Customer {
   id: string;
@@ -467,7 +468,7 @@ export function SalesOrdersCreate() {
         <div className="page-header">
           <h1>{t('nav.sales_orders')}</h1>
         </div>
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       </div>
     );
   }

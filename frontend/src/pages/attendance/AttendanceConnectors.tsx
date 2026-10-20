@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -208,7 +209,7 @@ export function AttendanceConnectors() {
       </div>
 
       {connectors === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : connectors.length === 0 ? (
         <div className="empty-state">{t('panel.no_connectors_yet')}</div>
       ) : (
@@ -272,7 +273,7 @@ export function AttendanceConnectors() {
       </div>
 
       {mappings === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : mappings.length === 0 ? (
         <div className="empty-state">{t('panel.no_mappings_yet')}</div>
       ) : (
@@ -342,7 +343,7 @@ export function AttendanceConnectors() {
 
       <h3>{t('panel.no_unmapped_records_yet')}</h3>
       {unmapped === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : unmapped.length === 0 ? (
         <div className="empty-state">{t('panel.no_unmapped_records_yet')}</div>
       ) : (

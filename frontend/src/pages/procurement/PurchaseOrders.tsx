@@ -7,6 +7,7 @@ import { FinancialStatusCell } from '../../components/FinancialTrace';
 import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Supplier {
   id: string;
@@ -406,7 +407,7 @@ export function PurchaseOrders() {
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {orders === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : orders.length === 0 ? (
             <div className="empty-state">{t('panel.no_purchase_orders_yet')}</div>
           ) : (

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -149,7 +150,7 @@ export function Targets() {
       <ApprovalsPanel requestTypeCodes={TARGET_REQUEST_TYPE_CODES} decidePath={(reqId) => `/targets/approvals/${reqId}/decide`} onDecided={loadTargets} />
 
       {targets === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : targets.length === 0 ? (
         <div className="empty-state">{t('panel.no_targets_yet')}</div>
       ) : (

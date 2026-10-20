@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Department {
   id: string;
@@ -276,7 +277,7 @@ export function HrEmployees() {
       {error && <div className="error-text">{error}</div>}
 
       {employees === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : employees.length === 0 ? (
         <div className="empty-state">{t('panel.no_employees_yet')}</div>
       ) : (

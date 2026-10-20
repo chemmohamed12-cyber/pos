@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { fmtDateTime } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 type ReleasePackageType = 'full' | 'delta';
 type ReleaseStatus =
@@ -307,7 +308,7 @@ export function ReleaseCenter() {
       )}
 
       {releases === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : releases.length === 0 ? (
         <div className="empty-state">{t('panel.no_releases_yet')}</div>
       ) : (
@@ -471,7 +472,7 @@ export function ReleaseCenter() {
           {t('nav.release_center')} — {t('field.backup')}
         </div>
         {backups === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : backups.length === 0 ? (
           <div className="empty-state">{t('panel.no_backups_yet')}</div>
         ) : (

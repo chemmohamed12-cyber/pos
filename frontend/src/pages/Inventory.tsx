@@ -9,6 +9,7 @@ import { ProductCombobox } from '../components/ProductCombobox';
 import type { ProductOption } from '../components/ProductCombobox';
 import { ErrorState } from '../components/ErrorState';
 import { fmtDate } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 interface Warehouse {
   id: string;
@@ -292,7 +293,7 @@ export function Inventory() {
       {notice && <div style={{ color: '#166534', marginBottom: 8 }}>{notice}</div>}
 
       {data === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : data.rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_inventory_rows')}</div>
       ) : (

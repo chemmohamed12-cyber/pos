@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { loadingLabel } from '../../lib/displayNames';
 
 const CASH_BANK_ADJUSTMENT_KINDS = ['bank_adjustment', 'opening_balance', 'unreconciled_write_off', 'reclassification'] as const;
 const CASH_BANK_REQUEST_TYPE_CODES = CASH_BANK_ADJUSTMENT_KINDS.map((k) => `accounting.cash.${k}`);
@@ -194,7 +195,7 @@ export function CashBankReconciliation() {
       <ApprovalsPanel requestTypeCodes={CASH_BANK_REQUEST_TYPE_CODES} decidePath={(id) => `/accounting/cash-bank/approvals/${id}/decide`} onDecided={loadRuns} />
 
       {runs === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : runs.length === 0 ? (
         <div className="empty-state">{t('panel.no_cash_bank_reconciliations_yet')}</div>
       ) : (

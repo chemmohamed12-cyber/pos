@@ -4,7 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { CustomerProfileTab } from './CustomerProfileTab';
-import { nameOf, currentLang, STATUS_NAMES, PAYMENT_METHODS } from '../lib/displayNames';
+import { PAYMENT_METHODS, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
 interface Customer {
@@ -422,7 +422,7 @@ export function CustomerAccount() {
   }
 
   if (error && !statement) return <div className="error-text">{error}</div>;
-  if (!customer || !statement) return <div className="empty-state">Loading…</div>;
+  if (!customer || !statement) return <div className="empty-state">{loadingLabel()}</div>;
 
   const ordersWithoutOpenInvoice = orders.filter((o) => !invoices.some((inv) => inv.salesOrderId === o.id && inv.state !== 'void'));
   const lastInvoice = [...invoices].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];

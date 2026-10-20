@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { DepositPanel } from '../../components/DepositPanel';
 import { ReserveStockPanel } from '../../components/ReserveStockPanel';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface OrderLine {
   id: string;
@@ -345,7 +346,7 @@ export function SalesOrdersDetail() {
   }
 
   if (error && !order) return <div className="error-text">{error}</div>;
-  if (!order) return <div className="empty-state">Loading…</div>;
+  if (!order) return <div className="empty-state">{loadingLabel()}</div>;
 
   return (
     <div>

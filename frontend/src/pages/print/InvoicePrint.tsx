@@ -6,6 +6,7 @@ import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface InvoiceLine {
   productId: string;
@@ -92,7 +93,7 @@ export function InvoicePrint() {
   }, [id]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { inv, customer, order, products, preparer } = data;
 
   const doc: BusinessDocument = {

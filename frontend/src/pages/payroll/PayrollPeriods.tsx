@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface PayrollPeriod {
   id: string;
@@ -94,7 +95,7 @@ export function PayrollPeriods() {
       </div>
 
       {periods === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : periods.length === 0 ? (
         <div className="empty-state">{t('panel.no_periods_yet')}</div>
       ) : (

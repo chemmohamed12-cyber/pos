@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { FinancialStatusCell } from '../components/FinancialTrace';
-import { nameOf, currentLang, PAYMENT_METHODS } from '../lib/displayNames';
+import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDateTime } from '../lib/formatDateTime';
 
 interface PaymentRow {
@@ -82,7 +82,7 @@ export function Payments() {
       </div>
 
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('panel.no_payments_yet')}</div>
       ) : (

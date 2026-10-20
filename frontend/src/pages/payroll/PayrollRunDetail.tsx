@@ -5,7 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 import { ErrorState } from '../../components/ErrorState';
-import { currentLang } from '../../lib/displayNames';
+import { currentLang, loadingLabel } from '../../lib/displayNames';
 import { translateRejectionReason } from '../../lib/financialReason';
 
 interface Employee {
@@ -231,7 +231,7 @@ export function PayrollRunDetail() {
   // gate never reached the `{error && ...}` render below it — a failed load
   // was stuck on "Loading…" forever with the error silently sitting in state.
   if (!run && error) return <ErrorState error={new Error(error)} onRetry={loadRun} />;
-  if (!run) return <div className="empty-state">Loading…</div>;
+  if (!run) return <div className="empty-state">{loadingLabel()}</div>;
 
   const financialEventStatusCode = financialEvent ? financialEvent.status.toLowerCase() : 'none';
   const isGap = gaps.some((g) => g.payrollRunId === run.id);
@@ -261,7 +261,7 @@ export function PayrollRunDetail() {
         <div>
           <div style={{ fontSize: 12, opacity: 0.7 }}>{t('field.financial_event_status')}</div>
           <StatusBadge code={`value.financial_event_status.${financialEventStatusCode}`} />
-          {isGap && <div className="error-text" style={{ marginTop: 4 }}>⚠ Reconciliation gap</div>}
+          {isGap && <div className="error-text" style={{ marginTop: 4 }}>⚠ {currentLang() === 'ar' ? 'فجوة في المطابقة' : 'Reconciliation gap'}</div>}
           {financialEvent?.rejectionReason && <div style={{ fontSize: 12, opacity: 0.7 }}>{translateRejectionReason(financialEvent.rejectionReason, currentLang())}</div>}
         </div>
         <div>
@@ -344,7 +344,7 @@ export function PayrollRunDetail() {
                           <thead>
                             <tr>
                               <th>{t('field.calendar_date')}</th>
-                              <th>Attendance Status</th>
+                              <th>{currentLang() === 'ar' ? 'حالة الحضور' : 'Attendance Status'}</th>
                               <th>{t('field.day_type')}</th>
                               <th>{t('field.pay_impact')}</th>
                             </tr>

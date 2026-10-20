@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface DimensionType {
   id: string;
@@ -161,7 +162,7 @@ export function Dimensions() {
           </form>
 
           {types === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : types.length === 0 ? (
             <div className="empty-state">{t('panel.no_dimensions_yet')}</div>
           ) : (
@@ -208,7 +209,7 @@ export function Dimensions() {
             </form>
 
             {values === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : values.length === 0 ? (
               <div className="empty-state">{t('panel.no_dimensions_yet')}</div>
             ) : (

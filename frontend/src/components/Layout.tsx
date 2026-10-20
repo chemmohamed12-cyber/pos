@@ -7,6 +7,7 @@ import { CompanySwitcher } from './CompanySwitcher';
 import { ErrorState } from './ErrorState';
 import { companyRemountKey } from '../lib/companyScope';
 import './Layout.css';
+import { loadingLabel } from '../lib/displayNames';
 
 interface NavItem {
   to: string;
@@ -129,7 +130,7 @@ export function Layout() {
           </div>
         )}
         <nav>
-          {visibleGroups === null && !navError && <div className="empty-state">{lang === 'ar' ? 'جارِ التحميل…' : 'Loading…'}</div>}
+          {visibleGroups === null && !navError && <div className="empty-state">{lang === 'ar' ? 'جارِ التحميل…' : loadingLabel()}</div>}
           {Boolean(navError) && <ErrorState error={navError} onRetry={retryNav} />}
           {visibleGroups?.length === 0 && (
             <div className="empty-state">{lang === 'ar' ? 'لا توجد عناصر تنقل متاحة' : 'No navigation items available'}</div>

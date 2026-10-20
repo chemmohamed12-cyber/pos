@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError, uploadFile } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Product {
   id: string;
@@ -264,7 +265,7 @@ export function SalesOrdersEdit() {
     }
   }
 
-  if (!order) return <div className="empty-state">{error ?? 'Loading…'}</div>;
+  if (!order) return <div className="empty-state">{error ?? loadingLabel()}</div>;
 
   return (
     <div>

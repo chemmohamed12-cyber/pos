@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { FinancialStatusCell } from '../components/FinancialTrace';
 import { fmtDateTime } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 interface TreasuryAccount {
   id: string;
@@ -242,7 +243,7 @@ export function TreasuryLedger() {
       {error && <div className="error-text">{error}</div>}
 
       {transactions === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">

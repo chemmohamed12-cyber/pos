@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { ProductCombobox } from '../../components/ProductCombobox';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 type TxnType = 'receipt' | 'issue' | 'transfer' | 'adjustment';
 
@@ -220,7 +221,7 @@ export function WarehouseTransactionForm({ type }: { type: TxnType }) {
         <div className="page-header">
           <h1>{t(`action.create_${type}`)}</h1>
         </div>
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       </div>
     );
   }

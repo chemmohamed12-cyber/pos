@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { StockCell, useStockAvailability } from '../../components/StockAvailability';
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Warehouse {
   id: string;
@@ -366,7 +367,7 @@ export function PurchaseRequests() {
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {requests === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : requests.length === 0 ? (
             <div className="empty-state">{t('panel.no_purchase_requests_yet')}</div>
           ) : (

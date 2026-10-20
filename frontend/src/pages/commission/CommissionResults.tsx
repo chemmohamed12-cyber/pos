@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { currentLang, loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -121,7 +122,7 @@ export function CommissionResults() {
       {error && <div className="error-text">{error}</div>}
 
       {results === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : results.length === 0 ? (
         <div className="empty-state">{t('panel.no_results_yet')}</div>
       ) : (
@@ -155,7 +156,7 @@ export function CommissionResults() {
         <h3>{t('action.create_adjustment')}</h3>
         <form onSubmit={onCreateAdjustment} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
-            <label>Commission Result</label>
+            <label>{currentLang() === 'ar' ? 'نتيجة العمولة' : 'Commission Result'}</label>
             <select value={originalCommissionResultId} onChange={(e) => setOriginalCommissionResultId(e.target.value)} required>
               <option value="">—</option>
               {(results ?? []).map((r) => (

@@ -187,3 +187,8 @@ export const ORG_UNIT_TYPES: NameTable = {
 export function sourceDomainOf(sourceDomain: string, eventType: string): string {
   return sourceDomain && sourceDomain !== 'unknown' ? sourceDomain : eventType.split('.')[0] || 'unknown';
 }
+
+/** «Loading…» in the language the user chose (screens show it while their data loads). */
+export function loadingLabel(): string {
+  return currentLang() === 'ar' ? 'جارٍ التحميل…' : 'Loading…';
+}

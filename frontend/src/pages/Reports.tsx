@@ -4,7 +4,7 @@ import { api, ApiError, getAccessToken } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
-import { nameOf, currentLang, PAYMENT_METHODS } from '../lib/displayNames';
+import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
 interface SalesOrderReportRow {
@@ -316,7 +316,7 @@ function SalesOrdersReport({ setError }: { setError: (e: string | null) => void 
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   return (
     <div>
       <div className="action-row" style={{ marginBottom: 12 }}>
@@ -390,7 +390,7 @@ function SalesByPeriodReport({ setError }: { setError: (e: string | null) => voi
         <PrintButton type="sales_by_period" query={`groupBy=${groupBy}`} />
       </div>
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_report_data')}</div>
       ) : (
@@ -427,7 +427,7 @@ function SalesByCustomerReport({ setError }: { setError: (e: string | null) => v
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   return (
     <div>
       <div className="action-row" style={{ marginBottom: 12 }}>
@@ -470,7 +470,7 @@ function SalesByRepReport({ setError }: { setError: (e: string | null) => void }
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   return (
     <div>
       <div className="action-row" style={{ marginBottom: 12 }}>
@@ -546,7 +546,7 @@ function StockReport({
         />
       </div>
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_report_data')}</div>
       ) : (
@@ -669,7 +669,7 @@ function MovementsReport({
         <ExportButton url={`/api/inventory/reports/movements/export${buildQuery() ? `?${buildQuery()}` : ''}`} filename="warehouse-movements-report.xlsx" />
       </div>
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_report_data')}</div>
       ) : (
@@ -716,7 +716,7 @@ function FulfillmentReport({ setError }: { setError: (e: string | null) => void 
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (pickTasks === null || packTasks === null) return <div className="empty-state">Loading…</div>;
+  if (pickTasks === null || packTasks === null) return <div className="empty-state">{loadingLabel()}</div>;
   return (
     <div>
       <h3 style={{ marginTop: 0 }}>{t('panel.pick_tasks')}</h3>
@@ -779,7 +779,7 @@ function ShipmentsReport({ setError }: { setError: (e: string | null) => void })
       .catch(() => undefined);
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   if (rows.length === 0) return <div className="empty-state">{t('panel.no_report_data')}</div>;
   return (
     <table className="data-table">
@@ -831,7 +831,7 @@ function DeliveryReport({ setError }: { setError: (e: string | null) => void }) 
     })();
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   if (rows.length === 0) return <div className="empty-state">{t('panel.no_report_data')}</div>;
   return (
     <table className="data-table">
@@ -877,7 +877,7 @@ function ReturnsReport({
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (rows === null) return <div className="empty-state">Loading…</div>;
+  if (rows === null) return <div className="empty-state">{loadingLabel()}</div>;
   if (rows.length === 0) return <div className="empty-state">{t('panel.no_report_data')}</div>;
   return (
     <table className="data-table">
@@ -917,7 +917,7 @@ function CustodyCodReportTab({ setError }: { setError: (e: string | null) => voi
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load report.'));
   }, [setError]);
 
-  if (report === null) return <div className="empty-state">Loading…</div>;
+  if (report === null) return <div className="empty-state">{loadingLabel()}</div>;
   return (
     <div>
       <div className="action-row" style={{ marginBottom: 12 }}>

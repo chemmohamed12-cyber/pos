@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface WorkCenter {
   id: string;
@@ -143,7 +144,7 @@ export function WorkCenters() {
       {error && <div className="error-text">{error}</div>}
 
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('mfg.panel.no_work_centers')}</div>
       ) : (

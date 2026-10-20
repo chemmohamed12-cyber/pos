@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface ReturnRequest {
   salesOrderId: string;
@@ -56,7 +57,7 @@ export function ReturnPrint() {
   }, [id]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { ret, order, product, warehouse } = data;
 
   const doc: BusinessDocument = {

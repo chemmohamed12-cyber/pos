@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface ClosingException {
   id: string;
@@ -123,7 +124,7 @@ export function ClosingExceptions() {
       {error && <div className="error-text">{error}</div>}
 
       {exceptions === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : exceptions.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_exceptions')}</div>
       ) : (

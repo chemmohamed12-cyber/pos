@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { usePendingSources } from '../lib/pendingWork';
 import { fmtDate } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 /**
  * NAV-03 — "Pending work": everything waiting for a decision, across the Approval Engine AND the Process-Engine approvals that live inside their
@@ -34,7 +35,7 @@ export function PendingWork() {
         <p style={{ marginBottom: 0, fontSize: 13, opacity: 0.8 }}>{t('panel.pending_work_two_engines')}</p>
       </div>
       {sources === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : (
         <div className="card">
           {total === 0 && <div className="empty-state">{t('panel.pending_work_none')}</div>}

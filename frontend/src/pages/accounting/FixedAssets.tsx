@@ -4,6 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Link } from 'react-router-dom';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface GLAccount {
   id: string;
@@ -322,7 +323,7 @@ export function FixedAssets() {
       )}
 
       {assets === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : assets.length === 0 ? (
         <div className="empty-state">{t('panel.no_fixed_assets_yet')}</div>
       ) : (
@@ -369,7 +370,7 @@ export function FixedAssets() {
         <div className="card" style={{ marginBottom: 20 }}>
           <p style={{ marginTop: 0 }}>{t('panel.link_acquisition_steps')}</p>
           {candidates === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : candidates.length === 0 ? (
             <div className="empty-state">{t('panel.link_acquisition_none')}</div>
           ) : (
@@ -433,7 +434,7 @@ export function FixedAssets() {
           </button>
         </div>
         {runs === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : runs.length === 0 ? (
           <div className="empty-state">{t('panel.no_depreciation_runs_yet')}</div>
         ) : (

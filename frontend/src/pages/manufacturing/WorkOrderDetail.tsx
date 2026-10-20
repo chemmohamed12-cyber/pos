@@ -4,7 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
-import { nameOf, currentLang, STATUS_NAMES, EVENT_AND_ACTION_NAMES } from '../../lib/displayNames';
+import { EVENT_AND_ACTION_NAMES, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Warehouse {
@@ -256,7 +256,7 @@ export function WorkOrderDetail() {
   const warehouseName = (wid: string) => warehouses.find((w) => w.id === wid)?.name ?? wid.slice(0, 8);
 
   if (loadError) return <ErrorState error={loadError} onRetry={load} />;
-  if (!wo) return <div className="empty-state">Loading…</div>;
+  if (!wo) return <div className="empty-state">{loadingLabel()}</div>;
 
   const canIssue = wo.state === 'released' || wo.state === 'in_progress';
   const canReturn = wo.state === 'in_progress' || wo.state === 'on_hold';

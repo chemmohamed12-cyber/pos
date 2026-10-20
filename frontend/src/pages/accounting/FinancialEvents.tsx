@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAutoRefresh } from '../../lib/useAutoRefresh';
 import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
-import { nameOf, SOURCE_DOMAINS, FINANCIAL_EVENT_TYPES, sourceDomainOf } from '../../lib/displayNames';
+import { FINANCIAL_EVENT_TYPES, SOURCE_DOMAINS, loadingLabel, nameOf, sourceDomainOf } from '../../lib/displayNames';
 import { translateRejectionReason } from '../../lib/financialReason';
 
 interface FinancialEvent {
@@ -99,7 +99,7 @@ export function FinancialEvents() {
       {error && <div className="error-text">{error}</div>}
 
       {events === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : events.length === 0 ? (
         <div className="empty-state">{t('panel.no_financial_events_yet')}</div>
       ) : (

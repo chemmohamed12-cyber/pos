@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Task {
   fulfillmentOrderId: string;
@@ -58,7 +59,7 @@ export function PackListPrint() {
   }, [id]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { task, order, warehouse, fulfillmentOrder, products } = data;
   const productName = (pid: string) => {
     const p = products.find((x) => x.id === pid);
