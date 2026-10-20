@@ -74,8 +74,77 @@ function bump(d: Doc, over: Partial<Doc>) {
   return view(d);
 }
 
+
+// ---------------------------------------------------------------- T5 mock state (statuses only; the real rules are proven by the real-PostgreSQL specs)
+type Line = { id: string; lineNumber: number; valueDate: string; description: string | null; reference: string | null; amount: string; status: string; possibleDuplicate: boolean; suggestion: unknown; matches: unknown[] };
+type Stmt = { id: string; systemNumber: string; statementNumber: string | null; treasuryAccountId: string; periodStart: string; periodEnd: string; openingBalance: string; closingBalance: string; status: string; lineCount: number; lines: Line[] };
+const ln = (n: number, amount: string, reference: string, description: string, status = 'unmatched', suggestion: unknown = null): Line => ({ id: `l-${n}`, lineNumber: n, valueDate: today, description, reference, amount, status, possibleDuplicate: false, suggestion, matches: status === 'matched' ? [{ id: `m-${n}`, treasuryTransactionId: `t-${n}` }] : [] });
+const statements: Stmt[] = [
+  { id: 's-1', systemNumber: 'BST-2026-000001', statementNumber: 'OCT-1', treasuryAccountId: 'a-bank', periodStart: today, periodEnd: today, openingBalance: '0.00', closingBalance: '2155.00', status: 'imported', lineCount: 4,
+    lines: [ln(1, '2000.00', 'R-1', 'Incoming wire R-1', 'suggested', { outcome: 'suggested', candidates: [{ transactionId: 't-1', transactionNumber: 'TRS-IN-2026-000101', score: 100, reasons: ['amount', 'reference', 'same-day'] }] }),
+      ln(2, '300.00', 'DEP-1', 'Cash deposit DEP-1', 'matched'), ln(3, '-120.00', 'EXP-1', 'Payment EXP-1', 'suggested', { outcome: 'ambiguous', candidates: [{ transactionId: 't-3', transactionNumber: 'TRS-OUT-2026-000044', score: 55, reasons: ['amount', 'near-date'] }, { transactionId: 't-4', transactionNumber: 'TRS-OUT-2026-000045', score: 55, reasons: ['amount', 'near-date'] }] }),
+      ln(4, '-25.00', 'FEE-OCT', 'Monthly account fee')] },
+  { id: 's-2', systemNumber: 'BST-2026-000002', statementNumber: 'SEP', treasuryAccountId: 'a-bank', periodStart: '2026-09-01', periodEnd: '2026-09-30', openingBalance: '0.00', closingBalance: '500.00', status: 'reconciled', lineCount: 1, lines: [ln(1, '500.00', 'S-1', 'Wire', 'matched')] },
+];
+const sessions: Array<Record<string, unknown>> = [
+  { id: 'cs-1', sessionNumber: 'CS-2026-000001', treasuryAccountId: 'a-cash', status: 'open', openedAt: now(), openingBalance: '12500.00', closedAt: null, expectedBalance: null, countedAmount: null, variance: null, varianceReason: null, varianceDocumentId: null },
+  { id: 'cs-2', sessionNumber: 'CS-2026-000000', treasuryAccountId: 'a-new', status: 'closed', openedAt: now(), openingBalance: '300.00', closedAt: now(), expectedBalance: '300.00', countedAmount: '260.00', variance: '-40.00', varianceReason: 'till error', varianceDocumentId: 'd-3' },
+];
+function recon(st: Stmt) {
+  const bankOnly = st.lines.filter((l) => l.status !== 'matched').reduce((a, l) => a + Number(l.amount), 0);
+  const outstanding = st.id === 's-1' ? -25 : 0;
+  const book = 2155;
+  const adjBank = Number(st.closingBalance) + outstanding;
+  const adjBook = book + bankOnly;
+  return { statementId: st.id, systemNumber: st.systemNumber, status: st.status, closingBalance: st.closingBalance, bookBalanceAtPeriodEnd: book.toFixed(2), outstandingBookNet: outstanding.toFixed(2), bankOnlyNet: bankOnly.toFixed(2), adjustedBank: adjBank.toFixed(2), adjustedBook: adjBook.toFixed(2), difference: (adjBank - adjBook).toFixed(2), reconciled: st.status === 'reconciled', unmatchedLines: st.lines.filter((l) => l.status !== 'matched'), outstandingBookItems: st.id === 's-1' ? [{ transactionId: 't-9', transactionNumber: 'TRS-OUT-2026-000050', movementDate: today, signedAmount: '-25.00', reference: 'FEE-OCT', ageDays: 0 }] : [] };
+}
+function handleT5(method: string, p: string, body: Record<string, unknown>): unknown | undefined {
+  let m: RegExpMatchArray | null;
+  if (p === '/treasury/bank-statements' && method === 'GET') return statements.map((s) => ({ ...s, lines: undefined }));
+  if (p === '/treasury/bank-statements' && method === 'POST') {
+    const lines = (body.lines as Array<{ valueDate: string; amount: string; reference?: string; description?: string }>) ?? [];
+    const total = lines.reduce((a, l) => a + Number(l.amount), 0);
+    if (Math.abs(Number(body.openingBalance) + total - Number(body.closingBalance)) > 0.004) throw new ApiError(400, 'VALIDATION_ERROR', `The statement does not add up: opening ${body.openingBalance} + lines ${total.toFixed(2)}, but the closing balance is ${body.closingBalance}. Nothing was imported.`);
+    const st: Stmt = { id: `s-${statements.length + 1}`, systemNumber: `BST-2026-${String(statements.length + 1).padStart(6, '0')}`, statementNumber: (body.statementNumber as string) ?? null, treasuryAccountId: String(body.treasuryAccountId), periodStart: String(body.periodStart), periodEnd: String(body.periodEnd), openingBalance: String(body.openingBalance), closingBalance: String(body.closingBalance), status: 'imported', lineCount: lines.length, lines: lines.map((l, i) => ln(i + 1, l.amount, l.reference ?? '', l.description ?? '')) };
+    statements.unshift(st);
+    return { ...st, lines: undefined };
+  }
+  if ((m = p.match(/^\/treasury\/bank-statements\/(s-\d+)\/reconciliation$/))) return recon(statements.find((s) => s.id === m![1])!);
+  if ((m = p.match(/^\/treasury\/bank-statements\/(s-\d+)\/(suggest|reconcile|reopen)$/))) {
+    const st = statements.find((s) => s.id === m![1])!;
+    if (m[2] === 'suggest') return { suggested: 1, ambiguous: 1, unmatched: 1 };
+    if (m[2] === 'reopen') { st.status = 'imported'; return st; }
+    const open = st.lines.filter((l) => l.status !== 'matched').length;
+    if (open > 0) throw new ApiError(409, 'CONFLICT', `${open} bank line(s) are not matched. Record any bank fee / interest as a Treasury document, execute it, then match the line. Nothing was closed.`);
+    st.status = 'reconciled';
+    return st;
+  }
+  if ((m = p.match(/^\/treasury\/bank-statements\/(s-\d+)$/)) && method === 'GET') return JSON.parse(JSON.stringify(statements.find((s) => s.id === m![1])));
+  if ((m = p.match(/^\/treasury\/bank-statements\/lines\/(l-\d+)\/(confirm|unmatch)$/))) {
+    for (const st of statements) { const l = st.lines.find((x) => x.id === m![1]); if (l) { l.status = m[2] === 'confirm' ? 'matched' : 'unmatched'; l.suggestion = null; return l; } }
+  }
+  if (p === '/treasury/cash-sessions' && method === 'GET') return sessions;
+  if (p === '/treasury/cash-sessions' && method === 'POST') {
+    const s = { id: `cs-${sessions.length + 1}`, sessionNumber: `CS-2026-0000${sessions.length + 2}`, treasuryAccountId: String(body.treasuryAccountId), status: 'open', openedAt: now(), openingBalance: '1000.00', closedAt: null, expectedBalance: null, countedAmount: null, variance: null, varianceReason: null, varianceDocumentId: null };
+    sessions.unshift(s);
+    return s;
+  }
+  if ((m = p.match(/^\/treasury\/cash-sessions\/([^/]+)\/(close|reopen)$/))) {
+    const s = sessions.find((x) => x.id === m![1])!;
+    if (m[2] === 'close') {
+      const variance = Number(body.countedAmount) - 12500;
+      if (variance !== 0 && !body.varianceReason) throw new ApiError(400, 'VALIDATION_ERROR', `The count differs from the book balance by ${variance.toFixed(2)} — a reason for the variance is required. Nothing was closed.`);
+      Object.assign(s, { status: 'closed', closedAt: now(), expectedBalance: '12500.00', countedAmount: String(body.countedAmount), variance: variance.toFixed(2), varianceReason: (body.varianceReason as string) ?? null, varianceDocumentId: variance !== 0 ? 'd-3' : null });
+    } else Object.assign(s, { status: 'open', closedAt: null, expectedBalance: null, countedAmount: null, variance: null, varianceDocumentId: null });
+    return s;
+  }
+  return undefined;
+}
+
 async function handle(method: string, path: string, body: Record<string, unknown> = {}): Promise<unknown> {
   const [p, qs] = path.split('?');
+  const t5 = handleT5(method, p, body);
+  if (t5 !== undefined) return t5;
   const q = new URLSearchParams(qs ?? '');
   let m: RegExpMatchArray | null;
   if (p === '/treasury/accounts') return accounts;

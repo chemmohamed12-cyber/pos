@@ -6,6 +6,9 @@ import { TreasuryService } from '../application/treasury.service';
 import { TreasuryDocumentService } from '../application/treasury-document.service';
 import { TreasuryController } from './treasury.controller';
 import { TreasuryDocumentsController } from './treasury-documents.controller';
+import { BankStatementsController, CashSessionsController } from './bank-statements.controller';
+import { BankStatementService } from '../application/bank-statement.service';
+import { CashSessionService } from '../application/cash-session.service';
 import { PaymentsController } from '../../customer-finance/interface/payments.controller';
 import { PaymentsService } from '../../customer-finance/application/payments.service';
 import { CustomersService } from '../../crm/application/customers.service';
@@ -65,7 +68,7 @@ describe('Treasury Documents — HTTP, real guards, real PostgreSQL, A/B', () =>
   let http: ReturnType<INestApplication['getHttpServer']>;
   const cfg: Record<string, unknown> = {};
   const year = new Date().toISOString().slice(0, 4);
-  const u = { viewerNone: '', prep: '', approver: '', makerApprover: '', exec: '', canceller: '', reverser: '', payRev: '', payCreate: '' };
+  const u = { stmtImporter: '', stmtMatcher: '', sessOpener: '', sessCloser: '', viewerNone: '', prep: '', approver: '', makerApprover: '', exec: '', canceller: '', reverser: '', payRev: '', payCreate: '' };
   let acc = { cash: '', bank: '', customerId: '' };
   let dsA: DataSource;
 
@@ -144,6 +147,10 @@ describe('Treasury Documents — HTTP, real guards, real PostgreSQL, A/B', () =>
     u.exec = await mkUser('exec', [['finance.cash_document.view', 'read-only'], ['finance.cash_document.execute', 'editable']]);
     u.canceller = await mkUser('canceller', [['finance.cash_document.view', 'read-only'], ['finance.cash_document.cancel', 'editable']]);
     u.reverser = await mkUser('reverser', [['finance.cash_document.view', 'read-only'], ['finance.cash_document.reverse', 'editable']]);
+    u.stmtImporter = await mkUser('stmt-importer', [['finance.bank_statement.view', 'read-only'], ['finance.bank_statement.import', 'editable']]);
+    u.stmtMatcher = await mkUser('stmt-matcher', [['finance.bank_statement.view', 'read-only'], ['finance.bank_statement.match', 'editable']]);
+    u.sessOpener = await mkUser('sess-opener', [['finance.cash_session.view', 'read-only'], ['finance.cash_session.open', 'editable']]);
+    u.sessCloser = await mkUser('sess-closer', [['finance.cash_session.view', 'read-only'], ['finance.cash_session.close', 'editable']]);
     u.payRev = await mkUser('payrev', [['finance.payment.reverse', 'editable']]);
     u.payCreate = await mkUser('paycreate', [['finance.payment.create', 'editable'], ['finance.cash.post', 'editable']]);
     // the customer-scope lookup of the payment routes passes through the admin role (their negative permission cases use users that are NOT admin)
@@ -154,10 +161,12 @@ describe('Treasury Documents — HTTP, real guards, real PostgreSQL, A/B', () =>
     const contexts = new AuthorizationContextService(h.controlPlane);
     const permission = new PermissionService(h.controlPlane.getRepository(RolePermission), authorization);
     const moduleRef = await Test.createTestingModule({
-      controllers: [TreasuryController, TreasuryDocumentsController, PaymentsController],
+      controllers: [TreasuryController, TreasuryDocumentsController, PaymentsController, BankStatementsController, CashSessionsController],
       providers: [
         { provide: TreasuryService, useValue: treasury },
         { provide: TreasuryDocumentService, useValue: docs },
+        { provide: BankStatementService, useValue: new BankStatementService(h.controlPlane, treasury, numbering, audit) },
+        { provide: CashSessionService, useValue: new CashSessionService(h.controlPlane, treasury, docs, numbering, audit) },
         { provide: PaymentsService, useValue: payments },
         { provide: FINANCE_COLLECTION_CONTRACT, useValue: payments },
         { provide: SALES_CUSTOMERS_CONTRACT, useValue: customers },
@@ -327,5 +336,43 @@ describe('Treasury Documents — HTTP, real guards, real PostgreSQL, A/B', () =>
     const listB = await call('get', '/treasury/documents', u.prep, undefined, { 'x-test-company': 'B' });
     expect([200, 404]).toContain(listB.status);
     if (listB.status === 200) expect(listB.body.data).toEqual([]);
+  });
+  it('H9 bank statements over HTTP: import needs its own node, the body is validated (unknown field / bad amount 400), a duplicate file is 409, matching and reconciling need THEIR nodes', async () => {
+    const body = { treasuryAccountId: acc.bank, statementNumber: 'HTTP-1', periodStart: '2026-01-01', periodEnd: '2026-01-31', openingBalance: '0.00', closingBalance: '100.00', lines: [{ valueDate: '2026-01-15', reference: 'X-1', description: 'deposit', amount: '100.00' }] };
+    expect((await call('post', '/treasury/bank-statements', u.viewerNone, body)).status).toBe(404);
+    expect((await call('post', '/treasury/bank-statements', u.stmtMatcher, body)).status).toBe(404); // may match, may not import
+    expect((await call('post', '/treasury/bank-statements', u.stmtImporter, { ...body, internalNote: 'x' })).status).toBe(400);
+    expect((await call('post', '/treasury/bank-statements', u.stmtImporter, { ...body, lines: [{ ...body.lines[0], amount: 'abc' }] })).status).toBe(400);
+    const sumWrong = await call('post', '/treasury/bank-statements', u.stmtImporter, { ...body, closingBalance: '99.00' });
+    expect(sumWrong.status).toBe(400);
+    expect(sumWrong.body.error.message).toMatch(/does not add up/);
+    const ok = await call('post', '/treasury/bank-statements', u.stmtImporter, body, { 'idempotency-key': 'http-stmt-1' });
+    expect(ok.status).toBe(201);
+    const again = await call('post', '/treasury/bank-statements', u.stmtImporter, body);
+    expect(again.status).toBe(409);
+    const id = ok.body.data.id;
+    expect((await call('post', `/treasury/bank-statements/${id}/suggest`, u.stmtImporter, {})).status).toBe(404); // importer cannot match
+    expect((await call('post', `/treasury/bank-statements/${id}/suggest`, u.stmtMatcher, {})).status).toBe(201);
+    expect((await call('post', `/treasury/bank-statements/${id}/reconcile`, u.stmtMatcher, {})).status).toBe(404); // matcher cannot reconcile
+    const view = await call('get', `/treasury/bank-statements/${id}/reconciliation`, u.stmtMatcher);
+    expect(view.status).toBe(200);
+    expect(view.body.data.unmatchedLines).toHaveLength(1);
+  });
+
+  it('H10 cash sessions over HTTP: open and close are separate permissions; a count with a variance needs a reason (400); the response is the envelope', async () => {
+    expect((await call('post', '/treasury/cash-sessions', u.sessCloser, { treasuryAccountId: acc.cash })).status).toBe(404);
+    const opened = await call('post', '/treasury/cash-sessions', u.sessOpener, { treasuryAccountId: acc.cash });
+    expect(opened.status).toBe(201);
+    expect(opened.body.data.status).toBe('open');
+    const id = opened.body.data.id;
+    expect((await call('post', `/treasury/cash-sessions/${id}/close`, u.sessOpener, { countedAmount: '1.00' })).status).toBe(404);
+    const variance = await call('post', `/treasury/cash-sessions/${id}/close`, u.sessCloser, { countedAmount: '999.00' });
+    expect(variance.status).toBe(400);
+    expect(variance.body.error.message).toMatch(/reason for the variance is required/);
+    const bal = (await dsA.query(`SELECT COALESCE(SUM(CASE WHEN type IN ('cash_in','transfer_in') THEN amount ELSE -amount END),0)::numeric(20,2)::text AS b FROM treasury_transactions WHERE "treasuryAccountId" = $1`, [acc.cash]))[0].b;
+    const closed = await call('post', `/treasury/cash-sessions/${id}/close`, u.sessCloser, { countedAmount: bal });
+    expect(closed.status).toBe(201);
+    expect(closed.body.data).toMatchObject({ status: 'closed', variance: '0.00' });
+    expect((await call('get', '/treasury/cash-sessions', u.viewerNone)).status).toBe(404);
   });
 });

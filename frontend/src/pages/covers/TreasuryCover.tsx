@@ -49,6 +49,8 @@ export function TreasuryCover() {
       shortcuts={[
         { to: '/treasury/workspace', labelCode: 'nav.treasury_workspace' },
         { to: '/treasury/documents', labelCode: 'nav.treasury_documents' },
+        { to: '/treasury/bank-statements', labelCode: 'nav.treasury_bank_statements' },
+        { to: '/treasury/cash-sessions', labelCode: 'nav.treasury_cash_sessions' },
         { to: '/treasury/accounts', labelCode: 'nav.treasury_accounts' },
         { to: '/treasury/ledger', labelCode: 'nav.treasury_ledger' },
       ]}

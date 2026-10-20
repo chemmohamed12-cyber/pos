@@ -91,6 +91,15 @@ export function TreasuryDocumentDetail() {
             {doc.executedAt && row(tr('نُفّذ', 'Executed'), fmtDateTime(doc.executedAt))}
             {doc.reversedAt && row(tr('عُكس', 'Reversed'), `${fmtDateTime(doc.reversedAt)} — ${doc.reversalReason ?? ''}`)}
             {doc.cancelReason && row(tr('سبب الإلغاء', 'Cancel reason'), doc.cancelReason)}
+            {doc.settlement && doc.settlement.state !== 'not_executed' &&
+              row(
+                tr('التسوية البنكية', 'Bank settlement'),
+                doc.settlement.state === 'matched' ? (
+                  <span className="status-badge positive">{tr(`مطابق مع كشف ${doc.settlement.statementNumber} — سطر ${doc.settlement.lineNumber}`, `Matched to statement ${doc.settlement.statementNumber}, line ${doc.settlement.lineNumber}`)}</span>
+                ) : (
+                  <span className="status-badge warning">{tr('منفّذ ومرحَّل، لكن لم يُطابَق بعد مع كشف بنكي', 'Executed and posted, but not yet matched to a bank statement')}</span>
+                ),
+              )}
             {doc.executedTransactionId && row(tr('حركة الخزينة', 'Treasury movement'), <Link to={`/treasury/ledger?accountId=${doc.treasuryAccountId}`}>{tr('عرض في سجل الخزينة', 'Open in the treasury ledger')}</Link>)}
           </tbody>
         </table>

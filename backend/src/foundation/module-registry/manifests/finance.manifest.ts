@@ -74,6 +74,20 @@ export const financeManifest: ModuleManifest = {
     { node: 'finance.cash_document.cancel', title_code: 'perm.finance.cash_document.cancel', parent: 'finance.cash_document' },
     { node: 'finance.cash_document.reverse', title_code: 'perm.finance.cash_document.reverse', parent: 'finance.cash_document' },
 
+    // T5 - bank statements (import / match / unmatch / reconcile / reopen) and cash custody sessions (open / close / reopen); all inherit from `finance`.
+    { node: 'finance.bank_statement', title_code: 'perm.finance.bank_statement', parent: 'finance' },
+    { node: 'finance.bank_statement.view', title_code: 'perm.finance.bank_statement.view', parent: 'finance.bank_statement' },
+    { node: 'finance.bank_statement.import', title_code: 'perm.finance.bank_statement.import', parent: 'finance.bank_statement' },
+    { node: 'finance.bank_statement.match', title_code: 'perm.finance.bank_statement.match', parent: 'finance.bank_statement' },
+    { node: 'finance.bank_statement.unmatch', title_code: 'perm.finance.bank_statement.unmatch', parent: 'finance.bank_statement' },
+    { node: 'finance.bank_statement.reconcile', title_code: 'perm.finance.bank_statement.reconcile', parent: 'finance.bank_statement' },
+    { node: 'finance.bank_statement.reopen', title_code: 'perm.finance.bank_statement.reopen', parent: 'finance.bank_statement' },
+    { node: 'finance.cash_session', title_code: 'perm.finance.cash_session', parent: 'finance' },
+    { node: 'finance.cash_session.view', title_code: 'perm.finance.cash_session.view', parent: 'finance.cash_session' },
+    { node: 'finance.cash_session.open', title_code: 'perm.finance.cash_session.open', parent: 'finance.cash_session' },
+    { node: 'finance.cash_session.close', title_code: 'perm.finance.cash_session.close', parent: 'finance.cash_session' },
+    { node: 'finance.cash_session.reopen', title_code: 'perm.finance.cash_session.reopen', parent: 'finance.cash_session' },
+
     { node: 'finance.invoice', title_code: 'perm.finance.invoice', parent: 'finance' },
     { node: 'finance.invoice.view', title_code: 'perm.finance.invoice.view', parent: 'finance.invoice' },
     { node: 'finance.invoice.create', title_code: 'perm.finance.invoice.create', parent: 'finance.invoice' },

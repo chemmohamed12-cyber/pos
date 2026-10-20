@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { TreasuryController } from './treasury.controller';
 import { TreasuryDocumentsController } from './treasury-documents.controller';
+import { BankStatementsController, CashSessionsController } from './bank-statements.controller';
 import { PaymentsController } from '../../customer-finance/interface/payments.controller';
 import { PERMISSION_METADATA_KEY, RequiredPermission } from '../../../foundation/permission/require-permission.decorator';
 import { MODULE_REGISTRY } from '../../../foundation/module-registry/module-registry';
@@ -63,6 +64,27 @@ describe('Treasury / payment authorization separation', () => {
     ['reverse', 'finance.cash_document.reverse', 'editable'],
   ])('Treasury Documents route %s requires %s (%s) — prepare, submit, approve, execute, cancel and reverse are separate permissions', (method, node, access) => {
     const r = required(TreasuryDocumentsController.prototype, method);
+    expect(r?.nodeKey).toBe(node);
+    expect(r?.access).toBe(access);
+    expect(MODULE_REGISTRY.nodesForModule('finance')).toContain(node);
+  });
+
+  it.each([
+    ['list', 'finance.bank_statement.view', 'read-only'], ['get', 'finance.bank_statement.view', 'read-only'], ['reconciliation', 'finance.bank_statement.view', 'read-only'],
+    ['import', 'finance.bank_statement.import', 'editable'], ['suggest', 'finance.bank_statement.match', 'editable'], ['confirm', 'finance.bank_statement.match', 'editable'],
+    ['unmatch', 'finance.bank_statement.unmatch', 'editable'], ['reconcile', 'finance.bank_statement.reconcile', 'editable'], ['reopen', 'finance.bank_statement.reopen', 'editable'],
+  ])('Bank statements route %s requires %s (%s) - import, match, unmatch, reconcile and reopen are separate permissions', (method, node, access) => {
+    const r = required(BankStatementsController.prototype, method);
+    expect(r?.nodeKey).toBe(node);
+    expect(r?.access).toBe(access);
+    expect(MODULE_REGISTRY.nodesForModule('finance')).toContain(node);
+  });
+
+  it.each([
+    ['list', 'finance.cash_session.view', 'read-only'], ['get', 'finance.cash_session.view', 'read-only'], ['open', 'finance.cash_session.open', 'editable'],
+    ['close', 'finance.cash_session.close', 'editable'], ['reopen', 'finance.cash_session.reopen', 'editable'],
+  ])('Cash sessions route %s requires %s (%s)', (method, node, access) => {
+    const r = required(CashSessionsController.prototype, method);
     expect(r?.nodeKey).toBe(node);
     expect(r?.access).toBe(access);
     expect(MODULE_REGISTRY.nodesForModule('finance')).toContain(node);

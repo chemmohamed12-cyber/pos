@@ -51,6 +51,11 @@ export interface TreasuryDocumentInput {
 export interface TreasuryDocumentView extends TreasuryDocument {
   /** each allocation carries the human invoice number (UI review finding: a raw id is not something a user can act on). */
   allocations: Array<TreasuryDocumentAllocation & { invoiceNumber: string | null }>;
+  /**
+   * BANK SETTLEMENT is a separate fact from execution and posting: `not_executed` (no movement yet), `unsettled` (executed and posted, but no confirmed bank-statement match),
+   * `matched` (a person confirmed a statement line for the movement). Execution never implies the bank cleared it.
+   */
+  settlement: { state: 'not_executed' | 'unsettled' | 'matched'; statementNumber?: string; lineNumber?: number };
 }
 
 export interface EffectLine {
@@ -116,7 +121,18 @@ export class TreasuryDocumentService implements OnModuleInit {
       for (const f of found) numbers.set(f.id, f.invoiceNumber);
     }
     const allocations = rows.map((r) => Object.assign(r, { invoiceNumber: numbers.get(r.invoiceId) ?? null }));
-    return Object.assign(doc, { allocations }) as TreasuryDocumentView;
+    let settlement: TreasuryDocumentView['settlement'] = { state: doc.executedTransactionId ? 'unsettled' : 'not_executed' };
+    if (doc.executedTransactionId) {
+      const present: Array<{ ok: boolean }> = await em.query(`SELECT to_regclass('bank_statement_matches') IS NOT NULL AS ok`);
+      if (present[0]?.ok) {
+        const hit: Array<{ systemNumber: string; lineNumber: number }> = await em.query(
+          `SELECT s."systemNumber", l."lineNumber" FROM bank_statement_matches m JOIN bank_statement_lines l ON l.id = m."lineId" JOIN bank_statements s ON s.id = l."statementId" WHERE m."unmatchedAt" IS NULL AND m."treasuryTransactionId" = $1 LIMIT 1`,
+          [doc.executedTransactionId],
+        );
+        if (hit.length > 0) settlement = { state: 'matched', statementNumber: hit[0].systemNumber, lineNumber: hit[0].lineNumber };
+      }
+    }
+    return Object.assign(doc, { allocations, settlement }) as TreasuryDocumentView;
   }
 
   async list(filter: { status?: string; kind?: string } = {}, manager?: EntityManager): Promise<TreasuryDocument[]> {

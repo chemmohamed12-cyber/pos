@@ -43,6 +43,7 @@ export interface TreasuryDocumentRow {
   version: number;
   createdAt: string;
   allocations?: Array<{ id: string; invoiceId: string; invoiceNumber?: string | null; amount: string }>;
+  settlement?: { state: 'not_executed' | 'unsettled' | 'matched'; statementNumber?: string; lineNumber?: number };
 }
 
 const KIND_LABEL: Record<DocKind, [string, string]> = {

@@ -34,6 +34,9 @@ import { TreasuryWorkspace } from './pages/treasury/TreasuryWorkspace';
 import { TreasuryDocuments } from './pages/treasury/TreasuryDocuments';
 import { TreasuryDocumentForm } from './pages/treasury/TreasuryDocumentForm';
 import { TreasuryDocumentDetail } from './pages/treasury/TreasuryDocumentDetail';
+import { BankStatements } from './pages/treasury/BankStatements';
+import { BankStatementDetail } from './pages/treasury/BankStatementDetail';
+import { CashSessions } from './pages/treasury/CashSessions';
 import { HrEmployees } from './pages/hr/HrEmployees';
 import { HrDepartments } from './pages/hr/HrDepartments';
 import { HrLeaveRequests } from './pages/hr/HrLeaveRequests';
@@ -261,6 +264,9 @@ function AppRoutes() {
         <Route path="treasury/documents/new" element={<TreasuryDocumentForm />} />
         <Route path="treasury/documents/:id/edit" element={<TreasuryDocumentForm />} />
         <Route path="treasury/documents/:id" element={<TreasuryDocumentDetail />} />
+        <Route path="treasury/bank-statements" element={<BankStatements />} />
+        <Route path="treasury/bank-statements/:id" element={<BankStatementDetail />} />
+        <Route path="treasury/cash-sessions" element={<CashSessions />} />
         <Route path="hr" element={<HrCover />} />
         <Route path="hr/employees" element={<HrEmployees />} />
         <Route path="hr/departments" element={<HrDepartments />} />

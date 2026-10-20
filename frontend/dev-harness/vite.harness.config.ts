@@ -16,6 +16,7 @@ const swap: Plugin = {
   enforce: 'pre',
   resolveId(source, importer) {
     if (!importer || importer.includes('dev-harness')) return null;
+    if (source === './api' && /[\/]src[\/]lib[\/]/.test(importer)) return stubs['lib/api']; // src/lib/errors.ts imports its own ApiError from './api'
     for (const [suffix, file] of Object.entries(stubs)) if (/^\.{1,2}\//.test(source) && source.replace(/\.(ts|tsx)$/, '').endsWith(suffix)) return file;
     return null;
   },

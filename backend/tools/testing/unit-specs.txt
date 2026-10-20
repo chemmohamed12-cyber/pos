@@ -65,3 +65,4 @@ src/domains/inventory-warehouse/application/inventory-reference-numbers.spec.ts
 src/domains/commerce/application/product-image.service.spec.ts
 src/domains/treasury/interface/treasury-permissions.spec.ts
 src/domains/treasury/interface/treasury-generic-cash.spec.ts
+src/domains/treasury/domain/bank-statement.spec.ts

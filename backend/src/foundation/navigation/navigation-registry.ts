@@ -154,6 +154,8 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // the former `roles: ['admin','finance']` via the legacy-role backfill.
       { to: '/treasury/workspace', code: 'nav.treasury_workspace', module: 'finance', permissionNode: 'finance' },
       { to: '/treasury/documents', code: 'nav.treasury_documents', module: 'finance', permissionNode: 'finance.cash_document.view' },
+      { to: '/treasury/bank-statements', code: 'nav.treasury_bank_statements', module: 'finance', permissionNode: 'finance.bank_statement.view' },
+      { to: '/treasury/cash-sessions', code: 'nav.treasury_cash_sessions', module: 'finance', permissionNode: 'finance.cash_session.view' },
       { to: '/treasury/accounts', code: 'nav.treasury_accounts', module: 'finance', permissionNode: 'finance' },
       { to: '/treasury/ledger', code: 'nav.treasury_ledger', module: 'finance', permissionNode: 'finance' },
     ],

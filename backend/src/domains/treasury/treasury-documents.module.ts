@@ -4,6 +4,10 @@ import { TreasuryDocument } from './infrastructure/treasury-document.entity';
 import { TreasuryDocumentAllocation } from './infrastructure/treasury-document-allocation.entity';
 import { TreasuryDocumentService } from './application/treasury-document.service';
 import { TreasuryDocumentsController } from './interface/treasury-documents.controller';
+import { BankStatementService } from './application/bank-statement.service';
+import { CashSessionService } from './application/cash-session.service';
+import { BankStatementsController, CashSessionsController } from './interface/bank-statements.controller';
+import { BankStatement, BankStatementLine, BankStatementMatch, CashSession } from './infrastructure/bank-statement.entities';
 import { TreasuryModule } from './treasury.module';
 import { CustomerFinanceModule } from '../customer-finance/customer-finance.module';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
@@ -24,7 +28,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TreasuryDocument, TreasuryDocumentAllocation]),
+    TypeOrmModule.forFeature([TreasuryDocument, TreasuryDocumentAllocation, BankStatement, BankStatementLine, BankStatementMatch, CashSession]),
     TreasuryModule,
     CustomerFinanceModule,
     ApprovalEngineModule,
@@ -39,8 +43,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [TreasuryDocumentsController],
-  providers: [TreasuryDocumentService],
-  exports: [TreasuryDocumentService],
+  controllers: [TreasuryDocumentsController, BankStatementsController, CashSessionsController],
+  providers: [TreasuryDocumentService, BankStatementService, CashSessionService],
+  exports: [TreasuryDocumentService, BankStatementService, CashSessionService],
 })
 export class TreasuryDocumentsModule {}

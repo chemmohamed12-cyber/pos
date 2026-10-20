@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/** T3 (2026-10-20) - labels for the two Treasury posting-profile policy entries and the two new Treasury navigation items (same idempotent seed shape as every other terminology migration). */
+/** T3 (2026-10-20) - labels for the two Treasury posting-profile policy entries and the four new Treasury navigation items (same idempotent seed shape as every other terminology migration). */
 export class SeedTreasuryDocumentTerminology1790030200000 implements MigrationInterface {
   name = 'SeedTreasuryDocumentTerminology1790030200000';
 
@@ -11,6 +11,8 @@ export class SeedTreasuryDocumentTerminology1790030200000 implements MigrationIn
     ['policy.treasury_disbursement_reason_accounts.help', 'panel', 'لكل سبب صرف حساب مقابل معتمد؛ لا يمكن تحضير مستند صرف بسبب غير مربوط.', 'One approved counter account per disbursement reason; a disbursement document with an unmapped reason cannot be prepared.'],
     ['nav.treasury_workspace', 'nav', 'مساحة عمل الخزينة', 'Treasury workspace'],
     ['nav.treasury_documents', 'nav', 'مستندات الخزينة', 'Treasury documents'],
+    ['nav.treasury_bank_statements', 'nav', 'كشوف الحسابات البنكية', 'Bank statements'],
+    ['nav.treasury_cash_sessions', 'nav', 'جلسات الخزينة النقدية', 'Cash sessions'],
   ];
 
   public async up(queryRunner: QueryRunner): Promise<void> {
