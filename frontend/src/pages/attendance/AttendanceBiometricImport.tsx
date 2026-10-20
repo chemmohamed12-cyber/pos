@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, api, downloadBlob, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface BiometricImportRow {
   acNo: string;
@@ -262,7 +264,7 @@ export function AttendanceBiometricImport() {
 
       <h3>{t('field.ac_no')}</h3>
       {unmapped === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : unmapped.length === 0 ? (
         <div className="empty-state">{t('panel.no_biometric_unmapped_yet')}</div>
       ) : (
@@ -288,7 +290,7 @@ export function AttendanceBiometricImport() {
 
       <h3>{t('field.import_date')}</h3>
       {history === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : history.length === 0 ? (
         <div className="empty-state">{t('panel.no_biometric_history_yet')}</div>
       ) : (
@@ -306,7 +308,7 @@ export function AttendanceBiometricImport() {
             {history.map((b) => (
               <tr key={b.id}>
                 <td>{b.fileName}</td>
-                <td>{new Date(b.importedAt).toLocaleString()}</td>
+                <td>{fmtDateTime(b.importedAt)}</td>
                 <td>{b.totalRows}</td>
                 <td>{b.succeededCount}</td>
                 <td>{b.rejectedCount}</td>

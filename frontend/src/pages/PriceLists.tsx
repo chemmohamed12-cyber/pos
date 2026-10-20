@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
+import { loadingLabel } from '../lib/displayNames';
 
 interface PriceList {
   id: string;
@@ -246,7 +247,7 @@ export function PriceLists() {
       {error && <div className="error-text">{error}</div>}
 
       {priceLists === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : priceLists.length === 0 ? (
         <div className="empty-state">{t('panel.no_price_lists_yet')}</div>
       ) : (
@@ -328,7 +329,7 @@ export function PriceLists() {
                         )}
 
                         {items === null ? (
-                          <div className="empty-state">Loading…</div>
+                          <div className="empty-state">{loadingLabel()}</div>
                         ) : items.length === 0 ? (
                           <div className="empty-state">{t('panel.no_price_list_items_yet')}</div>
                         ) : (

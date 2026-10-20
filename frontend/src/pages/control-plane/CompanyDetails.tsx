@@ -7,6 +7,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { CompanyMembers } from './CompanyMembers';
 import { CompanyPackage } from './CompanyPackage';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface CompanyView {
   id: string;
@@ -93,7 +95,7 @@ export function CompanyDetails() {
   }
 
   if (error) return <ErrorState error={error} onRetry={load} />;
-  if (!company) return <div className="empty-state">Loading…</div>;
+  if (!company) return <div className="empty-state">{loadingLabel()}</div>;
 
   const terminal = company.status === 'PROVISIONING' || company.status === 'DECOMMISSIONED';
 
@@ -118,7 +120,7 @@ export function CompanyDetails() {
         </div>
         <div>
           <label>{t('field.created_at')}</label>
-          <div>{new Date(company.createdAt).toLocaleString()}</div>
+          <div>{fmtDateTime(company.createdAt)}</div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>

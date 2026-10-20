@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { loadingLabel } from '../../lib/displayNames';
 
 const AR_ADJUSTMENT_KINDS = ['write_off', 'credit_note', 'debit_note', 'adjustment', 'opening_balance'] as const;
 const AR_REQUEST_TYPE_CODES = AR_ADJUSTMENT_KINDS.map((k) => `accounting.ar.${k}`);
@@ -170,7 +171,7 @@ export function ArReconciliation() {
       <ApprovalsPanel requestTypeCodes={AR_REQUEST_TYPE_CODES} decidePath={(id) => `/accounting/ar/approvals/${id}/decide`} onDecided={loadRuns} />
 
       {runs === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : runs.length === 0 ? (
         <div className="empty-state">{t('panel.no_reconciliations_yet')}</div>
       ) : (

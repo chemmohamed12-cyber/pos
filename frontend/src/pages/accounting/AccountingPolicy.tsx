@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { loadingLabel } from '../../lib/displayNames';
 
 /** NAV-02 — the mandatory Accounting Policy accounts (the Configuration Engine keys posting reads), shown grouped, validated against THIS Company's chart. */
 interface AccountRef {
@@ -153,7 +154,7 @@ export function AccountingPolicy() {
       </div>
       {error && <div className="error-text">{error}</div>}
       {items === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : (
         GROUPS.map((g) => (
           <div key={g} className="card" style={{ marginBottom: 20 }}>

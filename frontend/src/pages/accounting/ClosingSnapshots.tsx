@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface ClosingSnapshotRun {
   id: string;
@@ -103,7 +105,7 @@ export function ClosingSnapshots() {
       {error && <div className="error-text">{error}</div>}
 
       {snapshots === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : snapshots.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_snapshots_yet')}</div>
       ) : (
@@ -129,7 +131,7 @@ export function ClosingSnapshots() {
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{s.contentHash ? s.contentHash.slice(0, 20) + '…' : '—'}</td>
                 <td>{s.signingKeyId ?? '—'}</td>
-                <td>{s.generatedAt ? new Date(s.generatedAt).toLocaleString() : '—'}</td>
+                <td>{s.generatedAt ? fmtDateTime(s.generatedAt) : '—'}</td>
                 <td>
                   {s.status === 'complete' && (
                     <button className="btn btn-secondary" disabled={busyId === s.id} onClick={() => verify(s.id)}>

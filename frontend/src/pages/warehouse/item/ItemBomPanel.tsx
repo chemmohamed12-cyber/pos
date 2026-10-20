@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { ProductCombobox, type ProductOption } from '../../../components/ProductCombobox';
+import { loadingLabel } from '../../../lib/displayNames';
 
 interface BomComponentView {
   componentProductId: string;
@@ -88,7 +89,7 @@ export function ItemBomPanel({ productId, originWarehouseId, onChanged }: { prod
 
   const itemLink = (id: string) => `/inventory/items/${id}${originWarehouseId ? `?warehouseId=${originWarehouseId}` : ''}`;
 
-  if (bom === undefined) return <div className="empty-state">Loading…</div>;
+  if (bom === undefined) return <div className="empty-state">{loadingLabel()}</div>;
 
   if (editing) {
     return (

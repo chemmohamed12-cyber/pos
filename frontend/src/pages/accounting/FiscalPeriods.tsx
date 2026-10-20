@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { loadingLabel } from '../../lib/displayNames';
 
 const FISCAL_CLOSING_REQUEST_TYPE_CODES = [
   'accounting.fiscal_period.close',
@@ -240,7 +241,7 @@ export function FiscalPeriods() {
         </form>
 
         {fiscalYears === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : fiscalYears.length === 0 ? (
           <div className="empty-state">{t('panel.no_fiscal_years_yet')}</div>
         ) : (

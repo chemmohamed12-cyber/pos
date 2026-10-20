@@ -144,6 +144,7 @@ import { Plans } from './pages/control-plane/Plans';
 import { SupportAccess } from './pages/control-plane/SupportAccess';
 import { PlatformRoles } from './pages/control-plane/PlatformRoles';
 import './styles/ui.css';
+import { loadingLabel } from './lib/displayNames';
 
 function WarehouseTransactionFormRoute() {
   const { type } = useParams<{ type: 'receipt' | 'issue' | 'transfer' | 'adjustment' }>();
@@ -152,14 +153,14 @@ function WarehouseTransactionFormRoute() {
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="empty-state">Loading…</div>;
+  if (loading) return <div className="empty-state">{loadingLabel()}</div>;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="empty-state">Loading…</div>;
+  if (loading) return <div className="empty-state">{loadingLabel()}</div>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

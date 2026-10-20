@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -232,7 +233,7 @@ export function CommissionPolicies() {
             )}
             {scope === 'customer_group' && (
               <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
-                <label>Customer Group ID</label>
+                <label>{currentLang() === 'ar' ? 'معرّف مجموعة العملاء' : 'Customer Group ID'}</label>
                 <input value={scopeRefId} onChange={(e) => setScopeRefId(e.target.value)} required />
               </div>
             )}
@@ -303,7 +304,7 @@ export function CommissionPolicies() {
       </div>
 
       {policies === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : policies.length === 0 ? (
         <div className="empty-state">{t('panel.no_policies_yet')}</div>
       ) : (
@@ -311,7 +312,7 @@ export function CommissionPolicies() {
           <thead>
             <tr>
               <th>{t('field.scope')}</th>
-              <th>Scope Ref</th>
+              <th>{currentLang() === 'ar' ? 'مرجع النطاق' : 'Scope Ref'}</th>
               <th>{t('field.basis')}</th>
               <th>{t('field.rate_model')}</th>
               <th>{t('field.flat_rate')}</th>
@@ -330,7 +331,7 @@ export function CommissionPolicies() {
                   <td>{t(`value.commission_basis.${p.basis}`)}</td>
                   <td>{t(`value.commission_rate_model.${p.rateModel}`)}</td>
                   <td>{p.flatRate ?? '—'}</td>
-                  <td>{p.status}</td>
+                  <td>{nameOf(STATUS_NAMES, p.status, currentLang())}</td>
                   <td>
                     {p.rateModel === 'target_tiered' && (
                       <button className="btn btn-secondary" onClick={() => toggleTiers(p.id)}>

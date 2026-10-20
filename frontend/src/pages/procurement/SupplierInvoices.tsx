@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FinancialTrace } from '../../components/FinancialTrace';
+import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 
 interface Supplier {
   id: string;
@@ -349,7 +350,7 @@ export function SupplierInvoices() {
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {invoices === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : invoices.length === 0 ? (
             <div className="empty-state">{t('panel.no_supplier_invoices_yet')}</div>
           ) : (
@@ -446,7 +447,7 @@ export function SupplierInvoices() {
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label>{t('field.payment_method')}</label>
                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="bank_transfer">{nameOf(PAYMENT_METHODS, 'bank_transfer', currentLang())}</option>
                     <option value="cash">Cash</option>
                     <option value="cheque">Cheque</option>
                   </select>

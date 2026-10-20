@@ -5,6 +5,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Collection {
   id: string;
@@ -93,7 +95,7 @@ export function CollectionReceiptPrint() {
   }, [shipmentId]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { collection, shipment, order, company, vehicle } = data;
 
   const doc: BusinessDocument = {
@@ -109,7 +111,7 @@ export function CollectionReceiptPrint() {
       { label: t('field.payment_method'), value: collection.method },
       ...(company ? [{ label: t('field.shipping_company'), value: company.name }] : []),
       ...(vehicle ? [{ label: t('field.vehicle'), value: vehicle.plateNumber }] : []),
-      ...(collection.remittedAt ? [{ label: t('field.remitted_at'), value: new Date(collection.remittedAt).toLocaleString() }] : []),
+      ...(collection.remittedAt ? [{ label: t('field.remitted_at'), value: fmtDateTime(collection.remittedAt) }] : []),
     ],
     totals: [{ label: t('field.collected_amount'), value: collection.amount }],
   };

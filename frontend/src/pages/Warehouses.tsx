@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
+import { ORG_UNIT_TYPES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
+import { fmtDate } from '../lib/formatDateTime';
 
 interface Warehouse {
   id: string;
@@ -191,7 +193,7 @@ export function Warehouses() {
               <select value={orgUnitId} onChange={(e) => setOrgUnitId(e.target.value)}>
                 <option value="">{ar ? '— بدون —' : '— none —'}</option>
                 {units.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                  <option key={u.id} value={u.id}>{u.name} ({nameOf(ORG_UNIT_TYPES, u.type, currentLang())})</option>
                 ))}
               </select>
             </div>
@@ -205,7 +207,7 @@ export function Warehouses() {
       {error && <div className="error-text">{error}</div>}
 
       {warehouses === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : warehouses.length === 0 ? (
         <div className="empty-state">{t('panel.no_warehouses_yet')}</div>
       ) : (
@@ -234,7 +236,7 @@ export function Warehouses() {
                     <select value={w.orgUnitId ?? ''} disabled={busyLink === w.id} onChange={(e) => linkUnit(w, e.target.value)} aria-label={ar ? 'الوحدة التنظيمية' : 'Organization unit'}>
                       <option value="">{ar ? '— بدون (يراه الجميع) —' : '— none (visible to everyone) —'}</option>
                       {units.map((u) => (
-                        <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                        <option key={u.id} value={u.id}>{u.name} ({nameOf(ORG_UNIT_TYPES, u.type, currentLang())})</option>
                       ))}
                     </select>
                   ) : (
@@ -244,7 +246,7 @@ export function Warehouses() {
                 <td>
                   <StatusBadge code={`warehouse_status.${w.status}`} />
                 </td>
-                <td>{new Date(w.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(w.createdAt)}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-secondary" onClick={() => navigate(`/inventory?warehouseId=${w.id}`)}>
                     {t('action.view_inventory')}

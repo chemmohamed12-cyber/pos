@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface CommissionApprovalBatch {
   id: string;
@@ -92,7 +93,7 @@ export function CommissionBatches() {
       <ApprovalsPanel requestTypeCodes={COMMISSION_REQUEST_TYPE_CODES} decidePath={(reqId) => `/commission/approvals/${reqId}/decide`} onDecided={loadBatches} />
 
       {batches === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : batches.length === 0 ? (
         <div className="empty-state">{t('panel.no_batches_yet')}</div>
       ) : (

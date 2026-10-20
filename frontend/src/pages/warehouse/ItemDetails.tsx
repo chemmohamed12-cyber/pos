@@ -9,6 +9,8 @@ import { ItemBasicPanel } from './item/ItemBasicPanel';
 import { ItemBarcodesPanel } from './item/ItemBarcodesPanel';
 import { ItemBomPanel } from './item/ItemBomPanel';
 import { ITEM_BARCODE_LABELS, ITEM_BASIC_LABELS, ITEM_BOM_LABELS, type Category } from './item/itemMaster';
+import { fmtDate, fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Product {
   id: string;
@@ -329,7 +331,7 @@ function ItemDetails({ productId }: { productId: string }) {
       </div>
     );
   }
-  if (!product) return <div className="empty-state">Loading…</div>;
+  if (!product) return <div className="empty-state">{loadingLabel()}</div>;
 
   // All six tabs are always shown (the committed Item Details contract); the BOM tab itself explains when an item type has no BOM.
   const visibleTabs = TABS;
@@ -417,7 +419,7 @@ function ItemDetails({ productId }: { productId: string }) {
 
         {activeTab === 'balances' &&
           (balances === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : balances.length === 0 ? (
             <div className="empty-state">{t('panel.item_no_balances')}</div>
           ) : (
@@ -445,7 +447,7 @@ function ItemDetails({ productId }: { productId: string }) {
                       <td>{b.reserved}</td>
                       <td style={{ color: b.available < 0 ? '#a3262d' : undefined }}>{b.available}</td>
                       {canViewCost && <td>{costs[b.warehouse.id] ?? '—'}</td>}
-                      <td>{b.lastMovementAt ? new Date(b.lastMovementAt).toLocaleDateString() : '—'}</td>
+                      <td>{b.lastMovementAt ? fmtDate(b.lastMovementAt) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -490,7 +492,7 @@ function ItemDetails({ productId }: { productId: string }) {
             <p className="item-note">{t('panel.item_dates_posting_time')}</p>
             {mvError && <div className="error-text">{mvError}</div>}
             {movements === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table item-ledger">
@@ -523,7 +525,7 @@ function ItemDetails({ productId }: { productId: string }) {
                       const number = m.referenceNumber ?? (m.referenceId ? docNumbers[m.referenceId] ?? m.referenceId.slice(0, 8) : '');
                       return (
                         <tr key={m.id}>
-                          <td style={{ whiteSpace: 'nowrap' }}>{new Date(m.createdAt).toLocaleString()}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(m.createdAt)}</td>
                           <td>{labelOr(`movement_type.${m.movementType}`, m.movementType)}</td>
                           <td>
                             {refLabel}

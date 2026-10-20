@@ -1,0 +1,21 @@
+PASS GRNI reason translated (ar)
+PASS translated text is not re-translated / no duplicated prefix
+PASS English translation is stable too
+PASS an Arabic backend message is returned unchanged
+PASS an unknown reason stays visible, with identifiers intact
+PASS unknown reason with no prefix is returned as is
+PASS account code keeps its exact characters (isolates removed)
+PASS account code is wrapped as a left-to-right isolate in Arabic (so RTL cannot reorder it)
+PASS English output has no invisible characters
+PASS translating the isolated Arabic text again leaves it unchanged
+PASS empty / null reason shows a dash
+PASS a reason with several colons keeps everything after the first
+PASS upper-case prefix is not touched
+PASS domain falls back to the event type when stored as unknown
+PASS unknown code shown as words, never a dotted key
+PASS null / empty code shows a dash
+PASS payment method ar/en
+PASS upper-case company status maps (READY)
+PASS invalid / empty dates show a dash, not "Invalid Date"
+PASS Arabic time shows ص/م with Latin digits
+SUMMARY pass 20 fail 0

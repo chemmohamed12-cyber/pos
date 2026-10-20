@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
+import { fmtDateTime } from '../lib/formatDateTime';
 
 interface Customer {
   id: string;
@@ -203,7 +205,7 @@ export function CustomerStatement() {
       {!customerId ? (
         <div className="empty-state">{t('panel.select_customer_to_view_statement')}</div>
       ) : entries === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : rows.length === 0 ? (
         <div className="empty-state">{t('panel.no_ledger_entries_yet')}</div>
       ) : (
@@ -229,13 +231,13 @@ export function CustomerStatement() {
                   else if (r.salesOrderId) navigate(`/sales-orders/${r.salesOrderId}`);
                 }}
               >
-                <td>{new Date(r.entryDate).toLocaleString()}</td>
+                <td>{fmtDateTime(r.entryDate)}</td>
                 <td>{t(`customer_ledger_entry_type.${r.entryType}`)}</td>
                 <td>{r.entryNumber}</td>
                 <td>{r.direction === 'debit' ? r.amount : '—'}</td>
                 <td>{r.direction === 'credit' ? r.amount : '—'}</td>
                 <td>{r.runningBalance}</td>
-                <td>{r.status}</td>
+                <td>{nameOf(STATUS_NAMES, r.status, currentLang())}</td>
               </tr>
             ))}
           </tbody>

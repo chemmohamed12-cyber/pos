@@ -3,6 +3,8 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;
@@ -174,7 +176,7 @@ export function HrLeaveRequests() {
       <ApprovalsPanel requestTypeCodes={LEAVE_REQUEST_TYPE_CODES} decidePath={(id) => `/hr/leave-requests/${id}/decide`} onDecided={loadRequests} />
 
       {requests === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : requests.length === 0 ? (
         <div className="empty-state">{t('panel.no_leave_requests_yet')}</div>
       ) : (
@@ -202,7 +204,7 @@ export function HrLeaveRequests() {
                 <td>
                   <StatusBadge code={`value.leave_request_status.${displayStatus(r)}`} />
                 </td>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>{fmtDateTime(r.createdAt)}</td>
                 <td>
                   {r.status === 'submitted' && r.approvalState === 'pending' && (
                     <button className="btn btn-secondary" disabled={busyId === r.id} onClick={() => cancelRequest(r.id)}>

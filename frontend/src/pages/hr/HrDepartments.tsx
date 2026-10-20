@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Department {
   id: string;
@@ -101,7 +103,7 @@ export function HrDepartments() {
       {error && <div className="error-text">{error}</div>}
 
       {departments === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : departments.length === 0 ? (
         <div className="empty-state">{t('panel.no_departments_yet')}</div>
       ) : (
@@ -125,7 +127,7 @@ export function HrDepartments() {
                     d.name
                   )}
                 </td>
-                <td>{new Date(d.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(d.createdAt)}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   {editingId === d.id ? (
                     <>

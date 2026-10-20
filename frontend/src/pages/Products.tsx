@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { ExcelImportExport } from '../components/ExcelImportExport';
+import { loadingLabel } from '../lib/displayNames';
 
 interface Product {
   id: string;
@@ -251,7 +252,7 @@ export function Products() {
       {error && <div className="error-text">{error}</div>}
 
       {products === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : products.length === 0 ? (
         <div className="empty-state">{t('panel.no_products_yet')}</div>
       ) : (

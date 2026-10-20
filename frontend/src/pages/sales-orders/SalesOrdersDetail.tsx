@@ -6,6 +6,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { DepositPanel } from '../../components/DepositPanel';
 import { ReserveStockPanel } from '../../components/ReserveStockPanel';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface OrderLine {
   id: string;
@@ -344,7 +346,7 @@ export function SalesOrdersDetail() {
   }
 
   if (error && !order) return <div className="error-text">{error}</div>;
-  if (!order) return <div className="empty-state">Loading…</div>;
+  if (!order) return <div className="empty-state">{loadingLabel()}</div>;
 
   return (
     <div>
@@ -420,7 +422,7 @@ export function SalesOrdersDetail() {
           </div>
           <div className="detail-field">
             <div className="label">{t('field.created_at')}</div>
-            <div className="value">{new Date(order.createdAt).toLocaleString()}</div>
+            <div className="value">{fmtDateTime(order.createdAt)}</div>
           </div>
           <div className="detail-field">
             <div className="label">{t('field.invoice')}</div>
@@ -641,7 +643,7 @@ export function SalesOrdersDetail() {
           <tbody>
             {editHistory.map((h) => (
               <tr key={h.seq}>
-                <td>{new Date(h.timestamp).toLocaleString()}</td>
+                <td>{fmtDateTime(h.timestamp)}</td>
                 <td>{h.actorName ?? h.actorUserId ?? '—'}</td>
                 <td>{h.field ?? '—'}</td>
                 <td>{String(h.before ?? '—')}</td>

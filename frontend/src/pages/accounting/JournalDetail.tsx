@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface GLAccount {
   id: string;
@@ -106,7 +107,7 @@ export function JournalDetail() {
     return a ? `${a.code} — ${a.nameAr ?? a.name}` : accountId;
   };
 
-  if (!entry) return <div className="empty-state">{error ?? 'Loading…'}</div>;
+  if (!entry) return <div className="empty-state">{error ?? loadingLabel()}</div>;
 
   return (
     <div>

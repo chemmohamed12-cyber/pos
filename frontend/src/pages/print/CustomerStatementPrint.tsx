@@ -5,6 +5,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument, DocumentLine } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface LedgerEntry {
   entryNumber: string;
@@ -61,7 +63,7 @@ export function CustomerStatementPrint() {
   }, [id, searchParams]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { customer, entries } = data;
   const from = searchParams.get('from');
   const to = searchParams.get('to');
@@ -74,7 +76,7 @@ export function CustomerStatementPrint() {
         lines: [
           ...acc.lines,
           {
-            label: `${new Date(e.entryDate).toLocaleDateString()} — ${t(`customer_ledger_entry_type.${e.entryType}`)} — ${e.entryNumber}`,
+            label: `${fmtDate(e.entryDate)} — ${t(`customer_ledger_entry_type.${e.entryType}`)} — ${e.entryNumber}`,
             quantity: '',
             unitPrice: e.direction === 'debit' ? e.amount : `(${e.amount})`,
             total: running.toFixed(2),
@@ -91,8 +93,8 @@ export function CustomerStatementPrint() {
     issuedAt: new Date().toISOString(),
     fields: [
       { label: t('field.customer'), value: `${customer.code} — ${customer.name}` },
-      { label: t('field.date_from'), value: from ? new Date(from).toLocaleDateString() : '—' },
-      { label: t('field.date_to'), value: to ? new Date(to).toLocaleDateString() : '—' },
+      { label: t('field.date_from'), value: from ? fmtDate(from) : '—' },
+      { label: t('field.date_to'), value: to ? fmtDate(to) : '—' },
     ],
     lines,
     totals: [{ label: t('field.running_balance'), value: running.toFixed(2) }],

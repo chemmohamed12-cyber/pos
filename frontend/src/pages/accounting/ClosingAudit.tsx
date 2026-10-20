@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDateTime } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface ClosingAuditRun {
   id: string;
@@ -117,7 +119,7 @@ export function ClosingAudit() {
       {error && <div className="error-text">{error}</div>}
 
       {auditRuns === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : auditRuns.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_audit_runs_yet')}</div>
       ) : (
@@ -136,7 +138,7 @@ export function ClosingAudit() {
                 <td>
                   <StatusBadge code={`value.closing_audit_status.${r.status}`} />
                 </td>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>{fmtDateTime(r.createdAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -144,7 +146,7 @@ export function ClosingAudit() {
       )}
 
       {workflowRuns === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : workflowRuns.length === 0 ? (
         <div className="empty-state">{t('panel.no_closing_workflow_runs_yet')}</div>
       ) : (
@@ -168,8 +170,8 @@ export function ClosingAudit() {
                   <StatusBadge code={`value.closing_workflow_status.${w.status}`} />
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{w.approvalRequestId ? w.approvalRequestId.slice(0, 8) : '—'}</td>
-                <td>{new Date(w.createdAt).toLocaleString()}</td>
-                <td>{w.completedAt ? new Date(w.completedAt).toLocaleString() : '—'}</td>
+                <td>{fmtDateTime(w.createdAt)}</td>
+                <td>{w.completedAt ? fmtDateTime(w.completedAt) : '—'}</td>
               </tr>
             ))}
           </tbody>

@@ -3,6 +3,8 @@ import { api, uploadFile, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { nameOf, currentLang, EVENT_AND_ACTION_NAMES } from '../lib/displayNames';
+import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
 interface Shipment {
   id: string;
@@ -559,8 +561,8 @@ function ShipmentDetail({
             <tbody>
               {tracking.map((ev) => (
                 <tr key={ev.id}>
-                  <td>{new Date(ev.occurredAt).toLocaleString()}</td>
-                  <td>{ev.eventType}</td>
+                  <td>{fmtDateTime(ev.occurredAt)}</td>
+                  <td>{nameOf(EVENT_AND_ACTION_NAMES, ev.eventType, currentLang())}</td>
                   <td>{ev.detail ?? '—'}</td>
                 </tr>
               ))}
@@ -918,7 +920,7 @@ export function Shipments() {
                 <td>
                   <StatusBadge code={`shipment_lifecycle.state.${s.state}`} />
                 </td>
-                <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(s.createdAt)}</td>
                 <td>{s.waybillNumber}</td>
                 <td>{s.shippingCompanyId ? companies.find((c) => c.id === s.shippingCompanyId)?.name ?? '—' : '—'}</td>
                 <td>{s.vehicleId ? vehicles.find((v) => v.id === s.vehicleId)?.plateNumber ?? '—' : '—'}</td>

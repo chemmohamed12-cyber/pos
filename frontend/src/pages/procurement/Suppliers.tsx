@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Supplier {
   id: string;
@@ -280,7 +281,7 @@ export function Suppliers() {
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           {suppliers === null ? (
-            <div className="empty-state">Loading…</div>
+            <div className="empty-state">{loadingLabel()}</div>
           ) : suppliers.length === 0 ? (
             <div className="empty-state">{t('panel.no_suppliers_yet')}</div>
           ) : (

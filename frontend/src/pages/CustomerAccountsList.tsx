@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { loadingLabel } from '../lib/displayNames';
 
 interface Customer {
   id: string;
@@ -88,7 +89,7 @@ export function CustomerAccountsList() {
       </div>
 
       {rows === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('panel.no_customer_accounts_yet')}</div>
       ) : (

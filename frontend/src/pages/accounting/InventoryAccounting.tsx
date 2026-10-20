@@ -5,6 +5,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ApprovalsPanel } from '../../components/ApprovalsPanel';
 import { useAutoRefresh } from '../../lib/useAutoRefresh';
 import { RefreshStamp, PostingStatusChip } from '../../components/RefreshStamp';
+import { loadingLabel } from '../../lib/displayNames';
 
 const INVENTORY_ADJUSTMENT_KINDS = ['physical_count_variance', 'valuation_write_down'] as const;
 const INVENTORY_REQUEST_TYPE_CODES = INVENTORY_ADJUSTMENT_KINDS.map((k) => `accounting.inventory.${k}`);
@@ -237,7 +238,7 @@ export function InventoryAccounting() {
       <ApprovalsPanel requestTypeCodes={INVENTORY_REQUEST_TYPE_CODES} decidePath={(id) => `/accounting/inventory/approvals/${id}/decide`} onDecided={loadRuns} />
 
       {runs === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : runs.length === 0 ? (
         <div className="empty-state">{t('panel.no_inventory_reconciliations_yet')}</div>
       ) : (

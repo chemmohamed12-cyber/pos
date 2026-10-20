@@ -4,6 +4,8 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { FinancialTrace } from '../components/FinancialTrace';
+import { fmtDate } from '../lib/formatDateTime';
+import { loadingLabel } from '../lib/displayNames';
 
 interface InvoiceLine {
   id: string;
@@ -96,7 +98,7 @@ export function InvoiceDetail() {
   }, [id]);
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!invoice) return <div className="empty-state">Loading…</div>;
+  if (!invoice) return <div className="empty-state">{loadingLabel()}</div>;
 
   return (
     <div>
@@ -142,7 +144,7 @@ export function InvoiceDetail() {
           </div>
           <div className="detail-field">
             <div className="label">{t('field.due_date')}</div>
-            <div className="value">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '—'}</div>
+            <div className="value">{invoice.dueDate ? fmtDate(invoice.dueDate) : '—'}</div>
           </div>
           <div className="detail-field">
             <div className="label">{t('field.total_amount')}</div>

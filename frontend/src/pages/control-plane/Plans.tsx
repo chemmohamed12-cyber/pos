@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface CatalogModule {
   code: string;
@@ -216,7 +217,7 @@ export function Plans() {
       )}
 
       {plans === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : plans.length === 0 ? (
         <div className="empty-state">{ar ? 'لا توجد باقات بعد.' : 'No plans yet.'}</div>
       ) : (

@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { PrintDocument } from '../../print/PrintDocument';
 import type { BusinessDocument } from '../../print/documentTypes';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Shipment {
   waybillNumber: string;
@@ -88,7 +89,7 @@ export function WaybillPrint() {
   }, [id]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
-  if (!data) return <div className="empty-state">Loading…</div>;
+  if (!data) return <div className="empty-state">{loadingLabel()}</div>;
   const { shipment, order, warehouse, fulfillmentOrder, customer, driver, company, vehicle } = data;
 
   const doc: BusinessDocument = {

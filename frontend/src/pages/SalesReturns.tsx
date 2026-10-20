@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ReturnsTabs } from '../components/ReturnsTabs';
 import { StatusBadge } from '../components/StatusBadge';
+import { fmtDate } from '../lib/formatDateTime';
 
 /**
  * Sales/Shipment/Returns workflow review (CTO directive, 2026-09-16).
@@ -381,7 +382,7 @@ export function SalesReturns() {
                 <td onClick={() => viewDetail(r.id)}>{r.returnNumber}</td>
                 <td onClick={() => viewDetail(r.id)}>{r.customerName ?? '—'}</td>
                 <td onClick={() => viewDetail(r.id)}>{r.totalAmount}</td>
-                <td onClick={() => viewDetail(r.id)}>{new Date(r.returnDate).toLocaleDateString()}</td>
+                <td onClick={() => viewDetail(r.id)}>{fmtDate(r.returnDate)}</td>
                 <td onClick={() => viewDetail(r.id)}>
                   <StatusBadge code={`sales_return.state.${r.state}`} />
                 </td>

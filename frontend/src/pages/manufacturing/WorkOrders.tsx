@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { fmtDate } from '../../lib/formatDateTime';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Warehouse {
   id: string;
@@ -181,7 +183,7 @@ export function WorkOrders() {
       </div>
 
       {workOrders === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : filtered && filtered.length === 0 ? (
         <div className="empty-state">{t('panel.no_work_orders_yet')}</div>
       ) : (
@@ -213,7 +215,7 @@ export function WorkOrders() {
                   <StatusBadge code={`work_order_lifecycle.state.${wo.state}`} />
                 </td>
                 <td>{wo.wipValue}</td>
-                <td>{new Date(wo.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(wo.createdAt)}</td>
                 <td>
                   <Link className="btn btn-secondary" to={`/manufacturing/work-orders/${wo.id}`}>
                     {t('action.view')}

@@ -3,6 +3,7 @@ import { api, ApiError } from '../lib/api';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useVisibleRoutes } from '../lib/navVisibility';
+import { loadingLabel } from '../lib/displayNames';
 
 interface BomListEntry {
   finishedProductId: string;
@@ -177,7 +178,7 @@ export function Bom() {
       {error && <div className="error-text">{error}</div>}
 
       {boms === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : boms.length === 0 && expandedId === null ? (
         <div className="empty-state">{t('panel.no_boms_yet')}</div>
       ) : (

@@ -4,6 +4,8 @@ import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ExcelImportExport } from '../components/ExcelImportExport';
+import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
+import { fmtDate } from '../lib/formatDateTime';
 
 const PAGE_SIZE = 50;
 
@@ -300,7 +302,7 @@ export function Customers() {
       {error && <div className="error-text">{error}</div>}
 
       {customers === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : customers.length === 0 ? (
         <div className="empty-state">{t('panel.no_customers_yet')}</div>
       ) : (
@@ -330,7 +332,7 @@ export function Customers() {
                 <td>{c.governorate ?? '—'}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span className="status-badge">{c.status}</span>
+                    <span className="status-badge">{nameOf(STATUS_NAMES, c.status, currentLang())}</span>
                     {can('sales.customer_status.edit', 'editable') && NEXT_CUSTOMER_STATUS[c.status] && (
                       <button
                         className="btn btn-secondary"
@@ -343,7 +345,7 @@ export function Customers() {
                     )}
                   </div>
                 </td>
-                <td>{new Date(c.createdAt).toLocaleDateString()}</td>
+                <td>{fmtDate(c.createdAt)}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-secondary" onClick={() => window.open(`/print/customer/${c.id}`, '_blank')}>
                     {t('action.print')}

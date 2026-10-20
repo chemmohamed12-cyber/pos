@@ -7,6 +7,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ProfileFieldsCard, type ProfileField } from '../../components/profile/ProfileFieldsCard';
 import { ProfileContactsPanel, type ProfileContact } from '../../components/profile/ProfileContactsPanel';
 import { ProfileAddressesPanel, type ProfileAddress } from '../../components/profile/ProfileAddressesPanel';
+import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
+import { fmtDate } from '../../lib/formatDateTime';
 
 /**
  * Supplier profile (master-data gap matrix §5) — one page over the EXISTING supplier APIs plus the shared profile components used by the
@@ -140,7 +142,7 @@ export function SupplierProfile() {
   }, [tab, id, orders]);
 
   if (error) return <div className="error-text">{error}</div>;
-  if (!detail) return <div className="empty-state">Loading…</div>;
+  if (!detail) return <div className="empty-state">{loadingLabel()}</div>;
 
   const base = `/procurement/suppliers/${id}`;
   const s = detail.supplier;
@@ -255,7 +257,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.purchase_orders')}</h3>
             {orders === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : orders.length === 0 ? (
               empty
             ) : (
@@ -272,7 +274,7 @@ export function SupplierProfile() {
                   {orders.map((o) => (
                     <tr key={o.id}>
                       <td>{o.poNumber}</td>
-                      <td>{new Date(o.createdAt).toLocaleDateString()}</td>
+                      <td>{fmtDate(o.createdAt)}</td>
                       <td>{o.totalAmountBase}</td>
                       <td>
                         <StatusBadge code={`purchase_order_lifecycle.state.${o.state}`} />
@@ -286,7 +288,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.supplier_invoices')}</h3>
             {invoices === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : invoices.length === 0 ? (
               empty
             ) : (
@@ -304,7 +306,7 @@ export function SupplierProfile() {
                   {invoices.map((i) => (
                     <tr key={i.id}>
                       <td>{i.invoiceNumber}</td>
-                      <td>{i.dueDate ? new Date(i.dueDate).toLocaleDateString() : '—'}</td>
+                      <td>{i.dueDate ? fmtDate(i.dueDate) : '—'}</td>
                       <td>{i.totalAmount}</td>
                       <td>{i.remaining}</td>
                       <td>
@@ -319,7 +321,7 @@ export function SupplierProfile() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h3 style={{ marginTop: 0 }}>{t('panel.supplier_payments')}</h3>
             {payments === null ? (
-              <div className="empty-state">Loading…</div>
+              <div className="empty-state">{loadingLabel()}</div>
             ) : payments.length === 0 ? (
               empty
             ) : (
@@ -336,9 +338,9 @@ export function SupplierProfile() {
                   {payments.map((p) => (
                     <tr key={p.id}>
                       <td>{p.paymentNumber}</td>
-                      <td>{new Date(p.occurredAt).toLocaleDateString()}</td>
+                      <td>{fmtDate(p.occurredAt)}</td>
                       <td>{p.amount}</td>
-                      <td>{p.method}</td>
+                      <td>{nameOf(PAYMENT_METHODS, p.method, currentLang())}</td>
                     </tr>
                   ))}
                 </tbody>

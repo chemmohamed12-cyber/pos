@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { loadingLabel } from '../lib/displayNames';
 
 interface TreasuryAccountType {
   id: string;
@@ -237,7 +238,7 @@ export function TreasuryAccounts() {
       {error && <div className="error-text">{error}</div>}
 
       {accounts === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : (
         groups.map(({ type: ty, accounts: groupAccounts }) => (
           <div key={ty.id} style={{ marginBottom: 20 }}>

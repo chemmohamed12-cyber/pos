@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { loadingLabel } from '../lib/displayNames';
 
 interface RequestType {
   requestTypeCode: string;
@@ -327,7 +328,7 @@ export function Approvals() {
         </form>
 
         {rules === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : rules.length === 0 ? (
           <div className="empty-state">{t('panel.no_matrix_rules_yet')}</div>
         ) : (
@@ -368,7 +369,7 @@ export function Approvals() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{L('الطلبات بانتظار الاعتماد', 'Requests waiting for approval')}</h3>
         {requests === null ? (
-          <div className="empty-state">Loading…</div>
+          <div className="empty-state">{loadingLabel()}</div>
         ) : requests.length === 0 ? (
           <div className="empty-state">{t('panel.no_approval_requests_pending')}</div>
         ) : (

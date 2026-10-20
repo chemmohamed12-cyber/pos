@@ -3,6 +3,8 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { PasswordInput } from '../components/PasswordInput';
+import { DIRECTIONS, EVENT_AND_ACTION_NAMES, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
+import { fmtDateTime } from '../lib/formatDateTime';
 
 interface Connector {
   id: string;
@@ -242,7 +244,7 @@ export function ExternalIntegrations() {
       {error && <div className="error-text">{error}</div>}
 
       {connectors === null ? (
-        <div className="empty-state">Loading…</div>
+        <div className="empty-state">{loadingLabel()}</div>
       ) : connectors.length === 0 ? (
         <div className="empty-state">{t('panel.no_connectors_yet')}</div>
       ) : (
@@ -304,7 +306,7 @@ export function ExternalIntegrations() {
                     <td colSpan={5}>
                       <div className="card" style={{ margin: '8px 0' }}>
                         {mappings === null ? (
-                          <div className="empty-state">Loading…</div>
+                          <div className="empty-state">{loadingLabel()}</div>
                         ) : mappings.length === 0 ? (
                           <div className="empty-state">{t('panel.no_mappings_yet')}</div>
                         ) : (
@@ -334,7 +336,7 @@ export function ExternalIntegrations() {
                     <td colSpan={5}>
                       <div className="card" style={{ margin: '8px 0' }}>
                         {logs === null ? (
-                          <div className="empty-state">Loading…</div>
+                          <div className="empty-state">{loadingLabel()}</div>
                         ) : logs.length === 0 ? (
                           <div className="empty-state">{t('panel.no_logs_yet')}</div>
                         ) : (
@@ -351,12 +353,12 @@ export function ExternalIntegrations() {
                             <tbody>
                               {logs.map((l) => (
                                 <tr key={l.id}>
-                                  <td>{new Date(l.createdAt).toLocaleString()}</td>
-                                  <td>{l.direction}</td>
-                                  <td>{l.eventType}</td>
+                                  <td>{fmtDateTime(l.createdAt)}</td>
+                                  <td>{nameOf(DIRECTIONS, l.direction, currentLang())}</td>
+                                  <td>{nameOf(EVENT_AND_ACTION_NAMES, l.eventType, currentLang())}</td>
                                   <td>
                                     <span className={`status-badge ${l.status === 'success' ? 'positive' : l.status === 'failed' ? 'negative' : ''}`}>
-                                      {l.status}
+                                      {nameOf(STATUS_NAMES, l.status, currentLang())}
                                     </span>
                                   </td>
                                   <td>{l.detail ?? '—'}</td>

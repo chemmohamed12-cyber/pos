@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { overallState, traceStateOf, useTraceEvents } from '../lib/financialTrace';
+import { nameOf, currentLang, FINANCIAL_EVENT_TYPES } from '../lib/displayNames';
 
 /**
  * A rejected financial event means the ACCOUNTING entry was not created - the operational document itself (stock movement, receipt ...) is unaffected. These helpers say that in plain
@@ -61,7 +62,7 @@ export function FinancialTrace({ ids }: { ids: string[] }) {
             {events.map((e) => (
               <tr key={e.id}>
                 <td>
-                  <code>{e.eventType}</code>
+                  {nameOf(FINANCIAL_EVENT_TYPES, e.eventType, currentLang())}
                 </td>
                 <td>
                   <span className={`status-badge${traceStateOf(e) === 'posted' ? '' : traceStateOf(e) === 'rejected' ? ' negative' : ''}`} data-testid={`trace-${traceStateOf(e)}`}>

@@ -4,6 +4,8 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { CustomerProfileTab } from './CustomerProfileTab';
+import { PAYMENT_METHODS, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
+import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
 interface Customer {
   id: string;
@@ -420,7 +422,7 @@ export function CustomerAccount() {
   }
 
   if (error && !statement) return <div className="error-text">{error}</div>;
-  if (!customer || !statement) return <div className="empty-state">Loading…</div>;
+  if (!customer || !statement) return <div className="empty-state">{loadingLabel()}</div>;
 
   const ordersWithoutOpenInvoice = orders.filter((o) => !invoices.some((inv) => inv.salesOrderId === o.id && inv.state !== 'void'));
   const lastInvoice = [...invoices].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
@@ -461,7 +463,7 @@ export function CustomerAccount() {
           </div>
           <div>
             <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.status')}</div>
-            <div>{customer.status}</div>
+            <div>{nameOf(STATUS_NAMES, customer.status, currentLang())}</div>
           </div>
           <div>
             <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.account_type')}</div>
@@ -578,14 +580,14 @@ export function CustomerAccount() {
                   style={{ cursor: entry.salesOrderId ? 'pointer' : 'default', opacity: entry.status === 'reversed' ? 0.5 : 1 }}
                   onClick={() => entry.salesOrderId && navigate(`/sales-orders/${entry.salesOrderId}`)}
                 >
-                  <td>{new Date(entry.date).toLocaleString()}</td>
+                  <td>{fmtDateTime(entry.date)}</td>
                   <td>{t(`customer_ledger_entry_type.${entry.type}`)}</td>
                   <td>{entry.reference}</td>
                   <td>{entry.description}</td>
                   <td>{entry.debit !== '0.00' ? entry.debit : '—'}</td>
                   <td>{entry.credit !== '0.00' ? entry.credit : '—'}</td>
                   <td>{entry.runningBalance}</td>
-                  <td>{entry.status}</td>
+                  <td>{nameOf(STATUS_NAMES, entry.status, currentLang())}</td>
                 </tr>
               ))}
             </tbody>
@@ -755,7 +757,7 @@ export function CustomerAccount() {
                     <td>{orders.find((o) => o.id === inv.salesOrderId)?.orderNumber ?? inv.salesOrderId}</td>
                     <td>{inv.totalAmount}</td>
                     <td>{inv.remaining}</td>
-                    <td>{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}</td>
+                    <td>{inv.dueDate ? fmtDate(inv.dueDate) : '—'}</td>
                     <td>
                       <StatusBadge code={`sales_invoice_lifecycle.state.${inv.state}`} />
                     </td>
@@ -832,8 +834,8 @@ export function CustomerAccount() {
                       <td>{p.paymentNumber}</td>
                       <td>{p.invoiceId ? (invoices.find((i) => i.id === p.invoiceId)?.invoiceNumber ?? p.invoiceId) : t('panel.customer_advance_unapplied')}</td>
                       <td>{p.amount}</td>
-                      <td>{p.method}</td>
-                      <td>{new Date(p.occurredAt).toLocaleString()}</td>
+                      <td>{nameOf(PAYMENT_METHODS, p.method, currentLang())}</td>
+                      <td>{fmtDateTime(p.occurredAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -864,7 +866,7 @@ export function CustomerAccount() {
               {arAging.map((row) => (
                 <tr key={row.invoiceId}>
                   <td>{row.invoiceNumber}</td>
-                  <td>{row.dueDate ? new Date(row.dueDate).toLocaleDateString() : '—'}</td>
+                  <td>{row.dueDate ? fmtDate(row.dueDate) : '—'}</td>
                   <td>{row.originalAmount}</td>
                   <td>{row.remaining}</td>
                   <td>{row.daysOverdue}</td>

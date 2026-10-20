@@ -4,6 +4,8 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { EVENT_AND_ACTION_NAMES, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
+import { fmtDateTime } from '../../lib/formatDateTime';
 
 interface Warehouse {
   id: string;
@@ -254,7 +256,7 @@ export function WorkOrderDetail() {
   const warehouseName = (wid: string) => warehouses.find((w) => w.id === wid)?.name ?? wid.slice(0, 8);
 
   if (loadError) return <ErrorState error={loadError} onRetry={load} />;
-  if (!wo) return <div className="empty-state">Loading…</div>;
+  if (!wo) return <div className="empty-state">{loadingLabel()}</div>;
 
   const canIssue = wo.state === 'released' || wo.state === 'in_progress';
   const canReturn = wo.state === 'in_progress' || wo.state === 'on_hold';
@@ -406,8 +408,8 @@ export function WorkOrderDetail() {
                   <td>
                     <StatusBadge code={`mfg.op.state.${op.status}`} />
                   </td>
-                  <td>{op.startedAt ? new Date(op.startedAt).toLocaleString() : '—'}</td>
-                  <td>{op.completedAt ? new Date(op.completedAt).toLocaleString() : '—'}</td>
+                  <td>{op.startedAt ? fmtDateTime(op.startedAt) : '—'}</td>
+                  <td>{op.completedAt ? fmtDateTime(op.completedAt) : '—'}</td>
                   <td>
                     {(wo.state === 'released' || wo.state === 'in_progress') && op.status === 'pending' && (
                       <button className="btn btn-secondary" disabled={busy !== null} onClick={() => runOperation(op.id, 'start')}>
@@ -514,10 +516,10 @@ export function WorkOrderDetail() {
             <tbody>
               {wo.auditTrail.map((entry) => (
                 <tr key={entry.seq}>
-                  <td>{new Date(entry.timestamp).toLocaleString()}</td>
-                  <td>{entry.action}</td>
+                  <td>{fmtDateTime(entry.timestamp)}</td>
+                  <td>{nameOf(EVENT_AND_ACTION_NAMES, entry.action, currentLang())}</td>
                   <td>{entry.actorUserId ?? '—'}</td>
-                  <td>{entry.result}</td>
+                  <td>{nameOf(STATUS_NAMES, entry.result, currentLang())}</td>
                 </tr>
               ))}
             </tbody>

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Transaction {
   id: string;
@@ -80,7 +81,7 @@ export function StockCountEntry() {
   }, [load]);
 
   if (loadError) return <ErrorState error={loadError} onRetry={load} />;
-  if (!txn) return <div className="empty-state">Loading…</div>;
+  if (!txn) return <div className="empty-state">{loadingLabel()}</div>;
   const productName = (pid: string) => {
     const p = products.find((x) => x.id === pid);
     return p ? `${p.sku} — ${p.name}` : pid;
