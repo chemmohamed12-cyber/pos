@@ -13,7 +13,7 @@ Branch `feature/treasury-integrity`, head = the commit that adds this file (see 
 | Static analysis | `npm run lint` (backend, whole project) | **exit 0, 0 errors**; 5 warnings, **all in pre-existing files** (`company-connection-manager.service.spec`, `biz-harness-smoke`, `biz-support`, `t09`, `t10`) | **PASS** |
 | Type-check / build | `tsc --noEmit`, `nest build` (backend); `tsc -b && vite build` (frontend) | clean; frontend built in 2.0 s | **PASS** |
 | Full-stack browser E2E on a provisioned environment | — | not run (cloning on 5433 refused by the permission layer and not bypassed; the harness databases carry no installation/plan/login bootstrap) | **PENDING** |
-| Cross-domain with Procurement's invoicing/allocation branch | — | not run: that branch is **not** in the integration line | **PENDING** (dependency) |
+| Combined cross-domain run after Procurement's branch was merged into integration (eabd3fd) and into this branch (bef1c0e): 74 specs (treasury, finance, AR/AP, procurement, accounting, approval, isolation) in 3 chunks, namespaces `biz_t79_`/`biz_t81_`/`biz_t82_` | `biz-run.js --regression` | **74/74 specs PASS — 537 tests** (28/28 188 · 28/28 199 · 18/18 150); logs `70`–`72-combined-chunk*.log` | **PASS** |
 
 Evidence: `evidence-treasury-integrity-2026-10-20/` (`60-T6-regression-chunk1..5.log`, `61-T6-lint.log`, `62-T6-unit.log`, `63-T6-frontend-build.log`, earlier gate logs). One tracked evidence file (`evidence-2026-10-17-inventory-c1-closure/controlled-scenario-results.json`) is rewritten by an existing spec on every run; it was restored with `git checkout` so the branch carries no accidental change.
 
