@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, MigrationExecutor } from 'typeorm';
-import { readdirSync } from 'fs';
-import { join } from 'path';
 import { AppConfigService } from '../configuration/app-config.service';
 import { AuditService } from '../audit/audit.service';
 import { CompanyService } from '../company/company.service';
@@ -11,6 +9,7 @@ import { runMigrationsForDatabase } from '../release-orchestration/company-migra
 import { BackupManagerService } from './backup-manager.service';
 import { CompanySchemaCheckResult, checkCompanySchema, summarizeFindings } from './company-schema-check';
 import { createMigrationDataSource, discoverMigrationTags } from './migration-datasource';
+import { migrationNamesByTag, tagsReceivedByCompany } from './migration-names';
 
 /**
  * Release Engine — Company fan-out (CTO 2026-10-08). The capability the Production Engine did not have: a staged deploy that upgrades the EXISTING Company
@@ -104,46 +103,8 @@ export class CompanyFanoutBlockedError extends Error {
   }
 }
 
-const MIGRATION_FILE = /^(\d+)-(.+)\.js$/;
-
-/**
- * `<candidate>/dist/database/migrations/<tag>/<timestamp>-<Name>.js` -> the migration's recorded name `<Name><timestamp>` (the TypeORM class-name convention
- * every migration in this repo follows; `company-fanout.real-pg.spec.ts` proves it against the real compiled set), grouped by tag.
- */
-export function migrationNamesByTag(appRoot: string, tags: readonly string[]): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  for (const tag of tags) {
-    const names = new Set<string>();
-    try {
-      for (const f of readdirSync(join(appRoot, 'dist', 'database', 'migrations', tag))) {
-        const m = MIGRATION_FILE.exec(f);
-        if (m) names.add(`${m[2]}${m[1]}`);
-      }
-    } catch {
-      /* a tag directory that is not on disk contributes nothing */
-    }
-    out.set(tag, names);
-  }
-  return out;
-}
-
-/** The tags a Company receives: `core`, plus every candidate tag of which the Company already has at least one executed migration. */
-export function tagsReceivedByCompany(byTag: Map<string, Set<string>>, executed: ReadonlySet<string>): string[] {
-  const tags: string[] = [];
-  for (const [tag, names] of byTag) {
-    if (tag === 'core') {
-      tags.push(tag);
-      continue;
-    }
-    for (const n of names) {
-      if (executed.has(n)) {
-        tags.push(tag);
-        break;
-      }
-    }
-  }
-  return tags.sort();
-}
+// the pure name helpers live in migration-names.ts (shared with the run-time Company schema admission); re-exported here for existing importers
+export { migrationNamesByTag, tagsReceivedByCompany };
 
 /** Audit-safe summary of a plan (no credentials, no connection strings). */
 export function summarizePlan(plan: CompanyFanoutPlan): Record<string, unknown> {

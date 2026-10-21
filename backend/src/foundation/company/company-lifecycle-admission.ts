@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { CompanyConnectionManagerService } from '../database-registry/company-connection-manager.service';
 import { COMPANY_NOT_READY_CODE, isCompanyOperational } from './company-operational-status';
+import { COMPANY_SCHEMA_BEHIND_CODE, CompanySchemaBehindException } from '../database-registry/company-schema-admission';
 import { CompanyStatus } from './company-status';
 
 /**
@@ -38,7 +39,7 @@ import { CompanyStatus } from './company-status';
  * NOT given a bypass flag. It keeps its own, separate policy (DP-9 O-1) and its
  * own scheduler; nothing here changes it.
  */
-export type AdmissionRefusal = { admitted: false; reason: typeof COMPANY_NOT_READY_CODE; status: CompanyStatus | 'MISSING' };
+export type AdmissionRefusal = { admitted: false; reason: typeof COMPANY_NOT_READY_CODE | typeof COMPANY_SCHEMA_BEHIND_CODE; status: CompanyStatus | 'MISSING' };
 export type Admitted<T> = { admitted: true; value: T };
 export type AdmissionResult<T> = Admitted<T> | AdmissionRefusal;
 
@@ -57,7 +58,17 @@ export async function runOperationalAdmitted<T>(
       await runner.commitTransaction();
       return { admitted: false, reason: COMPANY_NOT_READY_CODE, status: rows.length === 0 ? 'MISSING' : rows[0].status };
     }
-    const dataSource = await connections.getDataSource(companyId);
+    let dataSource: DataSource;
+    try {
+      dataSource = await connections.getDataSource(companyId);
+    } catch (err) {
+      // READY but its schema is behind the running build (1.1.12): the work is deferred, exactly like a non-READY Company; nothing was executed
+      if (err instanceof CompanySchemaBehindException) {
+        await runner.commitTransaction();
+        return { admitted: false, reason: COMPANY_SCHEMA_BEHIND_CODE, status: rows[0].status };
+      }
+      throw err;
+    }
     const value = await work(dataSource);
     await runner.commitTransaction();
     return { admitted: true, value };

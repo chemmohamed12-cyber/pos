@@ -167,6 +167,9 @@ export const configurationValidationSchema = Joi.object({
   // Read-only schema check of every in-scope Company database against the candidate's own entity registry (catches a Company whose migration list looks complete
   // but whose tables/columns are not what the new code queries).  enforce = a finding blocks the swap; report = recorded in the audit only.
   RELEASE_COMPANY_SCHEMA_CHECK: Joi.string().valid('enforce', 'report').default('enforce'),
+  // RUN-TIME guard (1.1.12): a Company database that lacks a migration the RUNNING build ships for its tags is refused with HTTP 503 COMPANY_SCHEMA_BEHIND before any
+  // query runs, instead of failing screen by screen with HTTP 500 (see company-schema-admission.ts). enforce (default) | report (log only) | off.
+  COMPANY_SCHEMA_ADMISSION: Joi.string().valid('enforce', 'report', 'off').default('enforce'),
   // How each affected Company gets its restore point before it is migrated.
   //   create         = the engine takes (and verifies) a `pre_update` backup of that Company's own database first.
   //   require-recent = a verified backup of that Company no older than RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS must already exist.

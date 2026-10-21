@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DatabaseRegistry } from './database-registry.entity';
 import { DatabaseRegistryService } from './database-registry.service';
 import { createCompanyDataSource } from './company-datasource-factory';
+import { CompanySchemaAdmission } from './company-schema-admission';
 
 export class CompanyDatabaseNotProvisionedError extends Error {}
 export class CompanyDatabaseNotActiveError extends Error {}
@@ -35,7 +36,11 @@ export class CompanyConnectionManagerService implements OnModuleDestroy {
   private readonly logger = new Logger(CompanyConnectionManagerService.name);
   private readonly cache = new Map<string, CachedConnection>();
 
-  constructor(private readonly databaseRegistry: DatabaseRegistryService) {}
+  constructor(
+    private readonly databaseRegistry: DatabaseRegistryService,
+    /** 1.1.12: refuses (503 COMPANY_SCHEMA_BEHIND) a Company whose schema is behind the running build, before any caller can query it. */
+    @Optional() private readonly schemaAdmission?: CompanySchemaAdmission,
+  ) {}
 
   /** Every Company whose database is provisioned and marked reachable — the sweep set for a company-scoped background job. */
   async listActiveCompanyIds(): Promise<string[]> {
@@ -72,6 +77,7 @@ export class CompanyConnectionManagerService implements OnModuleDestroy {
     const fingerprint = `${registry.host}:${registry.port}:${registry.databaseName}`;
     const cached = this.cache.get(companyId);
     if (cached && cached.fingerprint === fingerprint && cached.dataSource.isInitialized) {
+      if (this.schemaAdmission) await this.schemaAdmission.assertCurrent(companyId, cached.dataSource);
       return cached.dataSource;
     }
     if (cached) {
@@ -88,6 +94,7 @@ export class CompanyConnectionManagerService implements OnModuleDestroy {
     const dataSource = createCompanyDataSource({ host: registry.host, port: registry.port, username, password, database: registry.databaseName });
     await dataSource.initialize();
     this.cache.set(companyId, { dataSource, fingerprint });
+    if (this.schemaAdmission) await this.schemaAdmission.assertCurrent(companyId, dataSource);
     return dataSource;
   }
 

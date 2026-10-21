@@ -73,3 +73,4 @@ src/foundation/release/release-execution-company-fanout.spec.ts
 src/foundation/configuration/app-config.company-migrations.spec.ts
 src/foundation/release/release.controller.company-migrations.spec.ts
 src/foundation/release/company-catch-up.service.spec.ts
+src/foundation/database-registry/company-schema-admission.spec.ts

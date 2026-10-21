@@ -5,6 +5,7 @@ import { DatabaseCredential } from './database-credential.entity';
 import { DatabaseCredentialCipherService } from './database-credential-cipher.service';
 import { DatabaseRegistryService } from './database-registry.service';
 import { CompanyConnectionManagerService } from './company-connection-manager.service';
+import { CompanySchemaAdmission } from './company-schema-admission';
 
 /**
  * Multi-Company Phase 3 V7, Area 3 (Database Registry) + Area 9
@@ -13,7 +14,7 @@ import { CompanyConnectionManagerService } from './company-connection-manager.se
  */
 @Module({
   imports: [TypeOrmModule.forFeature([DatabaseRegistry, DatabaseCredential])],
-  providers: [DatabaseCredentialCipherService, DatabaseRegistryService, CompanyConnectionManagerService],
-  exports: [DatabaseRegistryService, CompanyConnectionManagerService],
+  providers: [DatabaseCredentialCipherService, DatabaseRegistryService, CompanySchemaAdmission, CompanyConnectionManagerService],
+  exports: [DatabaseRegistryService, CompanyConnectionManagerService, CompanySchemaAdmission],
 })
 export class DatabaseRegistryModule {}

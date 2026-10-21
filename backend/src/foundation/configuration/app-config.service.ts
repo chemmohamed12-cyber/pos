@@ -183,6 +183,11 @@ export class AppConfigService {
     return this.configService.get<string>('INTEGRATION_ENCRYPTION_KEY')!;
   }
 
+  /** Run-time Company schema admission (1.1.12): `enforce` refuses a Company behind the running build with 503 COMPANY_SCHEMA_BEHIND; `report` only logs; `off` disables. */
+  get companySchemaAdmission(): 'enforce' | 'report' | 'off' {
+    return this.configService.get<'enforce' | 'report' | 'off'>('COMPANY_SCHEMA_ADMISSION') ?? 'enforce';
+  }
+
   /** Multi-Company Phase 3 V7, Area 3 (Database Registry) — deliberately separate from `integrationEncryptionKey`. */
   get databaseCredentialEncryptionKey(): string {
     return this.configService.get<string>('DATABASE_CREDENTIAL_ENCRYPTION_KEY')!;

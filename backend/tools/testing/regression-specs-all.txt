@@ -128,3 +128,4 @@ src/domains/procurement/interface/procurement-invoice-charges.company-isolation.
 src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts
 src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts
 src/foundation/release/company-schema-check.real-pg.spec.ts
+src/foundation/database-registry/company-schema-admission.real-pg.spec.ts

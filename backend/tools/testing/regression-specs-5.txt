@@ -3,3 +3,4 @@ src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
 src/foundation/release/company-fanout.real-pg.spec.ts
 src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
 src/foundation/release/company-schema-check.real-pg.spec.ts
+src/foundation/database-registry/company-schema-admission.real-pg.spec.ts
