@@ -4,6 +4,7 @@ import { CustomersService } from '../../crm/application/customers.service';
 import { CustomerLedgerService } from '../application/customer-ledger.service';
 import { InvoiceService } from '../application/invoices.service';
 import { TreasuryService } from '../../treasury/application/treasury.service';
+import { TreasuryPostingExceptionsService } from '../../accounting/application/treasury-posting-exceptions.service';
 import { JournalEntryService, JOURNAL_ENTRY_DOCUMENT_TYPE } from '../../accounting/application/journal-entry.service';
 import { FinancialEventService } from '../../accounting/application/financial-events/financial-event.service';
 import { FinancialEventHandlerRegistry } from '../../accounting/application/financial-events/handler-registry';
@@ -274,6 +275,9 @@ describe('T2 — customer payment reversal through the owning document — real-
       `SELECT count(*)::int AS n FROM "accounting_financial_events" e WHERE e."eventType" = 'finance.payment.reversed' AND NOT EXISTS (SELECT 1 FROM "customer_payment_reversals" r WHERE r."paymentId"::text = e."sourceEntityId")`,
     );
     expect(reversalsWithoutRow[0].n).toBe(0);
+    // the offsetting leg of a reversed payment is covered by the document's own `...:reversed` event - it must NOT show up as a posting exception
+    const exc = await new TreasuryPostingExceptionsService(h.controlPlane).list({}, ds.manager);
+    expect(exc.rows.filter((r) => r.category === 'customer_payment')).toEqual([]);
     expect((await fingerprint('B')).treasuryTxns).toBe(0);
   });
 });

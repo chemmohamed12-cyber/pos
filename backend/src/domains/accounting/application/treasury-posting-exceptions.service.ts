@@ -43,25 +43,34 @@ export class TreasuryPostingExceptionsService {
   async list(opts: { limit?: number } = {}, manager?: EntityManager): Promise<TreasuryPostingExceptionsResult> {
     const runner = manager ?? this.dataSource;
     const limit = Math.min(500, Math.max(1, opts.limit ?? 200));
+    // The offsetting leg of a payment reversed through its owning document is covered by that document's `...:reversed` event (not by a per-leg event); those tables exist only
+    // where the Finance / Procurement tags were migrated, so the joins are added only when present.
+    const present: Array<{ cr: boolean; sr: boolean }> = await runner.query(`SELECT to_regclass('customer_payment_reversals') IS NOT NULL AS cr, to_regclass('supplier_payment_reversals') IS NOT NULL AS sr`);
+    const hasCr = !!present[0]?.cr;
+    const hasSr = !!present[0]?.sr;
     const sql = `
       WITH legs AS (
         SELECT t.id, t."transactionNumber", t.type, t.amount, t."movementDate", t."treasuryAccountId",
           CASE WHEN t."depositId" IS NOT NULL THEN 'deposit'
-               WHEN cp.id IS NOT NULL THEN 'customer_payment'
-               WHEN sp.id IS NOT NULL THEN 'supplier_payment'
+               WHEN cp.id IS NOT NULL OR ${hasCr ? 'cr.id IS NOT NULL' : 'false'} THEN 'customer_payment'
+               WHEN sp.id IS NOT NULL OR ${hasSr ? 'sr.id IS NOT NULL' : 'false'} THEN 'supplier_payment'
                WHEN t."employeeId" IS NOT NULL OR t."payrollRunId" IS NOT NULL THEN 'payroll'
                WHEN t.reason = 'cod_collection_custody' THEN 'cod_custody'
                WHEN t."transferGroupId" IS NOT NULL THEN 'transfer'
                ELSE 'direct_cash' END AS category,
           CASE WHEN t."depositId" IS NOT NULL THEN 'deposit:' || t."depositId" || ':verified'
                WHEN cp.id IS NOT NULL THEN 'customer-finance:payment:' || cp.id || ':recorded'
+               ${hasCr ? `WHEN cr.id IS NOT NULL THEN 'customer-finance:payment:' || cr."paymentId" || ':reversed'` : ''}
                WHEN sp.id IS NOT NULL THEN 'procurement:supplier_payment:' || sp.id || ':recorded'
+               ${hasSr ? `WHEN sr.id IS NOT NULL THEN 'procurement:supplier_payment:' || sr."supplierPaymentId" || ':reversed'` : ''}
                WHEN t."employeeId" IS NOT NULL OR t."payrollRunId" IS NOT NULL OR t.reason = 'cod_collection_custody' THEN NULL
                WHEN t."transferGroupId" IS NOT NULL THEN 'treasury:transfer:' || t."transferGroupId" || ':completed'
                ELSE 'treasury:txn:' || t.id || ':recorded' END AS expected_key
         FROM treasury_transactions t
         LEFT JOIN customer_payments cp ON cp."treasuryTransactionId" = t.id
         LEFT JOIN supplier_payments sp ON sp."treasuryTransactionId" = t.id
+        ${hasCr ? 'LEFT JOIN customer_payment_reversals cr ON cr."treasuryReversalTransactionId" = t.id' : ''}
+        ${hasSr ? 'LEFT JOIN supplier_payment_reversals sr ON sr."treasuryReversalTransactionId" = t.id' : ''}
         WHERE t.type <> 'transfer_in'
       )
       SELECT l.id AS "transactionId", l."transactionNumber", l.type, l.amount::text AS amount, to_char(l."movementDate", 'YYYY-MM-DD') AS "movementDate",
