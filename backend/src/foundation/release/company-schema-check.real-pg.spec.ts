@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { runMigrationsForDatabase } from '../release-orchestration/company-migration-runner';
 import { discoverMigrationTags } from './migration-datasource';
-import { checkCompanySchema, hasFindings } from './company-schema-check';
+import { checkCompanySchema, checkCompanySchemaInProcess, hasFindings } from './company-schema-check';
 
 /**
  * Company schema check against REAL Postgres and the REAL compiled repository (CTO 2026-10-21). Needs `npm run build` first (it loads `dist/`). The point of this spec
@@ -119,6 +119,34 @@ describeIsolated('Company schema check — real Postgres, real compiled reposito
     const before = await fp();
     await check(healthy, ALL_TAGS);
     expect(await fp()).toEqual(before);
+  });
+
+  it('the IN-PROCESS fallback gives exactly the child-process result (healthy and with a missing column + a missing table), and is used when the child cannot start', async () => {
+    const same = async (db: string) => {
+      const child = await check(db, ALL_TAGS);
+      const inProc = await checkCompanySchemaInProcess(process.cwd(), dbCfg(db), ALL_TAGS);
+      expect(inProc.ran).toBe(true);
+      expect(inProc.via).toBe('in_process');
+      expect({ checked: inProc.checkedTables, findings: inProc.findings }).toEqual({ checked: child.checkedTables, findings: child.findings });
+      return inProc;
+    };
+    expect(hasFindings((await same(healthy)).findings)).toBe(false);
+    const db = await freshCompanyDb('inproc', ALL_TAGS);
+    await onDb(db, async (ds) => {
+      await ds.query(`ALTER TABLE "products" DROP COLUMN "itemType"`);
+      await ds.query(`DROP TABLE "cash_sessions" CASCADE`);
+    });
+    const r = await same(db);
+    expect(r.findings.missingColumns.products).toContain('itemType');
+    expect(r.findings.missingTables).toContain('cash_sessions');
+    // the child cannot start (a host that refuses a second node process): the fallback still judges, and says so
+    const viaFallback = await checkCompanySchema(process.cwd(), dbCfg(db), ALL_TAGS, 'C:/definitely/not/node.exe', 60_000, true);
+    expect(viaFallback.ran).toBe(true);
+    expect(viaFallback.via).toBe('in_process');
+    expect(viaFallback.findings.missingColumns.products).toContain('itemType');
+    const noFallback = await checkCompanySchema(process.cwd(), dbCfg(db), ALL_TAGS, 'C:/definitely/not/node.exe', 60_000, false);
+    expect(noFallback.ran).toBe(false);
+    expect(noFallback.error).toContain('could not be started (ENOENT)');
   });
 
   it('a Company database that cannot be reached => ran:false, never clean, and the message carries no password', async () => {

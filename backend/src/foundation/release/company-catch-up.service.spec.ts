@@ -13,7 +13,7 @@ const co = (name: string, pending: string[], over: Partial<PlannedCompany> = {})
 const planOf = (planned: PlannedCompany[], over: Partial<CompanyFanoutPlan> = {}): CompanyFanoutPlan => ({ mode: 'on', scope: ['core'], planned, skipped: [], blockers: [], ...over });
 const okResult = (names: string[]): CompanyFanoutResult => ({ ok: true, outcomes: names.map((n) => ({ companyId: `id-${n}`, companyName: n, status: 'migrated' as const, executed: ['M1'], error: null, finalCompanyStatus: 'READY', durationMs: 1 })) });
 
-function build(opts: { release?: boolean; inFlight?: number; plan?: CompanyFanoutPlan } = {}) {
+function build(opts: { release?: boolean; inFlight?: Array<{ version: string; status: string }>; plan?: CompanyFanoutPlan } = {}) {
   const calls: string[] = [];
   const fanout = {
     plan: jest.fn(async () => (calls.push('plan'), opts.plan ?? planOf([co('A', ['M1']), co('B', ['M1'])]))),
@@ -24,7 +24,7 @@ function build(opts: { release?: boolean; inFlight?: number; plan?: CompanyFanou
   };
   const releaseRepo = {
     findOne: jest.fn(async () => (opts.release === false ? null : ({ id: 'rel-1', version: '1.1.11', status: 'succeeded' } as unknown as Release))),
-    count: jest.fn(async () => opts.inFlight ?? 0),
+    find: jest.fn(async () => opts.inFlight ?? []),
   };
   const dataSource = { getRepository: jest.fn(() => releaseRepo) };
   const auditCalls: Array<{ action: string; result: string }> = [];
@@ -56,8 +56,21 @@ describe('CompanyCatchUpService', () => {
     nothingChanged(f);
   });
 
-  it('refuses next to a deploy in flight', async () => {
-    const f = build({ inFlight: 1 });
+  it('refuses next to a deploy in flight (a NEWER version is being deployed)', async () => {
+    const f = build({ inFlight: [{ version: '99.0.0', status: 'migrating' }] });
+    await expect(f.svc.run('a', ['db_A', 'db_B'])).rejects.toThrow(/deploy is in progress \(99.0.0: migrating\)/);
+    nothingChanged(f);
+  });
+
+  it('a stale in-flight row of a version OLDER than the live build (a deploy cut off long ago, as 1.1.6 on the host) does NOT block the catch-up', async () => {
+    const f = build({ inFlight: [{ version: '1.0.1', status: 'deploying' }, { version: '1.1.6', status: 'health_checking' }] });
+    const r = await f.svc.run('a', ['db_A', 'db_B']);
+    expect(r.status).toBe('SUCCESS');
+    expect(await f.svc.preview()).toEqual({ databasesNeedingCatchUp: ['db_A', 'db_B'], refusal: null });
+  });
+
+  it('a stale row does not hide a genuinely newer deploy next to it', async () => {
+    const f = build({ inFlight: [{ version: '1.0.1', status: 'deploying' }, { version: '99.0.0', status: 'deploying' }] });
     await expect(f.svc.run('a', ['db_A', 'db_B'])).rejects.toThrow(/deploy is in progress/);
     nothingChanged(f);
   });

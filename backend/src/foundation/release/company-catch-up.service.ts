@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { AppConfigService } from '../configuration/app-config.service';
 import { AuditService } from '../audit/audit.service';
 import { readAppVersion } from './app-version';
+import { compareVersions } from './version-compare';
 import { Release } from './release.entity';
 import { CompanyBackupEvidence, CompanyFanoutBlockedError, CompanyFanoutService, summarizePlan, summarizeResult } from './company-fanout.service';
 import { hasFindings } from './company-schema-check';
@@ -67,8 +68,13 @@ export class CompanyCatchUpService {
     if (!release) {
       throw new CatchUpRefusedError(`No succeeded release row exists for the installed version ${installedBuild}: catch-up only repairs Companies of a release that is live.`);
     }
-    const inFlight = await this.dataSource.getRepository(Release).count({ where: [{ status: 'deploying' }, { status: 'migrating' }, { status: 'health_checking' }] });
-    if (inFlight > 0) throw new CatchUpRefusedError('A deploy is in progress; catch-up refuses to run next to it.');
+    const inFlight = await this.dataSource.getRepository(Release).find({ where: [{ status: 'deploying' }, { status: 'migrating' }, { status: 'health_checking' }] });
+    // A deploy of a version OLDER than (or equal to) the live build cannot be running next to it: the swap that made this build live ended that process (the 1.1.6 row on the
+    // host, cut off while the candidate was prepared, stayed `deploying` for good and blocked every catch-up). Only a newer version is a live deploy.
+    const live = inFlight.filter((r) => compareVersions(r.version, installedBuild) > 0);
+    const stale = inFlight.filter((r) => compareVersions(r.version, installedBuild) <= 0);
+    if (live.length > 0) throw new CatchUpRefusedError(`A deploy is in progress (${live.map((r) => `${r.version}: ${r.status}`).join(', ')}); catch-up refuses to run next to it.`);
+    if (stale.length > 0) this.logger.warn(`catch-up ignores ${stale.length} stale in-flight release row(s) older than the live build ${installedBuild}: ${stale.map((r) => `${r.version}=${r.status}`).join(', ')}`);
     const plan = await this.fanout.plan(this.config.releaseExecution.appRoot);
     return { release, installedBuild, plan };
   }

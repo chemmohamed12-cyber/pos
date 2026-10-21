@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, MigrationExecutor } from 'typeorm';
 import { AppConfigService } from '../configuration/app-config.service';
@@ -10,6 +11,12 @@ import { BackupManagerService } from './backup-manager.service';
 import { CompanySchemaCheckResult, checkCompanySchema, summarizeFindings } from './company-schema-check';
 import { createMigrationDataSource, discoverMigrationTags } from './migration-datasource';
 import { migrationNamesByTag, tagsReceivedByCompany } from './migration-names';
+
+/** True when `candidatePath` is the application root of the build that is running this process (dist/foundation/release -> three levels up). */
+export function isRunningBuildRoot(candidatePath: string): boolean {
+  const norm = (p: string) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
+  return norm(candidatePath) === norm(resolve(__dirname, '..', '..', '..'));
+}
 
 /**
  * Release Engine — Company fan-out (CTO 2026-10-08). The capability the Production Engine did not have: a staged deploy that upgrades the EXISTING Company
@@ -225,7 +232,7 @@ export class CompanyFanoutService {
   async schemaCheck(companyId: string, candidatePath: string, tags: readonly string[]): Promise<CompanySchemaCheckResult> {
     try {
       const cfg = await this.registry.getConnectionConfigForCompany(companyId);
-      return await checkCompanySchema(candidatePath, cfg, tags, this.config.releaseBuild.nodeBin);
+      return await checkCompanySchema(candidatePath, cfg, tags, this.config.releaseBuild.nodeBin, undefined, isRunningBuildRoot(candidatePath));
     } catch (err) {
       return { ran: false, checkedTables: 0, findings: { missingTables: [], missingColumns: {} }, error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300) };
     }

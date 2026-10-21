@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import * as childProcess from 'child_process';
 import { readFileSync as readFile } from 'fs';
-import { checkCompanySchema, hasFindings, summarizeFindings, tablesCreatedByTags, SCHEMA_CHECK_PROGRAM } from './company-schema-check';
+import { checkCompanySchema, describeChildFailure, hasFindings, summarizeFindings, tablesCreatedByTags, SCHEMA_CHECK_PROGRAM } from './company-schema-check';
 
 jest.mock('child_process', () => ({ execFile: jest.fn() }));
 
@@ -79,7 +79,7 @@ describe('checkCompanySchema (child process mocked)', () => {
   it('runs the program in the CANDIDATE directory, passes credentials only through the environment, and returns the findings', async () => {
     respond(null, JSON.stringify({ checked: 90, missingTables: ['cash_sessions'], missingColumns: { products: ['itemType'] } }));
     const r = await checkCompanySchema(root, db, ['core'], 'node');
-    expect(r).toEqual({ ran: true, checkedTables: 90, findings: { missingTables: ['cash_sessions'], missingColumns: { products: ['itemType'] } } });
+    expect(r).toEqual({ ran: true, checkedTables: 90, findings: { missingTables: ['cash_sessions'], missingColumns: { products: ['itemType'] } }, via: 'child_process' });
     const [bin, args, opts] = execFileMock.mock.calls[0];
     expect(bin).toBe('node');
     expect(args).toEqual(['-e', SCHEMA_CHECK_PROGRAM]);
@@ -103,6 +103,33 @@ describe('checkCompanySchema (child process mocked)', () => {
     expect(r.error).toContain('password authentication failed');
     expect(r.error).not.toContain('S3cr3t-pw');
     expect(r.findings).toEqual({ missingTables: [], missingColumns: {} });
+  });
+
+  it('the reported reason is the exit code / signal / stderr, NEVER the echoed command line (the host showed only "Command failed: node -e const path = require")', async () => {
+    respond(Object.assign(new Error('Command failed: node -e ' + SCHEMA_CHECK_PROGRAM), { signal: 'SIGKILL', stderr: '' }));
+    const r = await checkCompanySchema(root, db, ['core'], 'node');
+    expect(r.ran).toBe(false);
+    expect(r.error).toContain('killed by SIGKILL');
+    expect(r.error).toContain('no stderr output');
+    expect(r.error).not.toContain('Command failed');
+    expect(r.error).not.toContain('const path');
+  });
+
+  it('describeChildFailure covers timeout, start failure, exit code and stderr tail', () => {
+    expect(describeChildFailure({ killed: true, signal: 'SIGTERM' }, 120_000)).toContain('120s timeout');
+    expect(describeChildFailure({ code: 'EAGAIN' }, 1)).toContain('could not be started (EAGAIN)');
+    expect(describeChildFailure({ code: 1, stderr: 'x'.repeat(1000) + 'THE-END' }, 1)).toMatch(/exited with code 1; stderr: .*THE-END$/);
+  });
+
+  it('the in-process fallback is used ONLY when allowed (the candidate is the running build); otherwise the child failure is reported as it is', async () => {
+    respond(Object.assign(new Error('x'), { signal: 'SIGKILL', stderr: '' }));
+    const r = await checkCompanySchema(root, db, ['core'], 'node', 1000, false);
+    expect(r.ran).toBe(false);
+    expect(r.via).toBe('child_process');
+    const withFallback = await checkCompanySchema(root, db, ['core'], 'node', 1000, true); // root has no typeorm / dist registry -> the fallback cannot run either
+    expect(withFallback.ran).toBe(false);
+    expect(withFallback.error).toContain('child process:');
+    expect(withFallback.error).toContain('in-process:');
   });
 
   it('unparseable output => ran:false (never clean)', async () => {
