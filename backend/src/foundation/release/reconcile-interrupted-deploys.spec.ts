@@ -1,5 +1,5 @@
 import { ReleaseExecutionService } from './release-execution.service';
-import { currentCompanyFanoutMock } from './company-gate-test-fixtures';
+import { currentCompanyFanoutMock } from './company-gate.test-helper';
 import { Release } from './release.entity';
 import { ReleaseManifest } from './release-manifest';
 import { ReleaseMigrationRun } from './release-migration-run.entity';

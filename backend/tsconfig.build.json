@@ -5,6 +5,7 @@
     "test",
     "dist",
     "**/*spec.ts",
+    "src/foundation/release/company-gate.test-helper.ts",
     "tools",
     "_deploy",
     "archive",
