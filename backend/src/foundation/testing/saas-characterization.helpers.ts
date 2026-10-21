@@ -8,8 +8,9 @@ import { DataSource } from 'typeorm';
  * Not production code. Untracked evidence tooling.
  *
  * Safety rule enforced here (CTO: tests never target the shared dev server):
- * `assertIsolatedInstance()` throws unless DB_PORT points at the isolated instance
- * (127.0.0.1:5544) — the specs refuse to run against 5433 or an unset port.
+ * `assertIsolatedInstance()` throws unless DB_PORT points at an isolated instance: the original isolated
+ * instance (127.0.0.1:5544) or the DB-guard-approved dedicated cluster (127.0.0.1:5546, the role the biz
+ * runner sets, disposable names `daii_test_biz_tNN...` only) — the specs refuse to run against 5433 or an unset port.
  */
 export const DB_HOST = process.env.DB_HOST ?? '';
 export const DB_PORT = process.env.DB_PORT ? Number(process.env.DB_PORT) : 0;
@@ -17,9 +18,22 @@ export const DB_USER = process.env.DB_USER ?? '';
 export const DB_PASSWORD = process.env.DB_PASSWORD ?? '';
 export const APP_ROOT = process.cwd();
 
+const DEDICATED_BIZ_CLUSTER_PORT = 5546;
+const DEDICATED_BIZ_CLUSTER_ROLE = 'daii_biz_test';
+const DEDICATED_BIZ_CLUSTER_NAME = /^daii_test_biz_t[0-9]{2}[a-z0-9_]*$/;
+
 export function assertIsolatedInstance(): void {
-  if (DB_HOST !== '127.0.0.1' || DB_PORT !== 5544 || !DB_USER || !DB_PASSWORD) {
-    throw new Error('Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).');
+  const legacyIsolated = DB_PORT === 5544;
+  const dedicatedBizCluster = DB_PORT === DEDICATED_BIZ_CLUSTER_PORT && DB_USER === DEDICATED_BIZ_CLUSTER_ROLE;
+  if (DB_HOST !== '127.0.0.1' || !(legacyIsolated || dedicatedBizCluster) || !DB_USER || !DB_PASSWORD) {
+    throw new Error('Refusing to run: these characterization specs only run against an isolated PostgreSQL instance (DB_HOST=127.0.0.1 and DB_PORT=5544, or the approved dedicated cluster DB_PORT=5546 with its biz role + credentials). Never the shared dev server.');
+  }
+}
+
+/** On the dedicated cluster the DB guard approves only `daii_test_biz_tNN...` names; refuse anything else before sending a statement. */
+function assertNameAllowedOnThisInstance(name: string): void {
+  if (DB_PORT === DEDICATED_BIZ_CLUSTER_PORT && !DEDICATED_BIZ_CLUSTER_NAME.test(name)) {
+    throw new Error(`Refusing: on the dedicated cluster only daii_test_biz_tNN... database names are allowed (got ${name})`);
   }
 }
 
@@ -38,6 +52,7 @@ export const dbConfig = (database: string) => ({ host: DB_HOST, port: DB_PORT, u
 
 export async function createDisposableDatabase(name: string): Promise<void> {
   if (!/^daii_test_[a-z0-9_]+$/.test(name)) throw new Error(`Refusing to create non-disposable database name: ${name}`);
+  assertNameAllowedOnThisInstance(name);
   await withAdmin(async (admin) => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`CREATE DATABASE "${name}"`);
@@ -51,6 +66,7 @@ export async function databaseExists(name: string): Promise<boolean> {
 /** Drops a disposable database; retries once because teardown can race other sessions' connections. */
 export async function dropDisposableDatabase(name: string): Promise<void> {
   if (!/^daii_test_[a-z0-9_]+$/.test(name)) throw new Error(`Refusing to drop non-disposable database name: ${name}`);
+  assertNameAllowedOnThisInstance(name);
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       await withAdmin(async (admin) => {

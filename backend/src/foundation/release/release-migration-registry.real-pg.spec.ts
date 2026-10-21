@@ -18,7 +18,7 @@ import { assertIsolatedInstance, createDisposableDatabase, dbConfig, dropDisposa
  * migration primitives (`ReleaseExecutionService.resolveEntitlementTags` / `runReleaseMigrations`
  * / `verifyMigrationsComplete` / `undoReleaseMigrations`, the real `buildMigrationPreflight`,
  * the real `createMigrationDataSource`) against REAL disposable PostgreSQL databases on the
- * ISOLATED instance (127.0.0.1:5544 — `assertIsolatedInstance()` refuses anything else), over
+ * ISOLATED instance (127.0.0.1:5544, or the approved dedicated cluster 127.0.0.1:5546 under the biz runner — `assertIsolatedInstance()` refuses anything else), over
  * COPIES of the compiled `dist/database/migrations` tree (`npm run build` first).
  *
  * D3 is CLOSED (2026-10-06): its two migrations (1789860000000 / 1789870000000) are part of the normal tree and are
@@ -31,7 +31,8 @@ import { assertIsolatedInstance, createDisposableDatabase, dbConfig, dropDisposa
  */
 const HELD_MIGRATION_IDS: string[] = [];
 const DIST_MIGRATIONS = join(process.cwd(), 'dist', 'database', 'migrations');
-const PREFIX = `daii_test_h3reg_${Date.now() % 100000}`;
+// namespace t85: valid for the DB guard's dedicated-cluster pattern (daii_test_biz_tNN...) and for the legacy 5544 instance; never t79 / t80 / t81 (other sessions)
+const PREFIX = `daii_test_biz_t85_h3reg_${Date.now() % 100000}`;
 
 /** Migrations added by "Release N+1" relative to "Release N" (accounting + manufacturing). */
 const N1_ONLY_IDS = ['1789733000000', '1789760000000', '1790000100000', '1790000200000'];
