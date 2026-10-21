@@ -1,0 +1,21 @@
+node_modules copied
+{"daii_test_biz_t88_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t88_u_c01":{"migrations":299,"customers":1,"salesInvoices":2},"daii_test_biz_t88_u_c02":{"migrations":299,"customers":1,"salesInvoices":2}}
+started pid 29708
+app old on :3631 -> 401 (401 = up)
+=== R3: old app RUNNING from the active slot (holds the directory); deploy 1.1.12 with RELEASE_COMPANY_MIGRATIONS=on
+deploy exit=0
+  "status": "failed",
+  "errorMessage": "EBUSY: resource busy or locked, rename 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.test-cluster\\gate-rehearsal-1112\\deploy\\app' -> 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.test-cluster\\gate-rehearsal-1112\\deploy\\app.prev-23b4d6aa-372f-4814-a63b-37a7aec2d66f'",
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"failed","e":"EBUSY: resource busy or locked, rename 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPAC"},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+-- the OLD app keeps serving on the already-advanced databases (expand-only compatibility):
+/treasury/cash-sessions -> HTTP 200 {"ok":true}
+/procurement/supplier-invoices -> HTTP 200 {"ok":true}
+/customers -> HTTP 200 {"ok":true}
+/products/all -> HTTP 200 {"ok":true}
+stopped 29708
+=== R3: holder stopped; re-run the SAME release (installed engine 1.1.11)
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+R3-DONE

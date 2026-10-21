@@ -1,0 +1,87 @@
+[31m[Nest] 30188  - [39m٢١‏/١٠‏/٢٠٢٦، ٦:٤٩:١٩ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31m[DIAG f064242d] scanDeltaMigrations connection=daii_biz_test@127.0.0.1:5546/daii_test_biz_t88_u_main migrationsLoaded=320 executedCount=320 pendingCount=0 pendingNames=[][39m
+{
+  "releaseId": "33716bad-4a54-4d36-96b0-49c99b4cbca6",
+  "version": "1.1.12",
+  "status": "succeeded",
+  "errorMessage": null,
+  "events": [
+    {
+      "seq": 38,
+      "action": "release.registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.12\", \"packageType\": \"full\"}"
+    },
+    {
+      "seq": 39,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"074516fc-59a7-4d2c-93e3-fcd071d6c443\"}"
+    },
+    {
+      "seq": 40,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 41,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 42,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal-1112\\\\deploy\\\\app.next-33716bad-4a54-4d36-96b0-49c99b4cbca6\\\\dist\\\\main.js + D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal-1112\\\\deploy\\\\app.next-33716bad-4a54-4d36-96b0-49c99b4cbca"
+    },
+    {
+      "seq": 43,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 44,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 45,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"CreateSupplierPaymentReversals1790030400000\", \"current\": \"CreateSupplierPaymentReversals1790030400000\", \"pending\": [], \"decision\": \"READY_TO_ACTIVATE\", \"tagsInScope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"compatibility\": {\"ok\": true, \"reason\": \"not a delta package, a"
+    },
+    {
+      "seq": 46,
+      "action": "release.deploy.company_fanout",
+      "result": "success",
+      "after": "{\"mode\": \"off\", \"note\": \"Company databases are not part of this deployment (RELEASE_COMPANY_MIGRATIONS=off); none was read or written.\"}"
+    },
+    {
+      "seq": 47,
+      "action": "release.deploy.swapped",
+      "result": "success",
+      "after": "{\"activePath\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal-1112\\\\deploy\\\\app\", \"previousPath\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal-1112\\\\deploy\\\\app.prev-33716bad-4a54-4d36-96b0-49c99b4cbca6\"}"
+    },
+    {
+      "seq": 48,
+      "action": "release.deploy.restart_triggered",
+      "result": "success",
+      "after": "{\"phase\": \"deploy\", \"restartFile\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal-1112\\\\deploy\\\\app\\\\tmp\\\\restart.txt\"}"
+    },
+    {
+      "seq": 49,
+      "action": "release.deploy.evidence",
+      "result": "success",
+      "after": "{\"layers\": {\"deployment\": \"ok (files swapped, migrations verified, health check ok)\", \"applicationStartup\": {\"reason\": \"RELEASE_READINESS_URL not configured\", \"status\": \"UNVERIFIED\"}, \"functionalReadiness\": {\"detail\": {\"reason\": \"application startup was not verified\"}, \"status\": \"skipped\"}}, \"outcome\": \"DEPLOYED_UNVERIFIED\", \"engineVersion\": \"1.1.11\", \"releaseVersion\": \"1.1.12\"}"
+    },
+    {
+      "seq": 50,
+      "action": "release.deploy.succeeded",
+      "result": "success",
+      "after": "{\"outcome\": \"DEPLOYED_UNVERIFIED\", \"swapped\": true}"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+node_modules copied
+{"daii_test_biz_t88_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t88_u_c01":{"migrations":299,"customers":1,"salesInvoices":2},"daii_test_biz_t88_u_c02":{"migrations":299,"customers":1,"salesInvoices":2}}
+started pid 11204
+app old on :3631 -> 401 (401 = up)
+=== F0: OLD 1.1.11 app, Companies at 299 (today on the host)
+/treasury/cash-sessions -> HTTP 500 {"code":"INTERNAL_ERROR","msg":"An unexpected error occurred."}
+/procurement/supplier-invoices -> HTTP 500 {"code":"INTERNAL_ERROR","msg":"An unexpected error occurred."}
+/customers -> HTTP 200 {"ok":true}
+stopped 11204
+=== F1: deploy FINAL 1.1.12 (sha d575edd5) with the setting unset, installed engine 1.1.11
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0}}
+started pid 376
+app new on :3632 -> 401 (401 = up)
+=== F2: INTERIM - new app, Companies still at 299, existing sessions
+/treasury/cash-sessions -> HTTP 503 {"code":"COMPANY_SCHEMA_BEHIND","msg":"This Company is being upgraded to the installed version and is temporarily unavailable. A "}
+/procurement/supplier-invoices -> HTTP 503 {"code":"COMPANY_SCHEMA_BEHIND","msg":"This Company is being upgraded to the installed version and is temporarily unavailable. A "}
+/customers -> HTTP 503 {"code":"COMPANY_SCHEMA_BEHIND","msg":"This Company is being upgraded to the installed version and is temporarily unavailable. A "}
+-- login + select Company:
+{"success":true,"data":{"accessToken":"eyJhbGciOiJIUzI1NiIsI
+
+-- platform routes:
+{"allCurrent":false,"decision":"BEHIND","needCatchUp":["daii_test_biz_t88_u_c01","daii_test_biz_t88_u_c02"]}
+=== F3: catch-up through the Release Center API (platform token), confirmation = the exact list
+{"status":"SUCCESS","migrated":["Rehearsal Co 1 (c01)","Rehearsal Co 2 (c02)"],"failed":[],"stillPending":{},"schemaProblems":{}}
+=== F4: after the catch-up (same pre-upgrade sessions)
+/treasury/cash-sessions -> HTTP 200 {"ok":true}
+/procurement/supplier-invoices -> HTTP 200 {"ok":true}
+/customers -> HTTP 200 {"ok":true}
+/treasury/cash-sessions -> HTTP 200 {"ok":true}
+/procurement/supplier-invoices -> HTTP 200 {"ok":true}
+/customers -> HTTP 200 {"ok":true}
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+=== F5: the response envelope for a behind Company (needs a behind Company: briefly sabotage-free check via live status only)
+F-DONE

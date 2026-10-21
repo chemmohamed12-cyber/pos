@@ -1,0 +1,22 @@
+=== REGRESSION: src/foundation/database-registry/company-schema-admission.real-pg.spec.ts
+Tests:       3 passed, 3 total
+RESULT PASS src/foundation/database-registry/company-schema-admission.real-pg.spec.ts
+=== REGRESSION: src/foundation/company/company-lifecycle-admission.real-pg.spec.ts
+Tests:       14 passed, 14 total
+RESULT PASS src/foundation/company/company-lifecycle-admission.real-pg.spec.ts
+=== REGRESSION: src/foundation/company/company-lifecycle-layer1.real-pg.spec.ts
+Tests:       10 passed, 10 total
+RESULT PASS src/foundation/company/company-lifecycle-layer1.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+Tests:       14 passed, 14 total
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/company-schema-check.real-pg.spec.ts
+Tests:       6 passed, 6 total
+RESULT FAIL src/foundation/release/company-schema-check.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/release-migration-registry.real-pg.spec.ts
+Tests:       21 passed, 21 total
+RESULT PASS src/foundation/release/release-migration-registry.real-pg.spec.ts
+=== REGRESSION: src/foundation/company/area6-company-isolation.acceptance.spec.ts
+Tests:       5 passed, 5 total
+RESULT PASS src/foundation/company/area6-company-isolation.acceptance.spec.ts
+REGRESSION DONE: 6/7 passed
