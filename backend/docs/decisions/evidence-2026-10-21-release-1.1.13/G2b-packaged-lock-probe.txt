@@ -1,0 +1,2 @@
+deploy during catch-up -> ConflictException A Company catch-up is running; a deploy cannot start next to it. Wait for it to finish.
+catch-up during deploy -> CatchUpRefusedError A deploy is in progress in this application; catch-up refuses to run next to it.

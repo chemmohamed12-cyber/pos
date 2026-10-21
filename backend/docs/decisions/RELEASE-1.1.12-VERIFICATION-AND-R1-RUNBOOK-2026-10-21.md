@@ -1,3 +1,5 @@
+> **SUPERSEDED for the host as it is now (2026-10-21, later):** 1.1.12 is already live there (engine 1.1.12) and its catch-up was blocked by a stale release row and an unreadable schema-check failure. The actual host steps are in `RELEASE-1.1.13-HOST-FINDINGS-AND-PATCH-2026-10-21.md` (package 1.1.13, SHA-256 `351922653e672ad7f9dcedd3bce2acaceaec9299fdf325babaa1ad320f7f6b60`). The text below remains the record of the 1.1.12 rehearsal.
+
 # DAII 1.1.12 - verification report and R1 runbook (2026-10-21)
 
 **Artifact.** Version **1.1.12** (`full`), package source commit **`511cbee`** on `release/1.1.12` (later commits on the branch are documentation/evidence only), file `_release-output/Daii-Release-v1.1.12-2026-10-21.zip`, 5,773,621 bytes, **SHA-256 `d575edd53e6bcb339814a9037a351520f5d1d24534288cb3fc7f6da48a167f0d`** (`.sha256` file beside it). Built from a clean `git archive` export with its own `node_modules` (no `npm ci` in any junction worktree). Previous packages untouched (1.1.9 `cff205a6`, 1.1.10 `89b8a979`, 1.1.11 `c5d0afa7` re-hashed). **Not uploaded, not deployed, not merged to `main`, no host change.**

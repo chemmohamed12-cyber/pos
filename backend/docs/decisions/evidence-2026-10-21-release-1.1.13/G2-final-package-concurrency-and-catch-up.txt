@@ -1,0 +1,35 @@
+node_modules copied
+{"daii_test_biz_t91_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t91_u_c01":{"migrations":299,"customers":1,"salesInvoices":2},"daii_test_biz_t91_u_c02":{"migrations
+=== G2 deploy (installed engine 1.1.11, setting unset)
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.13","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSession
+1.1.13=succeeded, 1.1.6=deploying
+started pid 20336
+app g on :3651 -> 401 (401 = up)
+=== G2 live status (host screenshot state)
+{"installedBuild":"1.1.13","configuredMode":"on","modeExplicit":false,"allCurrent":false,"decision":"BEHIND","blockers":["Rehearsal Co 1 (c01): 21 pending migration(s), 16 missing table(s), 6 table(s) with missing columns","Rehearsal Co 2 (c02): 21 pending migration(s), 16 missing table(s), 6 table(s) with missing columns"],"warnings":[],"counts":{"evaluated":2,"needingMigration":2,"withSchemaFindings":2,"withUnknownMigrations":0,"staleSkipped":0,"outOfScope":0},"staleCompanies":[],"databasesNeedingCatchUp":["daii_test_biz_t91_u_c01","daii_test_biz_t91_u_c02"],"plan":{"mode":"on","companies":[{"companyId":"a9190abe-6e15-403e-afdc-8483f813fc1e","name":"Rehearsal Co 1 (c01)","database":"daii_test_biz_t91_u_c01","tags":["accounting","attendance","commission","core","finance","hr","inventory","logistics","manufacturing","payroll","procurement","sales","targets"],"pendingCount":21,"pending":[
+
+=== G2 H1: a NEWER release in flight (9.9.9=deploying) blocks the catch-up
+1.1.13=succeeded, 1.1.6=deploying, 9.9.9=deploying
+{"success":false,"error":{"code":"CONFLICT","message":"A deploy is in progress (9.9.9: deploying); catch-up refuses to run next to it."},"meta":{"correlationId":"b4301fd5-c5ce-4f59-a624-f2457b188171"}}
+HTTP 409
+1.1.13=succeeded, 1.1.6=deploying
+=== G2 H2: wrong confirmation (only c01) is refused, nothing changed
+{"success":false,"error":{"code":"CONFLICT","message":"The confirmation must list exactly the Company databases that will be migrated: daii_test_biz_t91_u_c01, daii_test_biz_t91_u_c02. Nothing was changed."},"meta":{"correlationId":"df291d05-5b32-4ad6-b3fc-0c64fecdf8f3"}}
+HTTP 409
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.6","status":"deploying","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrat
+=== G2 H3: catch-up (exact confirmation) running; a second catch-up and a deploy are refused meanwhile
+-- second catch-up:
+{"success":false,"error":{"code":"CONFLICT","message":"A catch-up is already running."},"meta":{"correlationId":"09a22b7e-6bc4-49fd-8689-1ae610e33733"}}
+HTTP 409
+-- deploy of any release:
+{"success":false,"error":{"code":"NOT_FOUND","message":"Release \"00000000-0000-4000-8000-000000000000\" not found."},"meta":{"correlationId":"dee96de6-9957-42a1-bf7c-5cb10e964a85"}}
+HTTP 404
+-- the first catch-up:
+{"success":true,"data":{"releaseId":"1353c8da-880a-43d0-bc6b-798dde006b36","installedBuild":"1.1.13","databasesWithPending":["daii_test_biz_t91_u_c01","daii_test_biz_t91_u_c02"],"migrated":["Rehearsal Co 1 (c01)","Rehearsal Co 2 (c02)"],"failed":[],"notAttempted":[],"stillPending":{},"schemaProblems":{},"skippedNotReady":[],"status":"SUCCESS","note":"Every READY Company is migrated and re-verified (pending migrations and schema)."},"meta":{"correlationId":"9de5e514-ae35-4cab-b289-9c7221311130"}}
+HTTP 201
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.6","status":"deploying","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+stopped 20336
+G-DONE

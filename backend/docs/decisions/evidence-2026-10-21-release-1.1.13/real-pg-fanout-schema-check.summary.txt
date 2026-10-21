@@ -1,7 +1,0 @@
-=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
-Tests:       14 passed, 14 total
-RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
-=== REGRESSION: src/foundation/release/company-schema-check.real-pg.spec.ts
-Tests:       7 passed, 7 total
-RESULT PASS src/foundation/release/company-schema-check.real-pg.spec.ts
-REGRESSION DONE: 2/2 passed

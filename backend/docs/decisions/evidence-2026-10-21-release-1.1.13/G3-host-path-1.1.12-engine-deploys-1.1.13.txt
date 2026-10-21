@@ -1,0 +1,13 @@
+node_modules copied
+{"daii_test_biz_t91_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t91_u_c01":{"migrati
+=== G3a: bring the host state: deploy 1.1.12 (d575edd5) through the 1.1.11 engine
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migra
+1.1.12=succeeded, 1.1.6=deploying
+=== G3b: deploy 1.1.13 through the INSTALLED 1.1.12 engine, setting unset
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.13","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+G-DONE
