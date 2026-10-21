@@ -1,9 +1,10 @@
-import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { join } from 'path';
 import { AppConfigService } from '../configuration/app-config.service';
 import { migrationNamesByTag, pendingFor, tagsReceivedByCompany } from '../release/migration-names';
 import { discoverMigrationTags } from '../release/migration-datasource';
+import { DaiiException } from '../error-contract/daii-exception';
 
 /**
  * Company SCHEMA ADMISSION (CTO 2026-10-21, 1.1.12). The interim-period guard: a release can be LIVE while a Company database is still on an older schema (the state the
@@ -24,17 +25,18 @@ import { discoverMigrationTags } from '../release/migration-datasource';
  */
 export const COMPANY_SCHEMA_BEHIND_CODE = 'COMPANY_SCHEMA_BEHIND';
 
-/** HTTP 503 with the stable code; carries no Company data, only what the operator must do. */
-export class CompanySchemaBehindException extends ServiceUnavailableException {
+/**
+ * HTTP 503 with the stable code `COMPANY_SCHEMA_BEHIND` (a `DaiiException`, so the global error filter keeps the code in the response envelope); carries no Company data,
+ * only what the operator must do.
+ */
+export class CompanySchemaBehindException extends DaiiException {
   constructor() {
-    super({
-      statusCode: 503,
-      error: 'Service Unavailable',
-      code: COMPANY_SCHEMA_BEHIND_CODE,
-      message:
-        'This Company is being upgraded to the installed version and is temporarily unavailable. A platform administrator must complete the Company catch-up (Release Center). / ' +
+    super(
+      COMPANY_SCHEMA_BEHIND_CODE,
+      'This Company is being upgraded to the installed version and is temporarily unavailable. A platform administrator must complete the Company catch-up (Release Center). / ' +
         'هذه الشركة قيد الترقية إلى الإصدار المثبّت وغير متاحة مؤقتًا؛ يجب أن يستكمل مسؤول المنصة ترحيل قواعد بيانات الشركات من مركز الإصدارات.',
-    });
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 }
 

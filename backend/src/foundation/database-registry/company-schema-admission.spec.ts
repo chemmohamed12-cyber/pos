@@ -41,10 +41,9 @@ describe('CompanySchemaAdmission', () => {
     const e = (await isBehind(adm.assertCurrent('c1', ds as never))) as CompanySchemaBehindException;
     expect(e).toBeInstanceOf(CompanySchemaBehindException);
     expect(e.getStatus()).toBe(503);
-    const body = e.getResponse() as { code: string; message: string };
-    expect(body.code).toBe(COMPANY_SCHEMA_BEHIND_CODE);
-    expect(body.message).toContain('catch-up');
-    expect(body.message).toContain('الإصدارات');
+    expect(e.code).toBe(COMPANY_SCHEMA_BEHIND_CODE); // a DaiiException: the global filter keeps the code in the response envelope
+    expect(e.message).toContain('catch-up');
+    expect(e.message).toContain('الإصدارات');
   });
 
   it('the tag rule is the deploy\'s: a Company that never received a tag is not required to have its migrations; one that has ANY of a tag must have all of it', async () => {
