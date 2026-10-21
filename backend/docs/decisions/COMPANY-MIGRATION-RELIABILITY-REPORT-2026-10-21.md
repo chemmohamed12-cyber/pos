@@ -63,3 +63,18 @@ Results: see section 6 (final numbers).
 
 ## 6. Verification summary (final numbers are in the commit message / evidence folder)
 Evidence: `backend/docs/decisions/evidence-2026-10-21-company-migration-gate/` (README with the incident repro, the five rehearsal event logs, real-PG run summary). Final regression figures: see the last section appended below.
+
+## 7. Final results (after the last code change)
+| Layer | Result |
+|---|---|
+| Database-free unit mode (`npm run test:unit`, reviewed list; 6 new specs registered) | **72 suites / 582 tests PASS** (before this work: 66 / 509 per the 1.1.11 handover) |
+| Real PostgreSQL / HTTP, release area, namespace t89 | **8/8 specs, 69 tests PASS**: company-fanout.real-pg 14, company-schema-check.real-pg 6, release-migration-registry.real-pg (H3) 21, release-execution-environment-check 9, restore-manager-audit-chain.real-pg 3, company-migration-runner 5, installation-bootstrap.real-pg 8, release-upload.http 3 |
+| End-to-end engine rehearsal, real databases (t88) | off BLOCKED, dry-run PLAN ONLY, on SUCCEEDED, activation failure after migrations reported as such and recovered with 0 repeated migrations (evidence folder) |
+| `tsc --noEmit` backend, `tsc -b` frontend, ESLint backend, oxlint frontend | clean (one pre-existing frontend warning at ReleaseCenter.tsx:159) |
+| Browser | Release Center "Company databases" panel verified on an isolated preview (Company at the old schema: "5 pending migration(s), 7 missing table(s)"; default mode `on`, not explicit) |
+Cluster 5546: every run used a coordinated window with the Treasury session (t88 rehearsal, t89 regression); all databases dropped, nothing of mine remains. The temporary isolated preview processes (:3621 / :5621) were stopped.
+
+## 8. Decisions requested from the owner
+1. **Part A (host):** run the read-only Stage 0 / Stage A of `OWNER-RUNBOOK-ADDENDUM-1.1.11.md` on the host and send the output + the filled decision sheet; nothing is changed on the host before the plan, restore points and approval.
+2. **Part B (release):** authorize building the corrective release (proposed name 1.1.12: version, package, hosting upload are NOT authorized by anything done here) and decide: (a) keep the new defaults (unset = on; `off` enforced; non-READY Companies block) or soften the STALE policy to `allow` by default; (b) whether to build the "catch-up on reactivation" and the Release Center catch-up action (not built); (c) merge path for `fix/company-migration-gate` (not merged anywhere).
+3. Deploy 1.1.12 itself with `RELEASE_COMPANY_MIGRATIONS=on` set explicitly (see limit 1).
