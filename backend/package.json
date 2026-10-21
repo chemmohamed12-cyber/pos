@@ -1,6 +1,6 @@
 {
   "name": "daii-backend",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "description": "Daii Platform backend — Stage 2 Foundation build. See Daii/planning/stage-2/ for the build order this implements.",
   "private": true,
   "license": "UNLICENSED",
