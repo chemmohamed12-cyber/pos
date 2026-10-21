@@ -11,14 +11,14 @@ const clean = { ran: true, checkedTables: 100, findings: { missingTables: [], mi
 const drift = { ran: true, checkedTables: 100, findings: { missingTables: ['cash_sessions', 'bank_statements'], missingColumns: { products: ['itemType'] } } };
 const planOf = (over: Partial<CompanyFanoutPlan>): CompanyFanoutPlan => ({ mode: 'on', scope: ['core'], planned: [], skipped: [], blockers: [], ...over });
 
-function controller(opts: { plan?: CompanyFanoutPlan; wire?: boolean; rows?: unknown[] } = {}) {
+function controller(opts: { plan?: CompanyFanoutPlan; wire?: boolean; rows?: unknown[]; catchUp?: { run: jest.Mock } | null } = {}) {
   const fanout = { plan: jest.fn(async () => opts.plan ?? planOf({})) };
   const dataSource = { query: jest.fn(async () => opts.rows ?? []) };
   const config = {
     releaseExecution: { appRoot: 'C:/app' },
     releaseDeploy: { companyMigrations: 'on', companyMigrationsExplicit: false, companySkippedPolicy: 'block', companySchemaCheck: 'enforce' },
   };
-  const c = new ReleaseController({} as never, {} as never, {} as never, {} as never, {} as never, {} as never, config as never, dataSource as never, opts.wire === false ? undefined : (fanout as never));
+  const c = new ReleaseController({} as never, {} as never, {} as never, {} as never, {} as never, {} as never, config as never, dataSource as never, opts.wire === false ? undefined : (fanout as never), opts.catchUp === null ? undefined : ((opts.catchUp ?? { run: jest.fn(async () => ({ status: 'SUCCESS' })) }) as never));
   return { c, fanout, dataSource };
 }
 
@@ -67,6 +67,34 @@ describe('GET release/company-migrations (live, read-only)', () => {
   it('the service not wired => 503, never an empty "all current"', async () => {
     const { c } = controller({ wire: false });
     await expect(c.getLiveCompanyMigrationStatus()).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+});
+
+describe('POST release/company-migrations/catch-up', () => {
+  it('runs the catch-up as the signed-in actor with the confirmation list, and returns its result', async () => {
+    const catchUp = { run: jest.fn(async () => ({ status: 'SUCCESS', migrated: ['Alpha'] })) };
+    const { c } = controller({ catchUp });
+    const r = await c.catchUpCompanies({ confirmDatabases: ['db_a'] }, { user: { id: 'admin-1' } } as never);
+    expect(catchUp.run).toHaveBeenCalledWith('admin-1', ['db_a']);
+    expect(r).toMatchObject({ status: 'SUCCESS' });
+  });
+
+  it('the service not wired => 503', async () => {
+    const { c } = controller({ catchUp: null });
+    await expect(c.catchUpCompanies({ confirmDatabases: [] }, { user: { id: 'a' } } as never)).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('the live status lists exactly the databases the confirmation must name', async () => {
+    const { c } = controller({
+      plan: planOf({
+        planned: [
+          { companyId: 'a', companyName: 'Alpha', databaseName: 'db_b', tags: ['core'], pending: ['M1'], schema: drift },
+          { companyId: 'b', companyName: 'Beta', databaseName: 'db_a', tags: ['core'], pending: ['M1'], schema: drift },
+          { companyId: 'c', companyName: 'Gamma', databaseName: 'db_c', tags: ['core'], pending: [], schema: clean },
+        ],
+      }),
+    });
+    expect((await c.getLiveCompanyMigrationStatus()).databasesNeedingCatchUp).toEqual(['db_a', 'db_b']);
   });
 });
 

@@ -1,6 +1,6 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
 import { BadRequestException, Body, Controller, Get, Optional, Param, Post, Req, ServiceUnavailableException, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
-import { IsIn, IsObject, IsUUID } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsObject, IsString, IsUUID } from 'class-validator';
 import { DataRepairService } from './data-repair.service';
 import { DataRepairRun } from './data-repair-run.entity';
 import { DataRepairKind } from './data-repair-status';
@@ -13,6 +13,7 @@ import { RestoreManagerService } from './restore-manager.service';
 import { ReleaseManagerService } from './release-manager.service';
 import { ReleaseExecutionService } from './release-execution.service';
 import { CompanyFanoutService, summarizePlan } from './company-fanout.service';
+import { CompanyCatchUpService } from './company-catch-up.service';
 import { evaluateCompanyGate } from './company-migration-gate';
 import { hasFindings } from './company-schema-check';
 import { buildCompanyMigrationReport } from './company-migration-report';
@@ -49,6 +50,14 @@ class RegisterReleaseDto {
 class LinkBackupDto {
   @IsUUID()
   backupRunId!: string;
+}
+
+class CompanyCatchUpDto {
+  /** Exactly the Company databases that will be migrated (copied from the live status); anything else is refused. */
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  confirmDatabases!: string[];
 }
 
 class CreateDataRepairDto {
@@ -118,6 +127,7 @@ export class ReleaseController {
     private readonly config: AppConfigService,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Optional() private readonly companyFanout?: CompanyFanoutService,
+    @Optional() private readonly companyCatchUp?: CompanyCatchUpService,
   ) {}
 
   @RequirePlatform('platform.release.view', 'read-only')
@@ -399,8 +409,22 @@ export class ReleaseController {
       warnings: gate.warnings,
       counts: { ...gate.counts, needingMigration: behind.length },
       staleCompanies: gate.staleCompanies,
+      /** The exact list the catch-up action needs as its confirmation. */
+      databasesNeedingCatchUp: plan.planned.filter((c) => c.pending.length > 0).map((c) => c.databaseName).sort(),
       plan: summarizePlan(plan),
     };
+  }
+
+  /**
+   * CATCH-UP of the Company databases of the release that is ALREADY LIVE (1.1.12): the remediation for a platform that is ahead of its Companies. An explicit,
+   * confirmed, audited operator action (the confirmation must list exactly the databases to be touched); verified restore point per Company first, sequential,
+   * stop at the first failure, independent re-check. Not a deploy: it never swaps or restarts anything.
+   */
+  @RequirePlatform('platform.release.deploy', 'editable')
+  @Post('company-migrations/catch-up')
+  async catchUpCompanies(@Body() body: CompanyCatchUpDto, @Req() req: AuthenticatedRequest) {
+    if (!this.companyCatchUp) throw new ServiceUnavailableException('The Company catch-up service is not available in this build.');
+    return redactErrorForResponse(await this.companyCatchUp.run(req.user.id, body.confirmDatabases));
   }
 
   @RequirePlatform('platform.release.view', 'read-only')

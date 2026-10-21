@@ -25,7 +25,16 @@ interface LiveStatus {
   warnings: string[];
   counts: { evaluated: number; needingMigration: number; withSchemaFindings: number; staleSkipped: number; outOfScope: number };
   staleCompanies: Array<{ companyName: string | null; status: string | null }>;
+  databasesNeedingCatchUp: string[];
   plan: { companies: PlanCompany[] };
+}
+interface CatchUpResult {
+  status: string;
+  migrated: string[];
+  failed: Array<{ company: string; error: string | null }>;
+  notAttempted: string[];
+  skippedNotReady: Array<{ company: string | null; status: string | null }>;
+  note: string;
 }
 interface Report {
   attempt: { outcome: string; mode: string | null; modeExplicit: boolean | null };
@@ -42,11 +51,36 @@ const useL = () => {
   return (a: string, e: string) => (ar ? a : e);
 };
 
-export function CompanyMigrationLivePanel() {
+export function CompanyMigrationLivePanel({ canCatchUp = false }: { canCatchUp?: boolean }) {
   const L = useL();
   const [data, setData] = useState<LiveStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [catchUp, setCatchUp] = useState<CatchUpResult | null>(null);
+
+  /** Explicit, confirmed, audited: the operator sees exactly which databases will be migrated (and that a restore point is taken first) before anything runs. */
+  async function runCatchUp() {
+    if (!data || data.databasesNeedingCatchUp.length === 0) return;
+    const list = data.databasesNeedingCatchUp.join('\n');
+    const ok = window.confirm(
+      L(
+        `سيتم أخذ نقطة استعادة موثّقة لكل شركة ثم ترحيل قواعد البيانات التالية بالتتابع (يتوقف عند أول فشل):\n\n${list}\n\nلا يغيّر هذا الإصدار النشط. هل تريد المتابعة؟`,
+        `A verified restore point is taken for each Company, then these databases are migrated one at a time (stops at the first failure):\n\n${list}\n\nThis does not change the active release. Continue?`,
+      ),
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    setCatchUp(null);
+    try {
+      setCatchUp(await api.post<CatchUpResult>('/release/company-migrations/catch-up', { confirmDatabases: data.databasesNeedingCatchUp }));
+      setData(await api.get<LiveStatus>('/release/company-migrations'));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : L('تعذّر تنفيذ استكمال ترحيل الشركات.', 'The Company catch-up could not run.'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function load() {
     setBusy(true);
@@ -69,6 +103,13 @@ export function CompanyMigrationLivePanel() {
         </button>
       </div>
       {error && <div className="error-text" style={{ marginTop: 8 }}>{error}</div>}
+      {catchUp && (
+        <div style={{ marginTop: 8 }}>
+          <span className={`status-badge ${catchUp.status === 'SUCCESS' || catchUp.status === 'NOTHING_TO_DO' ? 'positive' : 'negative'}`}>{catchUp.status}</span> {catchUp.note}
+          {catchUp.migrated.length > 0 && <div className="muted">{L('تم ترحيل', 'Migrated')}: {catchUp.migrated.join(', ')}</div>}
+          {catchUp.failed.length > 0 && <div className="error-text">{catchUp.failed.map((f) => `${f.company}: ${f.error ?? ''}`).join(' | ')}</div>}
+        </div>
+      )}
       {data && (
         <div style={{ marginTop: 12 }}>
           <div style={{ marginBottom: 8 }}>
@@ -93,6 +134,13 @@ export function CompanyMigrationLivePanel() {
                 <li key={i}>{w}</li>
               ))}
             </ul>
+          )}
+          {canCatchUp && data.databasesNeedingCatchUp.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <button className="btn btn-primary" disabled={busy} onClick={runCatchUp}>
+                {L('استكمال ترحيل قواعد الشركات المتأخرة', 'Catch up the Company databases that are behind')}
+              </button>
+            </div>
           )}
           {data.plan.companies.length > 0 && (
             <table className="data-table">

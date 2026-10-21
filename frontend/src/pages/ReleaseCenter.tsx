@@ -282,7 +282,7 @@ export function ReleaseCenter() {
         </div>
       </div>
 
-      <CompanyMigrationLivePanel />
+      <CompanyMigrationLivePanel canCatchUp={canDeploy} />
 
       {error && <div className="error-text" style={{ marginBottom: 16 }}>{error}</div>}
 

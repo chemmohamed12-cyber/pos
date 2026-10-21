@@ -24,6 +24,7 @@ import { StagedActivationService } from './staged-activation.service';
 import { LkgRegistryService } from './lkg-registry.service';
 import { ReleaseExecutionService } from './release-execution.service';
 import { CompanyFanoutService } from './company-fanout.service';
+import { CompanyCatchUpService } from './company-catch-up.service';
 import { ReleaseController } from './release.controller';
 import { CompanyBackupController } from './company-backup.controller';
 import { AuthenticationModule } from '../authentication/authentication.module';
@@ -75,6 +76,7 @@ import { CompanyModule } from '../company/company.module';
     LkgRegistryService,
     ReleaseExecutionService,
     CompanyFanoutService,
+    CompanyCatchUpService,
     DataRepairService,
     DeployPreflightService,
   ],
