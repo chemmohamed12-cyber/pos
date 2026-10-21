@@ -1,0 +1,26 @@
+{
+  "out": {
+    "ok": true,
+    "kind": "OK"
+  },
+  "events": [
+    {
+      "id": "e959b6a3-d74f-4144-8db3-10f1f3d03d77",
+      "status": "POSTED",
+      "rejectionReason": null,
+      "journalEntryId": "0ac592d0-0b7f-4d3a-877a-86e29c8c850b"
+    },
+    {
+      "id": "1ec4a993-4c69-4573-837b-a4e2689bd65b",
+      "status": "REJECTED",
+      "rejectionReason": "inventory movement: COGS account is unset — set accounting.inventory_cogs_account_code to a postable non-control GL account",
+      "journalEntryId": null
+    }
+  ],
+  "movements": 2,
+  "valuation": {
+    "qty": 4,
+    "value": 16
+  },
+  "journals": 2
+}

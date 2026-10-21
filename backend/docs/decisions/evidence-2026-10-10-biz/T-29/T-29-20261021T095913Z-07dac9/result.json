@@ -1,0 +1,22 @@
+{
+  "testId": "T-29",
+  "runId": "T-29-20261021T095913Z-07dac9",
+  "finishedAt": "2026-10-21T09:59:23.131Z",
+  "results": [
+    {
+      "id": "P1-read-only-need-check-queries-counts-only",
+      "status": "PASS",
+      "note": "{\"Q0\":{\"users\":true,\"org_units\":true,\"audit_records\":true,\"data_repair_runs\":true},\"Q1\":1,\"Q2\":0,\"Q3\":4,\"Q4\":{\"n\":7,\"min\":1,\"max\":7},\"Q5\":0,\"Q6\":[],\"writeAttemptInsideReadOnlyTransactionRefused\":true}"
+    },
+    {
+      "id": "S1-simulated-repair-would-break-chain-at-first-legacy-row",
+      "status": "PASS",
+      "note": "{\"chainValidToday\":true,\"rowsWhoseHashInputWouldChange\":4,\"rowsThatWouldStillVerifyIndividually\":3,\"totalRows\":7,\"chainWouldFirstBreakAtSeq\":1,\"note\":\"computed in memory; no UPDATE was issued; the stored hash/prevHash are not recomputed by the repair\"}"
+    },
+    {
+      "id": "N1-no-historical-row-changed",
+      "status": "PASS",
+      "note": "{\"before\":{\"audit\":{\"h\":\"b916a19102768fc00bbd0bea31c858fc\",\"n\":7},\"users\":\"a2623c27aac7db0ced780b0e4c121bc4\"},\"after\":{\"audit\":{\"h\":\"b916a19102768fc00bbd0bea31c858fc\",\"n\":7},\"users\":\"a2623c27aac7db0ced780b0e4c121bc4\"}}"
+    }
+  ]
+}

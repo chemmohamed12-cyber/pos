@@ -1,0 +1,21 @@
+{
+  "request": {
+    "warehouseId": "746a1a47-9ae8-4faf-9055-0448c845bfaf",
+    "productId": "6047a5f6-ec3c-450b-af5e-127def37538c",
+    "quantity": 3,
+    "movementType": "receipt",
+    "reasonCode": "FOUND_STOCK"
+  },
+  "user": "99c8916a-d756-4d22-b0df-665e4881b75c",
+  "status": 400,
+  "body": {
+    "success": false,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "A manual receipt requires an explicit unit cost greater than zero (no fallback cost is used)"
+    },
+    "meta": {}
+  },
+  "fingerprintDiffA": [],
+  "fingerprintDiffB": []
+}

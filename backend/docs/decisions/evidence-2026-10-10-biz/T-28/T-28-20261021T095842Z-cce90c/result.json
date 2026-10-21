@@ -1,0 +1,67 @@
+{
+  "testId": "T-28",
+  "runId": "T-28-20261021T095842Z-cce90c",
+  "finishedAt": "2026-10-21T09:58:53.099Z",
+  "results": [
+    {
+      "id": "B0-healthy-path-unchanged",
+      "status": "PASS",
+      "note": "{\"rows\":5,\"chainValid\":true}"
+    },
+    {
+      "id": "B8a-healthy-append-issues-no-setval",
+      "status": "PASS",
+      "note": "{\"ok\":true,\"setvalStatements\":0,\"statements\":6}"
+    },
+    {
+      "id": "B1-L1-refused-identifiable-error-nothing-written-sequence-unchanged",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 6, nextSeq 2); no audit record written; realign the sequence under change control\"},\"rowsBefore\":6,\"rowsAfter\":6,\"sequenceBefore\":\"1/true\",\"sequenceAfter\":\"1/true\",\"chainValid\":true,\"setvalStatements\":0}"
+    },
+    {
+      "id": "B8b-refusing-append-issues-no-setval",
+      "status": "PASS",
+      "note": "{\"setvalStatements\":0}"
+    },
+    {
+      "id": "B3-ten-repeated-refusals-no-drift",
+      "status": "PASS",
+      "note": "{\"allRefused\":true,\"sequenceBefore\":\"1/true\",\"sequenceAfter\":\"1/true\",\"rows\":6}"
+    },
+    {
+      "id": "B4-twenty-concurrent-writers-all-refused",
+      "status": "PASS",
+      "note": "{\"refused\":20,\"other\":[],\"rows\":6,\"sequenceAfter\":\"1/true\"}"
+    },
+    {
+      "id": "B6-refusal-inside-outer-transaction",
+      "status": "PASS",
+      "note": "{\"outer\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 6, nextSeq 2); no audit record written; realign the sequence under change control\"},\"rows\":6,\"sequenceAfter\":\"1/true\"}"
+    },
+    {
+      "id": "B5-after-operator-realignment-20-concurrent-writers-succeed",
+      "status": "PASS",
+      "note": "{\"ok\":20,\"rows\":26,\"uniqueSeq\":true,\"chainValid\":true}"
+    },
+    {
+      "id": "B2-L2-refused-before-an-out-of-order-row-exists",
+      "status": "PASS",
+      "note": "{\"importedSeq\":126,\"chainValidBefore\":true,\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 126, nextSeq 27); no audit record written; realign the sequence under change control\"},\"repeatedAllRefused\":true,\"rowsBefore\":27,\"rowsAfter\":27,\"importedRowUntouched\":true,\"sequenceBefore\":\"26/true\",\"sequenceAfter\":\"26/true\"}"
+    },
+    {
+      "id": "B5b-after-operator-realignment-append-valid",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":true,\"kind\":\"OK\"},\"newSeq\":127,\"chainValid\":true}"
+    },
+    {
+      "id": "B7-broken-chain-not-changed-by-refusal",
+      "status": "PASS",
+      "note": "{\"append\":{\"ok\":false,\"kind\":\"AuditSequenceLagError\",\"message\":\"AUDIT_SEQUENCE_LAG: audit sequence is behind the stored tail (headSeq 127, nextSeq 2); no audit record written; realign the sequence under change control\"},\"rowsIdentical\":true,\"stillBroken\":true,\"sequenceUnchanged\":true}"
+    },
+    {
+      "id": "B9-audit-sequence-is-increment-1-cache-1",
+      "status": "PASS",
+      "note": "{\"inc\":1,\"cache\":1}"
+    }
+  ]
+}

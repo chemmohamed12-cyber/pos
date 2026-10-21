@@ -1,0 +1,221 @@
+{
+  "removed": [
+    "daii_test_biz_t01_control_plane",
+    "daii_test_biz_t01_company_a",
+    "daii_test_biz_t01_company_b"
+  ],
+  "allRemoved": true,
+  "otherDatabasesUnchanged": true,
+  "databasesAfter": [
+    {
+      "datname": "daii_test_biz_t54_t1_recovery_company_a",
+      "oid": "17094491"
+    },
+    {
+      "datname": "daii_test_biz_t54_t1_recovery_company_b",
+      "oid": "17094492"
+    },
+    {
+      "datname": "daii_test_biz_t54_t1_recovery_control_plane",
+      "oid": "17094490"
+    },
+    {
+      "datname": "daii_test_biz_t60_rh_co1",
+      "oid": "16459089"
+    },
+    {
+      "datname": "daii_test_biz_t60_rh_main",
+      "oid": "16459088"
+    },
+    {
+      "datname": "daii_test_biz_t61_fresh_co1",
+      "oid": "16642056"
+    },
+    {
+      "datname": "daii_test_biz_t61_fresh_main",
+      "oid": "16642046"
+    },
+    {
+      "datname": "daii_test_biz_t62_down_co1",
+      "oid": "16682494"
+    },
+    {
+      "datname": "daii_test_biz_t62_down_main",
+      "oid": "16682493"
+    },
+    {
+      "datname": "daii_test_biz_t72_down_co1",
+      "oid": "17376321"
+    },
+    {
+      "datname": "daii_test_biz_t72_down_main",
+      "oid": "17373885"
+    },
+    {
+      "datname": "daii_test_biz_t72_fresh_co1",
+      "oid": "17364700"
+    },
+    {
+      "datname": "daii_test_biz_t72_fresh_main",
+      "oid": "17364699"
+    },
+    {
+      "datname": "daii_test_biz_t72_rh_co1",
+      "oid": "17276752"
+    },
+    {
+      "datname": "daii_test_biz_t72_rh_main",
+      "oid": "17276751"
+    },
+    {
+      "datname": "daii_test_biz_t73_down_co1",
+      "oid": "17467074"
+    },
+    {
+      "datname": "daii_test_biz_t73_down_main",
+      "oid": "17467070"
+    },
+    {
+      "datname": "daii_test_biz_t73_fresh_co1",
+      "oid": "17456435"
+    },
+    {
+      "datname": "daii_test_biz_t73_fresh_main",
+      "oid": "17456411"
+    },
+    {
+      "datname": "daii_test_biz_t73_rh_co1",
+      "oid": "17395758"
+    },
+    {
+      "datname": "daii_test_biz_t73_rh_main",
+      "oid": "17395757"
+    },
+    {
+      "datname": "daii_test_biz_t79_tr_co",
+      "oid": "16008808"
+    },
+    {
+      "datname": "daii_test_biz_t79_tr_cp",
+      "oid": "16008807"
+    },
+    {
+      "datname": "daii_test_biz_t80_pv_co",
+      "oid": "15479818"
+    },
+    {
+      "datname": "daii_test_biz_t80_pv_cp",
+      "oid": "15479817"
+    },
+    {
+      "datname": "daii_test_biz_t97_c1_co",
+      "oid": "8390178"
+    },
+    {
+      "datname": "daii_test_biz_t97_c1_cp",
+      "oid": "8390177"
+    },
+    {
+      "datname": "daii_test_biz_t98_fresh",
+      "oid": "7644439"
+    },
+    {
+      "datname": "daii_test_biz_t98_r273712one",
+      "oid": "7650659"
+    },
+    {
+      "datname": "daii_test_biz_t98_r273712two",
+      "oid": "7650660"
+    },
+    {
+      "datname": "daii_test_biz_t98_r458882one",
+      "oid": "7654877"
+    },
+    {
+      "datname": "daii_test_biz_t98_r458882two",
+      "oid": "7654878"
+    },
+    {
+      "datname": "daii_test_biz_t98_r630664one",
+      "oid": "7669947"
+    },
+    {
+      "datname": "daii_test_biz_t98_r630664two",
+      "oid": "7669948"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest",
+      "oid": "7650724"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest1",
+      "oid": "7662545"
+    },
+    {
+      "datname": "daii_test_biz_t98_rtest2",
+      "oid": "7666228"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co",
+      "oid": "7654407"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co2",
+      "oid": "7654408"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co3",
+      "oid": "7654409"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_co_base",
+      "oid": "7643809"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_cp",
+      "oid": "7648398"
+    },
+    {
+      "datname": "daii_test_biz_t98_sim_cp_base",
+      "oid": "7643808"
+    },
+    {
+      "datname": "postgres",
+      "oid": "5"
+    },
+    {
+      "datname": "template0",
+      "oid": "4"
+    },
+    {
+      "datname": "template1",
+      "oid": "1"
+    }
+  ],
+  "teardownDropRecords": [
+    {
+      "database": "daii_test_biz_t01_control_plane",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    },
+    {
+      "database": "daii_test_biz_t01_company_a",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    },
+    {
+      "database": "daii_test_biz_t01_company_b",
+      "attempts": 1,
+      "outcome": "dropped",
+      "originalError": null,
+      "finalError": null,
+      "waitedMs": 0
+    }
+  ]
+}

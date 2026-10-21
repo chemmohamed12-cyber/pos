@@ -1,0 +1,62 @@
+{
+  "testId": "T-25",
+  "runId": "T-25-20261021T095740Z-ac2899",
+  "finishedAt": "2026-10-21T09:57:52.514Z",
+  "results": [
+    {
+      "id": "H5-1-plain-concurrent-pickup",
+      "status": "PASS",
+      "note": "{\"successes\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"state\":\"picked_up\",\"trackingEvents\":[\"assigned=1\",\"created=1\",\"pickup=1\"],\"transitionRecords\":2,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2}"
+    },
+    {
+      "id": "H5-1-transaction-concurrent-pickup",
+      "status": "PASS",
+      "note": "{\"successes\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"state\":\"picked_up\",\"trackingEvents\":[\"assigned=1\",\"created=1\",\"pickup=1\"],\"transitionRecords\":2,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2}"
+    },
+    {
+      "id": "H5-2-plain-concurrent-deliver",
+      "status": "PASS",
+      "note": "{\"successes\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"deliveredEventsPublished\":1,\"state\":\"delivered\",\"trackingEvents\":[\"arrive_for_delivery=1\",\"assigned=1\",\"created=1\",\"deliver=1\",\"depart=1\",\"pickup=1\"],\"transitionRecords\":5,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2}"
+    },
+    {
+      "id": "H5-2-transaction-concurrent-deliver",
+      "status": "PASS",
+      "note": "{\"successes\":1,\"tally\":{\"OK\":1,\"ConflictException:409\":7},\"deliveredEventsPublished\":1,\"state\":\"delivered\",\"trackingEvents\":[\"arrive_for_delivery=1\",\"assigned=1\",\"created=1\",\"deliver=1\",\"depart=1\",\"pickup=1\"],\"transitionRecords\":5,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2}"
+    },
+    {
+      "id": "H5-3-plain-pickup-custody-failure-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"call\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_reservations\\\" violates foreign key constraint \\\"stock_reservations_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(0c31791a-b91d-4688-8dc4-3c294066b727) is not present in table \\\"warehouses\\\".\"},\"before\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0},\"after\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0}}"
+    },
+    {
+      "id": "H5-3b-plain-no-reservation-lost-and-retry-succeeds",
+      "status": "PASS",
+      "note": "{\"qtyBefore\":6,\"qtyAfterFailure\":6,\"retry\":{\"ok\":true,\"kind\":\"OK\"},\"afterRetry\":{\"state\":\"picked_up\",\"trackingEvents\":[\"assigned=1\",\"created=1\",\"pickup=1\"],\"transitionRecords\":2,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2},\"qtyAfterRetry\":6}"
+    },
+    {
+      "id": "H5-3-transaction-pickup-custody-failure-all-or-nothing",
+      "status": "PASS",
+      "note": "{\"call\":{\"ok\":false,\"kind\":\"QueryFailedError\",\"message\":\"insert or update on table \\\"stock_reservations\\\" violates foreign key constraint \\\"stock_reservations_warehouseId_fkey\\\"\",\"pgCode\":\"23503\",\"detail\":\"Key (warehouseId)=(1979853a-a384-4c2f-8ce4-b41686c117cc) is not present in table \\\"warehouses\\\".\"},\"before\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0},\"after\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0}}"
+    },
+    {
+      "id": "H5-3b-transaction-no-reservation-lost-and-retry-succeeds",
+      "status": "PASS",
+      "note": "{\"qtyBefore\":6,\"qtyAfterFailure\":6,\"retry\":{\"ok\":true,\"kind\":\"OK\"},\"afterRetry\":{\"state\":\"picked_up\",\"trackingEvents\":[\"assigned=1\",\"created=1\",\"pickup=1\"],\"transitionRecords\":2,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2},\"qtyAfterRetry\":6}"
+    },
+    {
+      "id": "H5-4-outer-rollback-restores-state",
+      "status": "PASS",
+      "note": "{\"outerRolledBack\":true,\"before\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0},\"after\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0},\"eventsPublishedDuringRolledBackCall\":0}"
+    },
+    {
+      "id": "H5-5-legal-path-end-to-end",
+      "status": "PASS",
+      "note": "{\"steps\":[\"picked_up\",\"in_transit\",\"out_for_delivery\",\"delivered\"],\"state\":\"delivered\",\"trackingEvents\":[\"arrive_for_delivery=1\",\"assigned=1\",\"created=1\",\"deliver=1\",\"depart=1\",\"pickup=1\"],\"transitionRecords\":5,\"relocationMovements\":4,\"activeReservationsAtMain\":0,\"activeReservationsAtCustody\":2}"
+    },
+    {
+      "id": "H5-6-illegal-and-unauthorized-refused-without-side-effects",
+      "status": "PASS",
+      "note": "{\"illegal\":{\"ok\":false,\"kind\":\"ConflictException:409\",\"message\":\"Action \\\"deliver\\\" is not valid from state \\\"assigned\\\" for process \\\"shipment_lifecycle\\\".\"},\"unauthorizedDriverAction\":{\"ok\":false,\"kind\":\"ForbiddenException:403\",\"message\":\"Only the assigned driver (or an admin) may act on this shipment.\"},\"unauthorizedNonDriverAction\":{\"ok\":false,\"kind\":\"ForbiddenException:403\",\"message\":\"Role required for action \\\"return_to_sender\\\": admin.\"},\"before\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0},\"after\":{\"state\":\"assigned\",\"trackingEvents\":[\"assigned=1\",\"created=1\"],\"transitionRecords\":1,\"relocationMovements\":0,\"activeReservationsAtMain\":2,\"activeReservationsAtCustody\":0}}"
+    }
+  ]
+}

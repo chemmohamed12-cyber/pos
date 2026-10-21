@@ -1,0 +1,25 @@
+{
+  "redriven": {
+    "ok": true,
+    "kind": "OK"
+  },
+  "events": [
+    {
+      "id": "e959b6a3-d74f-4144-8db3-10f1f3d03d77",
+      "status": "POSTED",
+      "rejectionReason": null,
+      "journalEntryId": "0ac592d0-0b7f-4d3a-877a-86e29c8c850b"
+    },
+    {
+      "id": "1ec4a993-4c69-4573-837b-a4e2689bd65b",
+      "status": "POSTED",
+      "rejectionReason": null,
+      "journalEntryId": "7b982f4f-694e-43e7-96bf-101b3c75aeeb"
+    }
+  ],
+  "journals": 3,
+  "valuation": {
+    "qty": 3,
+    "value": 12
+  }
+}

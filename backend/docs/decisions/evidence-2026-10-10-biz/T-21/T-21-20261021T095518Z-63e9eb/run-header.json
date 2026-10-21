@@ -1,0 +1,44 @@
+{
+  "testId": "T-21",
+  "runId": "T-21-20261021T095518Z-63e9eb",
+  "startedAt": "2026-10-21T09:55:18.891Z",
+  "commit": "449fffe9aaafa3625ee08b21a9baeb75512ba0b6",
+  "branch": "release/1.1.11",
+  "dirtyPaths": [
+    "?? backend/tools/testing/_rc_0.txt",
+    "?? backend/tools/testing/_rc_1.txt",
+    "?? backend/tools/testing/_rc_2.txt",
+    "?? backend/tools/testing/_rc_3.txt",
+    "?? backend/tools/testing/_rc_4.txt",
+    "?? backend/tools/testing/_rc_5.txt"
+  ],
+  "applicationVersion": "1.1.11",
+  "node": "v20.20.2",
+  "environment": {
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5546",
+    "DB_USER": "daii_biz_test",
+    "DB_NAME": "daii_test_biz_t00_unused"
+  },
+  "projectRoot": "D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\treasury-integrity",
+  "systemIdentifier": "7695619915229547252",
+  "databases": [
+    "daii_test_biz_t21_control_plane",
+    "daii_test_biz_t21_company_a",
+    "daii_test_biz_t21_company_b"
+  ],
+  "prefix": "biz_t21",
+  "tags": {
+    "controlPlane": [
+      "core"
+    ],
+    "company": [
+      "core",
+      "sales",
+      "inventory",
+      "finance",
+      "procurement",
+      "accounting"
+    ]
+  }
+}
