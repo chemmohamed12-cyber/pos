@@ -1,0 +1,19 @@
+node_modules copied
+{"daii_test_biz_t90_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t90_u_c01":{"migrations":299,"customers":1,"salesInvoices":2},"daii_test_biz_t90_u_c02":{"migrations
+=== G0 deploy (installed engine 1.1.11, setting unset)
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.12","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSession
+1.1.12=succeeded, 1.1.6=deploying
+started pid 6816
+app g on :3641 -> 401 (401 = up)
+=== G0 live status (host screenshot state)
+{"installedBuild":"1.1.12","configuredMode":"on","modeExplicit":false,"allCurrent":false,"decision":"BEHIND","blockers":["Rehearsal Co 1 (c01): 21 pending migration(s)","Rehearsal Co 2 (c02): 21 pending migration(s)","the schema check could not run for 2 Company(ies): Rehearsal Co 1 (c01) (spawn C:/definitely/not/node.exe ENOENT), Rehearsal Co 2 (c02) (spawn C:/definitely/not/node.exe ENOENT). An unverified schema is never treated as clean"],"warnings":[],"counts":{"evaluated":2,"needingMigration":2,"withSchemaFindings":0,"withUnknownMigrations":0,"staleSkipped":0,"outOfScope":0},"staleCompanies":[],"databasesNeedingCatchUp":["daii_test_biz_t90_u_c01","daii_test_biz_t90_u_c02"],"plan":{"mode":"on","companies":[{"companyId":"d0cac38f-9b69-417c-9f7d-3518c378222c","name":"Rehearsal Co 1 (c01)","database":"daii_test_biz_t90_u_c01","tags":["accounting","attendance","commission","core","financ
+
+=== G0 catch-up with the exact confirmation
+{"success":false,"error":{"code":"CONFLICT","message":"A deploy is in progress; catch-up refuses to run next to it."},"meta":{"correlationId":"b57b94a6-cba6-4df8-9337-8c2bcfd2461a"}}
+HTTP 409
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.6","status":"deploying","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0}}
+stopped 6816
+G-DONE

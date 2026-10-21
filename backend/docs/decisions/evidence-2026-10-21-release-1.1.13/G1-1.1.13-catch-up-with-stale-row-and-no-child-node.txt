@@ -1,0 +1,19 @@
+node_modules copied
+{"daii_test_biz_t90_u_main":{"migrations":320,"customers":null,"salesInvoices":null},"daii_test_biz_t90_u_c01":{"migrations":299,"customers":1,"salesInvoices":2},"daii_test_biz_t90_u_c02":{"migrations
+=== G1 deploy (installed engine 1.1.11, setting unset)
+deploy exit=0
+  "status": "succeeded",
+  "errorMessage": null,
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.13","status":"succeeded","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":0},"c02":{"migrations":299,"duplicates":0,"customers":1,"salesInvoices":2,"cashSession
+1.1.13=succeeded, 1.1.6=deploying
+started pid 10504
+app g on :3641 -> 401 (401 = up)
+=== G1 live status (host screenshot state)
+{"installedBuild":"1.1.13","configuredMode":"on","modeExplicit":false,"allCurrent":false,"decision":"BEHIND","blockers":["Rehearsal Co 1 (c01): 21 pending migration(s), 16 missing table(s), 6 table(s) with missing columns","Rehearsal Co 2 (c02): 21 pending migration(s), 16 missing table(s), 6 table(s) with missing columns"],"warnings":[],"counts":{"evaluated":2,"needingMigration":2,"withSchemaFindings":2,"withUnknownMigrations":0,"staleSkipped":0,"outOfScope":0},"staleCompanies":[],"databasesNeedingCatchUp":["daii_test_biz_t90_u_c01","daii_test_biz_t90_u_c02"],"plan":{"mode":"on","companies":[{"companyId":"6cb2689f-bfd8-46fb-ac78-8581f453ab69","name":"Rehearsal Co 1 (c01)","database":"daii_test_biz_t90_u_c01","tags":["accounting","attendance","commission","core","finance","hr","inventory","logistics","manufacturing","payroll","procurement","sales","targets"],"pendingCount":21,"pending":[
+
+=== G1 catch-up with the exact confirmation
+{"success":true,"data":{"releaseId":"c61bf831-0574-42c8-91e2-c51f64843656","installedBuild":"1.1.13","databasesWithPending":["daii_test_biz_t90_u_c01","daii_test_biz_t90_u_c02"],"migrated":["Rehearsal Co 1 (c01)","Rehearsal Co 2 (c02)"],"failed":[],"notAttempted":[],"stillPending":{},"schemaProblems":{},"skippedNotReady":[],"status":"SUCCESS","note":"Every READY Company is migrated and re-verified (pending migrations and schema)."},"meta":{"correlationId":"1de59be5-5338-44f4-8451-10264d3c11e6"}}
+HTTP 201
+{"platform":{"migrations":320,"duplicates":0,"latestRelease":{"version":"1.1.6","status":"deploying","e":""},"companies":[{"name":"Rehearsal Co 1 (c01)","status":"READY"},{"name":"Rehearsal Co 2 (c02)","status":"READY"}]},"c01":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1},"c02":{"migrations":320,"duplicates":0,"customers":1,"salesInvoices":2,"cashSessionsTable":1}}
+stopped 10504
+G-DONE
