@@ -26,6 +26,7 @@ interface Account {
   code: string;
   name: string;
   accountTypeId: string;
+  status?: string;
 }
 interface AccountType {
   id: string;
@@ -54,7 +55,7 @@ export function CashSessions() {
   useEffect(load, []);
 
   const cashTypeIds = new Set(types.filter((t) => ['cash', 'custody'].includes(t.code)).map((t) => t.id));
-  const cashAccounts = accounts.filter((a) => cashTypeIds.has(a.accountTypeId));
+  const cashAccounts = accounts.filter((a) => cashTypeIds.has(a.accountTypeId) && a.status !== 'inactive');
   const accCode = (id: string) => accounts.find((a) => a.id === id)?.code ?? '—';
 
   async function act(path: string, body: Record<string, unknown>) {

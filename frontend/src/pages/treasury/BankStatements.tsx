@@ -23,6 +23,7 @@ interface Account {
   code: string;
   name: string;
   accountTypeId: string;
+  status?: string;
 }
 
 /** Parses pasted bank lines: `date,amount,reference,description` (one per line, header optional, amount signed: positive = into the account). */
@@ -99,7 +100,7 @@ export function BankStatements() {
               <label>{tr('الحساب البنكي', 'Bank account')}</label>
               <select value={f.accountId} onChange={(e) => setF({ ...f, accountId: e.target.value })} required>
                 <option value="">—</option>
-                {accounts.map((a) => (
+                {accounts.filter((a) => a.status !== 'inactive').map((a) => (
                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                 ))}
               </select>
