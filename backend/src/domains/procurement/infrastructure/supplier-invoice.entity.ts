@@ -61,6 +61,50 @@ export class SupplierInvoice {
   @Column({ type: 'varchar', length: 255, nullable: true })
   voidedReason!: string | null;
 
+  // ---- phase C-2 (D3 / E1): discount, freight and other charges. `totalAmount` stays the NET of the lines; gross = net - discount + freight + other charges + VAT ----
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  discountAmount!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  freightAmount!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  otherChargesAmount!: string;
+
+  /** 'capitalize' (default): freight is added to inventory cost; 'expense': freight is expensed with the other charges. */
+  @Column({ type: 'varchar', length: 12, default: 'capitalize' })
+  freightTreatment!: 'capitalize' | 'expense';
+
+  // ---- phase C-1: approval trail and matching result (all nullable; legacy invoices keep NULL) ----
+  @Column({ type: 'uuid', nullable: true })
+  submittedByUserId!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  submittedAt!: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  approvedByUserId!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  approvedAt!: Date | null;
+
+  /** 'within_tolerance' | 'exceeds_tolerance' - computed at submit from the Company policy; NULL until submitted. */
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  matchStatus!: string | null;
+
+  /** Per-line variance figures behind `matchStatus` (percentage, amount, which limit was exceeded). */
+  @Column({ type: 'jsonb', nullable: true })
+  matchDetail!: unknown;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  holdReason!: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  exceptionReason!: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  rejectedReason!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

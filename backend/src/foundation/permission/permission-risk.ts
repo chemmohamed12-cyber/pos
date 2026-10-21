@@ -36,7 +36,7 @@ export const CRITICAL_NODES: readonly string[] = [
 
 const SENSITIVE_VERBS = new Set([
   'approve', 'post', 'pay', 'close', 'cancel', 'void', 'delete', 'issue', 'receive', 'transfer', 'release', 'award', 'settle', 'manage', 'adjust', 'reverse',
-  'reopen', 'terminate', 'disburse', 'submit', 'confirm', 'link_user', 'material_issue', 'material_return', 'finished_goods_receive', 'resolve', 'reclose',
+  'reopen', 'terminate', 'disburse', 'override', 'submit', 'confirm', 'link_user', 'material_issue', 'material_return', 'finished_goods_receive', 'resolve', 'reclose',
 ]);
 
 const CRITICAL_SET = new Set(CRITICAL_NODES);

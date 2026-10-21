@@ -30,6 +30,12 @@ export const ACCOUNTING_POLICY_KEYS: readonly PolicyKeyDef[] = [
   { key: 'accounting.inventory_manual_receipt_reason_accounts', group: 'inventory', kind: 'reason_map', expectedTypes: ['equity', 'revenue', 'liability'] },
   { key: 'accounting.sales_returns_account_code', group: 'sales', kind: 'account', expectedTypes: ['revenue', 'expense'] },
   { key: 'accounting.purchase_price_variance_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },
+  // 2026-10-20 (owner decisions E1 / E3) - separate accounts, never the PPV account; account numbers are assigned by the finance owner (no default)
+  { key: 'accounting.purchase_cost_difference_after_receipt_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },
+  { key: 'accounting.purchase_return_cost_difference_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },
+  // 2026-10-21 (owner policy: a physical return does not reduce AP) - where the book value of returned INVOICED goods waits for its credit note
+  { key: 'accounting.purchase_return_clearing_account_code', group: 'procurement', kind: 'account', expectedTypes: ['asset', 'liability'] },
+  { key: 'accounting.purchase_other_charges_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },
   { key: 'accounting.cash_bank_opening_balance_account_code', group: 'cash', kind: 'account', expectedTypes: ['equity'] },
   { key: 'accounting.cash_movement_clearing_account_code', group: 'cash', kind: 'account', expectedTypes: ['asset', 'liability'] },
   { key: 'accounting.treasury_receipt_reason_accounts', group: 'cash', kind: 'reason_map', expectedTypes: ['revenue', 'liability', 'equity'] },

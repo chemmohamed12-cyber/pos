@@ -4,6 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FinancialTrace } from '../../components/FinancialTrace';
+import { MultiInvoicePayment } from './MultiInvoicePayment';
+import { InvoiceApprovalPanel } from './InvoiceApprovalPanel';
+import { InvoicePolicyPanel, type InvoicePolicy } from './InvoicePolicyPanel';
 import { PAYMENT_METHODS, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 
 interface Supplier {
@@ -23,6 +26,8 @@ interface PurchaseOrderLine {
   unitCostBase: string;
   quantityReceived: string;
   quantityInvoiced: string;
+  /** phase D-1: units returned to the supplier */
+  quantityReturned?: string;
 }
 interface SupplierInvoiceRow {
   id: string;
@@ -33,6 +38,11 @@ interface SupplierInvoiceRow {
   totalAmount: string;
   /** D5 — the explicit VAT stated by the supplier's invoice (totalAmount is NET). */
   taxAmount?: string;
+  /** phase C-2: discount (reduces cost), freight (capitalised unless freightTreatment is 'expense') and other charges (expensed) */
+  discountAmount?: string;
+  freightAmount?: string;
+  freightTreatment?: 'capitalize' | 'expense';
+  otherChargesAmount?: string;
   dueDate: string | null;
   priceVarianceAmount: string;
   state: string;
@@ -60,6 +70,11 @@ interface ProductOption {
 
 const CREATABLE_PO_STATES = new Set(['partially_received', 'received', 'closed']);
 
+function freightTreatmentLabel(treatment: 'capitalize' | 'expense' | undefined): string {
+  const ar = currentLang() === 'ar';
+  return treatment === 'expense' ? (ar ? 'مصروف' : 'expensed') : ar ? 'مرسمل على المخزون' : 'capitalised';
+}
+
 /**
  * ADR-048 — the `supplier-finance` bounded context's operational screen:
  * raise a Supplier Invoice against a received Purchase Order (3-way match
@@ -84,7 +99,14 @@ export function SupplierInvoices() {
   const [purchaseOrderId, setPurchaseOrderId] = useState(() => new URLSearchParams(window.location.search).get('purchaseOrderId') ?? '');
   const [supplierReference, setSupplierReference] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [freightAmount, setFreightAmount] = useState('');
+  const [freightTreatment, setFreightTreatment] = useState<'capitalize' | 'expense'>('capitalize');
+  const [otherChargesAmount, setOtherChargesAmount] = useState('');
   const [poLines, setPoLines] = useState<PurchaseOrderLine[]>([]);
+  // phase E: other orders of the SAME supplier added to this one invoice, and which order each loaded line belongs to
+  const [extraOrderIds, setExtraOrderIds] = useState<string[]>([]);
+  const [lineOrder, setLineOrder] = useState<Record<string, string>>({});
   const [invoiceQty, setInvoiceQty] = useState<Record<string, string>>({});
   const [invoiceCost, setInvoiceCost] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
@@ -95,6 +117,8 @@ export function SupplierInvoices() {
   const [paying, setPaying] = useState(false);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // phase C-1: the Company's approval / tolerance policy (legacy = direct posting until an administrator turns approval on)
+  const [policy, setPolicy] = useState<InvoicePolicy>({ approvalRequired: false, priceTolerancePct: 0, priceToleranceAmount: null, toleranceDirection: 'both' });
   const [error, setError] = useState<string | null>(null);
 
   preload([
@@ -156,29 +180,47 @@ export function SupplierInvoices() {
   useEffect(() => {
     if (!purchaseOrderId) {
       setPoLines([]);
+      setLineOrder({});
       return;
     }
-    api
-      .get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${purchaseOrderId}`)
-      .then((d) => {
-        setPoLines(d.lines);
+    const orderIds = [purchaseOrderId, ...extraOrderIds];
+    Promise.all(orderIds.map((id) => api.get<{ lines: PurchaseOrderLine[] }>(`/procurement/purchase-orders/${id}`).then((d) => ({ id, lines: d.lines }))))
+      .then((all) => {
+        const lines = all.flatMap((o) => o.lines);
+        const owner: Record<string, string> = {};
+        for (const o of all) for (const l of o.lines) owner[l.id] = o.id;
+        setPoLines(lines);
+        setLineOrder(owner);
+        // default quantity / price for every line with something left to invoice; whatever the user already typed on a line is kept
         const qty: Record<string, string> = {};
         const cost: Record<string, string> = {};
-        for (const l of d.lines) {
-          const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
+        for (const l of lines) {
+          const remaining = Number(l.quantityReceived) - Number(l.quantityReturned ?? 0) - Number(l.quantityInvoiced);
           if (remaining > 0) {
             qty[l.id] = String(remaining);
             cost[l.id] = l.unitCostBase;
           }
         }
-        setInvoiceQty(qty);
-        setInvoiceCost(cost);
+        setInvoiceQty((prev) => ({ ...qty, ...Object.fromEntries(Object.entries(prev).filter(([k]) => k in qty)) }));
+        setInvoiceCost((prev) => ({ ...cost, ...Object.fromEntries(Object.entries(prev).filter(([k]) => k in cost)) }));
       })
       .catch((err) => {
         // Foundation fix: no error handling — a failure silently left the PO-lines picker empty.
         setError(err instanceof ApiError ? err.message : 'Failed to load purchase order lines.');
       });
+  }, [purchaseOrderId, extraOrderIds]);
+
+  // changing the primary order resets the extra orders (they must belong to the same supplier)
+  useEffect(() => {
+    setExtraOrderIds([]);
   }, [purchaseOrderId]);
+
+  useEffect(() => {
+    api
+      .get<InvoicePolicy>('/procurement/supplier-invoices/policy')
+      .then(setPolicy)
+      .catch(() => undefined);
+  }, []);
 
   async function loadDetail(id: string) {
     setSelectedId(id);
@@ -206,10 +248,22 @@ export function SupplierInvoices() {
       .filter((l) => Number(invoiceQty[l.id] ?? 0) > 0)
       .map((l) => ({ purchaseOrderLineId: l.id, quantity: invoiceQty[l.id], unitCostBase: invoiceCost[l.id] || l.unitCostBase }));
     if (!purchaseOrderId || lines.length === 0) return;
+    // only the orders that actually have an invoiced line are sent (the server refuses a listed order with no line)
+    const usedOrders = [purchaseOrderId, ...extraOrderIds].filter((oid) => lines.some((l) => lineOrder[l.purchaseOrderLineId] === oid));
     setCreating(true);
     setError(null);
     try {
-      await api.post('/procurement/supplier-invoices', { purchaseOrderId, supplierReference: supplierReference || undefined, taxAmount: taxAmount || undefined, lines });
+      await api.post('/procurement/supplier-invoices', {
+        purchaseOrderId,
+        purchaseOrderIds: usedOrders.length > 1 ? usedOrders : undefined,
+        supplierReference: supplierReference || undefined,
+        taxAmount: taxAmount || undefined,
+        discountAmount: discountAmount || undefined,
+        freightAmount: freightAmount || undefined,
+        freightTreatment: freightAmount ? freightTreatment : undefined,
+        otherChargesAmount: otherChargesAmount || undefined,
+        lines,
+      });
       setPurchaseOrderId('');
       setSupplierReference('');
       setPoLines([]);
@@ -283,6 +337,25 @@ export function SupplierInvoices() {
                   ))}
                 </select>
               </div>
+              {purchaseOrderId && (
+                <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
+                  <label>{currentLang() === 'ar' ? 'أوامر شراء أخرى لنفس المورد في نفس الفاتورة' : 'Other orders of the same supplier on this invoice'}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
+                    {purchaseOrders
+                      .filter((p) => p.id !== purchaseOrderId && p.supplierId === purchaseOrders.find((x) => x.id === purchaseOrderId)?.supplierId)
+                      .map((p) => (
+                        <label key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 'normal' }}>
+                          <input
+                            type="checkbox"
+                            checked={extraOrderIds.includes(p.id)}
+                            onChange={(e) => setExtraOrderIds((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))}
+                          />
+                          {p.poNumber}
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              )}
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>{t('field.supplier_reference')}</label>
                 <input value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
@@ -291,12 +364,34 @@ export function SupplierInvoices() {
                 <label>{t('field.vat_amount')}</label>
                 <input type="number" min={0} step="0.01" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} placeholder="0.00" />
               </div>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'خصم المشتريات' : 'Purchase discount'}</label>
+                <input type="number" min={0} step="0.01" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" style={{ width: 110 }} />
+              </div>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'الشحن' : 'Freight'}</label>
+                <input type="number" min={0} step="0.01" value={freightAmount} onChange={(e) => setFreightAmount(e.target.value)} placeholder="0.00" style={{ width: 110 }} />
+              </div>
+              {Number(freightAmount) > 0 && (
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label>{currentLang() === 'ar' ? 'معالجة الشحن' : 'Freight treatment'}</label>
+                  <select value={freightTreatment} onChange={(e) => setFreightTreatment(e.target.value as 'capitalize' | 'expense')}>
+                    <option value="capitalize">{currentLang() === 'ar' ? 'رسملة على تكلفة المخزون' : 'Capitalise into inventory cost'}</option>
+                    <option value="expense">{currentLang() === 'ar' ? 'مصروف' : 'Expense'}</option>
+                  </select>
+                </div>
+              )}
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label>{currentLang() === 'ar' ? 'مصروفات أخرى (غير مرسملة)' : 'Other charges (expensed)'}</label>
+                <input type="number" min={0} step="0.01" value={otherChargesAmount} onChange={(e) => setOtherChargesAmount(e.target.value)} placeholder="0.00" style={{ width: 120 }} />
+              </div>
             </div>
 
             {poLines.length > 0 && (
               <table className="data-table" style={{ marginBottom: 14 }}>
                 <thead>
                   <tr>
+                    {extraOrderIds.length > 0 && <th>{t('field.po_number')}</th>}
                     <th>{t('field.product')}</th>
                     <th>{t('field.quantity_received')}</th>
                     <th>{t('field.quantity')}</th>
@@ -305,10 +400,11 @@ export function SupplierInvoices() {
                 </thead>
                 <tbody>
                   {poLines.map((l) => {
-                    const remaining = Number(l.quantityReceived) - Number(l.quantityInvoiced);
+                    const remaining = Number(l.quantityReceived) - Number(l.quantityReturned ?? 0) - Number(l.quantityInvoiced);
                     if (remaining <= 0) return null;
                     return (
                       <tr key={l.id}>
+                        {extraOrderIds.length > 0 && <td>{poNumber(lineOrder[l.id] ?? '')}</td>}
                         <td>{productName(l.productId)}</td>
                         <td>{remaining}</td>
                         <td>
@@ -345,6 +441,8 @@ export function SupplierInvoices() {
           </form>
         </div>
       )}
+
+      <InvoicePolicyPanel policy={policy} onSaved={setPolicy} />
 
       {error && <div className="error-text">{error}</div>}
 
@@ -395,17 +493,52 @@ export function SupplierInvoices() {
               <StatusBadge code={`supplier_invoice_lifecycle.state.${detail.state}`} />
             </div>
 
+            {(Number(detail.discountAmount ?? 0) > 0 || Number(detail.freightAmount ?? 0) > 0 || Number(detail.otherChargesAmount ?? 0) > 0) && (
+              <div style={{ fontSize: 13, marginBottom: 10, lineHeight: 1.7 }}>
+                {Number(detail.discountAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'خصم المشتريات' : 'Purchase discount'}: −{Number(detail.discountAmount).toFixed(2)}
+                  </div>
+                )}
+                {Number(detail.freightAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'الشحن' : 'Freight'}: +{Number(detail.freightAmount).toFixed(2)} ({freightTreatmentLabel(detail.freightTreatment)})
+                  </div>
+                )}
+                {Number(detail.otherChargesAmount ?? 0) > 0 && (
+                  <div>
+                    {currentLang() === 'ar' ? 'مصروفات أخرى' : 'Other charges'}: +{Number(detail.otherChargesAmount).toFixed(2)}
+                  </div>
+                )}
+                <div style={{ opacity: 0.7 }}>
+                  {currentLang() === 'ar'
+                    ? 'يظهر توزيع الخصم والشحن بين المخزون الحالي والوحدات المباعة/المستهلكة في قيد الفاتورة (التتبع المالي أدناه).'
+                    : 'The split of discount / freight between stock on hand and units already sold/consumed is shown in the invoice posting (financial trace below).'}
+                </div>
+              </div>
+            )}
+
+            <InvoiceApprovalPanel
+              invoice={detail as never}
+              approvalRequired={policy.approvalRequired}
+              onChanged={async () => {
+                await load();
+                await loadDetail(detail.id);
+              }}
+              onError={setError}
+            />
+
             {can('procurement.supplier_invoice.post', 'editable') && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {detail.state === 'draft' && (
-                  <>
-                    <button className="btn btn-primary" disabled={busyAction === 'post'} onClick={() => doAction('post')}>
-                      {t('action.post_invoice')}
-                    </button>
-                    <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
-                      {t('action.void_invoice')}
-                    </button>
-                  </>
+                {((detail.state === 'draft' && !policy.approvalRequired) || detail.state === 'approved') && (
+                  <button className="btn btn-primary" disabled={busyAction === 'post'} onClick={() => doAction('post')}>
+                    {t('action.post_invoice')}
+                  </button>
+                )}
+                {['draft', 'submitted', 'on_hold', 'approved', 'rejected'].includes(detail.state) && (
+                  <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
+                    {t('action.void_invoice')}
+                  </button>
                 )}
                 {(detail.state === 'posted' || detail.state === 'partially_paid') && (
                   <button className="btn btn-danger" disabled={busyAction === 'void'} onClick={() => doAction('void')}>
@@ -467,6 +600,21 @@ export function SupplierInvoices() {
                   {t('action.record_payment')}
                 </button>
               </form>
+            )}
+
+            {(detail.state === 'posted' || detail.state === 'partially_paid') && canPaySupplier && (
+              <MultiInvoicePayment
+                supplierId={detail.supplierId}
+                invoices={invoices ?? []}
+                treasuryAccounts={treasuryAccounts}
+                method={paymentMethod}
+                treasuryAccountId={paymentTreasuryAccountId}
+                onError={setError}
+                onDone={async () => {
+                  await load();
+                  await loadDetail(detail.id);
+                }}
+              />
             )}
           </div>
         )}

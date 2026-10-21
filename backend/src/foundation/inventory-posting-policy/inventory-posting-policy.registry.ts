@@ -23,6 +23,10 @@ export interface SupplierInvoicePostableInput {
   ppvBase: string;
   /** The explicit VAT amount (decimal string; '0' when none). */
   taxAmount: string;
+  /** Phase C-2: purchase discount (reduces cost), capitalised freight (adds cost) and expensed charges - decimal strings, absent/'0' when none. */
+  discountAmount?: string;
+  capitalizedFreight?: string;
+  expensedCharges?: string;
 }
 
 export interface InventoryPostingPolicy {
@@ -47,6 +51,11 @@ export interface InventoryPostingPolicy {
    * `tax_receivable` account must resolve. Throws (409) BEFORE any ledger/state/outbox write. No fallback account.
    */
   assertSupplierInvoicePostable(input: SupplierInvoicePostableInput, manager?: EntityManager): Promise<void>;
+  /**
+   * Phase D-1 (owner decisions D7 / E3) - OPTIONAL pre-mutation gate of a Purchase Return: the `inventory` and `grni` control accounts must exist and, when the book cost of the stock that leaves differs
+   * from the receipt cost (`expectedDifference` <> 0), the separately configured supplier-return cost-difference account must resolve. Throws (409) BEFORE any stock / valuation / outbox write.
+   */
+  assertPurchaseReturnPostable?(input: { expectedDifference: string; clearingValue?: string; settledNet?: string }, manager?: EntityManager): Promise<void>;
   /**
    * C2 (ADR-INV-02) - OPTIONAL pre-mutation gate for an EXPLICIT business date: a fiscal year/period must cover it and be open. Throws (409) BEFORE any
    * stock / valuation / outbox write; the date is never silently moved into another period. Unbound / absent => no GL => no gate.

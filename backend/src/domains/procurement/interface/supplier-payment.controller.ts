@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsNumberString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { SupplierPaymentService } from '../application/supplier-payment.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -16,6 +17,37 @@ class RecordSupplierPaymentDto {
 
   @IsNumberString()
   amount!: string;
+
+  @IsString()
+  @MaxLength(32)
+  method!: string;
+
+  @IsUUID()
+  treasuryAccountId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  reference?: string;
+}
+
+class PaymentAllocationDto {
+  @IsUUID()
+  invoiceId!: string;
+
+  @IsNumberString()
+  amount!: string;
+}
+
+class RecordAllocatedPaymentDto {
+  @IsUUID()
+  supplierId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PaymentAllocationDto)
+  allocations!: PaymentAllocationDto[];
 
   @IsString()
   @MaxLength(32)
@@ -50,6 +82,23 @@ export class SupplierPaymentController {
   async listForSupplier(@Req() req: CompanyScopedRequest, @Param('supplierId', ParseUUIDPipe) supplierId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.payments.listForSupplier(supplierId, req.companyContext.dataSource.manager);
+  }
+
+  /** One payment over several invoices of the same supplier (one cash-out, one event, one ledger debit per invoice). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.supplier_payment.create', 'editable')
+  @Post('allocated')
+  async recordAllocated(@Body() dto: RecordAllocatedPaymentDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.payments.recordPaymentAllocated(
+      dto.supplierId,
+      dto.allocations,
+      dto.method,
+      dto.treasuryAccountId,
+      dto.reference ?? null,
+      req.user.id,
+      req.companyContext.dataSource.manager,
+    );
   }
 
   @UseGuards(PermissionGuard)

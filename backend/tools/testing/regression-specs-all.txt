@@ -120,3 +120,10 @@ src/domains/accounting/interface/movement-reason-reference.migrations.company-is
 src/foundation/release/release-upload.http.spec.ts
 src/domains/accounting/interface/grni-control-account.company-isolation.spec.ts
 src/domains/accounting/interface/d3-clean-run-closure.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-allocations.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-allocations.migrations.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-invoice-approval.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-multi-order-invoice.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts
+src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts

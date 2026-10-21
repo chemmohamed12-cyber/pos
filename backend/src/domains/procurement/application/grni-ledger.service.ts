@@ -38,20 +38,20 @@ export class GrniLedgerService implements GrniLedgerContract {
     }> = await (manager ?? this.dataSource).query(
       `SELECT pol."purchaseOrderId",
               po."supplierId",
-              ((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4) AS balance,
+              ((pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") * pol."unitCostBase")::numeric(20,4) AS balance,
               (SELECT gr.id FROM "goods_receipt_lines" grl JOIN "goods_receipts" gr ON gr.id = grl."goodsReceiptId"
                 WHERE grl."purchaseOrderLineId" = pol.id ORDER BY gr."createdAt" DESC LIMIT 1) AS "goodsReceiptId",
               (SELECT gr."grNumber" FROM "goods_receipt_lines" grl JOIN "goods_receipts" gr ON gr.id = grl."goodsReceiptId"
                 WHERE grl."purchaseOrderLineId" = pol.id ORDER BY gr."createdAt" DESC LIMIT 1) AS "goodsReceiptNumber"
        FROM "purchase_order_lines" pol
        JOIN "purchase_orders" po ON po.id = pol."purchaseOrderId"
-       WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0
+       WHERE (pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") > 0
        ORDER BY pol."purchaseOrderId"`,
     );
     const [tot] = await (manager ?? this.dataSource).query(
-      `SELECT COALESCE(SUM((pol."quantityReceived" - pol."quantityInvoiced") * pol."unitCostBase"), 0)::numeric(20,4) AS total
+      `SELECT COALESCE(SUM((pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") * pol."unitCostBase"), 0)::numeric(20,4) AS total
        FROM "purchase_order_lines" pol
-       WHERE (pol."quantityReceived" - pol."quantityInvoiced") > 0`,
+       WHERE (pol."quantityReceived" - pol."quantityReturned" - pol."quantityInvoiced") > 0`,
     );
     return {
       balances: rows.map((r) => ({

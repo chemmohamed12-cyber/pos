@@ -10,6 +10,22 @@ import { GoodsReceipt } from './infrastructure/goods-receipt.entity';
 import { GoodsReceiptLine } from './infrastructure/goods-receipt-line.entity';
 import { SupplierInvoice } from './infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from './infrastructure/supplier-invoice-line.entity';
+import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
+import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
+import { InvoiceAllocationService } from './application/invoice-allocation.service';
+import { InvoiceApprovalService } from './application/invoice-approval.service';
+import { InvoicePolicyService } from './application/invoice-policy.service';
+import { PurchaseReturnService } from './application/purchase-return.service';
+import { SupplierCreditNoteService } from './application/supplier-credit-note.service';
+import { InvoiceCreditCapService } from './application/invoice-credit-cap.service';
+import { SupplierCreditNoteController } from './interface/supplier-credit-note.controller';
+import { SupplierCreditNote } from './infrastructure/supplier-credit-note.entity';
+import { SupplierCreditNoteLine } from './infrastructure/supplier-credit-note-line.entity';
+import { PurchaseReturnController } from './interface/purchase-return.controller';
+import { PurchaseReturn } from './infrastructure/purchase-return.entity';
+import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
+import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
+import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
 import { SupplierLedgerEntry } from './infrastructure/supplier-ledger-entry.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
 import { PurchaseRequest } from './infrastructure/purchase-request.entity';
@@ -95,6 +111,13 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
       GoodsReceiptLine,
       SupplierInvoice,
       SupplierInvoiceLine,
+      SupplierInvoiceLineReceipt,
+      SupplierPaymentAllocation,
+      ProcurementInvoicePolicy,
+      PurchaseReturn,
+      PurchaseReturnLine,
+      SupplierCreditNote,
+      SupplierCreditNoteLine,
       SupplierLedgerEntry,
       SupplierPayment,
       PurchaseRequest,
@@ -114,6 +137,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     NumberingModule,
     EventsModule,
     InventoryWarehouseModule,
+    // phase D-1: the valuation contract (stock leaves at book cost) - Manufacturing's own precedent; the valuation module imports nothing from procurement
+    InventoryValuationModule,
     // D7 — the Sales product contract (SALES_PRODUCTS_CONTRACT) for the lifecycle gate and New Item Requests; acyclic (Commerce never imports Procurement).
     CommerceModule,
     TreasuryModule,
@@ -133,6 +158,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     GoodsReceiptController,
     SupplierInvoiceController,
     SupplierPaymentController,
+    PurchaseReturnController,
+    SupplierCreditNoteController,
     PurchaseRequestController,
     RfqController,
     NewItemRequestController,
@@ -144,6 +171,12 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     GoodsReceiptService,
     SupplierLedgerService,
     SupplierInvoiceService,
+    InvoiceAllocationService,
+    InvoicePolicyService,
+    InvoiceApprovalService,
+    PurchaseReturnService,
+    InvoiceCreditCapService,
+    SupplierCreditNoteService,
     SupplierPaymentService,
     PurchaseRequestService,
     RfqService,

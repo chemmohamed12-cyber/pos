@@ -54,6 +54,7 @@ import { InventoryReconciliationService } from './application/inventory-reconcil
 import { PostingStatusService } from './application/posting-status.service';
 import { InventoryAdjustmentService } from './application/inventory-adjustment.service';
 import { InventoryCostingHandlerService } from './application/financial-events/inventory-costing-handler.service';
+import { SupplierInvoiceCostAdjustmentHandlerService } from './application/financial-events/supplier-invoice-cost-adjustment-handler.service';
 import { FixedAssetService } from './application/fixed-asset.service';
 import { DepreciationService } from './application/depreciation.service';
 import { FixedAssetDisposalService } from './application/fixed-asset-disposal.service';
@@ -226,6 +227,7 @@ import { CompanyModule } from '../../foundation/company/company.module';
     PostingStatusService,
     InventoryAdjustmentService,
     InventoryCostingHandlerService,
+    SupplierInvoiceCostAdjustmentHandlerService,
     InventoryPostingPolicyService,
     FixedAssetService,
     DepreciationService,
