@@ -14,6 +14,7 @@ import { ReleaseManagerService } from './release-manager.service';
 import { ReleaseExecutionService } from './release-execution.service';
 import { CompanyFanoutService, summarizePlan } from './company-fanout.service';
 import { evaluateCompanyGate } from './company-migration-gate';
+import { hasFindings } from './company-schema-check';
 import { buildCompanyMigrationReport } from './company-migration-report';
 import { ReleaseUploadInterceptor } from './release-upload.interceptor';
 import { BackupRun } from './backup-run.entity';
@@ -371,21 +372,32 @@ export class ReleaseController {
   async getLiveCompanyMigrationStatus() {
     if (!this.companyFanout) throw new ServiceUnavailableException('The Company migration service is not available in this build.');
     const plan = await this.companyFanout.plan(this.config.releaseExecution.appRoot);
+    // The gate is evaluated as `on` (pending migrations are not a gate failure there); what is BEHIND is reported separately, in the operator's own terms.
     const gate = evaluateCompanyGate({
-      mode: 'off', // "would a platform-only state be acceptable?": blocks while any Company needs migrations or drifts - exactly the live-health question
+      mode: 'on',
       plan,
       skippedPolicy: this.config.releaseDeploy.companySkippedPolicy ?? 'block',
       schemaCheck: this.config.releaseDeploy.companySchemaCheck ?? 'enforce',
     });
+    const behind = plan.planned.filter((c) => c.pending.length > 0 || (c.schema?.ran && hasFindings(c.schema.findings)));
+    const behindMessages = behind.map((c) => {
+      const f = c.schema?.ran ? c.schema.findings : null;
+      const parts = [`${c.pending.length} pending migration(s)`];
+      if (f && f.missingTables.length > 0) parts.push(`${f.missingTables.length} missing table(s)`);
+      if (f && Object.keys(f.missingColumns).length > 0) parts.push(`${Object.keys(f.missingColumns).length} table(s) with missing columns`);
+      return `${c.companyName}: ${parts.join(', ')}`;
+    });
+    const blockers = [...behindMessages, ...gate.blockers];
+    const allCurrent = blockers.length === 0 && gate.warnings.length === 0;
     return {
       installedBuild: readAppVersion(),
       configuredMode: this.config.releaseDeploy.companyMigrations,
       modeExplicit: this.config.releaseDeploy.companyMigrationsExplicit,
-      allCurrent: gate.decision === 'PASS' && gate.warnings.length === 0,
-      decision: gate.decision,
-      blockers: gate.blockers,
+      allCurrent,
+      decision: allCurrent ? 'CURRENT' : 'BEHIND',
+      blockers,
       warnings: gate.warnings,
-      counts: gate.counts,
+      counts: { ...gate.counts, needingMigration: behind.length },
       staleCompanies: gate.staleCompanies,
       plan: summarizePlan(plan),
     };

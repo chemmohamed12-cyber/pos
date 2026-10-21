@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { fmtDateTime } from '../lib/formatDateTime';
 import { loadingLabel } from '../lib/displayNames';
+import { CompanyMigrationLivePanel, CompanyMigrationReportPanel } from '../components/release/CompanyMigrationPanels';
 
 type ReleasePackageType = 'full' | 'delta';
 type ReleaseStatus =
@@ -281,6 +282,8 @@ export function ReleaseCenter() {
         </div>
       </div>
 
+      <CompanyMigrationLivePanel />
+
       {error && <div className="error-text" style={{ marginBottom: 16 }}>{error}</div>}
 
       {canDeploy && (
@@ -389,6 +392,8 @@ export function ReleaseCenter() {
                               </button>
                             </div>
                           )}
+
+                          <CompanyMigrationReportPanel releaseId={r.id} />
 
                           {/* Upgrade Resolver (Release Engine overhaul, stage 3/4) — read-only planning panel: "can the currently installed version reach THIS release, and how?" Never deploys or blocks anything itself. */}
                           <div style={{ marginBottom: 16 }}>
