@@ -32,5 +32,9 @@ export const SUPPLIER_INVOICE_PROCESS: ProcessDefinition = {
     { from: 'posted', to: 'paid', action: 'mark_paid' },
     { from: 'partially_paid', to: 'paid', action: 'mark_paid' },
     { from: 'posted', to: 'void', action: 'void' },
+    // T2-S (2026-10-21): a supplier payment reversed through its owning document re-opens the invoice; fired only internally by SupplierPaymentReversalService
+    { from: 'paid', to: 'partially_paid', action: 'reopen_partial' },
+    { from: 'paid', to: 'posted', action: 'reopen_paid' },
+    { from: 'partially_paid', to: 'posted', action: 'reopen_paid' },
   ],
 };

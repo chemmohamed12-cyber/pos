@@ -12,6 +12,9 @@ import { SupplierInvoice } from './infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from './infrastructure/supplier-invoice-line.entity';
 import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
 import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
+import { SupplierPaymentReversalService } from './application/supplier-payment-reversal.service';
+import { SupplierPaymentReversalController } from './interface/supplier-payment-reversal.controller';
+import { ErrorContractModule } from '../../foundation/error-contract/error-contract.module';
 import { InvoiceAllocationService } from './application/invoice-allocation.service';
 import { InvoiceApprovalService } from './application/invoice-approval.service';
 import { InvoicePolicyService } from './application/invoice-policy.service';
@@ -135,6 +138,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     ApprovalEngineModule,
     ProcessEngineModule,
     NumberingModule,
+    ErrorContractModule,
     EventsModule,
     InventoryWarehouseModule,
     // phase D-1: the valuation contract (stock leaves at book cost) - Manufacturing's own precedent; the valuation module imports nothing from procurement
@@ -158,6 +162,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     GoodsReceiptController,
     SupplierInvoiceController,
     SupplierPaymentController,
+    SupplierPaymentReversalController,
     PurchaseReturnController,
     SupplierCreditNoteController,
     PurchaseRequestController,
@@ -178,6 +183,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     InvoiceCreditCapService,
     SupplierCreditNoteService,
     SupplierPaymentService,
+    SupplierPaymentReversalService,
     PurchaseRequestService,
     RfqService,
     GrniLedgerService,

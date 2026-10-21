@@ -3,7 +3,6 @@ import { SupplierPaymentService } from '../application/supplier-payment.service'
 import { SupplierPaymentReversalService } from '../application/supplier-payment-reversal.service';
 import { SupplierLedgerService } from '../application/supplier-ledger.service';
 import { SupplierInvoiceService } from '../application/supplier-invoice.service';
-import { SUPPLIER_INVOICE_PROCESS } from '../domain/supplier-invoice-process';
 import { TreasuryService } from '../../treasury/application/treasury.service';
 import { JournalEntryService, JOURNAL_ENTRY_DOCUMENT_TYPE } from '../../accounting/application/journal-entry.service';
 import { FinancialEventService } from '../../accounting/application/financial-events/financial-event.service';
@@ -23,25 +22,14 @@ import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/t
  * T2-S (2026-10-21) — real-Postgres proof that a SUPPLIER payment is reversed THROUGH ITS OWNING DOCUMENT with Treasury, Supplier Ledger, invoice status and GL moving
  * together (and only together), that a multi-invoice allocated payment reverses per invoice, and that the raw Treasury reversal of the payment's leg is refused.
  *
- * NOTE: the three `reopen_*` transitions of `SUPPLIER_INVOICE_PROCESS` are the one change that lives in Procurement's own file; until that change is agreed and merged, this
- * spec adds them in memory (idempotently) so the reversal logic can be proven. Once the agreed change is in the file the shim is a no-op and can be deleted.
+ * The three `reopen_*` transitions of `SUPPLIER_INVOICE_PROCESS` (paid -> partially_paid, paid | partially_paid -> posted) are part of the shipped process definition.
  */
-function ensureAgreedReopenTransitions(): void {
-  const want = [
-    { from: 'paid', to: 'partially_paid', action: 'reopen_partial' },
-    { from: 'paid', to: 'posted', action: 'reopen_paid' },
-    { from: 'partially_paid', to: 'posted', action: 'reopen_paid' },
-  ];
-  for (const t of want) {
-    if (!SUPPLIER_INVOICE_PROCESS.transitions.some((x) => x.from === t.from && x.to === t.to && x.action === t.action)) SUPPLIER_INVOICE_PROCESS.transitions.push(t);
-  }
-}
-
 describe('T2-S — supplier payment reversal through the owning document — real-Postgres, A/B', () => {
   jest.setTimeout(580_000);
   let h: TwoCompanyHarness;
   let payments: SupplierPaymentService;
   let reversals: SupplierPaymentReversalService;
+  let events: EventBusService;
   let treasury: TreasuryService;
   let invoices: SupplierInvoiceService;
   const actor = randomUUID();
@@ -93,12 +81,11 @@ describe('T2-S — supplier payment reversal through the owning document — rea
   }
 
   beforeAll(async () => {
-    ensureAgreedReopenTransitions();
     h = await setUpTwoCompanyHarness({ namePrefix: 't2s_pay_reversal', extraCompanyTags: ['sales', 'inventory', 'finance', 'procurement', 'accounting'] });
     const inert = {} as never;
     const audit = new AuditService(h.controlPlane);
     const numbering = new NumberingService(h.controlPlane);
-    const events = new EventBusService(inert, h.connections);
+    events = new EventBusService(inert, h.connections);
     const processEngine = new ProcessEngineService(h.controlPlane);
     const config = { get: () => undefined } as unknown as ConfigurationEngineService;
     const currencies = new CurrencyService(h.controlPlane, audit);
@@ -255,6 +242,26 @@ describe('T2-S — supplier payment reversal through the owning document — rea
     expect(await fingerprint('A')).toEqual(before);
     expect(await state('A', inv)).toBe('paid');
     await reverse('A', p.id);
+  });
+
+  it('S8 atomic: a failure AFTER the Treasury leg, the reversal record and the ledger rows (at the event publish) rolls EVERYTHING back — payment, invoices and books exactly as before', async () => {
+    const i1 = await newInvoice('A', '300.00');
+    const i2 = await newInvoice('A', '200.00');
+    const ds = await dsOf('A');
+    const p = await payments.recordPaymentAllocated(ctx.A.supplierId, [{ invoiceId: i1, amount: '300.00' }, { invoiceId: i2, amount: '200.00' }], 'bank_transfer', ctx.A.bank1102, null, actor, ds.manager);
+    const before = await fingerprint('A');
+    const bankBefore = await bal('A');
+    const spy = jest.spyOn(events, 'publish').mockRejectedValueOnce(new Error('injected failure at publish'));
+    await expect(reverse('A', p.id, 'will fail')).rejects.toThrow(/injected failure/);
+    spy.mockRestore();
+    expect(await fingerprint('A')).toEqual(before);
+    expect(await bal('A')).toBe(bankBefore);
+    expect(await state('A', i1)).toBe('paid');
+    expect(await state('A', i2)).toBe('paid');
+    const orig = await ds.query(`SELECT status FROM "treasury_transactions" WHERE id = $1`, [p.treasuryTransactionId]);
+    expect(orig[0].status).toBe('posted');
+    await reverse('A', p.id, 'now it works'); // the failed attempt left nothing behind, so the real one succeeds exactly once
+    expect(await state('A', i1)).toBe('posted');
   });
 
   it('S7 reconciliation after everything: AP subledger == GL AP, every journal balanced, no non-POSTED event, every reversed event has its record, Company B untouched', async () => {

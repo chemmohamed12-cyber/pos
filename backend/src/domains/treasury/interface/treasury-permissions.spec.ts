@@ -3,6 +3,8 @@ import { TreasuryController } from './treasury.controller';
 import { TreasuryDocumentsController } from './treasury-documents.controller';
 import { BankStatementsController, CashSessionsController } from './bank-statements.controller';
 import { PaymentsController } from '../../customer-finance/interface/payments.controller';
+import { SupplierPaymentReversalController } from '../../procurement/interface/supplier-payment-reversal.controller';
+import { SupplierPaymentController } from '../../procurement/interface/supplier-payment.controller';
 import { PERMISSION_METADATA_KEY, RequiredPermission } from '../../../foundation/permission/require-permission.decorator';
 import { MODULE_REGISTRY } from '../../../foundation/module-registry/module-registry';
 import { nodeRisk } from '../../../foundation/permission/permission-risk';
@@ -88,5 +90,13 @@ describe('Treasury / payment authorization separation', () => {
     expect(r?.nodeKey).toBe(node);
     expect(r?.access).toBe(access);
     expect(MODULE_REGISTRY.nodesForModule('finance')).toContain(node);
+  });
+
+  it('supplier payment reversal has its own Finance node (sensitive), separate from recording a supplier payment', () => {
+    expect(required(SupplierPaymentReversalController.prototype, 'reverse').nodeKey).toBe('finance.supplier_payment.reverse');
+    expect(required(SupplierPaymentReversalController.prototype, 'reverse').access).toBe('editable');
+    expect(required(SupplierPaymentController.prototype, 'record').nodeKey).toBe('procurement.supplier_payment.create');
+    expect(MODULE_REGISTRY.nodesForModule('finance')).toContain('finance.supplier_payment.reverse');
+    expect(nodeRisk('finance.supplier_payment.reverse')).not.toBe('low');
   });
 });
