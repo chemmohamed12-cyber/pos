@@ -1,9 +1,11 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Phase D-2 / D-3 (owner decisions D6 / D7 / E3, 2026-10-20) - the supplier credit note linked to the original invoice and its lines, and the return of INVOICED goods.
- * Purely additive: two new tables, three nullable columns on purchase-return lines (an invoiced line carries the invoice line it credits and the net / tax credited), two audit counters
- * (`quantityReturnedInvoiced`, default 0) on goods-receipt and purchase-order lines, and terminology. No existing row, amount, journal or number is touched. `down` drops all of it
+ * Phase D-2 / D-3 (owner decisions D6 / D7 / E3 and the policy of 2026-10-21) - the supplier credit note linked to the original invoice and its lines, and the PHYSICAL return of INVOICED goods.
+ * The physical return and the financial settlement are separate documents: a return of invoiced goods records the stock leaving and parks its book value in a clearing account; it does NOT touch
+ * Accounts payable. A credit note settles it (optionally linking the returned lines), which is the only event that reduces AP.
+ * Purely additive: two new tables, a nullable `supplierInvoiceLineId` + `settledByCreditNoteId` on purchase-return lines (which invoice line the returned goods were billed on, and which credit note
+ * settled the return), a nullable `purchaseReturnLineId` on credit-note lines, two audit counters (`quantityReturnedInvoiced`, default 0) on goods-receipt and purchase-order lines, and terminology. No existing row, amount, journal or number is touched. `down` drops all of it
  * (documented as irreversible once credit notes or invoiced returns exist: it would delete their history).
  */
 export class CreateSupplierCreditNotes1790020600000 implements MigrationInterface {
@@ -29,8 +31,6 @@ export class CreateSupplierCreditNotes1790020600000 implements MigrationInterfac
     await queryRunner.query(`ALTER TABLE "goods_receipt_lines" ADD COLUMN IF NOT EXISTS "quantityReturnedInvoiced" NUMERIC(18,3) NOT NULL DEFAULT 0`);
     await queryRunner.query(`ALTER TABLE "purchase_order_lines" ADD COLUMN IF NOT EXISTS "quantityReturnedInvoiced" NUMERIC(18,3) NOT NULL DEFAULT 0`);
     await queryRunner.query(`ALTER TABLE "purchase_return_lines" ADD COLUMN IF NOT EXISTS "supplierInvoiceLineId" UUID REFERENCES "supplier_invoice_lines"("id")`);
-    await queryRunner.query(`ALTER TABLE "purchase_return_lines" ADD COLUMN IF NOT EXISTS "creditNetBase" NUMERIC(14,2)`);
-    await queryRunner.query(`ALTER TABLE "purchase_return_lines" ADD COLUMN IF NOT EXISTS "creditTaxBase" NUMERIC(14,2)`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_purchase_return_lines_invoice_line" ON "purchase_return_lines" ("supplierInvoiceLineId")`);
 
     await queryRunner.query(`
@@ -63,6 +63,10 @@ export class CreateSupplierCreditNotes1790020600000 implements MigrationInterfac
         "supplierInvoiceLineId" UUID NOT NULL REFERENCES "supplier_invoice_lines"("id"),
         "amount" NUMERIC(14,2) NOT NULL CHECK ("amount" > 0)
       )`);
+    // the credit note that SETTLED a returned invoiced line (the financial side of the return) / the returned line a credit-note line settles
+    await queryRunner.query(`ALTER TABLE "supplier_credit_note_lines" ADD COLUMN IF NOT EXISTS "purchaseReturnLineId" UUID REFERENCES "purchase_return_lines"("id")`);
+    await queryRunner.query(`ALTER TABLE "purchase_return_lines" ADD COLUMN IF NOT EXISTS "settledByCreditNoteId" UUID REFERENCES "supplier_credit_notes"("id")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_supplier_credit_note_lines_return_line" ON "supplier_credit_note_lines" ("purchaseReturnLineId")`);
     await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "UQ_supplier_credit_note_lines_pair" ON "supplier_credit_note_lines" ("supplierCreditNoteId", "supplierInvoiceLineId")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_supplier_credit_note_lines_invoice_line" ON "supplier_credit_note_lines" ("supplierInvoiceLineId")`);
 
@@ -75,12 +79,11 @@ export class CreateSupplierCreditNotes1790020600000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE "purchase_return_lines" DROP COLUMN IF EXISTS "settledByCreditNoteId"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "supplier_credit_note_lines"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "supplier_credit_notes"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchase_return_lines_invoice_line"`);
-    for (const col of ['supplierInvoiceLineId', 'creditNetBase', 'creditTaxBase']) {
-      await queryRunner.query(`ALTER TABLE "purchase_return_lines" DROP COLUMN IF EXISTS "${col}"`);
-    }
+    await queryRunner.query(`ALTER TABLE "purchase_return_lines" DROP COLUMN IF EXISTS "supplierInvoiceLineId"`);
     await queryRunner.query(`ALTER TABLE "goods_receipt_lines" DROP COLUMN IF EXISTS "quantityReturnedInvoiced"`);
     await queryRunner.query(`ALTER TABLE "purchase_order_lines" DROP COLUMN IF EXISTS "quantityReturnedInvoiced"`);
     await queryRunner.query(`DELETE FROM "terminology_entries" WHERE code = ANY($1::text[])`, [this.terms.map(([code]) => code)]);

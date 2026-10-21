@@ -162,6 +162,6 @@ export const procurementManifest: ModuleManifest = {
       'GetRfq',
       'ListRfqs',
     ],
-    events: ['finance.supplier_credit_note.cost_adjusted', 'finance.supplier_credit_note.tax_adjusted', 'procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
+    events: ['finance.supplier_credit_note.cost_adjusted', 'finance.supplier_credit_note.tax_adjusted', 'finance.supplier_credit_note.return_settled', 'procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
   },
 };

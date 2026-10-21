@@ -35,8 +35,8 @@ interface ReturnLine {
   exitValueBase: string | null;
   differenceBase: string | null;
   supplierInvoiceLineId?: string | null;
-  creditNetBase?: string | null;
-  creditTaxBase?: string | null;
+  /** set once a supplier credit note has settled this returned (invoiced) line */
+  settledByCreditNoteId?: string | null;
 }
 interface Returnable {
   goodsReceiptLineId: string;
@@ -195,7 +195,7 @@ export function PurchaseReturns() {
             {supplierId && returnable.length === 0 && returnableInvoiced.length === 0 && <div className="empty-state">{L('لا توجد بضاعة قابلة للإرجاع لهذا المورد.', 'No returnable goods for this supplier.')}</div>}
             {returnableInvoiced.length > 0 && (
               <>
-                <h4 style={{ margin: '4px 0' }}>{L('بضاعة مفوترة (يُسجَّل ائتمان المورد مع المردود)', 'Invoiced goods (the supplier credit is recorded with the return)')}</h4>
+                <h4 style={{ margin: '4px 0' }}>{L('بضاعة مفوترة (مرتجع مادي فقط؛ التسوية المالية بإشعار دائن منفصل)', 'Invoiced goods (physical return only; the financial settlement is a separate credit note)')}</h4>
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -311,7 +311,7 @@ export function PurchaseReturns() {
                 <tr>
                   <th>{L('الصنف', 'Item')}</th>
                   <th>{L('الكمية', 'Qty')}</th>
-                  <th>{L('قيمة الاستلام / ائتمان المورد', 'Receipt value / supplier credit')}</th>
+                  <th>{L('قيمة الاستلام / التسوية المالية', 'Receipt value / financial settlement')}</th>
                   {detail.state === 'posted' && <th>{L('قيمة الخروج', 'Exit value')}</th>}
                   {detail.state === 'posted' && <th>{L('الفرق', 'Difference')}</th>}
                 </tr>
@@ -322,7 +322,13 @@ export function PurchaseReturns() {
                     <td>{productName(l.productId)}</td>
                     <td>{Number(l.quantity)}</td>
                     <td>
-                      {l.supplierInvoiceLineId ? `${Number(l.creditNetBase ?? 0).toFixed(2)} + ${Number(l.creditTaxBase ?? 0).toFixed(2)} ${L('ضريبة', 'VAT')}` : (Number(l.quantity) * Number(l.receiptUnitCostBase)).toFixed(2)}
+                      {l.supplierInvoiceLineId
+                        ? l.settledByCreditNoteId
+                          ? L('سُوِّي بإشعار دائن', 'Settled by a credit note')
+                          : detail.state === 'posted'
+                            ? L('بانتظار إشعار المورد الدائن', 'Pending supplier credit')
+                            : L('مفوتر — يُسوّى بإشعار دائن', 'Invoiced - settled by a credit note')
+                        : (Number(l.quantity) * Number(l.receiptUnitCostBase)).toFixed(2)}
                     </td>
                     {detail.state === 'posted' && <td>{Number(l.exitValueBase ?? 0).toFixed(2)}</td>}
                     {detail.state === 'posted' && <td>{Number(l.differenceBase ?? 0).toFixed(2)}</td>}

@@ -62,6 +62,15 @@ export class PurchaseReturnController {
     return this.returns.returnableLines(supplierId, req.companyContext.dataSource.manager);
   }
 
+  /** Posted returns of invoiced goods still pending the supplier's credit note (book value waiting in the clearing account). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.purchase_return.view', 'read-only')
+  @Get('pending-credit')
+  async pendingCredit(@Req() req: CompanyScopedRequest, @Query('supplierId') supplierId?: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.returns.pendingCredit(supplierId || undefined, req.companyContext.dataSource.manager);
+  }
+
   @UseGuards(PermissionGuard)
   @RequirePermission('procurement.purchase_return.view', 'read-only')
   @Get('returnable-invoiced')

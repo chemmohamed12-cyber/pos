@@ -165,6 +165,7 @@ export const accountingManifest: ModuleManifest = {
   //          new table (`accounting_wip_reconciliation_runs`), no existing table altered. `admin`'s
   //          existing blanket `accounting: editable` grant already covers the 2 new nodes (same
   //          precedent as 1.13.0 — no corrective admin-grant migration needed).
+  // 1.21.0 — owner policy 2026-10-21 (physical return vs financial settlement): +1 config key (`accounting.purchase_return_clearing_account_code`, default '' = fail-closed).
   // 1.20.0 — procurement invoicing redesign (2026-10-20, owner decisions E1/E3): +3 config keys (`accounting.purchase_cost_difference_after_receipt_account_code`,
   //          `accounting.purchase_return_cost_difference_account_code`, `accounting.purchase_other_charges_account_code`), each default '' = fail-closed, never the PPV account.
   // 1.18.0 — D5 (PPV + Input VAT, 2026-10-05): +1 config key (`accounting.purchase_price_variance_account_code`, default '' = fail-closed).
@@ -176,7 +177,7 @@ export const accountingManifest: ModuleManifest = {
   //          default '' = fail-closed. No new table, no new permission node, no migration.
   // 1.19.0 — D8 acquisition-journal helper (2026-10-06, CTO Option C): +1 config key
   //          (`accounting.fixed_asset_acquisition_clearing_account_code`, default '' = fail-closed). No new table, no new node, no migration.
-  manifest_version: '1.20.0',
+  manifest_version: '1.21.0',
   title_code: 'module.accounting',
   business_domains: ['accounting'],
   depends_on: ['finance'],
@@ -516,6 +517,7 @@ export const accountingManifest: ModuleManifest = {
     // 2026-10-20 (E1 / E3 / D3) - purchase cost accounts assigned by the finance owner; '' = fail-closed (the document that needs one is rejected BEFORE any mutation). Resolved via `resolveConfiguredPostableAccount`.
     { key: 'accounting.purchase_cost_difference_after_receipt_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.purchase_return_cost_difference_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    { key: 'accounting.purchase_return_clearing_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.purchase_other_charges_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_manual_receipt_reason_accounts', type: 'json', default: {}, scope_levels: ['platform', 'edition', 'installation'] },
     // F12 — Fixed Assets (ADR-045 D10). Resolved via the existing

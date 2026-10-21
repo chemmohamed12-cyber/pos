@@ -16,4 +16,9 @@ export class SupplierCreditNoteLine {
 
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount!: string;
+
+  /** Optional: the posted return line of invoiced goods this credit SETTLES (its book value leaves the clearing account when the note posts). */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  purchaseReturnLineId!: string | null;
 }

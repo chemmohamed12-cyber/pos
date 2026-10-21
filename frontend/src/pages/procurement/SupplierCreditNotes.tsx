@@ -39,6 +39,8 @@ interface Creditable {
   lineNet: string;
   credited: string;
   remaining: string;
+  /** posted returns of invoiced goods billed on this line that no credit note has settled yet */
+  pendingReturns?: Array<{ purchaseReturnLineId: string; returnNumber: string; quantity: string; clearingValueBase: string }>;
 }
 
 /**
@@ -57,6 +59,8 @@ export function SupplierCreditNotes() {
   const [invoiceId, setInvoiceId] = useState('');
   const [creditable, setCreditable] = useState<Creditable[]>([]);
   const [amount, setAmount] = useState<Record<string, string>>({});
+  // which pending return (if any) each credited line settles
+  const [settles, setSettles] = useState<Record<string, string>>({});
   const [reason, setReason] = useState('');
   const [supplierReference, setSupplierReference] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -93,6 +97,7 @@ export function SupplierCreditNotes() {
 
   useEffect(() => {
     setAmount({});
+    setSettles({});
     if (!invoiceId) {
       setCreditable([]);
       return;
@@ -118,7 +123,9 @@ export function SupplierCreditNotes() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    const lines = creditable.filter((c) => Number(amount[c.supplierInvoiceLineId] ?? 0) > 0).map((c) => ({ supplierInvoiceLineId: c.supplierInvoiceLineId, amount: Number(amount[c.supplierInvoiceLineId]).toFixed(2) }));
+    const lines = creditable
+      .filter((c) => Number(amount[c.supplierInvoiceLineId] ?? 0) > 0)
+      .map((c) => ({ supplierInvoiceLineId: c.supplierInvoiceLineId, amount: Number(amount[c.supplierInvoiceLineId]).toFixed(2), purchaseReturnLineId: settles[c.supplierInvoiceLineId] || undefined }));
     if (lines.length === 0) return;
     setBusy('create');
     setError(null);
@@ -194,6 +201,7 @@ export function SupplierCreditNotes() {
                     <th>{L('تم ائتمانه', 'Credited')}</th>
                     <th>{L('المتاح', 'Remaining')}</th>
                     <th>{L('قيمة الإشعار', 'Credit amount')}</th>
+                    <th>{L('يسوّي مردودًا', 'Settles a return')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,6 +213,20 @@ export function SupplierCreditNotes() {
                       <td>{c.remaining}</td>
                       <td>
                         <input type="number" min={0} max={Number(c.remaining)} step="0.01" value={amount[c.supplierInvoiceLineId] ?? ''} onChange={(e) => setAmount((p) => ({ ...p, [c.supplierInvoiceLineId]: e.target.value }))} style={{ width: 110 }} />
+                      </td>
+                      <td>
+                        {(c.pendingReturns ?? []).length > 0 ? (
+                          <select value={settles[c.supplierInvoiceLineId] ?? ''} onChange={(e) => setSettles((p) => ({ ...p, [c.supplierInvoiceLineId]: e.target.value }))}>
+                            <option value="">{L('— تسوية سعر فقط —', '— price credit only —')}</option>
+                            {(c.pendingReturns ?? []).map((r) => (
+                              <option key={r.purchaseReturnLineId} value={r.purchaseReturnLineId}>
+                                {r.returnNumber} — {Number(r.quantity)} {L('وحدة', 'units')} ({Number(r.clearingValueBase).toFixed(2)})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                     </tr>
                   ))}

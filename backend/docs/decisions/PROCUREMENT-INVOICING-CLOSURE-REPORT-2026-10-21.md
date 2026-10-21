@@ -50,3 +50,6 @@ Final assertions in the new specs: GL inventory = valuation of every product; GL
 
 ## 9. Preview verification and release recommendation
 Preview verification: not done (item 1). Recommendation: **do not release yet.** Next gates in order: owner review of this report and the E1 / E3 / return-credit points -> authorization of the `daii_dev` migration -> browser acceptance on `:5173` (Arabic and English, permissions, Company context) -> separate release authorization -> merge, post-merge checks, version, deployment workflow.
+
+## 10. Update 2026-10-21 (owner policy: physical return vs financial settlement)
+D-3 was reworked to the owner's policy (see addendum section 5): a physical return of invoiced goods no longer touches Accounts payable; it parks the book value in a new clearing account and a linked credit note settles it. Verified by 3 specs (14 + 8 + 8 scenarios incl. RT1-RT6 separation proofs) after the rework; the full-regression numbers in section 4 predate the rework for the three affected specs only (re-run green). Open for owner confirmation: the clearing account (fourth account setting).

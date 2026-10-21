@@ -17,8 +17,8 @@ export interface LineCreditPosition {
 }
 
 /**
- * Phases D-2 / D-3 - the cumulative cap of what can still be credited against an invoice line, across BOTH credit notes and returns of invoiced goods, so the two can never credit the same value
- * twice. A document counts while it is live (not void): a draft / submitted / approved one RESERVES its value, a posted one consumes it. Read-only; the callers hold the advisory lock and re-check
+ * Phase D-2 - the cumulative cap of what can still be credited against an invoice line. Only CREDIT NOTES consume it (policy 2026-10-21: a physical return of invoiced goods does not credit anything by
+ * itself - it is settled by a credit note that may link it). A note counts while it is live (not void): a draft / submitted / approved one RESERVES its value, a posted one consumes it. Read-only; the callers hold the advisory lock and re-check
  * inside their posting transaction.
  */
 @Injectable()
@@ -32,9 +32,7 @@ export class InvoiceCreditCapService {
               COALESCE((SELECT SUM(cl."amount") FROM "supplier_credit_note_lines" cl JOIN "supplier_credit_notes" cn ON cn."id" = cl."supplierCreditNoteId"
                           JOIN "process_instances" pi ON pi."definitionKey" = 'supplier_credit_note_lifecycle' AND pi."entityId" = cn."id"::text
                          WHERE cl."supplierInvoiceLineId" = sil."id" AND pi."currentState" <> 'void'), 0)::text AS "byNotes",
-              COALESCE((SELECT SUM(rl."creditNetBase") FROM "purchase_return_lines" rl JOIN "purchase_returns" pr ON pr."id" = rl."purchaseReturnId"
-                          JOIN "process_instances" pi ON pi."definitionKey" = 'purchase_return_lifecycle' AND pi."entityId" = pr."id"::text
-                         WHERE rl."supplierInvoiceLineId" = sil."id" AND pi."currentState" <> 'void'), 0)::text AS "byReturns",
+              0::text AS "byReturns",
               COALESCE((SELECT SUM(rl."quantity") FROM "purchase_return_lines" rl JOIN "purchase_returns" pr ON pr."id" = rl."purchaseReturnId"
                           JOIN "process_instances" pi ON pi."definitionKey" = 'purchase_return_lifecycle' AND pi."entityId" = pr."id"::text
                          WHERE rl."supplierInvoiceLineId" = sil."id" AND pi."currentState" <> 'void'), 0)::text AS "returnedQty"
@@ -64,10 +62,7 @@ export class InvoiceCreditCapService {
     const [row]: Array<{ byNotes: string; byReturns: string }> = await run.query(
       `SELECT COALESCE((SELECT SUM(cn."taxAmount") FROM "supplier_credit_notes" cn JOIN "process_instances" pi ON pi."definitionKey" = 'supplier_credit_note_lifecycle' AND pi."entityId" = cn."id"::text
                          WHERE cn."supplierInvoiceId" = $1 AND pi."currentState" <> 'void'), 0)::text AS "byNotes",
-              COALESCE((SELECT SUM(rl."creditTaxBase") FROM "purchase_return_lines" rl JOIN "purchase_returns" pr ON pr."id" = rl."purchaseReturnId"
-                          JOIN "process_instances" pi ON pi."definitionKey" = 'purchase_return_lifecycle' AND pi."entityId" = pr."id"::text
-                          JOIN "supplier_invoice_lines" sil ON sil."id" = rl."supplierInvoiceLineId"
-                         WHERE sil."supplierInvoiceId" = $1 AND pi."currentState" <> 'void'), 0)::text AS "byReturns"`,
+              0::text AS "byReturns"`,
       [invoiceId],
     );
     return r2(Number(row.byNotes) + Number(row.byReturns));

@@ -115,6 +115,7 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   // Phase D-2 - a posted supplier credit note (cost leg + Input VAT leg)
   'finance.supplier_credit_note.cost_adjusted',
   'finance.supplier_credit_note.tax_adjusted',
+  'finance.supplier_credit_note.return_settled',
   // Phase D-1 - a posted Purchase Return (GRNI path)
   'procurement.purchase_return.posted',
   'finance.supplier_payment.recorded',

@@ -114,6 +114,8 @@ export const AP_EVENT_TOPICS = {
   /** Phase D-2: a posted supplier credit note - the cost leg (Dr AP / Cr Inventory on-hand share / Cr cost-difference sold share) and the Input VAT leg (Dr AP / Cr Input VAT). */
   supplierCreditNoteCostAdjusted: 'finance.supplier_credit_note.cost_adjusted',
   supplierCreditNoteTaxAdjusted: 'finance.supplier_credit_note.tax_adjusted',
+  /** Policy 2026-10-21: a credit note that SETTLES physically returned invoiced goods - Dr AP / Cr the returns clearing account / the difference to the return cost-difference account. */
+  supplierCreditNoteReturnSettled: 'finance.supplier_credit_note.return_settled',
   /** Phase D-1 - a posted Purchase Return of goods received but not invoiced: Dr GRNI / Cr Inventory / supplier-return cost difference. */
   purchaseReturnPosted: 'procurement.purchase_return.posted',
   supplierInvoiceCostAdjustmentVoided: 'finance.supplier_invoice.cost_adjustment_voided',

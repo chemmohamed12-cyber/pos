@@ -3,9 +3,9 @@ import { SupplierInvoiceService } from '../application/supplier-invoice.service'
 import { SupplierLedgerService } from '../application/supplier-ledger.service';
 import { InvoiceAllocationService } from '../application/invoice-allocation.service';
 import { PurchaseReturnService } from '../application/purchase-return.service';
+import { InvoiceCreditCapService } from '../application/invoice-credit-cap.service';
 import { SupplierCreditNoteService } from '../application/supplier-credit-note.service';
 import { SupplierPaymentService } from '../application/supplier-payment.service';
-import { InvoiceCreditCapService } from '../application/invoice-credit-cap.service';
 import { GrniLedgerService } from '../application/grni-ledger.service';
 import { GoodsReceiptService } from '../application/goods-receipt.service';
 import { PURCHASE_ORDER_PROCESS } from '../domain/purchase-order-process';
@@ -38,7 +38,7 @@ import { makeProductLifecycleGate } from './product-lifecycle-gate.test-helper';
  *    ordered / received / invoiced / remaining view and the reconciliation hold, GRNI in the GL equals the received-not-invoiced value.
  * B: one payment over several invoices = ONE treasury cash-out, ONE payment row, ONE event (Dr AP / Cr Bank for the total), one ledger debit per invoice; never above a payment's amount or an invoice's balance.
  */
-describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and returns of invoiced goods - real-Postgres, A/B', () => {
+describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and the physical return vs financial settlement of invoiced goods - real-Postgres, A/B', () => {
   jest.setTimeout(580_000);
   let h: TwoCompanyHarness;
   let events: EventBusService;
@@ -63,6 +63,7 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     'accounting.inventory_cogs_account_code': '5201',
     'accounting.purchase_cost_difference_after_receipt_account_code': '5302',
     'accounting.purchase_return_cost_difference_account_code': '5303',
+    'accounting.purchase_return_clearing_account_code': '1135',
     'accounting.purchase_other_charges_account_code': '5304',
   };
   const dsOf = (k: Key) => h.connections.getDataSource(k === 'A' ? h.companyAId : h.companyBId);
@@ -82,6 +83,7 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
       ['5201', 'COGS', 'expense', 'debit', null],
       ['5302', 'Purchase Cost Differences After Receipt', 'expense', 'debit', null],
       ['5303', 'Supplier Return Cost Differences', 'expense', 'debit', null],
+      ['1135', 'Supplier Returns Pending Credit', 'asset', 'debit', null],
       ['5304', 'Purchase Charges Expensed', 'expense', 'debit', null],
     ] as Array<[string, string, string, string, string | null]>) {
       await ds.query(
@@ -129,7 +131,7 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     invoices = new SupplierInvoiceService(h.controlPlane, numbering, processEngine, audit, ledger, events, policyRegistry, allocations);
     treasury = new TreasuryService(h.controlPlane, numbering, audit, inert, events);
     const caps = new InvoiceCreditCapService(h.controlPlane);
-    purchaseReturns = new PurchaseReturnService(h.controlPlane, processEngine, numbering, audit, events, inventory, valuation, ledger, invoices, caps, policyRegistry);
+    purchaseReturns = new PurchaseReturnService(h.controlPlane, processEngine, numbering, audit, events, inventory, valuation, invoices, policyRegistry);
     creditNotes = new SupplierCreditNoteService(h.controlPlane, processEngine, numbering, audit, events, ledger, invoices, caps, policyRegistry);
     payments = new SupplierPaymentService(h.controlPlane, numbering, audit, treasury, ledger, invoices, events);
 
@@ -375,65 +377,130 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     expect(await snapshot()).toEqual(mid);
   });
 
-  it('RT1. return of 4 INVOICED units (net 100 + VAT 14, cost = book cost): Dr AP 45.60 / Cr Inventory 40 / Cr Input VAT 5.60; one ledger debit linked to the invoice; GRNI untouched; counters; stock leaves once', async () => {
+  const clearingBalance = () => glBalance('1135');
+  const pendingTotal = async () => (await purchaseReturns.pendingCredit(undefined, await A())).reduce((t, x) => t + Number(x.clearingValueBase), 0);
+
+  it('RT1. PHYSICAL return of 4 INVOICED units: stock leaves once and its book value (40) is parked in the clearing account; Accounts payable, Input VAT, the supplier ledger, the invoice balance and status do NOT move; it shows as pending supplier credit', async () => {
     const { product, po, invoice, lineId } = await postedInvoiceFor(10, '10.00', { tax: '14.00', supplierId: ids.supplierVat });
     const bal0 = await supplierBalance(ids.supplierVat);
     const ap0 = await glBalance('2101');
     const vat0 = await glBalance('1140');
     const grni0 = await glBalance('2115');
     const inv0 = await glBalance('1120');
+    const clr0 = await clearingBalance();
+    const rd0 = await retDiff();
     const r = await approvedReturn([{ goodsReceiptLineId: po.grLineIds[0], quantity: '4', supplierInvoiceLineId: lineId }]);
-    const line = (await purchaseReturns.get(r.id, await A())).lines[0];
-    expect([line.creditNetBase, line.creditTaxBase]).toEqual(['40.00', '5.60']);
     const before = await snapshot();
     await postReturn(r.id);
     const after = await snapshot();
     expect(after.stock).toBe(before.stock + 1);
-    expect(after.ledger).toBe(before.ledger + 1);
-    expect((await supplierBalance(ids.supplierVat)) - bal0).toBeCloseTo(-45.6, 2);
-    expect(await glBalance('2101')).toBeCloseTo(ap0 + 45.6, 2);
-    expect(await glBalance('1140')).toBeCloseTo(vat0 - 5.6, 2);
+    expect(after.ledger).toBe(before.ledger); // no supplier ledger entry
+    expect(await supplierBalance(ids.supplierVat)).toBeCloseTo(bal0, 2);
+    expect(await glBalance('2101')).toBeCloseTo(ap0, 2); // AP untouched
+    expect(await glBalance('1140')).toBeCloseTo(vat0, 2); // VAT untouched
+    expect(await glBalance('2115')).toBeCloseTo(grni0, 2);
     expect(await glBalance('1120')).toBeCloseTo(inv0 - 40, 2);
-    expect(await glBalance('2115')).toBeCloseTo(grni0, 2); // invoiced goods: GRNI was already cleared
+    expect(await clearingBalance()).toBeCloseTo(clr0 + 40, 2); // Dr clearing at the book value
+    expect(await retDiff()).toBeCloseTo(rd0, 2); // no difference until it is settled
     expect(await valuationOf(product)).toBeCloseTo(60, 2);
-    expect(await remaining(invoice.id)).toBeCloseTo(114 - 45.6, 2);
-    const grl = (await (await dsOf('A')).query(`SELECT "quantityReturned"::text AS r, "quantityReturnedInvoiced"::text AS ri FROM goods_receipt_lines WHERE id = $1`, [po.grLineIds[0]]))[0];
-    expect([Number(grl.r), Number(grl.ri)]).toEqual([0, 4]);
+    expect(await remaining(invoice.id)).toBeCloseTo(114, 2);
+    expect(await state(invoice.id)).toBe('posted');
+    const pending = (await purchaseReturns.pendingCredit(ids.supplierVat, await A())).filter((x) => x.supplierInvoiceLineId === lineId);
+    expect(pending.map((x) => Number(x.clearingValueBase))).toEqual([40]);
     expect(await reconcile()).toEqual([]);
   });
 
-  it('RT2. credited at the invoice price 11 vs book cost 10: stock leaves at 10, AP is debited 44, the 4.00 difference goes to the SEPARATE return-difference account (never PPV)', async () => {
-    const { product, po, lineId } = await postedInvoiceFor(10, '11.00');
-    const rd0 = await retDiff();
-    const ppv0 = await glBalance('5301');
-    const v0 = await valuationOf(product);
+  it('RT2. the credit note that LINKS the returned line SETTLES it: Dr AP 44 / Cr clearing 40 / Cr return cost-difference 4 (invoice price 11 vs book 10, never PPV); one ledger debit; clearing back to zero; the return line is marked settled; nothing pending', async () => {
+    const { po, invoice, lineId } = await postedInvoiceFor(10, '11.00');
     const r = await approvedReturn([{ goodsReceiptLineId: po.grLineIds[0], quantity: '4', supplierInvoiceLineId: lineId }]);
     await postReturn(r.id);
-    expect(await valuationOf(product)).toBeCloseTo(v0 - 40, 2);
-    expect(await retDiff()).toBeCloseTo(rd0 - 4, 2); // credit
-    expect(await glBalance('5301')).toBeCloseTo(ppv0, 2);
-  });
-
-  it('RT3. the cap is SHARED: a credit note of 80 leaves 20 - a return of 4 units (44) is refused, 2 units (22 at 11)... fits only up to the remaining value; and the other way round', async () => {
-    const { po, invoice, lineId } = await postedInvoiceFor(10, '10.00');
-    const n = await creditApproved(invoice.id, [{ lineId, amount: '80.00' }]);
+    const [retLine] = (await purchaseReturns.get(r.id, await A())).lines;
+    const clr0 = await clearingBalance();
+    const rd0 = await retDiff();
+    const ap0 = await glBalance('2101');
+    const ppv0 = await glBalance('5301');
+    const bal0 = await supplierBalance(ids.supplier);
+    const n = await creditNotes.createDraft({ supplierInvoiceId: invoice.id, reason: 'credit for the returned goods', lines: [{ supplierInvoiceLineId: lineId, amount: '44.00', purchaseReturnLineId: retLine.id }] }, actor, await A());
+    await creditNotes.submit(n.id, actor, await A());
+    await creditNotes.approve(n.id, approver, await A());
     const before = await snapshot();
-    await expect(purchaseReturns.createDraft({ reason: 'too much', lines: [{ goodsReceiptLineId: po.grLineIds[0], quantity: '3', supplierInvoiceLineId: lineId }] }, actor, await A())).rejects.toThrow(/can still be returned/i);
-    expect(await snapshot()).toEqual(before);
-    const ok = await approvedReturn([{ goodsReceiptLineId: po.grLineIds[0], quantity: '2', supplierInvoiceLineId: lineId }]); // 20 left -> exactly 2 units
-    await postReturn(ok.id);
-    await expect(postNote(n.id)).resolves.toBeDefined(); // the note's 80 + the return's 20 = the line's 100
-    const view = await creditNotes.creditableLines(invoice.id, await A());
-    expect(view[0].remaining).toBe('0.00');
+    await postNote(n.id);
+    expect((await snapshot()).ledger).toBe(before.ledger + 1);
+    expect(await glBalance('2101')).toBeCloseTo(ap0 + 44, 2);
+    expect(await clearingBalance()).toBeCloseTo(clr0 - 40, 2);
+    expect(await retDiff()).toBeCloseTo(rd0 - 4, 2); // credit: the supplier credited above the book value
+    expect(await glBalance('5301')).toBeCloseTo(ppv0, 2);
+    expect((await supplierBalance(ids.supplier)) - bal0).toBeCloseTo(-44, 2);
+    expect((await purchaseReturns.get(r.id, await A())).lines[0].settledByCreditNoteId).toBe(n.id);
+    expect((await purchaseReturns.pendingCredit(ids.supplier, await A())).filter((x) => x.supplierInvoiceLineId === lineId)).toEqual([]);
     expect(await reconcile()).toEqual([]);
   });
 
-  it('RT4. a MIXED return (one uninvoiced line, one invoiced line) posts one balanced journal with GRNI and AP legs; invoiced goods cannot be returned as uninvoiced and vice versa; posting twice does nothing', async () => {
+  it('RT3. settlement with VAT (net 100 + VAT 14; return 4 units; linked credit 40 + VAT 5.60): Dr AP 45.60 in total, Cr clearing 40, Cr Input VAT 5.60 - the VAT moves only now', async () => {
+    const { po, invoice, lineId } = await postedInvoiceFor(10, '10.00', { tax: '14.00', supplierId: ids.supplierVat });
+    const r = await approvedReturn([{ goodsReceiptLineId: po.grLineIds[0], quantity: '4', supplierInvoiceLineId: lineId }]);
+    await postReturn(r.id);
+    const [retLine] = (await purchaseReturns.get(r.id, await A())).lines;
+    const clr0 = await clearingBalance();
+    const ap0 = await glBalance('2101');
+    const vat0 = await glBalance('1140');
+    const bal0 = await supplierBalance(ids.supplierVat);
+    const n = await creditNotes.createDraft({ supplierInvoiceId: invoice.id, reason: 'credit for returned goods', lines: [{ supplierInvoiceLineId: lineId, amount: '40.00', purchaseReturnLineId: retLine.id }] }, actor, await A());
+    expect([n.netAmount, n.taxAmount]).toEqual(['40.00', '5.60']);
+    await creditNotes.submit(n.id, actor, await A());
+    await creditNotes.approve(n.id, approver, await A());
+    await postNote(n.id);
+    expect(await glBalance('2101')).toBeCloseTo(ap0 + 45.6, 2);
+    expect(await clearingBalance()).toBeCloseTo(clr0 - 40, 2);
+    expect(await glBalance('1140')).toBeCloseTo(vat0 - 5.6, 2);
+    expect((await supplierBalance(ids.supplierVat)) - bal0).toBeCloseTo(-45.6, 2);
+    expect(await remaining(invoice.id)).toBeCloseTo(114 - 45.6, 2);
+    expect(await reconcile()).toEqual([]);
+  });
+
+  it('RT4. separation proofs: a price credit WITHOUT a link never touches the clearing account; the same returned line cannot be settled twice (live claim, then settled); a line of another invoice line and an unposted return are refused with no write', async () => {
+    const a = await postedInvoiceFor(10, '10.00');
+    const other = await postedInvoiceFor(5, '10.00');
+    const r = await approvedReturn([{ goodsReceiptLineId: a.po.grLineIds[0], quantity: '3', supplierInvoiceLineId: a.lineId }]);
+    const unposted = await approvedReturn([{ goodsReceiptLineId: other.po.grLineIds[0], quantity: '1', supplierInvoiceLineId: other.lineId }]);
+    const unpostedLine = (await purchaseReturns.get(unposted.id, await A())).lines[0];
+    const before = await snapshot();
+    await expect(
+      creditNotes.createDraft({ supplierInvoiceId: other.invoice.id, reason: 'too early', lines: [{ supplierInvoiceLineId: other.lineId, amount: '10.00', purchaseReturnLineId: unpostedLine.id }] }, actor, await A()),
+    ).rejects.toThrow(/Only a POSTED purchase return/i);
+    expect(await snapshot()).toEqual(before);
+    await postReturn(r.id);
+    const [retLine] = (await purchaseReturns.get(r.id, await A())).lines;
+    const clr0 = await clearingBalance();
+    // price credit without a link: E1 cost leg only
+    const price = await creditApproved(a.invoice.id, [{ lineId: a.lineId, amount: '10.00' }]);
+    await postNote(price.id);
+    expect(await clearingBalance()).toBeCloseTo(clr0, 2);
+    // a line of another invoice line cannot be linked
+    await expect(
+      creditNotes.createDraft({ supplierInvoiceId: other.invoice.id, reason: 'wrong link', lines: [{ supplierInvoiceLineId: other.lineId, amount: '10.00', purchaseReturnLineId: retLine.id }] }, actor, await A()),
+    ).rejects.toThrow(/not billed on this invoice line/i);
+    const first = await creditNotes.createDraft({ supplierInvoiceId: a.invoice.id, reason: 'settle the return', lines: [{ supplierInvoiceLineId: a.lineId, amount: '30.00', purchaseReturnLineId: retLine.id }] }, actor, await A());
+    await expect(
+      creditNotes.createDraft({ supplierInvoiceId: a.invoice.id, reason: 'second claim', lines: [{ supplierInvoiceLineId: a.lineId, amount: '30.00', purchaseReturnLineId: retLine.id }] }, actor, await A()),
+    ).rejects.toThrow(/already claimed/i);
+    await creditNotes.submit(first.id, actor, await A());
+    await creditNotes.approve(first.id, approver, await A());
+    await postNote(first.id);
+    await expect(
+      creditNotes.createDraft({ supplierInvoiceId: a.invoice.id, reason: 'third claim', lines: [{ supplierInvoiceLineId: a.lineId, amount: '10.00', purchaseReturnLineId: retLine.id }] }, actor, await A()),
+    ).rejects.toThrow(/already settled/i);
+    expect(await clearingBalance()).toBeCloseTo(clr0 - 30, 2);
+    expect(await reconcile()).toEqual([]);
+  });
+
+  it('RT5. a MIXED return (one uninvoiced line, one invoiced line) posts ONE balanced journal: Dr GRNI 30 + Dr clearing 20 / Cr Inventory 50; AP untouched; posting twice does nothing', async () => {
     const a = await postedInvoiceFor(6, '10.00'); // all invoiced
     const product = await newProduct();
     const b = await poWithReceipts([5], ids.supplier, product); // received, uninvoiced
     const grni0 = await glBalance('2115');
     const ap0 = await glBalance('2101');
+    const clr0 = await clearingBalance();
     const before = await snapshot();
     await expect(purchaseReturns.createDraft({ reason: 'wrong path', lines: [{ goodsReceiptLineId: a.po.grLineIds[0], quantity: '1' }] }, actor, await A())).rejects.toThrow(/invoiced goods are returned against their invoice line/i);
     await expect(purchaseReturns.createDraft({ reason: 'wrong path 2', lines: [{ goodsReceiptLineId: b.grLineIds[0], quantity: '1', supplierInvoiceLineId: a.lineId }] }, actor, await A())).rejects.toThrow(/can still be returned/i);
@@ -445,8 +512,9 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     const journals0 = await count('A', 'accounting_journal_entries');
     await postReturn(r.id);
     expect(await count('A', 'accounting_journal_entries')).toBe(journals0 + 1);
-    expect(await glBalance('2115')).toBeCloseTo(grni0 + 30, 2); // GRNI debit only for the uninvoiced 3 units
-    expect(await glBalance('2101')).toBeCloseTo(ap0 + 20, 2); // AP debit only for the invoiced 2 units
+    expect(await glBalance('2115')).toBeCloseTo(grni0 + 30, 2);
+    expect(await clearingBalance()).toBeCloseTo(clr0 + 20, 2);
+    expect(await glBalance('2101')).toBeCloseTo(ap0, 2);
     const mid = await snapshot();
     await expect(purchaseReturns.post(r.id, approver, await A())).rejects.toThrow(/not valid from state "posted"/);
     expect(await snapshot()).toEqual(mid);
@@ -454,7 +522,26 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     expect(listed.some((x) => x.supplierInvoiceLineId === a.lineId && Number(x.returnable) === 4)).toBe(true);
   });
 
-  it('RT5. company isolation: Company B has none of these documents and cannot reach the invoice lines of Company A; resolving A never requests B', async () => {
+  it('RT6. fails closed with NO write when the finance owner has not assigned the clearing account: an invoiced return is refused; an uninvoiced return needs no such account; works once assigned', async () => {
+    const a = await postedInvoiceFor(4, '10.00');
+    const r = await approvedReturn([{ goodsReceiptLineId: a.po.grLineIds[0], quantity: '1', supplierInvoiceLineId: a.lineId }]);
+    const saved = config['accounting.purchase_return_clearing_account_code'];
+    config['accounting.purchase_return_clearing_account_code'] = '';
+    const before = await snapshot();
+    await expect(postReturn(r.id)).rejects.toThrow(/returns pending credit account is not configured/i);
+    expect((await purchaseReturns.get(r.id, await A())).state).toBe('approved');
+    expect(await snapshot()).toEqual(before);
+    const product = await newProduct();
+    const u = await poWithReceipts([3], ids.supplier, product);
+    const ur = await approvedReturn([{ goodsReceiptLineId: u.grLineIds[0], quantity: '1' }]);
+    await postReturn(ur.id);
+    expect((await purchaseReturns.get(ur.id, await A())).state).toBe('posted');
+    config['accounting.purchase_return_clearing_account_code'] = saved;
+    await postReturn(r.id);
+    expect((await purchaseReturns.get(r.id, await A())).state).toBe('posted');
+  });
+
+  it('RT7. company isolation: Company B has none of these documents and cannot reach A\'s invoice lines; resolving A never requests B', async () => {
     const dsB = await dsOf('B');
     const { invoice, lineId } = await postedInvoiceFor(2, '10.00');
     await expect(creditNotes.createDraft({ supplierInvoiceId: invoice.id, reason: 'cross company', lines: [{ supplierInvoiceLineId: lineId, amount: '1' }] }, actor, dsB.manager)).rejects.toThrow(/not found/i);
@@ -467,8 +554,11 @@ describe('Procurement invoicing phases D-2 / D-3 - supplier credit notes and ret
     });
   });
 
-  it('D-Z. final: GL inventory = valuation, GL AP = supplier sub-ledger, GRNI sub-ledger = GL, trial balance zero, reconciliation clean', async () => {
+  it('D-Z. final: GL inventory = valuation, GL AP = supplier sub-ledger, GL clearing = pending returns, GRNI sub-ledger = GL, trial balance zero, reconciliation clean', async () => {
     const ds = await dsOf('A');
+    const notPosted = await ds.query(`SELECT "eventType", status, "rejectionReason" FROM accounting_financial_events WHERE status <> 'POSTED'`);
+    expect(notPosted).toEqual([]); // every financial event of every scenario reached the GL
+    expect(await clearingBalance()).toBeCloseTo(await pendingTotal(), 2);
     const val = Number((await ds.query(`SELECT coalesce(sum("totalValueBase"),0)::text AS v FROM "inventory_valuation_state"`))[0].v);
     expect(await glBalance('1120')).toBeCloseTo(val, 2);
     const ledgerTotal = (await supplierBalance(ids.supplier)) + (await supplierBalance(ids.supplierVat)) + (await supplierBalance(ids.otherSupplier));

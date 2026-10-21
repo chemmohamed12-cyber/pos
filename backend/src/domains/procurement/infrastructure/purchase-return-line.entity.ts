@@ -35,14 +35,14 @@ export class PurchaseReturnLine {
   @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
   differenceBase!: string | null;
 
-  /** Phase D-3: set when the line returns INVOICED goods - the invoice line it credits, the net credited (qty x invoice unit cost) and the proportional Input VAT. */
+  /**
+   * Phase D-3 (policy 2026-10-21): set when the line physically returns INVOICED goods - the invoice line they were billed on. The return parks the book value (`exitValueBase`) in the
+   * clearing account and never touches Accounts payable; `settledByCreditNoteId` is the credit note that later settled it (NULL = still pending the supplier's credit).
+   */
   @Index()
   @Column({ type: 'uuid', nullable: true })
   supplierInvoiceLineId!: string | null;
 
-  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
-  creditNetBase!: string | null;
-
-  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
-  creditTaxBase!: string | null;
+  @Column({ type: 'uuid', nullable: true })
+  settledByCreditNoteId!: string | null;
 }

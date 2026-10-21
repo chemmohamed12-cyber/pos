@@ -55,7 +55,7 @@ export interface InventoryPostingPolicy {
    * Phase D-1 (owner decisions D7 / E3) - OPTIONAL pre-mutation gate of a Purchase Return: the `inventory` and `grni` control accounts must exist and, when the book cost of the stock that leaves differs
    * from the receipt cost (`expectedDifference` <> 0), the separately configured supplier-return cost-difference account must resolve. Throws (409) BEFORE any stock / valuation / outbox write.
    */
-  assertPurchaseReturnPostable?(input: { expectedDifference: string; creditNet?: string; creditTax?: string }, manager?: EntityManager): Promise<void>;
+  assertPurchaseReturnPostable?(input: { expectedDifference: string; clearingValue?: string; settledNet?: string }, manager?: EntityManager): Promise<void>;
   /**
    * C2 (ADR-INV-02) - OPTIONAL pre-mutation gate for an EXPLICIT business date: a fiscal year/period must cover it and be open. Throws (409) BEFORE any
    * stock / valuation / outbox write; the date is never silently moved into another period. Unbound / absent => no GL => no gate.

@@ -15,6 +15,7 @@ const PPV_ACCOUNT_KEY = 'accounting.purchase_price_variance_account_code';
 const COST_DIFFERENCE_AFTER_RECEIPT_KEY = 'accounting.purchase_cost_difference_after_receipt_account_code';
 const OTHER_CHARGES_ACCOUNT_KEY = 'accounting.purchase_other_charges_account_code';
 const RETURN_COST_DIFFERENCE_KEY = 'accounting.purchase_return_cost_difference_account_code';
+const RETURN_CLEARING_KEY = 'accounting.purchase_return_clearing_account_code';
 
 /**
  * D3-B (2026-10-04, CTO-approved) — the pre-mutation gate of a MANUAL receipt: the reason code must be a controlled
@@ -186,7 +187,7 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
   }
 
   /** Phase D-1 (D7 / E3): see the registry. */
-  async assertPurchaseReturnPostable(input: { expectedDifference: string; creditNet?: string; creditTax?: string }, manager?: EntityManager): Promise<void> {
+  async assertPurchaseReturnPostable(input: { expectedDifference: string; clearingValue?: string; settledNet?: string }, manager?: EntityManager): Promise<void> {
     if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to validate purchase-return accounts');
     const accounts = manager.getRepository(GLAccount);
     if (!(await accounts.findOne({ where: { controlFunction: 'inventory', isActive: true, isPostable: true } }))) {
@@ -195,13 +196,15 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
     if (!(await accounts.findOne({ where: { controlFunction: 'grni', isActive: true, isPostable: true } }))) {
       throw new ConflictException('A purchase return cannot post: no active postable account has the "grni" control function');
     }
-    // phase D-3: a return of INVOICED goods credits Accounts payable (and Input VAT)
-    if (Number(input.creditNet ?? 0) > 0 && !(await accounts.findOne({ where: { controlFunction: 'ap', isActive: true, isPostable: true } }))) {
-      throw new ConflictException('A return of invoiced goods cannot post: no active postable account has the "ap" control function');
+    // policy 2026-10-21: the physical return of INVOICED goods parks its book value in the clearing account; settling it by a credit note also debits Accounts payable
+    if (Number(input.clearingValue ?? 0) > 0) {
+      const code = String(this.config.get<unknown>(RETURN_CLEARING_KEY) ?? '').trim();
+      if (!code) throw new ConflictException(`A return of invoiced goods cannot post: the supplier returns pending credit account is not configured — ask the finance owner to assign it (${RETURN_CLEARING_KEY})`);
+      const problem = this.accountProblem(await accounts.findOne({ where: { code } }));
+      if (problem) throw new ConflictException(`A return of invoiced goods cannot post: the configured account ${code} (${RETURN_CLEARING_KEY}) ${problem}`);
     }
-    if (Number(input.creditTax ?? 0) > 0) {
-      const vat = await accounts.find({ where: { controlFunction: 'tax_receivable', isActive: true, isPostable: true }, take: 2 });
-      if (vat.length !== 1) throw new ConflictException('A return of invoiced goods with VAT cannot post: exactly one active postable "tax_receivable" (Input VAT) account must exist');
+    if (Number(input.settledNet ?? 0) > 0 && !(await accounts.findOne({ where: { controlFunction: 'ap', isActive: true, isPostable: true } }))) {
+      throw new ConflictException('A credit note settling returned goods cannot post: no active postable account has the "ap" control function');
     }
     if (Math.abs(Number(input.expectedDifference)) > 0.00005) {
       const code = String(this.config.get<unknown>(RETURN_COST_DIFFERENCE_KEY) ?? '').trim();

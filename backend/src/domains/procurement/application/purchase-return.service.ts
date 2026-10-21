@@ -4,10 +4,7 @@ import { PurchaseReturn } from '../infrastructure/purchase-return.entity';
 import { PurchaseReturnLine } from '../infrastructure/purchase-return-line.entity';
 import { GoodsReceipt } from '../infrastructure/goods-receipt.entity';
 import { GoodsReceiptLine } from '../infrastructure/goods-receipt-line.entity';
-import { SupplierInvoice } from '../infrastructure/supplier-invoice.entity';
 import { PURCHASE_RETURN_PROCESS } from '../domain/purchase-return-process';
-import { InvoiceCreditCapService } from './invoice-credit-cap.service';
-import { SupplierLedgerService } from './supplier-ledger.service';
 import { SupplierInvoiceService } from './supplier-invoice.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
@@ -22,26 +19,26 @@ const ENTITY_TYPE = 'purchase_return';
 const DOCUMENT_TYPE = 'purchase_return';
 const PREFIX = 'PRET';
 const q3 = (n: number) => Math.round(n * 1000) / 1000;
-const r2 = (n: number) => Math.round(n * 100) / 100;
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
 
 export interface CreatePurchaseReturnInput {
   reason: string;
-  /** a line returns uninvoiced goods (GRNI path) or - with `supplierInvoiceLineId` - goods that were already invoiced (credited through that invoice line, D-3) */
+  /** a line returns uninvoiced goods (GRNI path) or - with `supplierInvoiceLineId` - goods that were already invoiced (physical return only; the financial settlement is a separate credit note) */
   lines: Array<{ goodsReceiptLineId: string; quantity: string; supplierInvoiceLineId?: string | null }>;
 }
 
 /**
- * Phase D-1 / D-3 (owner decisions D7 / E3, 2026-10-20) - the formal Purchase Return. Lifecycle Draft -> Submitted -> Approved -> Posted (independent approver).
+ * Phase D-1 / D-3 (owner decisions D7 / E3 and the policy of 2026-10-21) - the formal Purchase Return: the PHYSICAL return of goods. Lifecycle Draft -> Submitted -> Approved -> Posted (independent approver).
  *
- * UNINVOICED goods (D-1, GRNI path): Dr GRNI at the receipt cost / Cr Inventory at the book cost that left / the difference to the separate supplier-return cost-difference account.
- * INVOICED goods (D-3): a line names the invoice line it returns; the supplier's credit is documented right here as a Supplier Ledger debit linked to that invoice (value = quantity x the invoice's unit
- * cost, Input VAT proportional): Dr Accounts payable (net + VAT) / Cr Inventory (book cost) / Cr Input VAT / the difference (credit net - book cost) to the same separate account. A payment already made is never
- * touched: the invoice balance simply falls and may become a credit balance with the supplier (no automatic refund). The credited value counts against the same per-invoice-line cap as supplier credit notes
- * (`InvoiceCreditCapService`), so a return and a credit note can never credit the same value twice.
- *
- * Posting is one atomic unit under the per-order-line advisory lock (shared with invoicing) and the per-invoice-line credit lock: caps re-checked, stock leaves ONCE at the moving-average cost (E3), counters rise,
- * the ledger debit (invoiced lines) and ONE accounting event are written; every account is checked BEFORE any mutation. A posted return is never edited or voided.
+ * The physical return and the financial settlement are separate:
+ *  - Stock leaves ONCE at the actual book cost (moving average, E3) and the physical `purchase_return_out` movement is recorded - for every line.
+ *  - UNINVOICED goods (GRNI path): Dr GRNI at the receipt cost / Cr Inventory at the book cost / the difference to the separate supplier-return cost-difference account. (The supplier has not billed them yet,
+ *    so there is no payable to settle.)
+ *  - INVOICED goods: the line names the invoice line the goods were billed on. The return does NOT reduce Accounts payable: Dr the clearing account "supplier returns pending credit" / Cr Inventory, both at the
+ *    book value. Accounts payable falls only when a supplier credit note settles the return (`SupplierCreditNoteService`, which may link the returned lines); the difference between the book value
+ *    and the credited value then goes to the separate cost-difference account. An unsettled return stays visible as "pending supplier credit".
+ * A payment already made is never touched. Posting is one atomic unit under the per-order-line advisory lock (shared with invoicing): caps re-checked, counters raised, ONE accounting event; every account
+ * is checked BEFORE any mutation. A posted return is never edited or voided.
  */
 @Injectable()
 export class PurchaseReturnService {
@@ -53,9 +50,7 @@ export class PurchaseReturnService {
     private readonly events: EventBusService,
     private readonly inventory: InventoryService,
     @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation: InventoryValuationContract,
-    private readonly ledger: SupplierLedgerService,
     private readonly invoices: SupplierInvoiceService,
-    private readonly caps: InvoiceCreditCapService,
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
   ) {}
 
@@ -76,7 +71,7 @@ export class PurchaseReturnService {
     return v.slice(0, 500);
   }
 
-  /** received - returned - allocated to live invoices, for one receipt line (the units that can still go back WITHOUT a credit: not yet invoiced). */
+  /** received - returned - allocated to live invoices, for one receipt line (the units that can still go back WITHOUT an invoice behind them: not yet invoiced). */
   async returnableQuantity(goodsReceiptLineId: string, m: EntityManager): Promise<number> {
     const [row]: Array<{ received: string; returned: string; allocated: string }> = await m.query(
       `SELECT grl."quantityReceived"::text AS received, grl."quantityReturned"::text AS returned,
@@ -88,7 +83,7 @@ export class PurchaseReturnService {
     return q3(Number(row.received) - Number(row.returned) - Number(row.allocated));
   }
 
-  /** Units of ONE (invoice line, receipt line) allocation that can still be returned as INVOICED goods: allocated - already on live returns of that pair, also limited by the creditable value and the physical units left. */
+  /** Units of ONE (invoice line, receipt line) allocation that can still be returned as INVOICED goods: allocated - already on live returns of that pair, limited by the units physically still there. */
   async returnableInvoicedQuantity(supplierInvoiceLineId: string, goodsReceiptLineId: string, m: EntityManager): Promise<number> {
     const [alloc]: Array<{ allocated: string; physical: string }> = await m.query(
       `SELECT r."quantity"::text AS allocated, (grl."quantityReceived" - grl."quantityReturned" - grl."quantityReturnedInvoiced")::text AS physical
@@ -103,9 +98,7 @@ export class PurchaseReturnService {
         WHERE rl."supplierInvoiceLineId" = $1 AND rl."goodsReceiptLineId" = $2 AND pi."currentState" <> 'void'`,
       [supplierInvoiceLineId, goodsReceiptLineId],
     );
-    const pos = await this.caps.linePosition(supplierInvoiceLineId, m);
-    const byValue = pos && pos.unitCostBase > 0 ? Math.floor((pos.remainingNet / pos.unitCostBase) * 1000) / 1000 : 0;
-    return Math.max(0, Math.min(q3(Number(alloc.allocated) - Number(used.q)), q3(Number(alloc.physical)), byValue));
+    return Math.max(0, Math.min(q3(Number(alloc.allocated) - Number(used.q)), q3(Number(alloc.physical))));
   }
 
   async createDraft(input: CreatePurchaseReturnInput, actorUserId: string, manager?: EntityManager): Promise<PurchaseReturn & { lines: PurchaseReturnLine[] }> {
@@ -130,24 +123,20 @@ export class PurchaseReturnService {
       const [supplierId] = [...supplierIds];
       const [warehouseId] = [...warehouseIds];
 
-      // serialise the invoiced-line cap checks with credit notes / other returns on the same invoice lines
-      for (const key of [...new Set(input.lines.map((l) => l.supplierInvoiceLineId).filter(Boolean) as string[])].sort()) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`supplier_credit:invoice_line:${key}`]);
-      const taxLeftByInvoice = new Map<string, number>();
-
       const lineRows: Array<Partial<PurchaseReturnLine>> = [];
       for (const l of input.lines) {
         const g = grLines.find((x) => x.id === l.goodsReceiptLineId)!;
         if (!l.supplierInvoiceLineId) {
           const available = await this.returnableQuantity(g.id, m);
           if (Number(l.quantity) > available) {
-            throw new ConflictException(`Cannot return ${l.quantity} - only ${available} of this receipt line can still be returned without a credit (received ${g.quantityReceived}, already returned, or already invoiced - invoiced goods are returned against their invoice line).`);
+            throw new ConflictException(`Cannot return ${l.quantity} - only ${available} of this receipt line can still be returned without an invoice behind it (received ${g.quantityReceived}, already returned, or already invoiced - invoiced goods are returned against their invoice line).`);
           }
           lineRows.push({ goodsReceiptLineId: g.id, purchaseOrderLineId: g.purchaseOrderLineId, productId: g.productId, quantity: l.quantity, receiptUnitCostBase: g.unitCostBase });
           continue;
         }
-        // ---- invoiced goods (D-3) ----
-        const [il]: Array<{ id: string; invoiceId: string; supplierId: string; unitCostBase: string }> = await m.query(
-          `SELECT sil."id", sil."supplierInvoiceId" AS "invoiceId", si."supplierId", sil."unitCostBase"::text AS "unitCostBase" FROM "supplier_invoice_lines" sil JOIN "supplier_invoices" si ON si."id" = sil."supplierInvoiceId" WHERE sil."id" = $1`,
+        // ---- invoiced goods (D-3): physical return only ----
+        const [il]: Array<{ id: string; invoiceId: string; supplierId: string }> = await m.query(
+          `SELECT sil."id", sil."supplierInvoiceId" AS "invoiceId", si."supplierId" FROM "supplier_invoice_lines" sil JOIN "supplier_invoices" si ON si."id" = sil."supplierInvoiceId" WHERE sil."id" = $1`,
           [l.supplierInvoiceLineId],
         );
         if (!il) throw new NotFoundException(`Supplier invoice line "${l.supplierInvoiceLineId}" not found.`);
@@ -155,26 +144,8 @@ export class PurchaseReturnService {
         const invState = await this.invoices.getStatus(il.invoiceId, m);
         if (invState !== 'posted' && invState !== 'partially_paid' && invState !== 'paid') throw new ConflictException(`The invoice of this line is "${invState}" - only goods on a posted invoice can be returned against it.`);
         const available = await this.returnableInvoicedQuantity(il.id, g.id, m);
-        if (Number(l.quantity) > available) throw new ConflictException(`Cannot return ${l.quantity} of invoiced goods - only ${available} of this invoice line / receipt line can still be returned (billed to that receipt, not yet returned, still creditable and still physically there).`);
-        const creditNet = r2(Number(l.quantity) * Number(il.unitCostBase));
-        if (!taxLeftByInvoice.has(il.invoiceId)) {
-          const [inv]: Array<{ tax: string }> = await m.query(`SELECT COALESCE("taxAmount", 0)::text AS tax FROM "supplier_invoices" WHERE "id" = $1`, [il.invoiceId]);
-          taxLeftByInvoice.set(il.invoiceId, Math.max(0, r2(Number(inv.tax) - (await this.caps.invoiceTaxCredited(il.invoiceId, m)))));
-        }
-        const [invNet]: Array<{ net: string; tax: string }> = await m.query(`SELECT "totalAmount"::text AS net, COALESCE("taxAmount", 0)::text AS tax FROM "supplier_invoices" WHERE "id" = $1`, [il.invoiceId]);
-        const wanted = Number(invNet.net) > 0 ? r2((Number(invNet.tax) * creditNet) / Number(invNet.net)) : 0;
-        const creditTax = Math.min(wanted, taxLeftByInvoice.get(il.invoiceId)!);
-        taxLeftByInvoice.set(il.invoiceId, r2(taxLeftByInvoice.get(il.invoiceId)! - creditTax));
-        lineRows.push({
-          goodsReceiptLineId: g.id,
-          purchaseOrderLineId: g.purchaseOrderLineId,
-          productId: g.productId,
-          quantity: l.quantity,
-          receiptUnitCostBase: g.unitCostBase,
-          supplierInvoiceLineId: il.id,
-          creditNetBase: creditNet.toFixed(2),
-          creditTaxBase: creditTax.toFixed(2),
-        });
+        if (Number(l.quantity) > available) throw new ConflictException(`Cannot return ${l.quantity} of invoiced goods - only ${available} of this invoice line / receipt line can still be returned (billed to that receipt, not yet returned, still physically there).`);
+        lineRows.push({ goodsReceiptLineId: g.id, purchaseOrderLineId: g.purchaseOrderLineId, productId: g.productId, quantity: l.quantity, receiptUnitCostBase: g.unitCostBase, supplierInvoiceLineId: il.id });
       }
 
       await this.numbering.registerDocumentType(DOCUMENT_TYPE, PREFIX, true, m);
@@ -228,33 +199,30 @@ export class PurchaseReturnService {
     return this.transition(id, 'cancel', actorUserId, (r) => (r.voidedReason = why.slice(0, 255)), 'purchase_return.cancelled', manager);
   }
 
-  /** Posts an APPROVED return: stock leaves at book cost, counters rise, the supplier credit (invoiced lines) and one accounting event. All or nothing. */
+  /** Posts an APPROVED return: stock leaves at book cost, counters rise, ONE accounting event. Accounts payable is never touched. All or nothing. */
   async post(id: string, actorUserId: string, manager?: EntityManager): Promise<PurchaseReturn> {
     const saved = await this.run(manager, async (m) => {
       const doc = await this.load(id, m);
       const lines = await m.getRepository(PurchaseReturnLine).find({ where: { purchaseReturnId: id }, order: { id: 'ASC' } });
       if (lines.length === 0) throw new ConflictException('This purchase return has no lines.');
 
-      // serialise with invoicing / credit notes / other returns (fixed order -> no deadlock), then take the state transition under its row lock
+      // serialise with invoicing / other returns (fixed order -> no deadlock), then take the state transition under its row lock
       for (const key of [...new Set(lines.map((l) => l.purchaseOrderLineId))].sort()) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`supplier_invoice_po_line:${key}`]);
-      for (const key of [...new Set(lines.map((l) => l.supplierInvoiceLineId).filter(Boolean) as string[])].sort()) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`supplier_credit:invoice_line:${key}`]);
       for (const key of [...new Set(lines.map((l) => `${doc.warehouseId}:${l.productId}`))].sort()) await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
       await this.processEngine.transition(PURCHASE_RETURN_PROCESS, ENTITY_TYPE, id, 'post', actorUserId, m);
 
-      // 1. quantity / credit caps re-checked under the locks; 2. expected difference and accounts pre-flight BEFORE any mutation
+      // 1. quantity caps re-checked under the locks; 2. expected difference and accounts pre-flight BEFORE any mutation
       let expectedDifference = 0;
-      let creditNet = 0;
-      let creditTax = 0;
+      let clearingValue = 0;
       for (const l of lines) {
         const unit = await this.valuation.getUnitCost(l.productId, doc.warehouseId, undefined, m);
         if (!unit) throw new ConflictException(`Cannot post: no valued stock exists for product "${l.productId}" in the return warehouse.`);
         const book = Number(l.quantity) * Number(unit.unitCostBase);
         if (!l.supplierInvoiceLineId) {
           const available = await this.returnableQuantity(l.goodsReceiptLineId, m);
-          if (Number(l.quantity) > available) throw new ConflictException(`Cannot post: ${l.quantity} of a receipt line is no longer returnable without a credit (available ${available}).`);
+          if (Number(l.quantity) > available) throw new ConflictException(`Cannot post: ${l.quantity} of a receipt line is no longer returnable without an invoice behind it (available ${available}).`);
           expectedDifference += Number(l.quantity) * Number(l.receiptUnitCostBase) - book;
         } else {
-          // this line is live, so its own quantity is inside the "used" figure: re-check that the position is still non-negative
           const [alloc]: Array<{ allocated: string; physical: string }> = await m.query(
             `SELECT r."quantity"::text AS allocated, (grl."quantityReceived" - grl."quantityReturned" - grl."quantityReturnedInvoiced")::text AS physical
                FROM "supplier_invoice_line_receipts" r JOIN "goods_receipt_lines" grl ON grl."id" = r."goodsReceiptLineId" WHERE r."supplierInvoiceLineId" = $1 AND r."goodsReceiptLineId" = $2`,
@@ -266,23 +234,21 @@ export class PurchaseReturnService {
               WHERE rl."supplierInvoiceLineId" = $1 AND rl."goodsReceiptLineId" = $2 AND pi."currentState" <> 'void'`,
             [l.supplierInvoiceLineId, l.goodsReceiptLineId],
           );
-          const pos = await this.caps.linePosition(l.supplierInvoiceLineId, m);
-          if (!alloc || Number(used.q) > Number(alloc.allocated) + 0.0005 || Number(l.quantity) > Number(alloc.physical) + 0.0005 || !pos || pos.remainingNet < -0.00001) {
-            throw new ConflictException('Cannot post: the invoiced goods of a line can no longer be returned (already returned, credited elsewhere, or no longer physically there).');
+          if (!alloc || Number(used.q) > Number(alloc.allocated) + 0.0005 || Number(l.quantity) > Number(alloc.physical) + 0.0005) {
+            throw new ConflictException('Cannot post: the invoiced goods of a line can no longer be returned (already returned, or no longer physically there).');
           }
-          expectedDifference += Number(l.creditNetBase ?? 0) - book;
-          creditNet += Number(l.creditNetBase ?? 0);
-          creditTax += Number(l.creditTaxBase ?? 0);
+          clearingValue += book; // parked in the clearing account at the book value; no difference is booked until the credit note settles it
         }
       }
       const policy = this.postingPolicy?.get();
       if (!policy?.assertPurchaseReturnPostable) throw new ConflictException('The accounting posting policy for purchase returns is not available - nothing was changed.');
-      await policy.assertPurchaseReturnPostable({ expectedDifference: r4(expectedDifference).toFixed(4), creditNet: r2(creditNet).toFixed(2), creditTax: r2(creditTax).toFixed(2) }, m);
+      await policy.assertPurchaseReturnPostable({ expectedDifference: r4(expectedDifference).toFixed(4), clearingValue: r4(clearingValue).toFixed(4) }, m);
 
       // 3. stock leaves at the actual book cost; physical movement once; counters
       let totalReceiptValue = 0; // uninvoiced lines (GRNI)
-      let totalExitValue = 0;
-      const eventLines: Array<{ purchaseReturnLineId: string; productId: string; quantity: string; invoiced: boolean; receiptValueBase: string; creditNetBase: string; exitValueBase: string; differenceBase: string }> = [];
+      let exitUninvoiced = 0;
+      let exitInvoiced = 0; // -> clearing
+      const eventLines: Array<{ purchaseReturnLineId: string; productId: string; quantity: string; invoiced: boolean; receiptValueBase: string; exitValueBase: string; differenceBase: string }> = [];
       for (const l of lines) {
         const consumed = await this.valuation.consumeIssueCost(l.productId, doc.warehouseId, Number(l.quantity), `procurement:purchase_return:${id}:line:${l.id}:consume`, m);
         if (!consumed || 'rejected' in consumed) throw new ConflictException(`Cannot post: insufficient valued stock to return ${l.quantity} of product "${l.productId}".`);
@@ -292,44 +258,15 @@ export class PurchaseReturnService {
         await m.query(`UPDATE "purchase_order_lines" SET "${counter}" = "${counter}" + $2 WHERE "id" = $1`, [l.purchaseOrderLineId, l.quantity]);
         const exitValue = Number(consumed.totalCostBase);
         const receiptValue = l.supplierInvoiceLineId ? 0 : r4(Number(l.quantity) * Number(l.receiptUnitCostBase));
-        const credit = Number(l.creditNetBase ?? 0);
-        const diff = r4(receiptValue + credit - exitValue);
+        const diff = l.supplierInvoiceLineId ? 0 : r4(receiptValue - exitValue);
         l.exitValueBase = exitValue.toFixed(4);
         l.differenceBase = diff.toFixed(4);
         totalReceiptValue += receiptValue;
-        totalExitValue += exitValue;
-        eventLines.push({ purchaseReturnLineId: l.id, productId: l.productId, quantity: l.quantity, invoiced: !!l.supplierInvoiceLineId, receiptValueBase: receiptValue.toFixed(4), creditNetBase: credit.toFixed(2), exitValueBase: exitValue.toFixed(4), differenceBase: diff.toFixed(4) });
+        if (l.supplierInvoiceLineId) exitInvoiced += exitValue;
+        else exitUninvoiced += exitValue;
+        eventLines.push({ purchaseReturnLineId: l.id, productId: l.productId, quantity: l.quantity, invoiced: !!l.supplierInvoiceLineId, receiptValueBase: receiptValue.toFixed(4), exitValueBase: exitValue.toFixed(4), differenceBase: diff.toFixed(4) });
       }
       await m.getRepository(PurchaseReturnLine).save(lines);
-
-      // 4. supplier credit of invoiced goods: ONE ledger debit per invoice, linked to it (reduces the invoice balance; never touches a payment)
-      const creditByInvoice = new Map<string, { net: number; tax: number }>();
-      for (const l of lines) {
-        if (!l.supplierInvoiceLineId) continue;
-        const [il]: Array<{ invoiceId: string }> = await m.query(`SELECT "supplierInvoiceId" AS "invoiceId" FROM "supplier_invoice_lines" WHERE "id" = $1`, [l.supplierInvoiceLineId]);
-        const cur = creditByInvoice.get(il.invoiceId) ?? { net: 0, tax: 0 };
-        cur.net = r2(cur.net + Number(l.creditNetBase ?? 0));
-        cur.tax = r2(cur.tax + Number(l.creditTaxBase ?? 0));
-        creditByInvoice.set(il.invoiceId, cur);
-      }
-      for (const [invoiceId, c] of creditByInvoice) {
-        const invoice = await m.getRepository(SupplierInvoice).findOneOrFail({ where: { id: invoiceId } });
-        await this.ledger.postEntry(
-          {
-            supplierId: doc.supplierId,
-            entryType: 'credit_note',
-            direction: 'debit',
-            amount: r2(c.net + c.tax).toFixed(2),
-            purchaseOrderId: invoice.purchaseOrderId,
-            supplierInvoiceId: invoiceId,
-            reference: doc.returnNumber,
-            reason: `Return of invoiced goods: ${doc.reason}`.slice(0, 255),
-            createdByUserId: actorUserId,
-          },
-          m,
-        );
-        await this.invoices.recomputeStatus(invoiceId, actorUserId, m);
-      }
 
       doc.postedByUserId = actorUserId;
       doc.postedAt = new Date();
@@ -343,16 +280,16 @@ export class PurchaseReturnService {
         sourceEntityType: 'purchase_return' as const,
         sourceEntityId: id,
         externalDocument: null,
-        payloadVersion: 2,
+        payloadVersion: 3,
         purchaseReturnId: id,
         returnNumber: doc.returnNumber,
         supplierId: doc.supplierId,
         warehouseId: doc.warehouseId,
         receiptValueBase: r4(totalReceiptValue).toFixed(4),
-        creditNetBase: r2(creditNet).toFixed(2),
-        creditTaxBase: r2(creditTax).toFixed(2),
-        exitValueBase: r4(totalExitValue).toFixed(4),
-        differenceBase: r4(totalReceiptValue + creditNet - totalExitValue).toFixed(4),
+        exitUninvoicedBase: r4(exitUninvoiced).toFixed(4),
+        clearingValueBase: r4(exitInvoiced).toFixed(4),
+        exitValueBase: r4(exitUninvoiced + exitInvoiced).toFixed(4),
+        differenceBase: r4(totalReceiptValue - exitUninvoiced).toFixed(4),
         lines: eventLines,
       });
       await this.audit.record(
@@ -364,7 +301,7 @@ export class PurchaseReturnService {
           resourceId: id,
           result: 'success',
           correlationId: null,
-          after: { receiptValueBase: r4(totalReceiptValue).toFixed(4), creditNetBase: r2(creditNet).toFixed(2), exitValueBase: r4(totalExitValue).toFixed(4), differenceBase: r4(totalReceiptValue + creditNet - totalExitValue).toFixed(4) },
+          after: { receiptValueBase: r4(totalReceiptValue).toFixed(4), clearingValueBase: r4(exitInvoiced).toFixed(4), exitValueBase: r4(exitUninvoiced + exitInvoiced).toFixed(4), differenceBase: r4(totalReceiptValue - exitUninvoiced).toFixed(4) },
         },
         m,
       );
@@ -403,7 +340,7 @@ export class PurchaseReturnService {
     return rows;
   }
 
-  /** Invoiced goods of a supplier that can still go back against their invoice line (for the create form). */
+  /** Invoiced goods of a supplier that can still go back against their invoice line (physical return; for the create form). */
   async returnableInvoicedLines(supplierId: string, manager?: EntityManager) {
     const m = manager ?? this.dataSource.manager;
     const rows: Array<{ supplierInvoiceLineId: string; invoiceNumber: string; goodsReceiptLineId: string; grNumber: string; productId: string; unitCostBase: string; warehouseId: string }> = await m.query(
@@ -422,5 +359,20 @@ export class PurchaseReturnService {
       if (returnable > 0) out.push({ ...r, returnable: returnable.toFixed(3) });
     }
     return out;
+  }
+
+  /** Posted returns of invoiced goods that no credit note has settled yet ("pending supplier credit"), with the book value waiting in the clearing account. */
+  async pendingCredit(supplierId?: string, manager?: EntityManager) {
+    const m = manager ?? this.dataSource.manager;
+    const rows: Array<{ purchaseReturnLineId: string; returnNumber: string; supplierId: string; supplierInvoiceLineId: string; invoiceNumber: string; productId: string; quantity: string; clearingValueBase: string }> = await m.query(
+      `SELECT rl."id" AS "purchaseReturnLineId", pr."returnNumber", pr."supplierId", rl."supplierInvoiceLineId", si."invoiceNumber", rl."productId", rl."quantity"::text AS quantity, rl."exitValueBase"::text AS "clearingValueBase"
+         FROM "purchase_return_lines" rl JOIN "purchase_returns" pr ON pr."id" = rl."purchaseReturnId"
+         JOIN "supplier_invoice_lines" sil ON sil."id" = rl."supplierInvoiceLineId" JOIN "supplier_invoices" si ON si."id" = sil."supplierInvoiceId"
+         JOIN "process_instances" pi ON pi."definitionKey" = 'purchase_return_lifecycle' AND pi."entityId" = pr."id"::text
+        WHERE rl."supplierInvoiceLineId" IS NOT NULL AND pi."currentState" = 'posted' AND rl."settledByCreditNoteId" IS NULL ${supplierId ? 'AND pr."supplierId" = $1' : ''}
+        ORDER BY pr."createdAt", rl."id"`,
+      supplierId ? [supplierId] : [],
+    );
+    return rows;
   }
 }

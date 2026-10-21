@@ -36,3 +36,6 @@ Code-side (in the integration build, not a database change): accounting manifest
 
 ## 6. Decision requested
 Authorize (or refuse) the dry run and apply on: `daii_dev` + Alpha, Beta, Gamma, Delta, scope = the 7 migrations above, rollback = dump restore / reverse `down`.
+
+## 7. Update 2026-10-21 (policy rework)
+Migration `1790020600000` was reworked before any application outside disposable databases: purchase-return lines carry `supplierInvoiceLineId` and `settledByCreditNoteId` (no credit value columns), credit-note lines carry `purchaseReturnLineId`. The core terminology migration `1790020300000` now also seeds the label of the fourth account setting. Accounting manifest is 1.21.0 with FOUR purchase cost account keys (`..._cost_difference_after_receipt`, `..._return_cost_difference`, `..._other_charges`, `..._return_clearing`), all empty = fail-closed. The rest of this plan is unchanged; nothing was executed.

@@ -14,6 +14,11 @@ class CreditLineDto {
 
   @IsNumberString()
   amount!: string;
+
+  /** the posted return line of invoiced goods this credit settles (optional) */
+  @IsOptional()
+  @IsUUID()
+  purchaseReturnLineId?: string;
 }
 
 class CreateCreditNoteDto {
