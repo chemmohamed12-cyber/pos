@@ -161,6 +161,13 @@ describe('SupplierInvoiceController Area 21 retrofit — real-Postgres Company i
         `INSERT INTO "purchase_order_lines" ("id","purchaseOrderId","productId","quantity","quantityReceived","unitCostBase","lineTotalBase") VALUES ($1,$2,$3,10,10,'5.00','50.00')`,
         [poLineId, purchaseOrderId, productId],
       );
+      // phase A: the 10 received units now live on a real goods-receipt line (invoice lines are allocated to receipt lines)
+      const grId = randomUUID();
+      await ds.query(`INSERT INTO "goods_receipts" ("id","grNumber","purchaseOrderId","supplierId","warehouseId") VALUES ($1,$2,$3,$4,$5)`, [grId, `WP-GR-${key}`, purchaseOrderId, supplierId, warehouseId]);
+      await ds.query(
+        `INSERT INTO "goods_receipt_lines" ("id","goodsReceiptId","purchaseOrderLineId","productId","quantityReceived","unitCostBase") VALUES ($1,$2,$3,$4,10,'5.00')`,
+        [randomUUID(), grId, poLineId, productId],
+      );
       await ds.query(
         `INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'purchase_order_lifecycle','purchase_order',$2,'received')`,
         [randomUUID(), purchaseOrderId],

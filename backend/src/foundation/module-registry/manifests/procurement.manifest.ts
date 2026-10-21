@@ -17,7 +17,7 @@ import { ModuleManifest } from '../module-manifest.type';
  */
 export const procurementManifest: ModuleManifest = {
   module_code: 'procurement',
-  manifest_version: '1.3.0',
+  manifest_version: '1.7.0',
   title_code: 'module.procurement',
   business_domains: ['procurement'],
   // 1.1.0 (Goods Receipt) added `inventory`: `GoodsReceiptService` calls
@@ -69,6 +69,28 @@ export const procurementManifest: ModuleManifest = {
     { node: 'procurement.supplier_invoice.create', title_code: 'perm.procurement.supplier_invoice.create', parent: 'procurement.supplier_invoice' },
     { node: 'procurement.supplier_invoice.post', title_code: 'perm.procurement.supplier_invoice.post', parent: 'procurement.supplier_invoice' },
     { node: 'procurement.supplier_invoice.void', title_code: 'perm.procurement.supplier_invoice.void', parent: 'procurement.supplier_invoice' },
+    // phase C-1 (D5 / D2 / D1): submit -> approve (independent person) -> post; `override` approves a price exception; `invoice_policy.manage` sets the Company approval switch and tolerance limits
+    { node: 'procurement.supplier_invoice.submit', title_code: 'perm.procurement.supplier_invoice.submit', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.supplier_invoice.approve', title_code: 'perm.procurement.supplier_invoice.approve', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.supplier_invoice.override', title_code: 'perm.procurement.supplier_invoice.override', parent: 'procurement.supplier_invoice' },
+    { node: 'procurement.invoice_policy', title_code: 'perm.procurement.invoice_policy', parent: 'procurement' },
+    { node: 'procurement.invoice_policy.manage', title_code: 'perm.procurement.invoice_policy.manage', parent: 'procurement.invoice_policy' },
+
+    // phase D-1 (D7): purchase returns - create (maker) -> submit -> approve (independent person) -> post
+    { node: 'procurement.purchase_return', title_code: 'perm.procurement.purchase_return', parent: 'procurement' },
+    { node: 'procurement.purchase_return.view', title_code: 'perm.procurement.purchase_return.view', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.create', title_code: 'perm.procurement.purchase_return.create', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.submit', title_code: 'perm.procurement.purchase_return.submit', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.approve', title_code: 'perm.procurement.purchase_return.approve', parent: 'procurement.purchase_return' },
+    { node: 'procurement.purchase_return.post', title_code: 'perm.procurement.purchase_return.post', parent: 'procurement.purchase_return' },
+
+    // phase D-2 (D6): supplier credit notes linked to the invoice - create (maker) -> submit -> approve (independent person) -> post
+    { node: 'procurement.supplier_credit_note', title_code: 'perm.procurement.supplier_credit_note', parent: 'procurement' },
+    { node: 'procurement.supplier_credit_note.view', title_code: 'perm.procurement.supplier_credit_note.view', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.create', title_code: 'perm.procurement.supplier_credit_note.create', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.submit', title_code: 'perm.procurement.supplier_credit_note.submit', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.approve', title_code: 'perm.procurement.supplier_credit_note.approve', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.post', title_code: 'perm.procurement.supplier_credit_note.post', parent: 'procurement.supplier_credit_note' },
 
     { node: 'procurement.supplier_payment', title_code: 'perm.procurement.supplier_payment', parent: 'procurement' },
     { node: 'procurement.supplier_payment.view', title_code: 'perm.procurement.supplier_payment.view', parent: 'procurement.supplier_payment' },
@@ -140,6 +162,6 @@ export const procurementManifest: ModuleManifest = {
       'GetRfq',
       'ListRfqs',
     ],
-    events: ['finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_payment.recorded'],
+    events: ['finance.supplier_credit_note.cost_adjusted', 'finance.supplier_credit_note.tax_adjusted', 'finance.supplier_credit_note.return_settled', 'procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
   },
 };

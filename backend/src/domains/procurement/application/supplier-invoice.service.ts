@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { SupplierInvoice } from '../infrastructure/supplier-invoice.entity';
 import { SupplierInvoiceLine } from '../infrastructure/supplier-invoice-line.entity';
 import { SupplierLedgerEntry } from '../infrastructure/supplier-ledger-entry.entity';
@@ -14,6 +14,8 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { InvoiceAllocationService } from './invoice-allocation.service';
+import { InvoicePolicyService } from './invoice-policy.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 
 const ENTITY_TYPE = 'supplier_invoice';
@@ -24,15 +26,27 @@ const INVOICE_PREFIX = 'SINV';
 export interface CreateSupplierInvoiceLineInput {
   purchaseOrderLineId: string;
   quantity: string;
+  /** Optional: bill this goods-receipt line first (it must have free quantity); otherwise receipts are allocated first-in-first-out. */
+  goodsReceiptLineId?: string | null;
   /** The supplier's own billed unit cost — cross-checked against the PO line's unitCostBase for the price-variance signal; NOT required to match exactly (variance is informational, never blocking). */
   unitCostBase: string;
 }
 export interface CreateSupplierInvoiceInput {
-  purchaseOrderId: string;
+  /** The primary order (kept on the invoice header for compatibility). Omit when `purchaseOrderIds` is given. */
+  purchaseOrderId?: string;
+  /** Phase E (D4): one invoice covering several orders of the SAME supplier. Every order must be used by at least one line; every line must belong to one of them. */
+  purchaseOrderIds?: string[];
   supplierReference?: string | null;
   lines: CreateSupplierInvoiceLineInput[];
   /** D5 — the EXPLICIT VAT amount stated by the supplier's invoice (the lines' total is NET). Omitted/0 = no VAT. Never derived or defaulted. */
   taxAmount?: string | null;
+  /** Phase C-2 (D3): a purchase discount that reduces the cost of the goods (allocated to the lines by value). Omitted/0 = none. */
+  discountAmount?: string | null;
+  /** Phase C-2 (D3): freight stated by the supplier; capitalised into inventory cost unless `freightTreatment` is 'expense'. */
+  freightAmount?: string | null;
+  freightTreatment?: 'capitalize' | 'expense';
+  /** Phase C-2 (D3): other charges that are NOT capitalised (expensed). */
+  otherChargesAmount?: string | null;
 }
 
 export interface ApAgingRow {
@@ -70,7 +84,15 @@ export class SupplierInvoiceService {
     private readonly events: EventBusService,
     // D5 — the accounting pre-flight (PPV / Input VAT accounts), bound by `accounting` through the foundation holder.
     @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
-  ) {}
+    @Optional() allocations?: InvoiceAllocationService,
+    @Optional() policies?: InvoicePolicyService,
+  ) {
+    this.allocations = allocations ?? new InvoiceAllocationService(dataSource);
+    this.policies = policies ?? new InvoicePolicyService(dataSource);
+  }
+
+  private readonly allocations: InvoiceAllocationService;
+  private readonly policies: InvoicePolicyService;
 
   async getStatus(invoiceId: string, manager?: EntityManager): Promise<string> {
     return this.processEngine.getState(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, manager);
@@ -82,7 +104,30 @@ export class SupplierInvoiceService {
 
   /** D5 — gross = net (`totalAmount`, tax-exclusive) + the explicit VAT. What AP / the Supplier Ledger carry. */
   private grossOf(invoice: SupplierInvoice): number {
-    return Math.round((Number(invoice.totalAmount) + Number(invoice.taxAmount ?? 0)) * 100) / 100;
+    // phase C-2: gross = net - discount + freight + other charges + VAT (the three charge columns are 0 on every pre-C-2 invoice, so their gross is unchanged)
+    return (
+      Math.round(
+        (Number(invoice.totalAmount) - Number(invoice.discountAmount ?? 0) + Number(invoice.freightAmount ?? 0) + Number(invoice.otherChargesAmount ?? 0) + Number(invoice.taxAmount ?? 0)) * 100,
+      ) / 100
+    );
+  }
+
+  private parseCharge(raw: string | number | null | undefined, label: string): number {
+    if (raw == null || String(raw).trim() === '') return 0;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) throw new BadRequestException(`The ${label} must be a non-negative number.`);
+    return Math.round(n * 100) / 100;
+  }
+
+  /** Phase C-2: the amounts the cost-adjustment journal is built from (capitalised vs expensed split, by the invoice's own freight treatment). */
+  private chargesOf(invoice: SupplierInvoice): { discount: number; freightCapitalized: number; expensed: number } {
+    const freight = Number(invoice.freightAmount ?? 0);
+    const capitalize = (invoice.freightTreatment ?? 'capitalize') === 'capitalize';
+    return {
+      discount: Number(invoice.discountAmount ?? 0),
+      freightCapitalized: capitalize ? freight : 0,
+      expensed: Number(invoice.otherChargesAmount ?? 0) + (capitalize ? 0 : freight),
+    };
   }
 
   private parseVatAmount(raw: string | number | null | undefined): number {
@@ -125,11 +170,23 @@ export class SupplierInvoiceService {
   async createDraftInvoice(input: CreateSupplierInvoiceInput, actorUserId: string, manager?: EntityManager): Promise<SupplierInvoice> {
     if (input.lines.length === 0) throw new BadRequestException('A Supplier Invoice needs at least one line.');
 
-    const po = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: input.purchaseOrderId } });
-    if (!po) throw new NotFoundException(`Purchase Order "${input.purchaseOrderId}" not found.`);
-    const poState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, po.id, manager);
-    if (poState !== 'partially_received' && poState !== 'received' && poState !== 'closed') {
-      throw new ConflictException(`Purchase Order is "${poState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
+    // Phase E (D4): the covered orders - the legacy single order, or several orders of one supplier. The first one is the "primary" order kept on the header.
+    const orderIds = [...new Set([...(input.purchaseOrderId ? [input.purchaseOrderId] : []), ...(input.purchaseOrderIds ?? [])])];
+    if (orderIds.length === 0) throw new BadRequestException('A Supplier Invoice needs a purchase order.');
+    const orders: PurchaseOrder[] = [];
+    for (const orderId of orderIds) {
+      const found = await (manager ?? this.dataSource).getRepository(PurchaseOrder).findOne({ where: { id: orderId } });
+      if (!found) throw new NotFoundException(`Purchase Order "${orderId}" not found.`);
+      const foundState = await this.processEngine.getState(PURCHASE_ORDER_PROCESS, PO_ENTITY_TYPE, found.id, manager);
+      if (foundState !== 'partially_received' && foundState !== 'received' && foundState !== 'closed') {
+        throw new ConflictException(`Purchase Order ${found.poNumber} is "${foundState}" — a Supplier Invoice can only be raised once at least one Goods Receipt has been posted against it.`);
+      }
+      orders.push(found);
+    }
+    const po = orders[0];
+    const foreign = orders.find((o) => o.supplierId !== po.supplierId);
+    if (foreign) {
+      throw new ConflictException(`Purchase orders ${po.poNumber} and ${foreign.poNumber} belong to different suppliers — one supplier invoice can only cover orders of the same supplier. / لا يجوز أن تغطي الفاتورة أوامر شراء لموردين مختلفين.`);
     }
 
     const supplier = await (manager ?? this.dataSource).getRepository(Supplier).findOne({ where: { id: po.supplierId } });
@@ -139,6 +196,12 @@ export class SupplierInvoiceService {
     // D5 — explicit VAT as stated by the supplier's invoice; validated BEFORE any write.
     const taxAmount = this.parseVatAmount(input.taxAmount);
     this.assertVatAllowed(supplier, taxAmount);
+    // Phase C-2 (D3): discount / freight / other charges - validated BEFORE any write.
+    const discountAmount = this.parseCharge(input.discountAmount, 'discount amount');
+    const freightAmount = this.parseCharge(input.freightAmount, 'freight amount');
+    const otherChargesAmount = this.parseCharge(input.otherChargesAmount, 'other charges amount');
+    const freightTreatment = input.freightTreatment ?? 'capitalize';
+    if (freightTreatment !== 'capitalize' && freightTreatment !== 'expense') throw new BadRequestException('The freight treatment must be "capitalize" or "expense".');
 
     // 3-way match, duplicate-invoice leg: the same supplier's own reference number can't be billed
     // twice (a live, still-usable invoice — void doesn't count, matching how `findOpenInvoiceForOrder`
@@ -157,8 +220,13 @@ export class SupplierInvoiceService {
       }
     }
 
-    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: po.id } });
+    const poLines = await (manager ?? this.dataSource).getRepository(PurchaseOrderLine).find({ where: { purchaseOrderId: In(orders.map((o) => o.id)) } });
     const poLineById = new Map(poLines.map((l) => [l.id, l]));
+    const ordersUsed = new Set(input.lines.map((l) => poLineById.get(l.purchaseOrderLineId)?.purchaseOrderId).filter(Boolean));
+    const unused = orders.find((o) => !ordersUsed.has(o.id));
+    if (unused && input.lines.every((l) => poLineById.has(l.purchaseOrderLineId))) {
+      throw new BadRequestException(`Purchase order ${unused.poNumber} is listed on the invoice but no line belongs to it.`);
+    }
 
     let totalAmount = 0;
     let priceVarianceAmount = 0;
@@ -167,7 +235,7 @@ export class SupplierInvoiceService {
 
     for (const line of input.lines) {
       const poLine = poLineById.get(line.purchaseOrderLineId);
-      if (!poLine) throw new BadRequestException(`Purchase Order line "${line.purchaseOrderLineId}" does not belong to this order.`);
+      if (!poLine) throw new BadRequestException(`Purchase Order line "${line.purchaseOrderLineId}" does not belong to the order(s) of this invoice.`);
 
       const qty = Number(line.quantity);
       const cost = Number(line.unitCostBase);
@@ -175,7 +243,7 @@ export class SupplierInvoiceService {
       if (!Number.isFinite(cost) || cost < 0) throw new BadRequestException('Every invoice line unit cost must be a non-negative number.');
 
       // 3-way match, quantity leg (hard guard): invoiced can never exceed received.
-      const receivedNotYetInvoiced = Number(poLine.quantityReceived) - Number(poLine.quantityInvoiced);
+      const receivedNotYetInvoiced = Number(poLine.quantityReceived) - Number(poLine.quantityReturned ?? 0) - Number(poLine.quantityInvoiced);
       if (qty > receivedNotYetInvoiced) {
         throw new ConflictException(
           `Cannot invoice ${qty} on this line — only ${receivedNotYetInvoiced} has been received but not yet invoiced (received ${poLine.quantityReceived}, already invoiced ${poLine.quantityInvoiced}). Post a Goods Receipt first, or invoice a smaller quantity.`,
@@ -200,6 +268,7 @@ export class SupplierInvoiceService {
     }
 
     const net = Number(totalAmount.toFixed(2));
+    if (discountAmount > net + 0.00001) throw new BadRequestException(`The discount (${discountAmount.toFixed(2)}) cannot exceed the invoice net amount (${net.toFixed(2)}).`);
     const receiptValueBase = this.r4(receiptValue);
     const ppvBase = this.r4(net - receiptValueBase);
 
@@ -220,6 +289,10 @@ export class SupplierInvoiceService {
           purchaseOrderId: po.id,
           totalAmount: net.toFixed(2),
           taxAmount: taxAmount.toFixed(2),
+          discountAmount: discountAmount.toFixed(2),
+          freightAmount: freightAmount.toFixed(2),
+          otherChargesAmount: otherChargesAmount.toFixed(2),
+          freightTreatment,
           receiptValueBase: receiptValueBase.toFixed(4),
           ppvBase: ppvBase.toFixed(4),
           dueDate,
@@ -229,7 +302,17 @@ export class SupplierInvoiceService {
           voidedReason: null,
         }),
       );
-      await lineRepo.save(lineEntities.map((l) => lineRepo.create({ ...l, supplierInvoiceId: savedInvoice.id })));
+      const savedLines = await lineRepo.save(lineEntities.map((l) => lineRepo.create({ ...l, supplierInvoiceId: savedInvoice.id })));
+      // Phase A: bill specific goods receipts (race-safe per order line; the whole creation rolls back if the received-and-not-invoiced quantity is not there).
+      await this.allocations.allocate(
+        savedLines.map((sl, i) => ({
+          supplierInvoiceLineId: sl.id,
+          purchaseOrderLineId: sl.purchaseOrderLineId,
+          quantity: Number(sl.quantity),
+          goodsReceiptLineId: input.lines[i].goodsReceiptLineId ?? null,
+        })),
+        txManager,
+      );
       for (const line of input.lines) {
         await poLineRepo.increment({ id: line.purchaseOrderLineId }, 'quantityInvoiced', Number(line.quantity));
       }
@@ -267,7 +350,13 @@ export class SupplierInvoiceService {
     const invoice = await (manager ?? this.dataSource).getRepository(SupplierInvoice).findOne({ where: { id: invoiceId } });
     if (!invoice) throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
     const state = await this.getStatus(invoiceId, manager);
-    if (state !== 'draft') throw new ConflictException(`Cannot post an invoice in state "${state}".`);
+    // Phase C-1 (D5): with the Company's approval workflow ON an invoice posts only from "approved"; OFF keeps the legacy direct draft -> posted path. (The transition below re-checks the state under the row lock.)
+    const policy = await this.policies.get(manager);
+    if (state !== 'approved' && !(state === 'draft' && !policy.approvalRequired)) {
+      throw new ConflictException(
+        state === 'draft' ? 'This Company requires supplier invoices to be submitted and approved before posting.' : `Cannot post an invoice in state "${state}".`,
+      );
+    }
 
     const lines = await (manager ?? this.dataSource).getRepository(SupplierInvoiceLine).find({ where: { supplierInvoiceId: invoiceId } });
     const basis = this.invoiceBasis(invoice, lines);
@@ -275,14 +364,25 @@ export class SupplierInvoiceService {
     if (!supplier) throw new NotFoundException(`Supplier "${invoice.supplierId}" not found.`);
     this.assertVatAllowed(supplier, basis.tax);
 
-    if (basis.ppv !== 0 || basis.tax > 0) {
+    const charges = this.chargesOf(invoice);
+    const hasCharges = charges.discount > 0 || charges.freightCapitalized > 0 || charges.expensed > 0;
+    if (basis.ppv !== 0 || basis.tax > 0 || hasCharges) {
       const policy = this.postingPolicy?.get();
-      if (!policy) throw new ConflictException('This invoice has a price variance or VAT but the accounting posting policy is not available — nothing was changed.');
-      await policy.assertSupplierInvoicePostable({ ppvBase: basis.ppv.toFixed(4), taxAmount: basis.tax.toFixed(2) }, manager ?? this.dataSource.manager);
+      if (!policy) throw new ConflictException('This invoice has a price variance, VAT or charges but the accounting posting policy is not available — nothing was changed.');
+      await policy.assertSupplierInvoicePostable(
+        {
+          ppvBase: basis.ppv.toFixed(4),
+          taxAmount: basis.tax.toFixed(2),
+          discountAmount: charges.discount.toFixed(2),
+          capitalizedFreight: charges.freightCapitalized.toFixed(2),
+          expensedCharges: charges.expensed.toFixed(2),
+        },
+        manager ?? this.dataSource.manager,
+      );
     }
 
     const saved = await (manager ?? this.dataSource).transaction(async (m) => {
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'post', actorUserId, m);
+      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, state === 'approved' ? 'post_approved' : 'post', actorUserId, m);
       invoice.postedByUserId = actorUserId;
       const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);
 
@@ -321,6 +421,46 @@ export class SupplierInvoiceService {
         ppvBase: basis.ppv.toFixed(4),
         dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
       });
+
+      if (hasCharges) {
+        // phase C-2: the cost-adjustment leg - same transaction, own idempotent event; shares allocated to the lines by invoice value (last line takes the rounding remainder)
+        const lineRows: Array<{ id: string; productId: string; quantity: string; lineTotalBase: string; warehouseId: string }> = await m.query(
+          `SELECT sil."id", sil."productId", sil."quantity"::text AS quantity, sil."lineTotalBase"::text AS "lineTotalBase", po."warehouseId"
+             FROM "supplier_invoice_lines" sil JOIN "purchase_order_lines" pol ON pol."id" = sil."purchaseOrderLineId" JOIN "purchase_orders" po ON po."id" = pol."purchaseOrderId"
+            WHERE sil."supplierInvoiceId" = $1 ORDER BY sil."id"`,
+          [invoice.id],
+        );
+        const totalValue = lineRows.reduce((s, l) => s + Number(l.lineTotalBase), 0);
+        let discountLeft = charges.discount;
+        let freightLeft = charges.freightCapitalized;
+        const shares = lineRows.map((l, i) => {
+          const last = i === lineRows.length - 1;
+          const ratio = totalValue > 0 ? Number(l.lineTotalBase) / totalValue : 1 / lineRows.length;
+          const d = last ? discountLeft : this.r4(charges.discount * ratio);
+          const f = last ? freightLeft : this.r4(charges.freightCapitalized * ratio);
+          discountLeft = this.r4(discountLeft - d);
+          freightLeft = this.r4(freightLeft - f);
+          return { invoiceLineId: l.id, productId: l.productId, warehouseId: l.warehouseId, quantity: l.quantity, discountShare: d.toFixed(4), freightShare: f.toFixed(4) };
+        });
+        await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjusted, {
+          idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjusted`,
+          businessDate: new Date().toISOString().slice(0, 10),
+          orgUnitId: null,
+          currency: 'EGP',
+          sourceEntityType: 'supplier_invoice' as const,
+          sourceEntityId: invoice.id,
+          externalDocument: null,
+          payloadVersion: 1,
+          supplierInvoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          supplierId: invoice.supplierId,
+          discountAmount: charges.discount.toFixed(2),
+          freightCapitalizedAmount: charges.freightCapitalized.toFixed(2),
+          expensedChargesAmount: charges.expensed.toFixed(2),
+          allocationBasis: 'line_value' as const,
+          lines: shares,
+        });
+      }
 
       await this.audit.record(
         {
@@ -385,10 +525,27 @@ export class SupplierInvoiceService {
           dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
           voidReason: reason,
         });
+        const voidCharges = this.chargesOf(invoice);
+        if (voidCharges.discount > 0 || voidCharges.freightCapitalized > 0 || voidCharges.expensed > 0) {
+          await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjustmentVoided, {
+            idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjustment_voided`,
+            businessDate: new Date().toISOString().slice(0, 10),
+            orgUnitId: null,
+            currency: 'EGP',
+            sourceEntityType: 'supplier_invoice' as const,
+            sourceEntityId: invoice.id,
+            externalDocument: null,
+            payloadVersion: 1,
+            supplierInvoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            voidReason: reason,
+          });
+        }
       } else {
         await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'cancel_draft', actorUserId, m);
       }
       await this.restoreInvoicedQuantities(lines, m);
+      await this.allocations.release(lines.map((l) => l.id), m);
 
       invoice.voidedReason = reason;
       const savedInvoice = await m.getRepository(SupplierInvoice).save(invoice);
@@ -439,7 +596,11 @@ export class SupplierInvoiceService {
     if (remaining <= 0) {
       await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'mark_paid', actorUserId, manager);
     } else if (state === 'posted' && remaining < this.grossOf(invoice)) {
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'record_partial_payment', actorUserId, manager);
+      // "partially paid" means a PAYMENT was applied: a credit note / return credit lowers the balance without changing the payment status (phase D-2 / D-3)
+      const [paid]: Array<{ n: string }> = await runner.query(`SELECT COUNT(*)::text AS n FROM "supplier_ledger_entries" WHERE "supplierInvoiceId" = $1 AND "entryType" = 'payment' AND "status" = 'posted'`, [invoiceId]);
+      if (Number(paid.n) > 0) {
+        await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'record_partial_payment', actorUserId, manager);
+      }
     }
     return this.getStatus(invoiceId, manager);
   }
@@ -461,7 +622,13 @@ export class SupplierInvoiceService {
   }
 
   async listForPurchaseOrder(purchaseOrderId: string, manager?: EntityManager): Promise<Array<SupplierInvoice & { state: string; remaining: string }>> {
-    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { purchaseOrderId }, order: { createdAt: 'DESC' } });
+    // Phase E: an invoice belongs to every order any of its lines belongs to (the header order is only the primary one)
+    const covered: Array<{ id: string }> = await (manager ?? this.dataSource).query(
+      `SELECT DISTINCT si."id" FROM "supplier_invoices" si LEFT JOIN "supplier_invoice_lines" sil ON sil."supplierInvoiceId" = si."id" LEFT JOIN "purchase_order_lines" pol ON pol."id" = sil."purchaseOrderLineId"
+        WHERE si."purchaseOrderId" = $1 OR pol."purchaseOrderId" = $1`,
+      [purchaseOrderId],
+    );
+    const invoices = await (manager ?? this.dataSource).getRepository(SupplierInvoice).find({ where: { id: In(covered.map((c) => c.id)) }, order: { createdAt: 'DESC' } });
     return Promise.all(invoices.map(async (i) => ({ ...i, state: await this.getStatus(i.id, manager), remaining: await this.getInvoiceRemaining(i.id, manager) })));
   }
 

@@ -17,6 +17,13 @@ import { Rfq } from './infrastructure/rfq.entity';
 import { RfqSupplierInvite } from './infrastructure/rfq-supplier-invite.entity';
 import { SupplierPayment } from './infrastructure/supplier-payment.entity';
 import { ProductItemRequest } from './infrastructure/product-item-request.entity';
+import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-line-receipt.entity';
+import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
+import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
+import { PurchaseReturn } from './infrastructure/purchase-return.entity';
+import { SupplierCreditNote } from './infrastructure/supplier-credit-note.entity';
+import { SupplierCreditNoteLine } from './infrastructure/supplier-credit-note-line.entity';
+import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Procurement's own
@@ -51,4 +58,11 @@ export const PROCUREMENT_COMPANY_ENTITIES = [
   SupplierQuotation,
   SupplierQuotationLine,
   ProductItemRequest,
+  SupplierInvoiceLineReceipt,
+  SupplierPaymentAllocation,
+  ProcurementInvoicePolicy,
+  PurchaseReturn,
+  PurchaseReturnLine,
+  SupplierCreditNote,
+  SupplierCreditNoteLine,
 ];

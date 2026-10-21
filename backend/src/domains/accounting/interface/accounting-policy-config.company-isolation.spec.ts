@@ -126,9 +126,9 @@ describe('NAV-02 — accounting policy configuration (validated, Company-aware) 
   const CLEARING = 'accounting.fixed_asset_acquisition_clearing_account_code';
   const auditCount = async (k: Key, action: string) => Number((await (await mgr(k)).query(`SELECT count(*) AS n FROM audit_records WHERE action = $1`, [action]))[0].n);
 
-  it('1. LIST: exactly the 13 keys posting actually consumes, grouped, all UNSET on a fresh installation (the 5 unconsumed AR/AP hint keys are not offered)', async () => {
+  it('1. LIST: exactly the 17 keys posting actually consumes (13 + the 4 purchase cost accounts of 2026-10-20 / 21), grouped, all UNSET on a fresh installation (the 5 unconsumed AR/AP hint keys are not offered)', async () => {
     const list = await policy.list(await mgr('A'));
-    expect(list).toHaveLength(13);
+    expect(list).toHaveLength(17);
     expect(ACCOUNTING_POLICY_KEYS.map((k) => k.key)).not.toContain('accounting.ap_expense_account_code');
     expect(list.every((v) => v.status === 'unset')).toBe(true);
     expect([...new Set(list.map((v) => v.group))].sort()).toEqual(['cash', 'fixed_assets', 'inventory', 'procurement', 'sales']);

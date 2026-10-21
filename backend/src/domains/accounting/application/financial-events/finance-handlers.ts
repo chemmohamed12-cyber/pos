@@ -1,6 +1,8 @@
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { HandlerContext, HandlerResult, JournalDraftLine } from './handler-registry';
 import { handleSupplierInvoicePosted, handleSupplierInvoiceVoided, handleSupplierPaymentRecorded } from './supplier-invoice.handler';
+import { handlePurchaseReturnPosted, handleSupplierCreditNoteReturnSettled } from './purchase-return.handler';
+import { handleSupplierCreditNoteTax } from './supplier-credit-note-tax.handler';
 import { handleGoodsReceiptPosted } from './goods-receipt.handler';
 import { handleWorkOrderMaterialIssued, handleWorkOrderMaterialReturned, handleWorkOrderFinishedGoodsReceived } from './manufacturing-events.handler';
 import { handlePayrollRunPosted } from './payroll-run-posted.handler';
@@ -347,6 +349,12 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   // ADR-054/ADR-057 — GRNI's own leg: Dr Inventory / Cr GRNI at receipt (the FIRST GL entry
   // Procurement's purchased value now hits, before the invoice clears GRNI above).
   'procurement.goods_receipt.posted': handleGoodsReceiptPosted,
+  // Phase D-1 (D7 / E3) - Purchase Return of goods not yet invoiced: Dr GRNI / Cr Inventory / return cost difference.
+  'procurement.purchase_return.posted': handlePurchaseReturnPosted,
+  // Phase D-2 (D6) - the Input VAT leg of a posted supplier credit note (the cost leg is handled by the self-registering cost-adjustment service).
+  'finance.supplier_credit_note.tax_adjusted': handleSupplierCreditNoteTax,
+  // Policy 2026-10-21 - the financial settlement of a physical return of invoiced goods (clearing account -> AP).
+  'finance.supplier_credit_note.return_settled': handleSupplierCreditNoteReturnSettled,
   // ADR-061 — Manufacturing Work Order movements (§13's accounting table).
   'manufacturing.work_order.material_issued': handleWorkOrderMaterialIssued,
   'manufacturing.work_order.material_returned': handleWorkOrderMaterialReturned,

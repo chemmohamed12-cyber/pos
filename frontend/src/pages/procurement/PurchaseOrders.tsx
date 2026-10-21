@@ -8,6 +8,7 @@ import { StockCell, useStockAvailability } from '../../components/StockAvailabil
 import { ProductCombobox, type ProductOption } from '../../components/ProductCombobox';
 import { fmtDateTime } from '../../lib/formatDateTime';
 import { loadingLabel } from '../../lib/displayNames';
+import { PoInvoicingTable } from './PoInvoicingTable';
 
 interface Supplier {
   id: string;
@@ -523,6 +524,8 @@ export function PurchaseOrders() {
                 {t('action.post_goods_receipt')}
               </button>
             )}
+
+            <PoInvoicingTable purchaseOrderId={detail.purchaseOrder.id} productName={productName} refreshKey={receipts.length} />
 
             <h4>{t('field.gr_number')}</h4>
             {receipts.length === 0 ? (

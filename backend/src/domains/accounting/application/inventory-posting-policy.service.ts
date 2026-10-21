@@ -12,6 +12,10 @@ const OPENING_BALANCE_ACCOUNT_KEY = 'accounting.inventory_opening_balance_accoun
 const OPENING_CORRECTION_ACCOUNT_KEY = 'accounting.inventory_opening_correction_account_code';
 const SALES_RETURNS_ACCOUNT_KEY = 'accounting.sales_returns_account_code';
 const PPV_ACCOUNT_KEY = 'accounting.purchase_price_variance_account_code';
+const COST_DIFFERENCE_AFTER_RECEIPT_KEY = 'accounting.purchase_cost_difference_after_receipt_account_code';
+const OTHER_CHARGES_ACCOUNT_KEY = 'accounting.purchase_other_charges_account_code';
+const RETURN_COST_DIFFERENCE_KEY = 'accounting.purchase_return_cost_difference_account_code';
+const RETURN_CLEARING_KEY = 'accounting.purchase_return_clearing_account_code';
 
 /**
  * D3-B (2026-10-04, CTO-approved) — the pre-mutation gate of a MANUAL receipt: the reason code must be a controlled
@@ -158,10 +162,55 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
       if (problem) throw new ConflictException(`A supplier invoice with a price variance cannot post: the configured PPV account ${code} (${PPV_ACCOUNT_KEY}) ${problem}`);
     }
 
+    // Phase C-2 (owner decisions E1 / D3): a discount or capitalised freight needs the inventory account and the separate cost-difference account; expensed charges need their own expense account.
+    if (Number(input.discountAmount ?? 0) > 0 || Number(input.capitalizedFreight ?? 0) > 0) {
+      if (!(await accounts.findOne({ where: { controlFunction: 'inventory', isActive: true, isPostable: true } }))) {
+        throw new ConflictException('A supplier invoice with a discount or capitalised freight cannot post: no active postable account has the "inventory" control function');
+      }
+      const code = String(this.config.get<unknown>(COST_DIFFERENCE_AFTER_RECEIPT_KEY) ?? '').trim();
+      if (!code) throw new ConflictException(`A supplier invoice with a discount or capitalised freight cannot post: the purchase cost differences after receipt account is not configured — ask the finance owner to assign it (${COST_DIFFERENCE_AFTER_RECEIPT_KEY})`);
+      const problem = this.accountProblem(await accounts.findOne({ where: { code } }));
+      if (problem) throw new ConflictException(`A supplier invoice with a discount or capitalised freight cannot post: the configured account ${code} (${COST_DIFFERENCE_AFTER_RECEIPT_KEY}) ${problem}`);
+    }
+    if (Number(input.expensedCharges ?? 0) > 0) {
+      const code = String(this.config.get<unknown>(OTHER_CHARGES_ACCOUNT_KEY) ?? '').trim();
+      if (!code) throw new ConflictException(`A supplier invoice with non-capitalised charges cannot post: the purchase charges expense account is not configured — ask the finance owner to assign it (${OTHER_CHARGES_ACCOUNT_KEY})`);
+      const problem = this.accountProblem(await accounts.findOne({ where: { code } }));
+      if (problem) throw new ConflictException(`A supplier invoice with non-capitalised charges cannot post: the configured account ${code} (${OTHER_CHARGES_ACCOUNT_KEY}) ${problem}`);
+    }
+
     if (Number(input.taxAmount) > 0) {
       const vat = await accounts.find({ where: { controlFunction: 'tax_receivable', isActive: true, isPostable: true }, take: 2 });
       if (vat.length === 0) throw new ConflictException('A supplier invoice with VAT cannot post: no active postable account has the "tax_receivable" (Input VAT) control function');
       if (vat.length > 1) throw new ConflictException('A supplier invoice with VAT cannot post: more than one active postable "tax_receivable" account exists — Input VAT would be ambiguous');
+    }
+  }
+
+  /** Phase D-1 (D7 / E3): see the registry. */
+  async assertPurchaseReturnPostable(input: { expectedDifference: string; clearingValue?: string; settledNet?: string }, manager?: EntityManager): Promise<void> {
+    if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to validate purchase-return accounts');
+    const accounts = manager.getRepository(GLAccount);
+    if (!(await accounts.findOne({ where: { controlFunction: 'inventory', isActive: true, isPostable: true } }))) {
+      throw new ConflictException('A purchase return cannot post: no active postable account has the "inventory" control function');
+    }
+    if (!(await accounts.findOne({ where: { controlFunction: 'grni', isActive: true, isPostable: true } }))) {
+      throw new ConflictException('A purchase return cannot post: no active postable account has the "grni" control function');
+    }
+    // policy 2026-10-21: the physical return of INVOICED goods parks its book value in the clearing account; settling it by a credit note also debits Accounts payable
+    if (Number(input.clearingValue ?? 0) > 0) {
+      const code = String(this.config.get<unknown>(RETURN_CLEARING_KEY) ?? '').trim();
+      if (!code) throw new ConflictException(`A return of invoiced goods cannot post: the supplier returns pending credit account is not configured — ask the finance owner to assign it (${RETURN_CLEARING_KEY})`);
+      const problem = this.accountProblem(await accounts.findOne({ where: { code } }));
+      if (problem) throw new ConflictException(`A return of invoiced goods cannot post: the configured account ${code} (${RETURN_CLEARING_KEY}) ${problem}`);
+    }
+    if (Number(input.settledNet ?? 0) > 0 && !(await accounts.findOne({ where: { controlFunction: 'ap', isActive: true, isPostable: true } }))) {
+      throw new ConflictException('A credit note settling returned goods cannot post: no active postable account has the "ap" control function');
+    }
+    if (Math.abs(Number(input.expectedDifference)) > 0.00005) {
+      const code = String(this.config.get<unknown>(RETURN_COST_DIFFERENCE_KEY) ?? '').trim();
+      if (!code) throw new ConflictException(`A purchase return whose book cost differs from the receipt cost cannot post: the supplier return cost differences account is not configured — ask the finance owner to assign it (${RETURN_COST_DIFFERENCE_KEY})`);
+      const problem = this.accountProblem(await accounts.findOne({ where: { code } }));
+      if (problem) throw new ConflictException(`A purchase return cannot post: the configured account ${code} (${RETURN_COST_DIFFERENCE_KEY}) ${problem}`);
     }
   }
 
