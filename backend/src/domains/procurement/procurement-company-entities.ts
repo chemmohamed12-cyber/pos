@@ -21,6 +21,8 @@ import { SupplierInvoiceLineReceipt } from './infrastructure/supplier-invoice-li
 import { SupplierPaymentAllocation } from './infrastructure/supplier-payment-allocation.entity';
 import { ProcurementInvoicePolicy } from './infrastructure/procurement-invoice-policy.entity';
 import { PurchaseReturn } from './infrastructure/purchase-return.entity';
+import { SupplierCreditNote } from './infrastructure/supplier-credit-note.entity';
+import { SupplierCreditNoteLine } from './infrastructure/supplier-credit-note-line.entity';
 import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
 
 /**
@@ -61,4 +63,6 @@ export const PROCUREMENT_COMPANY_ENTITIES = [
   ProcurementInvoicePolicy,
   PurchaseReturn,
   PurchaseReturnLine,
+  SupplierCreditNote,
+  SupplierCreditNoteLine,
 ];

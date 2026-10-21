@@ -16,6 +16,11 @@ import { InvoiceAllocationService } from './application/invoice-allocation.servi
 import { InvoiceApprovalService } from './application/invoice-approval.service';
 import { InvoicePolicyService } from './application/invoice-policy.service';
 import { PurchaseReturnService } from './application/purchase-return.service';
+import { SupplierCreditNoteService } from './application/supplier-credit-note.service';
+import { InvoiceCreditCapService } from './application/invoice-credit-cap.service';
+import { SupplierCreditNoteController } from './interface/supplier-credit-note.controller';
+import { SupplierCreditNote } from './infrastructure/supplier-credit-note.entity';
+import { SupplierCreditNoteLine } from './infrastructure/supplier-credit-note-line.entity';
 import { PurchaseReturnController } from './interface/purchase-return.controller';
 import { PurchaseReturn } from './infrastructure/purchase-return.entity';
 import { PurchaseReturnLine } from './infrastructure/purchase-return-line.entity';
@@ -111,6 +116,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
       ProcurementInvoicePolicy,
       PurchaseReturn,
       PurchaseReturnLine,
+      SupplierCreditNote,
+      SupplierCreditNoteLine,
       SupplierLedgerEntry,
       SupplierPayment,
       PurchaseRequest,
@@ -152,6 +159,7 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     SupplierInvoiceController,
     SupplierPaymentController,
     PurchaseReturnController,
+    SupplierCreditNoteController,
     PurchaseRequestController,
     RfqController,
     NewItemRequestController,
@@ -167,6 +175,8 @@ import { ScopeModule } from '../../foundation/scope/scope.module';
     InvoicePolicyService,
     InvoiceApprovalService,
     PurchaseReturnService,
+    InvoiceCreditCapService,
+    SupplierCreditNoteService,
     SupplierPaymentService,
     PurchaseRequestService,
     RfqService,

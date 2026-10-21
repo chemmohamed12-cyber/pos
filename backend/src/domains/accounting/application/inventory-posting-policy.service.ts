@@ -186,7 +186,7 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
   }
 
   /** Phase D-1 (D7 / E3): see the registry. */
-  async assertPurchaseReturnPostable(input: { expectedDifference: string }, manager?: EntityManager): Promise<void> {
+  async assertPurchaseReturnPostable(input: { expectedDifference: string; creditNet?: string; creditTax?: string }, manager?: EntityManager): Promise<void> {
     if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to validate purchase-return accounts');
     const accounts = manager.getRepository(GLAccount);
     if (!(await accounts.findOne({ where: { controlFunction: 'inventory', isActive: true, isPostable: true } }))) {
@@ -194,6 +194,14 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
     }
     if (!(await accounts.findOne({ where: { controlFunction: 'grni', isActive: true, isPostable: true } }))) {
       throw new ConflictException('A purchase return cannot post: no active postable account has the "grni" control function');
+    }
+    // phase D-3: a return of INVOICED goods credits Accounts payable (and Input VAT)
+    if (Number(input.creditNet ?? 0) > 0 && !(await accounts.findOne({ where: { controlFunction: 'ap', isActive: true, isPostable: true } }))) {
+      throw new ConflictException('A return of invoiced goods cannot post: no active postable account has the "ap" control function');
+    }
+    if (Number(input.creditTax ?? 0) > 0) {
+      const vat = await accounts.find({ where: { controlFunction: 'tax_receivable', isActive: true, isPostable: true }, take: 2 });
+      if (vat.length !== 1) throw new ConflictException('A return of invoiced goods with VAT cannot post: exactly one active postable "tax_receivable" (Input VAT) account must exist');
     }
     if (Math.abs(Number(input.expectedDifference)) > 0.00005) {
       const code = String(this.config.get<unknown>(RETURN_COST_DIFFERENCE_KEY) ?? '').trim();

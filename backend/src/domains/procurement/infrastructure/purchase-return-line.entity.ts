@@ -34,4 +34,15 @@ export class PurchaseReturnLine {
 
   @Column({ type: 'numeric', precision: 20, scale: 4, nullable: true })
   differenceBase!: string | null;
+
+  /** Phase D-3: set when the line returns INVOICED goods - the invoice line it credits, the net credited (qty x invoice unit cost) and the proportional Input VAT. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  supplierInvoiceLineId!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  creditNetBase!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  creditTaxBase!: string | null;
 }

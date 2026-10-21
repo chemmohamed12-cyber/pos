@@ -111,6 +111,9 @@ export const AP_EVENT_TOPICS = {
   supplierInvoicePosted: 'finance.supplier_invoice.posted',
   supplierInvoiceVoided: 'finance.supplier_invoice.voided',
   supplierInvoiceCostAdjusted: 'finance.supplier_invoice.cost_adjusted',
+  /** Phase D-2: a posted supplier credit note - the cost leg (Dr AP / Cr Inventory on-hand share / Cr cost-difference sold share) and the Input VAT leg (Dr AP / Cr Input VAT). */
+  supplierCreditNoteCostAdjusted: 'finance.supplier_credit_note.cost_adjusted',
+  supplierCreditNoteTaxAdjusted: 'finance.supplier_credit_note.tax_adjusted',
   /** Phase D-1 - a posted Purchase Return of goods received but not invoiced: Dr GRNI / Cr Inventory / supplier-return cost difference. */
   purchaseReturnPosted: 'procurement.purchase_return.posted',
   supplierInvoiceCostAdjustmentVoided: 'finance.supplier_invoice.cost_adjustment_voided',

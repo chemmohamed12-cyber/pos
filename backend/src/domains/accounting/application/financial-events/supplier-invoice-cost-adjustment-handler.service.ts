@@ -57,6 +57,8 @@ export class SupplierInvoiceCostAdjustmentHandlerService implements OnModuleInit
 
   onModuleInit(): void {
     if (!this.registry.get(AP_EVENT_TOPICS.supplierInvoiceCostAdjusted)) this.registry.register(AP_EVENT_TOPICS.supplierInvoiceCostAdjusted, (e, c) => this.handleAdjusted(e, c));
+    // Phase D-2: a supplier credit note's cost leg is the same E1 split with the credited net as the "discount"
+    if (!this.registry.get(AP_EVENT_TOPICS.supplierCreditNoteCostAdjusted)) this.registry.register(AP_EVENT_TOPICS.supplierCreditNoteCostAdjusted, (e, c) => this.handleAdjusted(e, c));
     if (!this.registry.get(AP_EVENT_TOPICS.supplierInvoiceCostAdjustmentVoided)) this.registry.register(AP_EVENT_TOPICS.supplierInvoiceCostAdjustmentVoided, (e, c) => this.handleVoided(e, c));
   }
 

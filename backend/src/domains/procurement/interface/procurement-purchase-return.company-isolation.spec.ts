@@ -3,6 +3,7 @@ import { SupplierInvoiceService } from '../application/supplier-invoice.service'
 import { SupplierLedgerService } from '../application/supplier-ledger.service';
 import { InvoiceAllocationService } from '../application/invoice-allocation.service';
 import { PurchaseReturnService } from '../application/purchase-return.service';
+import { InvoiceCreditCapService } from '../application/invoice-credit-cap.service';
 import { GrniLedgerService } from '../application/grni-ledger.service';
 import { GoodsReceiptService } from '../application/goods-receipt.service';
 import { PURCHASE_ORDER_PROCESS } from '../domain/purchase-order-process';
@@ -123,7 +124,7 @@ describe('Procurement invoicing phase D-1 - purchase returns of uninvoiced goods
     allocations = new InvoiceAllocationService(h.controlPlane);
     invoices = new SupplierInvoiceService(h.controlPlane, numbering, processEngine, audit, ledger, events, policyRegistry, allocations);
     treasury = new TreasuryService(h.controlPlane, numbering, audit, inert, events);
-    purchaseReturns = new PurchaseReturnService(h.controlPlane, processEngine, numbering, audit, events, inventory, valuation, policyRegistry);
+    purchaseReturns = new PurchaseReturnService(h.controlPlane, processEngine, numbering, audit, events, inventory, valuation, ledger, invoices, new InvoiceCreditCapService(h.controlPlane), policyRegistry);
 
     await seedCompany('A');
     await seedCompany('B');

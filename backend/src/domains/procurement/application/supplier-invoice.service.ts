@@ -596,7 +596,11 @@ export class SupplierInvoiceService {
     if (remaining <= 0) {
       await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'mark_paid', actorUserId, manager);
     } else if (state === 'posted' && remaining < this.grossOf(invoice)) {
-      await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'record_partial_payment', actorUserId, manager);
+      // "partially paid" means a PAYMENT was applied: a credit note / return credit lowers the balance without changing the payment status (phase D-2 / D-3)
+      const [paid]: Array<{ n: string }> = await runner.query(`SELECT COUNT(*)::text AS n FROM "supplier_ledger_entries" WHERE "supplierInvoiceId" = $1 AND "entryType" = 'payment' AND "status" = 'posted'`, [invoiceId]);
+      if (Number(paid.n) > 0) {
+        await this.processEngine.transition(SUPPLIER_INVOICE_PROCESS, ENTITY_TYPE, invoiceId, 'record_partial_payment', actorUserId, manager);
+      }
     }
     return this.getStatus(invoiceId, manager);
   }

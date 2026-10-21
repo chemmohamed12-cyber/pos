@@ -33,4 +33,8 @@ export class PurchaseOrderLine {
   /** Phase D-1: units of this order line returned to the supplier by posted purchase returns (net received = quantityReceived - quantityReturned). */
   @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
   quantityReturned!: string;
+
+  /** Phase D-3: units returned after invoicing (audit counter, see GoodsReceiptLine). */
+  @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
+  quantityReturnedInvoiced!: string;
 }

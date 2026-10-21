@@ -34,6 +34,9 @@ interface ReturnLine {
   receiptUnitCostBase: string;
   exitValueBase: string | null;
   differenceBase: string | null;
+  supplierInvoiceLineId?: string | null;
+  creditNetBase?: string | null;
+  creditTaxBase?: string | null;
 }
 interface Returnable {
   goodsReceiptLineId: string;
@@ -41,6 +44,11 @@ interface Returnable {
   productId: string;
   unitCostBase: string;
   returnable: string;
+}
+/** phase D-3: goods that were already invoiced - returned against their invoice line (the supplier's credit is recorded with the return) */
+interface ReturnableInvoiced extends Returnable {
+  supplierInvoiceLineId: string;
+  invoiceNumber: string;
 }
 
 /**
@@ -59,6 +67,7 @@ export function PurchaseReturns() {
   const [detail, setDetail] = useState<(ReturnRow & { lines: ReturnLine[] }) | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [returnable, setReturnable] = useState<Returnable[]>([]);
+  const [returnableInvoiced, setReturnableInvoiced] = useState<ReturnableInvoiced[]>([]);
   const [qty, setQty] = useState<Record<string, string>>({});
   const [reason, setReason] = useState('');
   const [actionReason, setActionReason] = useState('');
@@ -89,8 +98,13 @@ export function PurchaseReturns() {
     setQty({});
     if (!supplierId) {
       setReturnable([]);
+      setReturnableInvoiced([]);
       return;
     }
+    api
+      .get<ReturnableInvoiced[]>(`/procurement/purchase-returns/returnable-invoiced?supplierId=${supplierId}`)
+      .then(setReturnableInvoiced)
+      .catch(() => setReturnableInvoiced([]));
     api
       .get<Returnable[]>(`/procurement/purchase-returns/returnable?supplierId=${supplierId}`)
       .then(setReturnable)
@@ -111,7 +125,12 @@ export function PurchaseReturns() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    const lines = returnable.filter((r) => Number(qty[r.goodsReceiptLineId] ?? 0) > 0).map((r) => ({ goodsReceiptLineId: r.goodsReceiptLineId, quantity: qty[r.goodsReceiptLineId] }));
+    const lines = [
+      ...returnable.filter((r) => Number(qty[r.goodsReceiptLineId] ?? 0) > 0).map((r) => ({ goodsReceiptLineId: r.goodsReceiptLineId, quantity: qty[r.goodsReceiptLineId] })),
+      ...returnableInvoiced
+        .filter((r) => Number(qty[`inv:${r.supplierInvoiceLineId}:${r.goodsReceiptLineId}`] ?? 0) > 0)
+        .map((r) => ({ goodsReceiptLineId: r.goodsReceiptLineId, supplierInvoiceLineId: r.supplierInvoiceLineId, quantity: qty[`inv:${r.supplierInvoiceLineId}:${r.goodsReceiptLineId}`] })),
+    ];
     if (lines.length === 0) return;
     setBusy('create');
     setError(null);
@@ -173,7 +192,41 @@ export function PurchaseReturns() {
                 <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} required />
               </div>
             </div>
-            {supplierId && returnable.length === 0 && <div className="empty-state">{L('لا توجد بضاعة قابلة للإرجاع لهذا المورد.', 'No returnable goods for this supplier.')}</div>}
+            {supplierId && returnable.length === 0 && returnableInvoiced.length === 0 && <div className="empty-state">{L('لا توجد بضاعة قابلة للإرجاع لهذا المورد.', 'No returnable goods for this supplier.')}</div>}
+            {returnableInvoiced.length > 0 && (
+              <>
+                <h4 style={{ margin: '4px 0' }}>{L('بضاعة مفوترة (يُسجَّل ائتمان المورد مع المردود)', 'Invoiced goods (the supplier credit is recorded with the return)')}</h4>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{L('الفاتورة', 'Invoice')}</th>
+                      <th>{L('إذن الاستلام', 'Goods receipt')}</th>
+                      <th>{L('الصنف', 'Item')}</th>
+                      <th>{L('القابل للإرجاع', 'Returnable')}</th>
+                      <th>{L('سعر الفاتورة', 'Invoice price')}</th>
+                      <th>{L('الكمية المرتجعة', 'Quantity to return')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnableInvoiced.map((r) => {
+                      const key = `inv:${r.supplierInvoiceLineId}:${r.goodsReceiptLineId}`;
+                      return (
+                        <tr key={key}>
+                          <td>{r.invoiceNumber}</td>
+                          <td>{r.grNumber}</td>
+                          <td>{productName(r.productId)}</td>
+                          <td>{Number(r.returnable)}</td>
+                          <td>{Number(r.unitCostBase).toFixed(2)}</td>
+                          <td>
+                            <input type="number" min={0} max={Number(r.returnable)} step="0.001" value={qty[key] ?? ''} onChange={(e) => setQty((p) => ({ ...p, [key]: e.target.value }))} style={{ width: 100 }} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
             {returnable.length > 0 && (
               <table className="data-table">
                 <thead>
@@ -201,7 +254,7 @@ export function PurchaseReturns() {
               </table>
             )}
             <div>
-              <button className="btn btn-primary" type="submit" disabled={busy === 'create' || returnable.length === 0}>
+              <button className="btn btn-primary" type="submit" disabled={busy === 'create' || (returnable.length === 0 && returnableInvoiced.length === 0)}>
                 {L('إنشاء مردود (مسودة)', 'Create return (draft)')}
               </button>
             </div>
@@ -258,7 +311,7 @@ export function PurchaseReturns() {
                 <tr>
                   <th>{L('الصنف', 'Item')}</th>
                   <th>{L('الكمية', 'Qty')}</th>
-                  <th>{L('قيمة الاستلام', 'Receipt value')}</th>
+                  <th>{L('قيمة الاستلام / ائتمان المورد', 'Receipt value / supplier credit')}</th>
                   {detail.state === 'posted' && <th>{L('قيمة الخروج', 'Exit value')}</th>}
                   {detail.state === 'posted' && <th>{L('الفرق', 'Difference')}</th>}
                 </tr>
@@ -268,7 +321,9 @@ export function PurchaseReturns() {
                   <tr key={l.id}>
                     <td>{productName(l.productId)}</td>
                     <td>{Number(l.quantity)}</td>
-                    <td>{(Number(l.quantity) * Number(l.receiptUnitCostBase)).toFixed(2)}</td>
+                    <td>
+                      {l.supplierInvoiceLineId ? `${Number(l.creditNetBase ?? 0).toFixed(2)} + ${Number(l.creditTaxBase ?? 0).toFixed(2)} ${L('ضريبة', 'VAT')}` : (Number(l.quantity) * Number(l.receiptUnitCostBase)).toFixed(2)}
+                    </td>
                     {detail.state === 'posted' && <td>{Number(l.exitValueBase ?? 0).toFixed(2)}</td>}
                     {detail.state === 'posted' && <td>{Number(l.differenceBase ?? 0).toFixed(2)}</td>}
                   </tr>

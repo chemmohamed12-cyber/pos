@@ -19,19 +19,32 @@ export async function handlePurchaseReturnPosted(event: FinancialEvent, ctx: Han
   const p = event.payload;
   const receipt = num(p.receiptValueBase);
   const exit = num(p.exitValueBase);
-  if (!Number.isFinite(receipt) || !Number.isFinite(exit) || receipt < 0 || exit < 0 || receipt + exit <= 0) {
-    return { kind: 'rejected', reason: 'purchase_return.posted: invalid receiptValueBase / exitValueBase' };
+  // phase D-3 (payload v2): goods that were already INVOICED are credited through Accounts payable (net + VAT), not GRNI
+  const creditNet = Number.isNaN(num(p.creditNetBase)) ? 0 : num(p.creditNetBase);
+  const creditTax = Number.isNaN(num(p.creditTaxBase)) ? 0 : num(p.creditTaxBase);
+  if (!Number.isFinite(receipt) || !Number.isFinite(exit) || receipt < 0 || exit < 0 || creditNet < 0 || creditTax < 0 || receipt + creditNet <= 0 || exit <= 0) {
+    return { kind: 'rejected', reason: 'purchase_return.posted: invalid receiptValueBase / creditNetBase / exitValueBase' };
   }
-  const grni = await ctx.resolveControlAccount('grni');
   const inventory = await ctx.resolveControlAccount('inventory');
-  if (!grni) return { kind: 'rejected', reason: 'purchase_return.posted: no active postable GRNI control account in this Company chart' };
   if (!inventory) return { kind: 'rejected', reason: 'purchase_return.posted: no `inventory` control account in the chart' };
-
-  const diff = r4(receipt - exit);
-  const lines: JournalDraftLine[] = [
-    { accountId: grni, debit: receipt.toFixed(4), description: 'Goods Received Not Invoiced (returned to supplier, at the receipt cost)' },
-    { accountId: inventory, credit: exit.toFixed(4), description: 'Inventory asset (returned stock at its book cost)' },
-  ];
+  const lines: JournalDraftLine[] = [];
+  if (receipt > 0) {
+    const grni = await ctx.resolveControlAccount('grni');
+    if (!grni) return { kind: 'rejected', reason: 'purchase_return.posted: no active postable GRNI control account in this Company chart' };
+    lines.push({ accountId: grni, debit: receipt.toFixed(4), description: 'Goods Received Not Invoiced (returned to supplier, at the receipt cost)' });
+  }
+  if (creditNet > 0) {
+    const ap = await ctx.resolveControlAccount('ap');
+    if (!ap) return { kind: 'rejected', reason: 'purchase_return.posted: no AP control account in the chart' };
+    lines.push({ accountId: ap, debit: (creditNet + creditTax).toFixed(4), description: 'Accounts payable (credit for invoiced goods returned: net + VAT)' });
+    if (creditTax > 0) {
+      const vat = await ctx.resolveUniqueControlAccount('tax_receivable');
+      if (!vat.ok) return { kind: 'rejected', reason: `purchase_return.posted: Input VAT account (tax_receivable) is ${vat.reason} — exactly one active postable account must carry it` };
+      lines.push({ accountId: vat.id, credit: creditTax.toFixed(4), description: 'Input VAT (credited back on returned invoiced goods)' });
+    }
+  }
+  lines.push({ accountId: inventory, credit: exit.toFixed(4), description: 'Inventory asset (returned stock at its book cost)' });
+  const diff = r4(receipt + creditNet - exit);
   if (Math.abs(diff) > 0.00005) {
     const acc = await ctx.resolveConfiguredPostableAccount(RETURN_COST_DIFFERENCE_CONFIG_KEY);
     if (!acc.ok) {

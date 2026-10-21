@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { ArrayMinSize, IsArray, IsNumberString, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumberString, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PurchaseReturnService } from '../application/purchase-return.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -14,6 +14,11 @@ class ReturnLineDto {
 
   @IsNumberString()
   quantity!: string;
+
+  /** phase D-3: returning goods that were already invoiced - the invoice line the return is credited against */
+  @IsOptional()
+  @IsUUID()
+  supplierInvoiceLineId?: string;
 }
 
 class CreatePurchaseReturnDto {
@@ -55,6 +60,14 @@ export class PurchaseReturnController {
   async returnable(@Req() req: CompanyScopedRequest, @Query('supplierId', ParseUUIDPipe) supplierId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.returns.returnableLines(supplierId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('procurement.purchase_return.view', 'read-only')
+  @Get('returnable-invoiced')
+  async returnableInvoiced(@Req() req: CompanyScopedRequest, @Query('supplierId', ParseUUIDPipe) supplierId: string) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.returns.returnableInvoicedLines(supplierId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

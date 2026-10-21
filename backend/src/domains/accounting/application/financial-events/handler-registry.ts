@@ -112,6 +112,9 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   // 2026-10-20 (owner decisions D3 / E1) - the discount / freight / charges leg of a supplier invoice; handled by the self-registering SupplierInvoiceCostAdjustmentHandlerService
   'finance.supplier_invoice.cost_adjusted',
   'finance.supplier_invoice.cost_adjustment_voided',
+  // Phase D-2 - a posted supplier credit note (cost leg + Input VAT leg)
+  'finance.supplier_credit_note.cost_adjusted',
+  'finance.supplier_credit_note.tax_adjusted',
   // Phase D-1 - a posted Purchase Return (GRNI path)
   'procurement.purchase_return.posted',
   'finance.supplier_payment.recorded',

@@ -17,7 +17,7 @@ import { ModuleManifest } from '../module-manifest.type';
  */
 export const procurementManifest: ModuleManifest = {
   module_code: 'procurement',
-  manifest_version: '1.6.0',
+  manifest_version: '1.7.0',
   title_code: 'module.procurement',
   business_domains: ['procurement'],
   // 1.1.0 (Goods Receipt) added `inventory`: `GoodsReceiptService` calls
@@ -83,6 +83,14 @@ export const procurementManifest: ModuleManifest = {
     { node: 'procurement.purchase_return.submit', title_code: 'perm.procurement.purchase_return.submit', parent: 'procurement.purchase_return' },
     { node: 'procurement.purchase_return.approve', title_code: 'perm.procurement.purchase_return.approve', parent: 'procurement.purchase_return' },
     { node: 'procurement.purchase_return.post', title_code: 'perm.procurement.purchase_return.post', parent: 'procurement.purchase_return' },
+
+    // phase D-2 (D6): supplier credit notes linked to the invoice - create (maker) -> submit -> approve (independent person) -> post
+    { node: 'procurement.supplier_credit_note', title_code: 'perm.procurement.supplier_credit_note', parent: 'procurement' },
+    { node: 'procurement.supplier_credit_note.view', title_code: 'perm.procurement.supplier_credit_note.view', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.create', title_code: 'perm.procurement.supplier_credit_note.create', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.submit', title_code: 'perm.procurement.supplier_credit_note.submit', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.approve', title_code: 'perm.procurement.supplier_credit_note.approve', parent: 'procurement.supplier_credit_note' },
+    { node: 'procurement.supplier_credit_note.post', title_code: 'perm.procurement.supplier_credit_note.post', parent: 'procurement.supplier_credit_note' },
 
     { node: 'procurement.supplier_payment', title_code: 'perm.procurement.supplier_payment', parent: 'procurement' },
     { node: 'procurement.supplier_payment.view', title_code: 'perm.procurement.supplier_payment.view', parent: 'procurement.supplier_payment' },
@@ -154,6 +162,6 @@ export const procurementManifest: ModuleManifest = {
       'GetRfq',
       'ListRfqs',
     ],
-    events: ['procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
+    events: ['finance.supplier_credit_note.cost_adjusted', 'finance.supplier_credit_note.tax_adjusted', 'procurement.purchase_return.posted', 'finance.supplier_invoice.posted', 'finance.supplier_invoice.voided', 'finance.supplier_invoice.cost_adjusted', 'finance.supplier_invoice.cost_adjustment_voided', 'finance.supplier_payment.recorded'],
   },
 };

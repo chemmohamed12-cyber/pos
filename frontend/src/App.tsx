@@ -25,6 +25,7 @@ import { SupplierProfile } from './pages/procurement/SupplierProfile';
 import { PurchaseOrders } from './pages/procurement/PurchaseOrders';
 import { SupplierInvoices } from './pages/procurement/SupplierInvoices';
 import { PurchaseReturns } from './pages/procurement/PurchaseReturns';
+import { SupplierCreditNotes } from './pages/procurement/SupplierCreditNotes';
 import { ApAging } from './pages/procurement/ApAging';
 import { SupplierStatement } from './pages/procurement/SupplierStatement';
 import { PurchaseRequests } from './pages/procurement/PurchaseRequests';
@@ -219,6 +220,7 @@ function AppRoutes() {
         <Route path="purchase-orders" element={<PurchaseOrders />} />
         <Route path="supplier-invoices" element={<SupplierInvoices />} />
         <Route path="purchase-returns" element={<PurchaseReturns />} />
+        <Route path="supplier-credit-notes" element={<SupplierCreditNotes />} />
         <Route path="goods-not-invoiced" element={<GoodsNotInvoiced />} />
         <Route path="ap-aging" element={<ApAging />} />
         <Route path="supplier-statement" element={<SupplierStatement />} />
