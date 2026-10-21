@@ -254,6 +254,23 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
       expect(await statusOf(d.id)).toBe('SUSPENDED');
     });
 
+    it('UNKNOWN HISTORY: a migration recorded in a Company database that the candidate does not ship is reported (ahead of / divergent from the release); a clean Company reports none', async () => {
+      const a = await addCompany('Aardvark', ['core']);
+      const b = await addCompany('Badger', ['core']);
+      const ds = new DataSource({ type: 'postgres', ...dbCfg(a.db), synchronize: false, logging: false });
+      await ds.initialize();
+      try {
+        await ds.query(`INSERT INTO "migrations" ("timestamp","name") VALUES (1999999999999, 'FutureThing1999999999999')`);
+      } finally {
+        await ds.destroy();
+      }
+      const plan = await service.plan(rootNew);
+      const byName = Object.fromEntries(plan.planned.map((p) => [p.companyName.replace(`${PREFIX}-`, ''), p]));
+      expect(byName.Aardvark.unknownMigrations).toEqual(['FutureThing1999999999999']);
+      expect(byName.Badger.unknownMigrations).toEqual([]);
+      void b;
+    });
+
     it('a DECOMMISSIONED Company is OUT OF SCOPE (never blocks), a SUSPENDED one is STALE', async () => {
       await addCompany('Aardvark', ['core']);
       const dec = await addCompany('Decom', ['core'], 'DECOMMISSIONED');

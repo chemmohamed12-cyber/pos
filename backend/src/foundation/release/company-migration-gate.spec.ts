@@ -10,12 +10,13 @@ const clean: CompanySchemaCheckResult = { ran: true, checkedTables: 100, finding
 const drift: CompanySchemaCheckResult = { ran: true, checkedTables: 100, findings: { missingTables: ['cash_sessions'], missingColumns: { products: ['itemType'] } } };
 const unrunnable: CompanySchemaCheckResult = { ran: false, checkedTables: 0, findings: { missingTables: [], missingColumns: {} }, error: 'connect ECONNREFUSED' };
 
-const company = (name: string, pending: string[], schema: CompanySchemaCheckResult | null = clean): PlannedCompany => ({
+const company = (name: string, pending: string[], schema: CompanySchemaCheckResult | null = clean, unknownMigrations: string[] = []): PlannedCompany => ({
   companyId: `id-${name}`,
   companyName: name,
   databaseName: `db_${name}`,
   tags: ['core'],
   pending,
+  unknownMigrations,
   ...(schema ? { schema } : {}),
 });
 const skipped = (name: string, status: string): SkippedCompany => ({
@@ -85,6 +86,27 @@ describe('evaluateCompanyGate', () => {
     });
   });
 
+  describe('3b. a Company with migrations the release does not know (ahead of / divergent from the release)', () => {
+    it('BLOCKED in every non-plan mode (COMPANY_HISTORY_UNKNOWN), naming the Company and the unknown migrations', () => {
+      for (const mode of ['on', 'off'] as const) {
+        const d = gate(mode, plan([company('A', [], clean, ['FutureThing1999999999999']), company('B', [])]));
+        expect(d.decision).toBe('BLOCKED');
+        expect(d.blockers.join(' ')).toContain('COMPANY_HISTORY_UNKNOWN');
+        expect(d.blockers.join(' ')).toContain('A (FutureThing1999999999999)');
+        expect(d.counts.withUnknownMigrations).toBe(1);
+      }
+    });
+    it('report mode records it as a warning and does not block; no unknown migrations = no finding', () => {
+      const r = gate('on', plan([company('A', [], clean, ['X1'])]), { schemaCheck: 'report' });
+      expect(r.decision).toBe('PASS');
+      expect(r.warnings.join(' ')).toContain('COMPANY_HISTORY_UNKNOWN');
+      expect(gate('on', plan([company('A', [], clean, [])])).counts.withUnknownMigrations).toBe(0);
+    });
+    it('is reported even while migrations are pending (a divergent history is not repaired by migrating)', () => {
+      expect(gate('on', plan([company('A', ['M1'], drift, ['Alien1'])])).decision).toBe('BLOCKED');
+    });
+  });
+
   describe('4. Companies outside the plan', () => {
     it('SUSPENDED / DEGRADED / FAILED / MIGRATING / PROVISIONING are STALE and BLOCK by default', () => {
       for (const status of ['SUSPENDED', 'DEGRADED', 'FAILED', 'MIGRATING', 'PROVISIONING']) {
@@ -127,7 +149,7 @@ describe('evaluateCompanyGate', () => {
 
   it('counts are consistent', () => {
     const d = gate('on', plan([company('A', ['M']), company('B', [], drift), company('C', [])], { skipped: [skipped('S', 'SUSPENDED'), skipped('D', 'DECOMMISSIONED')] }), { skippedPolicy: 'allow', schemaCheck: 'report' });
-    expect(d.counts).toEqual({ evaluated: 3, needingMigration: 1, withSchemaFindings: 1, staleSkipped: 1, outOfScope: 1 });
+    expect(d.counts).toEqual({ evaluated: 3, needingMigration: 1, withSchemaFindings: 1, withUnknownMigrations: 0, staleSkipped: 1, outOfScope: 1 });
   });
 });
 

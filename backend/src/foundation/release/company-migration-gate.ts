@@ -31,7 +31,7 @@ export interface CompanyGateDecision {
   warnings: string[];
   /** Non-READY, non-DECOMMISSIONED Companies that will run the new code on the old schema until caught up. */
   staleCompanies: SkippedCompany[];
-  counts: { evaluated: number; needingMigration: number; withSchemaFindings: number; staleSkipped: number; outOfScope: number };
+  counts: { evaluated: number; needingMigration: number; withSchemaFindings: number; withUnknownMigrations: number; staleSkipped: number; outOfScope: number };
 }
 
 const names = (xs: string[], cap = 10) => xs.slice(0, cap).join(', ') + (xs.length > cap ? `, … (+${xs.length - cap})` : '');
@@ -60,6 +60,14 @@ export function evaluateCompanyGate(input: CompanyGateInput): CompanyGateDecisio
       `COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but ${needing.length} Company(ies) need migrations: ` +
         `${names(needing.map((c) => `${c.companyName} (${c.pending.length})`))}. A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it)`,
     );
+  }
+
+  // 3. incompatible history: migrations recorded in a Company database that the candidate does not ship (ahead of the candidate, or divergent)
+  const withUnknown = plan.planned.filter((c) => (c.unknownMigrations?.length ?? 0) > 0);
+  if (withUnknown.length > 0) {
+    const text = `COMPANY_HISTORY_UNKNOWN: ${withUnknown.length} Company(ies) have migrations recorded that this release does not ship (the database is ahead of, or diverges from, this release): ${names(withUnknown.map((c) => `${c.companyName} (${c.unknownMigrations!.slice(0, 3).join(', ')}${c.unknownMigrations!.length > 3 ? ', …' : ''})`))}`;
+    if (schemaCheck === 'enforce') blockers.push(text);
+    else warnings.push(`${text} (RELEASE_COMPANY_SCHEMA_CHECK=report: recorded, not blocking)`);
   }
 
   // 2. schema drift / unverifiable schema
@@ -94,6 +102,7 @@ export function evaluateCompanyGate(input: CompanyGateInput): CompanyGateDecisio
     evaluated: plan.planned.length,
     needingMigration: needing.length,
     withSchemaFindings: withFindings,
+    withUnknownMigrations: withUnknown.length,
     staleSkipped: stale.length,
     outOfScope: outOfScope.length,
   };

@@ -1,0 +1,25 @@
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+Tests:       14 passed, 14 total
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/company-schema-check.real-pg.spec.ts
+Tests:       6 passed, 6 total
+RESULT PASS src/foundation/release/company-schema-check.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/release-migration-registry.real-pg.spec.ts
+Tests:       21 passed, 21 total
+RESULT PASS src/foundation/release/release-migration-registry.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/release-execution-environment-check.spec.ts
+Tests:       9 passed, 9 total
+RESULT PASS src/foundation/release/release-execution-environment-check.spec.ts
+=== REGRESSION: src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+Tests:       3 passed, 3 total
+RESULT PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+=== REGRESSION: src/foundation/release-orchestration/company-migration-runner.spec.ts
+Tests:       5 passed, 5 total
+RESULT PASS src/foundation/release-orchestration/company-migration-runner.spec.ts
+=== REGRESSION: src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+Tests:       8 passed, 8 total
+RESULT PASS src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/release-upload.http.spec.ts
+Tests:       3 passed, 3 total
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+REGRESSION DONE: 8/8 passed

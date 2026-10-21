@@ -40,6 +40,11 @@ export interface PlannedCompany {
   tags: string[];
   /** Names of the migrations that will run (or, in dry-run, would run). */
   pending: string[];
+  /**
+   * Migrations RECORDED as executed in this Company database that the candidate does not ship at all (any tag). A Company ahead of the candidate or with a divergent
+   * history (a newer build's migration, a hand-applied row): deploying over it is not a plain upgrade, so the gate refuses it.
+   */
+  unknownMigrations?: string[];
   /** Read-only schema check of this Company database against the candidate's entity registry (taken at plan time, i.e. BEFORE any migration). */
   schema?: CompanySchemaCheckResult;
 }
@@ -151,11 +156,13 @@ export function summarizePlan(plan: CompanyFanoutPlan): Record<string, unknown> 
       tags: c.tags,
       pendingCount: c.pending.length,
       pending: c.pending,
+      ...(c.unknownMigrations && c.unknownMigrations.length > 0 ? { unknownMigrations: c.unknownMigrations.slice(0, 20), unknownMigrationCount: c.unknownMigrations.length } : {}),
       ...(c.schema ? { schemaCheck: { ran: c.schema.ran, checkedTables: c.schema.checkedTables, ...(c.schema.error ? { error: c.schema.error } : {}), ...summarizeFindings(c.schema.findings) } } : {}),
     })),
     counts: {
       companiesEvaluated: plan.planned.length,
       companiesWithPendingMigrations: plan.planned.filter((c) => c.pending.length > 0).length,
+      companiesWithUnknownMigrations: plan.planned.filter((c) => (c.unknownMigrations?.length ?? 0) > 0).length,
       companiesSkippedStale: plan.skipped.filter((c) => c.scope !== 'out_of_scope').length,
       companiesOutOfScope: plan.skipped.filter((c) => c.scope === 'out_of_scope').length,
     },
@@ -202,6 +209,9 @@ export class CompanyFanoutService {
   async plan(candidatePath: string, releaseTags?: readonly string[]): Promise<CompanyFanoutPlan> {
     const scope = releaseTags ?? discoverMigrationTags(candidatePath);
     const byTag = migrationNamesByTag(candidatePath, scope);
+    // everything the candidate ships, whatever the entitlement scope: a recorded migration outside this set is UNKNOWN to the candidate
+    const shippedAll = new Set<string>();
+    for (const names of migrationNamesByTag(candidatePath, discoverMigrationTags(candidatePath)).values()) for (const n of names) shippedAll.add(n);
     const plan: CompanyFanoutPlan = { mode: this.mode(), scope: [...scope], planned: [], skipped: [], blockers: [] };
 
     for (const reg of await this.registry.findAllActive()) {
@@ -215,7 +225,7 @@ export class CompanyFanoutService {
         continue;
       }
       try {
-        const evaluated = await this.evaluate(company.id, candidatePath, scope, byTag);
+        const evaluated = await this.evaluate(company.id, candidatePath, scope, byTag, shippedAll);
         const schema = await this.schemaCheck(company.id, candidatePath, evaluated.tags);
         plan.planned.push({ companyId: company.id, companyName: company.name, databaseName: reg.databaseName, ...evaluated, schema });
       } catch (err) {
@@ -226,7 +236,13 @@ export class CompanyFanoutService {
     return plan;
   }
 
-  private async evaluate(companyId: string, candidatePath: string, scope: readonly string[], byTag: Map<string, Set<string>>): Promise<{ tags: string[]; pending: string[] }> {
+  private async evaluate(
+    companyId: string,
+    candidatePath: string,
+    scope: readonly string[],
+    byTag: Map<string, Set<string>>,
+    shippedAll?: ReadonlySet<string>,
+  ): Promise<{ tags: string[]; pending: string[]; unknownMigrations?: string[] }> {
     const cfg = await this.registry.getConnectionConfigForCompany(companyId);
     const ds = createMigrationDataSource(candidatePath, cfg, scope);
     await ds.initialize();
@@ -237,7 +253,8 @@ export class CompanyFanoutService {
       const inScope = new Set<string>();
       for (const t of tags) for (const n of byTag.get(t) ?? []) inScope.add(n);
       const pendingAll = (await new MigrationExecutor(ds).getPendingMigrations()).map((m) => m.name as string);
-      return { tags, pending: pendingAll.filter((n) => inScope.has(n)) };
+      const unknownMigrations = shippedAll ? [...executed].filter((n) => !shippedAll.has(n)).sort() : undefined;
+      return { tags, pending: pendingAll.filter((n) => inScope.has(n)), ...(unknownMigrations ? { unknownMigrations } : {}) };
     } finally {
       if (ds.isInitialized) await ds.destroy();
     }
