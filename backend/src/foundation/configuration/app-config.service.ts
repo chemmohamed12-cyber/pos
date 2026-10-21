@@ -105,8 +105,17 @@ export interface ReleaseDeployConfig {
   readinessUrl: string | null;
   /** How long the engine waits for the restarted application to answer 2xx on every health endpoint before rolling back. */
   readinessTimeoutSeconds: number;
-  /** Company fan-out: `off` = Platform database only; `dry-run` = plan/report only; `on` = also upgrade every applicable READY Company database (staged path only). */
+  /**
+   * EFFECTIVE Company migration mode (see RELEASE_COMPANY_MIGRATIONS): the configured value, or - when unset - the safe default `on` (staged path) / `off` (legacy path).
+   * `off` is enforced (blocks while any Company needs migrations), `dry-run` is plan-only (no change at all), `on` migrates every applicable READY Company before the swap.
+   */
   companyMigrations: 'off' | 'dry-run' | 'on';
+  /** True when RELEASE_COMPANY_MIGRATIONS was set explicitly (false = the safe default was applied). */
+  companyMigrationsExplicit: boolean;
+  /** Non-READY Companies: `block` the deploy (default) or `allow` it with each one recorded as STALE. */
+  companySkippedPolicy: 'block' | 'allow';
+  /** Company schema check against the candidate's entity registry: `enforce` blocks the swap on a finding, `report` only records it. */
+  companySchemaCheck: 'enforce' | 'report';
   /** Restore-point policy for each Company about to be migrated: take a fresh verified backup, or require a recent verified one. */
   companyBackupPolicy: 'create' | 'require-recent';
   /** `require-recent` only: how old (hours) a verified Company backup may be. */
@@ -263,7 +272,10 @@ export class AppConfigService {
       stagedActivation: this.configService.get<boolean>('RELEASE_STAGED_ACTIVATION')!,
       readinessUrl: nullable('RELEASE_READINESS_URL'),
       readinessTimeoutSeconds: this.configService.get<number>('RELEASE_READINESS_TIMEOUT_SECONDS')!,
-      companyMigrations: this.configService.get<'off' | 'dry-run' | 'on'>('RELEASE_COMPANY_MIGRATIONS')!,
+      companyMigrations: this.configService.get<'off' | 'dry-run' | 'on'>('RELEASE_COMPANY_MIGRATIONS') ?? (this.configService.get<boolean>('RELEASE_STAGED_ACTIVATION') === false ? 'off' : 'on'),
+      companyMigrationsExplicit: this.configService.get<string>('RELEASE_COMPANY_MIGRATIONS') !== undefined,
+      companySkippedPolicy: this.configService.get<'block' | 'allow'>('RELEASE_COMPANY_SKIPPED_POLICY') ?? 'block',
+      companySchemaCheck: this.configService.get<'enforce' | 'report'>('RELEASE_COMPANY_SCHEMA_CHECK') ?? 'enforce',
       companyBackupPolicy: this.configService.get<'create' | 'require-recent'>('RELEASE_COMPANY_BACKUP_POLICY')!,
       companyBackupMaxAgeHours: this.configService.get<number>('RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS')!,
     };

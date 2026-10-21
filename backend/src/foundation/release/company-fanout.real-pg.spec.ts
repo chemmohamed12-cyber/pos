@@ -83,7 +83,7 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
   let audit: AuditService;
   let service: CompanyFanoutService;
   let backups: { createBackup: jest.Mock };
-  let cfgMock: { releaseDeploy: { companyMigrations: string; companyBackupPolicy: 'create' | 'require-recent'; companyBackupMaxAgeHours: number } };
+  let cfgMock: { releaseDeploy: { companyMigrations: string; companyBackupPolicy: 'create' | 'require-recent'; companyBackupMaxAgeHours: number }; releaseBuild: { nodeBin: string } };
   const made: Array<{ id: string; db: string }> = [];
 
   const dbCfg = (database: string) => ({ host: HOST, port: PORT, username: USERNAME, password: PASSWORD, database });
@@ -98,7 +98,7 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
   }
 
   /** A disposable Company database migrated from the OLD tree with exactly `tags`, registered ACTIVE with the given Company status. */
-  async function addCompany(name: string, tags: string[], status: 'READY' | 'SUSPENDED' = 'READY'): Promise<{ id: string; db: string }> {
+  async function addCompany(name: string, tags: string[], status: 'READY' | 'SUSPENDED' | 'DECOMMISSIONED' = 'READY'): Promise<{ id: string; db: string }> {
     const db = `${PREFIX}_${name.toLowerCase()}_${made.length}`;
     await admin((ds) => ds.query(`CREATE DATABASE "${db}"`));
     const m = await runMigrationsForDatabase(rootOld, dbCfg(db), tags);
@@ -121,6 +121,16 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
     }
   }
   const statusOf = async (id: string) => (await companies.findById(id))!.status;
+  async function onceEach(db: string): Promise<void> {
+    const ds = new DataSource({ type: 'postgres', ...dbCfg(db), synchronize: false, logging: false });
+    await ds.initialize();
+    try {
+      const dup: Array<{ name: string; n: string }> = await ds.query(`SELECT name, count(*)::text n FROM migrations GROUP BY name HAVING count(*) > 1`);
+      expect(dup).toEqual([]);
+    } finally {
+      await ds.destroy();
+    }
+  }
   const auditActions = async (like: string): Promise<Array<{ action: string; result: string; after: Record<string, unknown> }>> =>
     control.query(`SELECT action, result, after FROM audit_records WHERE action LIKE $1 ORDER BY seq`, [like]);
 
@@ -154,7 +164,7 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
   });
 
   beforeEach(() => {
-    cfgMock = { releaseDeploy: { companyMigrations: 'on', companyBackupPolicy: 'create', companyBackupMaxAgeHours: 24 } };
+    cfgMock = { releaseDeploy: { companyMigrations: 'on', companyBackupPolicy: 'create', companyBackupMaxAgeHours: 24 }, releaseBuild: { nodeBin: process.execPath } };
     // The restore-point collaborator is the engine's pg_dump pipeline (proven by its own specs); here it writes the rows that pipeline writes.
     backups = {
       createBackup: jest.fn(async (_trigger: string, _actor: string | null, companyId: string) => {
@@ -229,12 +239,29 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
       expect(byName.Camel.tags).toEqual(['core', 'hr', 'sales']);
       expect(byName.Camel.pending.sort()).toEqual(['CoreNew1790900001001', 'HrNew1790900001003', 'SalesNew1790900001002']);
       for (const p of plan.planned) expect(p.pending.join()).not.toContain('MfgFirst'); // the new tag is NEVER pushed onto a Company that never had it
-      expect(plan.skipped).toEqual([expect.objectContaining({ companyId: d.id, reason: expect.stringContaining('SUSPENDED') })]);
+      // the skipped Company says WHY and whether it is out of scope or STALE (a SUSPENDED Company will later run the new code on the old schema)
+      expect(plan.skipped).toEqual([expect.objectContaining({ companyId: d.id, reason: expect.stringContaining('SUSPENDED'), status: 'SUSPENDED', scope: 'stale' })]);
+      // the schema check ran per planned Company; the synthetic trees ship no entity registry, so it reports UNVERIFIED (ran:false), never clean
+      for (const p of plan.planned) {
+        expect(p.schema).toBeDefined();
+        expect(p.schema!.ran).toBe(false);
+        expect(p.schema!.error).toBeTruthy();
+      }
 
       const after = await Promise.all([a, b, c, d].map((x) => dbFingerprint(x.db)));
       expect(after).toEqual(before); // plan = zero writes to any Company database
       for (const x of [a, b, c]) expect(await statusOf(x.id)).toBe('READY');
       expect(await statusOf(d.id)).toBe('SUSPENDED');
+    });
+
+    it('a DECOMMISSIONED Company is OUT OF SCOPE (never blocks), a SUSPENDED one is STALE', async () => {
+      await addCompany('Aardvark', ['core']);
+      const dec = await addCompany('Decom', ['core'], 'DECOMMISSIONED');
+      const sus = await addCompany('Sus', ['core'], 'SUSPENDED');
+      const plan = await service.plan(rootNew);
+      const scopeOf = (id: string) => plan.skipped.find((s) => s.companyId === id)?.scope;
+      expect(scopeOf(dec.id)).toBe('out_of_scope');
+      expect(scopeOf(sus.id)).toBe('stale');
     });
 
     it('a READY Company that cannot be evaluated is a BLOCKER (never silently skipped)', async () => {
@@ -363,6 +390,30 @@ describeIsolated('Company fan-out — real Postgres (isolated instance only)', (
       expect(failed.result).toBe('failure');
       expect(failed.after.databaseProvablyUnchanged).toBe(true);
       expect(failed.after.stage).toBe('migration');
+    });
+
+    it('RESUMABLE: after a failure is fixed, the SAME flow completes the rest - the already-migrated Company is a no-op, nothing is applied twice, every migration is recorded exactly once', async () => {
+      const a = await addCompany('Aardvark', ['core']);
+      const b = await addCompany('Badger', ['core', 'sales']);
+      const c = await addCompany('Camel', ['core', 'sales', 'hr']);
+
+      const failedRun = await service.migrate(await service.plan(rootFail), rootFail, ACTOR, randomUUID());
+      expect(failedRun.outcomes.map((o) => o.status)).toEqual(['migrated', 'failed', 'not_attempted']);
+
+      // the cause is fixed (rootNew has the working SalesNew): re-plan, re-migrate
+      const plan2 = await service.plan(rootNew);
+      const byName = Object.fromEntries(plan2.planned.map((p) => [p.companyName.replace(`${PREFIX}-`, ''), p.pending.length]));
+      expect(byName.Aardvark).toBe(0); // already done in the first run: nothing to repeat
+      expect(byName.Badger).toBe(2);
+      expect(byName.Camel).toBe(3);
+      const run2 = await service.migrate(plan2, rootNew, ACTOR, randomUUID());
+      expect(run2.ok).toBe(true);
+      expect(run2.outcomes.map((o) => o.status)).toEqual(['noop', 'migrated', 'migrated']);
+      expect(await service.verify(await service.plan(rootNew), rootNew)).toEqual({});
+      for (const x of [a, b, c]) {
+        await onceEach(x.db);
+        expect(await statusOf(x.id)).toBe('READY');
+      }
     });
 
     it('a Company that is no longer READY at its turn is NOT migrated and the sweep stops (LA-1 re-check at execution time)', async () => {

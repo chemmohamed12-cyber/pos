@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- jest.spyOn on private methods of the service under test */
 import { mkdtempSync, mkdirSync, rmSync } from 'fs';
+import { currentCompanyFanoutMock } from './company-gate-test-fixtures';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MigrationExecutor } from 'typeorm';
@@ -164,6 +165,7 @@ describe('ReleaseExecutionService — pre-swap gate integrity (I-2)', () => {
       lkgMock as never,
       auditMock as never,
       undefined,
+      currentCompanyFanoutMock() as never,
     );
 
     // Sidestep real Postgres/filesystem for the two collaborators that are

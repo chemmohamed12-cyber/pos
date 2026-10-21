@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync } from 'fs';
+import { currentCompanyFanoutMock } from './company-gate-test-fixtures';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MigrationExecutor } from 'typeorm';
@@ -97,6 +98,8 @@ describe('ReleaseExecutionService — post-swap application readiness (startup +
       stagedActivationMock as never,
       { isSeeded: jest.fn(async () => true), seed: jest.fn(async () => undefined), commit: jest.fn(async () => undefined) } as never,
       auditMock as never,
+      undefined,
+      currentCompanyFanoutMock() as never,
     );
     const priv = svc as unknown as {
       scanDeltaMigrations: () => Promise<unknown[]>;

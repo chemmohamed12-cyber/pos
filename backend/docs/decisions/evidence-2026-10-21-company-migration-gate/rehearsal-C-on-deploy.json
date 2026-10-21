@@ -1,0 +1,255 @@
+[31m[Nest] 28716  - [39m٢١‏/١٠‏/٢٠٢٦، ٣:٤٩:٠٣ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31m[DIAG f064242d] scanDeltaMigrations connection=daii_biz_test@127.0.0.1:5546/daii_test_biz_t88_gr_main migrationsLoaded=320 executedCount=299 pendingCount=21 pendingNames=["AddValuationMovementBusinessDate1790017000000","AddInventoryReconciliationExplanation1790017100000","SeedInventoryC1Terminology1790017200000","CreateInventoryOpeningBatches1790018000000","SeedOpeningBatchTerminology1790018100000","AllowRevaluationValuationKind1790018200000","AddWarehouseTransactionReference1790018300000","SeedMovementReasonTerminology1790018400000","SeedPlatformRoleNames1790019200000","CreateSupplierInvoiceLineReceipts1790020000000","CreateSupplierPaymentAllocations1790020100000","AddSupplierInvoiceApprovalAndPolicy1790020200000","SeedProcurementCostPolicyTerminology1790020300000","AddSupplierInvoiceCharges1790020400000","CreatePurchaseReturns1790020500000","CreateSupplierCreditNotes1790020600000","CreateCustomerPaymentReversals1790030000000","CreateTreasuryDocuments1790030100000","SeedTreasuryDocumentTerminology1790030200000","CreateBankStatementsAndCashSessions1790030300000","CreateSupplierPaymentReversals1790030400000"][39m
+{
+  "releaseId": "9aec49c6-5a27-4db3-9474-ceb28eb23a67",
+  "version": "1.1.11",
+  "status": "succeeded",
+  "errorMessage": null,
+  "events": [
+    {
+      "seq": 3,
+      "action": "release.registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.11\", \"packageType\": \"full\"}"
+    },
+    {
+      "seq": 4,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"a0b1e888-c3df-4403-8f29-90d7581f5cd5\"}"
+    },
+    {
+      "seq": 5,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 6,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 7,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\dist\\\\main.js + D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\package"
+    },
+    {
+      "seq": 8,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 9,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 10,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"CreateSupplierPaymentReversals1790030400000\", \"current\": \"SeedSupplierProfileTerminology1790016400000\", \"pending\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology1790018100000\", \"AllowRevaluationValuationKind179001"
+    },
+    {
+      "seq": 11,
+      "action": "release.deploy.company_fanout_plan",
+      "result": "denied",
+      "after": "{\"mode\": \"off\", \"scope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"counts\": {\"companiesEvaluated\": 1, \"companiesOutOfScope\": 0, \"companiesSkippedStale\": 0, \"companiesWithPendingMigrations\": 1}, \"skipped\": [], \"blockers\": [], \"companies\": [{\"name\": \"Rehearsal Co\", \"tags\": [\"accountin"
+    },
+    {
+      "seq": 12,
+      "action": "release.deploy.company_gate",
+      "result": "denied",
+      "after": "{\"phase\": \"pre-migration\", \"counts\": {\"evaluated\": 1, \"outOfScope\": 0, \"staleSkipped\": 0, \"needingMigration\": 1, \"withSchemaFindings\": 1}, \"blockers\": [\"COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it)\"], \"decis"
+    },
+    {
+      "seq": 13,
+      "action": "release.deploy.failed",
+      "result": "failure",
+      "after": "{\"error\": \"COMPANY_MIGRATION_GATE: COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it). Nothing was changed and the active release was not touched.\", \"outcome\": \"DEPLOYMENT_FAILED\", \"swapped\": false, \"migrationsCom"
+    },
+    {
+      "seq": 16,
+      "action": "release.re_registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.11\", \"packageType\": \"full\", \"supersededStatus\": \"failed\"}"
+    },
+    {
+      "seq": 17,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"b73d33c8-73b6-4621-9352-8af572bd1202\"}"
+    },
+    {
+      "seq": 18,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 19,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 20,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\dist\\\\main.js + D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\package"
+    },
+    {
+      "seq": 21,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 22,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 23,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"CreateSupplierPaymentReversals1790030400000\", \"current\": \"SeedSupplierProfileTerminology1790016400000\", \"pending\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology1790018100000\", \"AllowRevaluationValuationKind179001"
+    },
+    {
+      "seq": 24,
+      "action": "release.deploy.company_fanout_plan",
+      "result": "success",
+      "after": "{\"mode\": \"dry-run\", \"scope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"counts\": {\"companiesEvaluated\": 1, \"companiesOutOfScope\": 0, \"companiesSkippedStale\": 0, \"companiesWithPendingMigrations\": 1}, \"skipped\": [], \"blockers\": [], \"companies\": [{\"name\": \"Rehearsal Co\", \"tags\": [\"accou"
+    },
+    {
+      "seq": 25,
+      "action": "release.deploy.company_gate",
+      "result": "success",
+      "after": "{\"phase\": \"pre-migration\", \"counts\": {\"evaluated\": 1, \"outOfScope\": 0, \"staleSkipped\": 0, \"needingMigration\": 1, \"withSchemaFindings\": 1}, \"blockers\": [], \"decision\": \"PLAN_ONLY\", \"warnings\": []}"
+    },
+    {
+      "seq": 26,
+      "action": "release.deploy.company_fanout",
+      "result": "success",
+      "after": "{\"mode\": \"dry-run\", \"note\": \"plan only; nothing was backed up, migrated or swapped\", \"wouldBlock\": [], \"companiesWithPending\": [\"Rehearsal Co\"]}"
+    },
+    {
+      "seq": 27,
+      "action": "release.deploy.plan_only",
+      "result": "success",
+      "after": "{\"note\": \"PLAN ONLY (RELEASE_COMPANY_MIGRATIONS=dry-run): 1 Company(ies) evaluated, 1 need migrations, 1 with schema findings, 0 stale. A real deploy would pass the Company gate. Nothing was changed.\"}"
+    },
+    {
+      "seq": 28,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 29,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 30,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\dist\\\\main.js + D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\package"
+    },
+    {
+      "seq": 31,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 32,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 33,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"CreateSupplierPaymentReversals1790030400000\", \"current\": \"SeedSupplierProfileTerminology1790016400000\", \"pending\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology1790018100000\", \"AllowRevaluationValuationKind179001"
+    },
+    {
+      "seq": 34,
+      "action": "release.deploy.company_fanout_plan",
+      "result": "success",
+      "after": "{\"mode\": \"on\", \"scope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"counts\": {\"companiesEvaluated\": 1, \"companiesOutOfScope\": 0, \"companiesSkippedStale\": 0, \"companiesWithPendingMigrations\": 1}, \"skipped\": [], \"blockers\": [], \"companies\": [{\"name\": \"Rehearsal Co\", \"tags\": [\"accounting"
+    },
+    {
+      "seq": 35,
+      "action": "release.deploy.company_gate",
+      "result": "success",
+      "after": "{\"phase\": \"pre-migration\", \"counts\": {\"evaluated\": 1, \"outOfScope\": 0, \"staleSkipped\": 0, \"needingMigration\": 1, \"withSchemaFindings\": 1}, \"blockers\": [], \"decision\": \"PASS\", \"warnings\": []}"
+    },
+    {
+      "seq": 38,
+      "action": "release.deploy.company_backups",
+      "result": "success",
+      "after": "{\"policy\": \"create\", \"backups\": [{\"basis\": \"created\", \"companyId\": \"8fc3f406-784a-4b78-9447-5cfeb4ca4c62\", \"backupRunId\": \"4d44ee4f-2c53-4666-a5b2-557f81b21238\"}]}"
+    },
+    {
+      "seq": 39,
+      "action": "release.deploy.company_migration_started",
+      "result": "success",
+      "after": "{\"tags\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"pending\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology1"
+    },
+    {
+      "seq": 40,
+      "action": "release.deploy.company_migration_succeeded",
+      "result": "success",
+      "after": "{\"tags\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"executed\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology"
+    },
+    {
+      "seq": 41,
+      "action": "release.deploy.company_fanout",
+      "result": "success",
+      "after": "{\"ok\": true, \"mode\": \"on\", \"noop\": [], \"failed\": [], \"migrated\": [\"Rehearsal Co\"], \"notAttempted\": []}"
+    },
+    {
+      "seq": 42,
+      "action": "release.deploy.company_fanout_verified",
+      "result": "success",
+      "after": "{\"companies\": [{\"status\": \"migrated\", \"company\": \"Rehearsal Co\"}]}"
+    },
+    {
+      "seq": 43,
+      "action": "release.deploy.company_gate",
+      "result": "success",
+      "after": "{\"phase\": \"post-migration\", \"schema\": {\"Rehearsal Co\": {\"ran\": true, \"truncated\": false, \"checkedTables\": 164, \"missingTables\": [], \"missingColumns\": {}, \"missingTableCount\": 0, \"tablesWithMissingColumns\": 0}}, \"blockers\": [], \"warnings\": []}"
+    },
+    {
+      "seq": 44,
+      "action": "release.deploy.swapped",
+      "result": "success",
+      "after": "{\"activePath\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app\", \"previousPath\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.prev-9aec49c6-5a27-4db3-9474-ceb28eb23a67\"}"
+    },
+    {
+      "seq": 45,
+      "action": "release.deploy.restart_triggered",
+      "result": "success",
+      "after": "{\"phase\": \"deploy\", \"restartFile\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app\\\\tmp\\\\restart.txt\"}"
+    },
+    {
+      "seq": 46,
+      "action": "release.deploy.evidence",
+      "result": "success",
+      "after": "{\"layers\": {\"deployment\": \"ok (files swapped, migrations verified, health check ok)\", \"applicationStartup\": {\"reason\": \"RELEASE_READINESS_URL not configured\", \"status\": \"UNVERIFIED\"}, \"functionalReadiness\": {\"detail\": {\"reason\": \"application startup was not verified\"}, \"status\": \"skipped\"}, \"companyMigrationGate\": {\"mode\": \"on\", \"failed\": 0, \"migrated\": 1, \"warnings\": [], \"evaluated\": 1, \"staleCom"
+    },
+    {
+      "seq": 47,
+      "action": "release.deploy.succeeded",
+      "result": "success",
+      "after": "{\"outcome\": \"DEPLOYED_UNVERIFIED\", \"swapped\": true}"
+    }
+  ]
+}

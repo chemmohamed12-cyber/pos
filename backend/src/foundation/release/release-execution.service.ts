@@ -30,6 +30,8 @@ import { canonicalize } from '../entitlement/canonicalize';
 import { EntitlementManifest } from '../entitlement/manifest.type';
 import { computeInstallationFingerprint } from '../entitlement/installation-fingerprint';
 import { ModuleLifecycleService } from '../module-lifecycle/module-lifecycle.service';
+import { evaluateCompanyGate, evaluatePostMigrationGate } from './company-migration-gate';
+import { summarizeFindings } from './company-schema-check';
 import { CompanyFanoutService, CompanyFanoutBlockedError, CompanyFanoutMode, CompanyFanoutPlan, CompanyFanoutResult, CompanyBackupEvidence, summarizePlan, summarizeResult } from './company-fanout.service';
 
 /**
@@ -58,6 +60,14 @@ class PreSwapAbort extends Error {
   }
 }
 
+
+/** `RELEASE_COMPANY_MIGRATIONS=dry-run`: the plan was produced and reported; the deploy stops here, before ANY change. Not a failure. */
+class PlanOnlyStop extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PlanOnlyStop';
+  }
+}
 
 /**
  * A POST-swap readiness failure, classified (post-incident review of release 1.1.4: "file deployment" success is not "application started" is not "initialised"):
@@ -112,9 +122,11 @@ export class ReleaseExecutionService {
    */
   private companyFanoutMode(): CompanyFanoutMode {
     const configured = this.config.releaseDeploy?.companyMigrations;
-    if (configured !== 'dry-run' && configured !== 'on') return 'off';
-    if (!this.companyFanout) throw new Error(`RELEASE_COMPANY_MIGRATIONS=${configured} but no CompanyFanoutService is wired — refusing to deploy.`);
-    return configured;
+    const mode: CompanyFanoutMode = configured === 'dry-run' || configured === 'on' ? configured : 'off';
+    // The Company migration gate ALWAYS plans (read-only), even for `off`, so the service is required whatever the mode: without it the engine cannot tell whether a
+    // Company is left behind, and "deploy anyway" is exactly the failure this gate exists to prevent.
+    if (!this.companyFanout) throw new Error(`RELEASE_COMPANY_MIGRATIONS=${mode} but no CompanyFanoutService is wired — refusing to deploy (the Company migration gate cannot run).`);
+    return mode;
   }
 
   private stagingDirFor(releaseId: string): string {
@@ -483,6 +495,11 @@ export class ReleaseExecutionService {
     let fanPlan: CompanyFanoutPlan | null = null;
     let fanBackups: CompanyBackupEvidence[] = [];
     let fanResult: CompanyFanoutResult | null = null;
+    let schemaMode: 'enforce' | 'report' = 'enforce';
+    let gateWarnings: string[] = [];
+    let staleCompanies: Array<{ companyId: string; name: string | null; status: string | null }> = [];
+    let migrationsCompleted = false;
+    let companyGatePassed = false;
 
     try {
       // 1. build + verify CANDIDATE — nothing touches ACTIVE yet
@@ -566,18 +583,26 @@ export class ReleaseExecutionService {
         throw new PreSwapAbort(formatMigrationPreflight(preflightReport));
       }
 
-      // 1d. Company fan-out PLAN (CTO 2026-10-08). `off` (the default) is an audited, deliberate statement that no Company database is part of this deploy —
-      //     nothing about any Company is read. `dry-run`/`on` discover the READY Companies and compute each one's tags + pending migrations (read-only). A READY
-      //     Company that cannot be evaluated BLOCKS the deploy here, pre-swap, with ACTIVE untouched.
+      // 1d. COMPANY MIGRATION GATE (CTO 2026-10-21). Whatever the mode, the Companies are planned READ-ONLY here (pending migrations + a schema check of every
+      //     Company against the candidate's own entity registry) and the decision is taken BEFORE any database is changed:
+      //       on      pending Companies are migrated below (restore points first);  off  pending Companies BLOCK the deploy (it is never a silent platform-only success);
+      //       dry-run the plan is reported and the deploy STOPS here (no backup, no migration, no swap; the release stays `backup_verified`).
+      //     A READY Company that cannot be evaluated, a non-READY (STALE) Company under the default policy, and schema drift no migration will repair BLOCK.
+      fanPlan = await this.companyFanout!.plan(candidatePath, migrationTags);
+      const skippedPolicy = this.config.releaseDeploy.companySkippedPolicy ?? 'block';
+      schemaMode = this.config.releaseDeploy.companySchemaCheck ?? 'enforce';
+      const gate = evaluateCompanyGate({ mode: fanMode, plan: fanPlan, skippedPolicy, schemaCheck: schemaMode });
+      gateWarnings = gate.warnings;
+      staleCompanies = gate.staleCompanies.map((c) => ({ companyId: c.companyId, name: c.companyName, status: c.status ?? null }));
+      await audit('release.deploy.company_fanout_plan', gate.blockers.length === 0 ? 'success' : 'denied', { ...summarizePlan(fanPlan), configuredMode: fanMode, modeExplicit: this.config.releaseDeploy.companyMigrationsExplicit ?? null });
+      await audit('release.deploy.company_gate', gate.decision === 'BLOCKED' ? 'denied' : 'success', { phase: 'pre-migration', decision: gate.decision, counts: gate.counts, blockers: gate.blockers, warnings: gate.warnings });
+      if (gate.decision === 'PLAN_ONLY') {
+        await audit('release.deploy.company_fanout', 'success', { mode: 'dry-run', note: 'plan only; nothing was backed up, migrated or swapped', wouldBlock: gate.blockers, companiesWithPending: fanPlan.planned.filter((c) => c.pending.length > 0).map((c) => c.companyName) });
+        throw new PlanOnlyStop(`PLAN ONLY (RELEASE_COMPANY_MIGRATIONS=dry-run): ${gate.counts.evaluated} Company(ies) evaluated, ${gate.counts.needingMigration} need migrations, ${gate.counts.withSchemaFindings} with schema findings, ${gate.counts.staleSkipped} stale. ${gate.blockers.length > 0 ? `A real deploy would be BLOCKED: ${gate.blockers.join(' | ')}` : 'A real deploy would pass the Company gate.'} Nothing was changed.`);
+      }
+      if (gate.decision === 'BLOCKED') throw new PreSwapAbort(`COMPANY_MIGRATION_GATE: ${gate.blockers.join(' | ')}. Nothing was changed and the active release was not touched.`);
       if (fanMode === 'off') {
-        await audit('release.deploy.company_fanout', 'success', { mode: 'off', note: 'Company databases are not part of this deployment (RELEASE_COMPANY_MIGRATIONS=off); none was read or written.' });
-      } else {
-        fanPlan = await this.companyFanout!.plan(candidatePath, migrationTags);
-        await audit('release.deploy.company_fanout_plan', fanPlan.blockers.length === 0 ? 'success' : 'denied', summarizePlan(fanPlan));
-        if (fanPlan.blockers.length > 0) throw new PreSwapAbort(`Company fan-out cannot proceed: ${fanPlan.blockers.join(' | ')}`);
-        if (fanMode === 'dry-run') {
-          await audit('release.deploy.company_fanout', 'success', { mode: 'dry-run', note: 'plan only; no backup taken, no Company touched', companiesWithPending: fanPlan.planned.filter((c) => c.pending.length > 0).map((c) => c.companyName) });
-        }
+        await audit('release.deploy.company_fanout', 'success', { mode: 'off', note: 'RELEASE_COMPANY_MIGRATIONS=off: no Company database needed migrations (verified by the read-only plan); none was written.', evaluated: fanPlan.planned.length });
       }
 
       // 2. Invariant I-8 — expand/contract migrations only. Scan the NEW
@@ -616,6 +641,7 @@ export class ReleaseExecutionService {
       release.status = 'migrating';
       await releaseRepo.save(release);
       await this.runReleaseMigrations(release, candidatePath, migrationTags);
+      migrationsCompleted = true;
 
       // 3a. Company fan-out (`on`) — Platform is migrated; now every applicable READY Company, one at a time, READY -> MIGRATING -> READY, stop at the first
       //     failure. Still PRE-SWAP: a failure here aborts with ACTIVE untouched, and Companies already migrated stay migrated (forward-only; expand-only
@@ -631,12 +657,22 @@ export class ReleaseExecutionService {
           );
         }
         const companiesStillPending = await this.companyFanout!.verify(fanPlan, candidatePath);
-        if (Object.keys(companiesStillPending).length > 0) {
-          await audit('release.deploy.company_fanout_verification_failed', 'denied', { companiesStillPending });
-          throw new PreSwapAbort(`Company fan-out reported success but ${Object.keys(companiesStillPending).length} Company(ies) still have pending migrations: ${JSON.stringify(companiesStillPending)}. Refusing to swap.`);
+        if (Object.keys(companiesStillPending).length > 0) await audit('release.deploy.company_fanout_verification_failed', 'denied', { companiesStillPending });
+        await audit('release.deploy.company_fanout_verified', Object.keys(companiesStillPending).length === 0 ? 'success' : 'denied', { companies: fanResult.outcomes.map((o) => ({ company: o.companyName, status: o.status })) });
+        const schemaAfter = await this.companyFanout!.verifySchema(fanPlan, candidatePath);
+        const post = evaluatePostMigrationGate(companiesStillPending, schemaAfter, schemaMode);
+        gateWarnings = [...gateWarnings, ...post.warnings];
+        await audit('release.deploy.company_gate', post.blockers.length === 0 ? 'success' : 'denied', {
+          phase: 'post-migration',
+          blockers: post.blockers,
+          warnings: post.warnings,
+          schema: Object.fromEntries(Object.entries(schemaAfter).map(([k, v]) => [k, { ran: v.ran, checkedTables: v.checkedTables, ...(v.error ? { error: v.error } : {}), ...summarizeFindings(v.findings, 10) }])),
+        });
+        if (post.blockers.length > 0) {
+          throw new PreSwapAbort(`COMPANY_MIGRATION_GATE (after migration): ${post.blockers.join(' | ')}. Refusing to swap. The databases may be AHEAD of the active application (migrations are expand-only, so it keeps working); fix the cause and re-run the same release - completed migrations are not repeated.`);
         }
-        await audit('release.deploy.company_fanout_verified', 'success', { companies: fanResult.outcomes.map((o) => ({ company: o.companyName, status: o.status })) });
       }
+      companyGatePassed = true;
 
       // 3b. Production Incident 2026-09-22 — migration EXECUTION completing
       //     without error was previously trusted as proof the release's own
@@ -659,6 +695,9 @@ export class ReleaseExecutionService {
           `Migration phase reported success but ${stillPending.length} migration(s) this release ships are still pending: ${stillPending.join(', ')}. Refusing to swap.`,
         );
       }
+
+      // 3c. INVARIANT: the atomic swap is unreachable unless the Company migration gate passed (pre- and, when Companies were migrated, post-migration).
+      if (!companyGatePassed) throw new PreSwapAbort('COMPANY_MIGRATION_GATE was not passed - refusing to swap (internal invariant).');
 
       // 4. ATOMIC SWAP
       const res = await this.stagedActivation.activate(release.id, candidatePath);
@@ -709,22 +748,47 @@ export class ReleaseExecutionService {
           deployment: 'ok (files swapped, migrations verified, health check ok)',
           applicationStartup: readiness.status === 'verified' ? { status: 'verified', ...readiness.detail } : { status: 'UNVERIFIED', ...readiness.detail },
           functionalReadiness: functional,
+          companyMigrationGate: {
+            mode: fanMode,
+            evaluated: fanPlan?.planned.length ?? 0,
+            migrated: fanResult ? fanResult.outcomes.filter((o) => o.status === 'migrated').length : 0,
+            failed: fanResult ? fanResult.outcomes.filter((o) => o.status === 'failed').length : 0,
+            staleCompanies,
+            warnings: gateWarnings,
+          },
         },
       });
-      await audit('release.deploy.succeeded', 'success', { swapped: true, outcome });
+      await audit('release.deploy.succeeded', 'success', { swapped: true, outcome, ...(staleCompanies.length > 0 ? { staleCompanies } : {}) });
       return release;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof PlanOnlyStop) {
+        // dry-run: a plan, not a failure. Nothing was backed up, migrated or swapped; the release stays deployable.
+        this.logger.log(err.message);
+        if (candidatePath) await rm(candidatePath, { recursive: true, force: true }).catch(() => undefined);
+        if (entitlementApplied) await this.restoreEntitlementManifest(entitlementApplied.prevText);
+        release.status = 'backup_verified';
+        release.errorMessage = null;
+        await releaseRepo.save(release);
+        await audit('release.deploy.plan_only', 'success', { note: err.message });
+        return release;
+      }
+      let message = err instanceof Error ? err.message : String(err);
+      // Migrations completed but the release did not go live: the databases are AHEAD of the active application (expand-only migrations keep it working). Say so,
+      // distinctly from "nothing happened", and never as a success.
+      if (!swapped && migrationsCompleted && !message.startsWith('ACTIVATION_FAILED_AFTER_MIGRATIONS') && !message.includes('(after migration)')) {
+        message = `ACTIVATION_FAILED_AFTER_MIGRATIONS: the migrations of this release completed but it was NOT activated; the databases are ahead of the active application, which keeps running (migrations are expand-only). Fix the cause and re-run this release - completed migrations are not repeated. Cause: ${message}`;
+      }
       this.logger.error(`Staged deploy failed for release "${release.id}" (swapped=${swapped})`, err instanceof Error ? err.stack : message);
       release.status = 'failed';
       release.errorMessage = message;
       await releaseRepo.save(release);
-      await audit('release.deploy.failed', 'failure', { error: message, swapped, outcome: ReleaseExecutionService.classifyFailure(err, swapped), ...(fanResult ? { companyFanout: summarizeResult(fanResult) } : {}) });
+      await audit('release.deploy.failed', 'failure', { error: message, swapped, migrationsCompleted, databasesAheadOfActiveApplication: !swapped && migrationsCompleted, outcome: ReleaseExecutionService.classifyFailure(err, swapped), ...(fanResult ? { companyFanout: summarizeResult(fanResult) } : {}) });
 
       if (!swapped) {
         // I-2 — nothing was promoted; ACTIVE is bit-for-bit unchanged.
         if (candidatePath) await rm(candidatePath, { recursive: true, force: true }).catch(() => undefined);
-        // migrations, if any ran, were rolled back by TypeORM's batch transaction.
+        // A migration that FAILED was rolled back by TypeORM's batch transaction. Migrations that COMPLETED before this abort stay applied (forward-only, expand-only):
+        // `migrationsCompleted` above makes the failure message and audit say so explicitly.
         // P6: if we wrote a new entitlement.manifest.json before the abort, put it back.
         if (entitlementApplied) await this.restoreEntitlementManifest(entitlementApplied.prevText);
         return release;

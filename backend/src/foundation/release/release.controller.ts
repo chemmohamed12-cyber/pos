@@ -1,5 +1,5 @@
 import { PlatformGuard, RequirePlatform } from '../platform/platform.guard';
-import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Optional, Param, Post, Req, ServiceUnavailableException, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { IsIn, IsObject, IsUUID } from 'class-validator';
 import { DataRepairService } from './data-repair.service';
 import { DataRepairRun } from './data-repair-run.entity';
@@ -12,6 +12,9 @@ import { BackupManagerService } from './backup-manager.service';
 import { RestoreManagerService } from './restore-manager.service';
 import { ReleaseManagerService } from './release-manager.service';
 import { ReleaseExecutionService } from './release-execution.service';
+import { CompanyFanoutService, summarizePlan } from './company-fanout.service';
+import { evaluateCompanyGate } from './company-migration-gate';
+import { buildCompanyMigrationReport } from './company-migration-report';
 import { ReleaseUploadInterceptor } from './release-upload.interceptor';
 import { BackupRun } from './backup-run.entity';
 import { BackupArtifact } from './backup-artifact.entity';
@@ -113,6 +116,7 @@ export class ReleaseController {
     private readonly deployPreflight: DeployPreflightService,
     private readonly config: AppConfigService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @Optional() private readonly companyFanout?: CompanyFanoutService,
   ) {}
 
   @RequirePlatform('platform.release.view', 'read-only')
@@ -344,6 +348,49 @@ export class ReleaseController {
    * older attempts stay in the table (nothing deleted), this endpoint just
    * stops conflating them with the latest one.
    */
+  /**
+   * Company migration report of the LATEST deploy attempt of a release (CTO 2026-10-21): how many Companies were checked, migrated, failed, stale, with the gate decisions
+   * (before and after the migration step) and per-Company restore points. Derived only from the release's own audit trail. Read-only.
+   */
+  @RequirePlatform('platform.release.view', 'read-only')
+  @Get('releases/:id/company-migration-report')
+  async getCompanyMigrationReport(@Param('id') id: string) {
+    const rows = await this.dataSource.query(
+      `SELECT seq, action, result, after FROM audit_records WHERE resource = 'release' AND "resourceId" = $1 AND action LIKE 'release.deploy.%' ORDER BY seq`,
+      [id],
+    );
+    return buildCompanyMigrationReport(rows);
+  }
+
+  /**
+   * LIVE Company migration status against the INSTALLED build: is every Company database current (no pending migrations, schema matching the code that is running)?
+   * Read-only (the engine's own read-only plan + schema check); no backup, no write. The same question the owner tool `company-migration-status.js` answers, from the UI.
+   */
+  @RequirePlatform('platform.release.view', 'read-only')
+  @Get('company-migrations')
+  async getLiveCompanyMigrationStatus() {
+    if (!this.companyFanout) throw new ServiceUnavailableException('The Company migration service is not available in this build.');
+    const plan = await this.companyFanout.plan(this.config.releaseExecution.appRoot);
+    const gate = evaluateCompanyGate({
+      mode: 'off', // "would a platform-only state be acceptable?": blocks while any Company needs migrations or drifts - exactly the live-health question
+      plan,
+      skippedPolicy: this.config.releaseDeploy.companySkippedPolicy ?? 'block',
+      schemaCheck: this.config.releaseDeploy.companySchemaCheck ?? 'enforce',
+    });
+    return {
+      installedBuild: readAppVersion(),
+      configuredMode: this.config.releaseDeploy.companyMigrations,
+      modeExplicit: this.config.releaseDeploy.companyMigrationsExplicit,
+      allCurrent: gate.decision === 'PASS' && gate.warnings.length === 0,
+      decision: gate.decision,
+      blockers: gate.blockers,
+      warnings: gate.warnings,
+      counts: gate.counts,
+      staleCompanies: gate.staleCompanies,
+      plan: summarizePlan(plan),
+    };
+  }
+
   @RequirePlatform('platform.release.view', 'read-only')
   @Get('releases/:id/migrations')
   async getReleaseMigrations(@Param('id') id: string) {

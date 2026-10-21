@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { currentCompanyFanoutMock } from './company-gate-test-fixtures';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MigrationExecutor } from 'typeorm';
@@ -65,7 +66,7 @@ describe('ReleaseExecutionService — pre-swap environment check of the candidat
       dataSource, config, {} as never, { checkDeploymentGate: jest.fn(async () => ({ allowed: true, backupRunId: 'b' })) } as never, { check: jest.fn(async () => ({ ok: true, detail: {} })) } as never,
       {} as never, { runPreflight: jest.fn(async () => ({ ok: true, checks: [] })) } as never,
       { buildCandidate: jest.fn(async () => candidatePath), verifyCandidate: jest.fn(async () => ({ ok: true, checks: [] })), activate, pruneSlots: jest.fn(), rollbackSwap: jest.fn() } as never,
-      { isSeeded: jest.fn(async () => true), seed: jest.fn(), commit: jest.fn() } as never, audit as never,
+      { isSeeded: jest.fn(async () => true), seed: jest.fn(), commit: jest.fn() } as never, audit as never, undefined, currentCompanyFanoutMock() as never,
     );
     const priv = svc as unknown as { scanDeltaMigrations: () => Promise<unknown[]>; runReleaseMigrations: () => Promise<void>; triggerPassengerRestart: () => Promise<void> };
     jest.spyOn(priv, 'scanDeltaMigrations').mockResolvedValue([]);

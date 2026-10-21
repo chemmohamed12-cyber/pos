@@ -11,7 +11,12 @@
  *
  *   node company-migration-status.js --app-root <ACTIVE root> [--json]
  *
- * Exit codes: 0 every Company database is complete | 5 at least one Company database has pending migrations (or could not be read) | 3 refused | 1 error.
+ * Schema check (CTO 2026-10-21, on unless `--no-schema-check`): ALSO read-only, per Company, compares the ACTIVE build's own entity registry with the database - every
+ * column of every entity whose table exists must exist (the 1.1.10 failure class: `column Product.itemType does not exist` -> HTTP 500), and, where the active build ships
+ * the shared check (`dist/foundation/release/company-schema-check.js`), every table that the Company's received migrations create must exist (the 1.1.11 class). A build
+ * without the shared check gets the column check only and says so. A Company whose migration list is COMPLETE but whose schema differs is reported SCHEMA DRIFT.
+ *
+ * Exit codes: 0 every Company database is complete | 5 at least one Company database has pending migrations, schema drift, or could not be read | 3 refused | 1 error.
  */
 'use strict';
 const fs = require('fs');
@@ -37,8 +42,73 @@ if (Number(process.versions.node.split('.')[0]) < 20) {
   console.error(`REFUSED: Node.js ${process.versions.node} is too old; the application requires >= 20`);
   process.exit(3);
 }
+const SCHEMA_MODE = args.includes('--no-schema-check') ? 'off' : 'on';
+// Same program as `SCHEMA_CHECK_PROGRAM` in src/foundation/release/company-schema-check.ts (a unit test asserts they are identical).
+const SCHEMA_CHECK_PROGRAM = String.raw`
+const path = require('path');
+const cfg = JSON.parse(process.env.DAII_SCHEMA_CHECK_CFG);
+const typeormPath = require.resolve('typeorm', { paths: [process.cwd()] });
+const { DataSource } = require(typeormPath);
+const registryPath = path.join(process.cwd(), 'dist', 'foundation', 'database-registry', 'company-entity-registry.js');
+const { COMPANY_ENTITY_REGISTRY } = require(registryPath);
+(async () => {
+  const ds = new DataSource({ type: 'postgres', host: cfg.host, port: cfg.port, username: cfg.username, password: cfg.password, database: cfg.database, entities: COMPANY_ENTITY_REGISTRY, synchronize: false, logging: false});
+  await ds.initialize();
+  try {
+    const qr = ds.createQueryRunner();
+    let rows;
+    try {
+      await qr.query('SET default_transaction_read_only = on');
+      rows = await qr.query("SELECT table_name AS t, column_name AS c FROM information_schema.columns WHERE table_schema = current_schema()");
+    } finally { await qr.release(); }
+    const have = new Map();
+    for (const r of rows) { if (!have.has(r.t)) have.set(r.t, new Set()); have.get(r.t).add(r.c); }
+    const expectedCreated = new Set(cfg.createdTables);
+    const missingTables = [];
+    const missingColumns = {};
+    let checked = 0;
+    for (const m of ds.entityMetadatas) {
+      if (m.tableType === 'view' || !m.tableName) continue;
+      const table = m.tableName;
+      const cols = have.get(table);
+      if (!cols) { if (expectedCreated.has(table)) missingTables.push(table); continue; }
+      checked += 1;
+      const miss = m.columns.filter((c) => !c.isVirtual && !c.isVirtualProperty && c.databaseName && !cols.has(c.databaseName)).map((c) => c.databaseName);
+      if (miss.length) missingColumns[table] = miss;
+    }
+    process.stdout.write(JSON.stringify({ checked, missingTables: [...new Set(missingTables)].sort(), missingColumns }));
+  } finally { await ds.destroy().catch(() => undefined); }
+})().catch((e) => { process.stderr.write(String(e && e.message ? e.message : e).slice(0, 300)); process.exit(1); });
+`;
 const nm = (p) => require(path.join(APP_ROOT, 'node_modules', p));
 const R = (p) => require(path.join(APP_ROOT, 'dist', p));
+
+/** Read-only schema check of one Company database against the ACTIVE build (see the header). Never throws; an unrunnable check is `ran: false`. */
+async function runSchemaCheck(cfg, tagsHad) {
+  let createdTables = [];
+  let tableCheck = false;
+  try {
+    const shared = R('foundation/release/company-schema-check');
+    createdTables = [...shared.tablesCreatedByTags(APP_ROOT, tagsHad)];
+    tableCheck = true;
+  } catch {
+    /* this build predates the shared check: columns of existing tables only */
+  }
+  try {
+    const { stdout } = await require('util').promisify(require('child_process').execFile)(process.execPath, ['-e', SCHEMA_CHECK_PROGRAM], {
+      cwd: APP_ROOT,
+      timeout: 180000,
+      maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, DAII_SCHEMA_CHECK_CFG: JSON.stringify({ host: cfg.host, port: cfg.port, username: cfg.username, password: cfg.password, database: cfg.database, createdTables }) },
+    });
+    const o = JSON.parse(stdout.trim().split('\n').pop() || '{}');
+    return { ran: true, tableCheck, checkedTables: o.checked || 0, missingTables: o.missingTables || [], missingColumns: o.missingColumns || {} };
+  } catch (e) {
+    const err = e && e.stderr ? String(e.stderr).trim() : e instanceof Error ? e.message : String(e);
+    return { ran: false, tableCheck, error: redact(err).slice(0, 300) };
+  }
+}
+const schemaFindings = (sc) => !!sc && sc.ran && (sc.missingTables.length > 0 || Object.keys(sc.missingColumns).length > 0);
 
 async function readMigrations(cfg) {
   const { Client } = nm('pg');
@@ -105,7 +175,15 @@ async function readMigrations(cfg) {
         row.tags = tagsHad;
         row.missing = [...expected].filter((n) => !set.has(n)).sort();
         row.unknownToThisBuild = names.filter((n) => !shipped.has(n)).sort();
-        row.verdict = row.missing.length === 0 ? 'COMPLETE' : `INCOMPLETE (${row.missing.length} missing)`;
+        if (SCHEMA_MODE === 'on') row.schema = await runSchemaCheck(cfg, tagsHad);
+        row.verdict =
+          row.missing.length > 0
+            ? `INCOMPLETE (${row.missing.length} missing)`
+            : schemaFindings(row.schema)
+              ? `SCHEMA DRIFT (${row.schema.missingTables.length} table(s), ${Object.keys(row.schema.missingColumns).length} table(s) with missing columns)`
+              : row.schema && !row.schema.ran
+                ? 'COMPLETE (schema UNVERIFIED)'
+                : 'COMPLETE';
       } catch (e) {
         row.verdict = 'UNREADABLE';
         row.error = redact(e instanceof Error ? e.message : String(e));
@@ -114,12 +192,14 @@ async function readMigrations(cfg) {
     }
     report.summary = {
       companyDatabases: report.companies.length,
-      complete: report.companies.filter((c) => c.verdict === 'COMPLETE').length,
+      complete: report.companies.filter((c) => c.verdict === 'COMPLETE' || /^COMPLETE \(schema UNVERIFIED\)/.test(c.verdict)).length,
       incomplete: report.companies.filter((c) => /^INCOMPLETE/.test(c.verdict)).length,
+      schemaDrift: report.companies.filter((c) => /^SCHEMA DRIFT/.test(c.verdict)).length,
+      schemaUnverified: report.companies.filter((c) => /UNVERIFIED/.test(c.verdict)).length,
       unreadable: report.companies.filter((c) => c.verdict === 'UNREADABLE').length,
       platformComplete: report.platformDatabase.missing.length === 0,
     };
-    const bad = report.summary.incomplete + report.summary.unreadable > 0 || !report.summary.platformComplete;
+    const bad = report.summary.incomplete + report.summary.unreadable + report.summary.schemaDrift > 0 || !report.summary.platformComplete;
     if (args.includes('--json')) console.log(redact(JSON.stringify(report, null, 2)));
     else {
       console.log(`Installed build ${installedVersion}; this build ships ${shipped.size} migrations.`);
@@ -127,6 +207,11 @@ async function readMigrations(cfg) {
       for (const c of report.companies) {
         console.log(`COMPANY   ${c.company ?? '(no company)'} [${c.companyStatus}/${c.registryStatus}] db=${c.database}: ${c.verdict}` + (c.migrationsRecorded !== undefined ? `, ${c.migrationsRecorded} recorded` : ''));
         for (const m of c.missing ?? []) console.log(`            missing: ${m}`);
+        if (c.schema && c.schema.ran) {
+          for (const t of c.schema.missingTables) console.log(`            schema: missing table ${t}`);
+          for (const [t, cols] of Object.entries(c.schema.missingColumns)) console.log(`            schema: ${t} lacks column(s) ${cols.join(', ')}`);
+          if (!c.schema.tableCheck) console.log('            schema: table-existence check unavailable on this build (columns of existing tables only)');
+        } else if (c.schema) console.log(`            schema: check could not run (${c.schema.error})`);
         if (c.error) console.log(`            error: ${c.error}`);
       }
       console.log(redact(JSON.stringify(report.summary)));

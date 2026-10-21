@@ -1,4 +1,5 @@
 import { ReleaseExecutionService } from './release-execution.service';
+import { currentCompanyFanoutMock } from './company-gate-test-fixtures';
 import { Release } from './release.entity';
 import { ReleaseManifest } from './release-manifest';
 import { ReleaseMigrationRun } from './release-migration-run.entity';
@@ -114,6 +115,7 @@ describe('ReleaseExecutionService.reconcileInterruptedDeploys', () => {
       lkgMock as never,
       auditMock as never,
       undefined,
+      currentCompanyFanoutMock() as never,
     );
   }
 

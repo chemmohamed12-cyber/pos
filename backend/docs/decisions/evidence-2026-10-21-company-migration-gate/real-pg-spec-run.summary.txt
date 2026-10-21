@@ -1,0 +1,26 @@
+=== REGRESSION: src/foundation/release/company-schema-check.real-pg.spec.ts
+    √ NO FALSE POSITIVES: a Company database migrated by the real migrations of every tag has ZERO findings, and the check actually looked at many tables (2524 ms)
+    √ a Company that never received an optional module (no manufacturing / hr / payroll ...) is NOT a finding: tables of modules it never had are not expected (4853 ms)
+    √ a MISSING COLUMN on an existing table is reported by table and column name (the 1.1.10 incident class: Product.itemType) (5567 ms)
+    √ a MISSING TABLE that the received migrations create is reported (the 1.1.11 class: the cash-session / treasury tables) (4906 ms)
+    √ the check is READ-ONLY: running it changes nothing (same table / column / migration fingerprint before and after) (1444 ms)
+    √ a Company database that cannot be reached => ran:false, never clean, and the message carries no password (1024 ms)
+Tests:       6 passed, 6 total
+RESULT PASS src/foundation/release/company-schema-check.real-pg.spec.ts
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+    √ NAME CONVENTION: the file-name -> migration-name mapping that tag derivation relies on matches TypeORM exactly for EVERY migration in the real compiled set (513 ms)
+    √ tagsReceivedByCompany: core always; another tag only if the Company has at least one executed migration of it (1 ms)
+      √ discovers READY Companies only, derives each one's tags from ITS OWN history, never invents a tag, and writes nothing (8417 ms)
+      √ a DECOMMISSIONED Company is OUT OF SCOPE (never blocks), a SUSPENDED one is STALE (4477 ms)
+      √ a READY Company that cannot be evaluated is a BLOCKER (never silently skipped) (917 ms)
+      √ policy `create`: one verified pre_update backup per Company that has something pending — none for a Company with nothing to do (4129 ms)
+      √ policy `create`: a backup that does not verify BLOCKS (nothing is migrated by this call, by construction) (2166 ms)
+      √ policy `require-recent`: no verified backup => BLOCKED; a verified recent one is accepted (basis `recent`); an OLD one is not (1824 ms)
+      √ HAPPY PATH: every applicable READY Company is migrated READY -> MIGRATING -> READY; the SUSPENDED one and the never-had tag are untouched; verify is clean; a re-run is a no-op; evidence is in the audit chain (13953 ms)
+      √ STOPS AT THE FIRST FAILURE: the earlier Company stays migrated (forward-only), the failing one is rolled back by its own transaction and provably unchanged -> READY, the later one is NOT TOUCHED (6845 ms)
+      √ RESUMABLE: after a failure is fixed, the SAME flow completes the rest - the already-migrated Company is a no-op, nothing is applied twice, every migration is recorded exactly once (11771 ms)
+      √ a Company that is no longer READY at its turn is NOT migrated and the sweep stops (LA-1 re-check at execution time) (4286 ms)
+      √ verify() reports a Company that still has pending migrations (the independent post-condition) (2032 ms)
+Tests:       13 passed, 13 total
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+REGRESSION DONE: 2/2 passed

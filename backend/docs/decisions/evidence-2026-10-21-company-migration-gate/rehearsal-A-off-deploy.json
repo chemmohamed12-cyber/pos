@@ -1,0 +1,80 @@
+[31m[Nest] 30060  - [39m٢١‏/١٠‏/٢٠٢٦، ٣:٤١:٠٣ م [31m  ERROR[39m [38;5;3m[ReleaseExecutionService] [39m[31mStaged deploy failed for release "9aec49c6-5a27-4db3-9474-ceb28eb23a67" (swapped=false)[39m
+PreSwapAbort: COMPANY_MIGRATION_GATE: COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it). Nothing was changed and the active release was not touched.
+    at ReleaseExecutionService.deployReleaseStaged (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.test-cluster\gate-rehearsal\deploy\app\dist\foundation\release\release-execution.service.js:470:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async ReleaseExecutionService.deployRelease (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.test-cluster\gate-rehearsal\deploy\app\dist\foundation\release\release-execution.service.js:324:20)
+    at async D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\cm-gate\backend\tools\release-sim\local-deploy-harness.js:129:17
+{
+  "releaseId": "9aec49c6-5a27-4db3-9474-ceb28eb23a67",
+  "version": "1.1.11",
+  "status": "failed",
+  "errorMessage": "COMPANY_MIGRATION_GATE: COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it). Nothing was changed and the active release was not touched.",
+  "events": [
+    {
+      "seq": 3,
+      "action": "release.registered",
+      "result": "success",
+      "after": "{\"errors\": [], \"version\": \"1.1.11\", \"packageType\": \"full\"}"
+    },
+    {
+      "seq": 4,
+      "action": "release.backup_linked",
+      "result": "success",
+      "after": "{\"backupRunId\": \"a0b1e888-c3df-4403-8f29-90d7581f5cd5\"}"
+    },
+    {
+      "seq": 5,
+      "action": "release.deploy.preflight",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"bin.node\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\node.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.npm\", \"detail\": \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\", \"status\": \"pass\", \"critical\": false}, {\"name\": \"bin.pg_dump\", \"detail\": \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\pg_dump.exe\", \"status\": \"pass\", \"critical\": true}, {\"name\": \"bin.pg_restore\", \"detail\": \"C:\\\\Program"
+    },
+    {
+      "seq": 6,
+      "action": "release.deploy.started",
+      "result": "success",
+      "after": "{\"mode\": \"staged\"}"
+    },
+    {
+      "seq": 7,
+      "action": "release.deploy.candidate_verified",
+      "result": "success",
+      "after": "{\"checks\": [{\"name\": \"structure\", \"detail\": \"D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\dist\\\\main.js + D:\\\\CLAUDE-CODE\\\\XNEXUS-WORKSPACE\\\\1-hosting\\\\daii.xnexustech.com\\\\release-new\\\\.test-cluster\\\\gate-rehearsal\\\\deploy\\\\app.next-9aec49c6-5a27-4db3-9474-ceb28eb23a67\\\\package"
+    },
+    {
+      "seq": 8,
+      "action": "release.deploy.artifact_integrity",
+      "result": "success",
+      "after": "{\"violations\": []}"
+    },
+    {
+      "seq": 9,
+      "action": "release.deploy.environment_check",
+      "result": "success",
+      "after": "{\"errors\": [], \"status\": \"valid\"}"
+    },
+    {
+      "seq": 10,
+      "action": "release.deploy.migration_preflight",
+      "result": "success",
+      "after": "{\"target\": \"CreateSupplierPaymentReversals1790030400000\", \"current\": \"SeedSupplierProfileTerminology1790016400000\", \"pending\": [\"AddValuationMovementBusinessDate1790017000000\", \"AddInventoryReconciliationExplanation1790017100000\", \"SeedInventoryC1Terminology1790017200000\", \"CreateInventoryOpeningBatches1790018000000\", \"SeedOpeningBatchTerminology1790018100000\", \"AllowRevaluationValuationKind179001"
+    },
+    {
+      "seq": 11,
+      "action": "release.deploy.company_fanout_plan",
+      "result": "denied",
+      "after": "{\"mode\": \"off\", \"scope\": [\"accounting\", \"attendance\", \"commission\", \"core\", \"finance\", \"hr\", \"inventory\", \"logistics\", \"manufacturing\", \"payroll\", \"procurement\", \"sales\", \"targets\"], \"counts\": {\"companiesEvaluated\": 1, \"companiesOutOfScope\": 0, \"companiesSkippedStale\": 0, \"companiesWithPendingMigrations\": 1}, \"skipped\": [], \"blockers\": [], \"companies\": [{\"name\": \"Rehearsal Co\", \"tags\": [\"accountin"
+    },
+    {
+      "seq": 12,
+      "action": "release.deploy.company_gate",
+      "result": "denied",
+      "after": "{\"phase\": \"pre-migration\", \"counts\": {\"evaluated\": 1, \"outOfScope\": 0, \"staleSkipped\": 0, \"needingMigration\": 1, \"withSchemaFindings\": 1}, \"blockers\": [\"COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it)\"], \"decis"
+    },
+    {
+      "seq": 13,
+      "action": "release.deploy.failed",
+      "result": "failure",
+      "after": "{\"error\": \"COMPANY_MIGRATION_GATE: COMPANY_MIGRATIONS_REQUIRED_BUT_DISABLED: RELEASE_COMPANY_MIGRATIONS=off but 1 Company(ies) need migrations: Rehearsal Co (21). A release that leaves a Company on the old schema is refused; set RELEASE_COMPANY_MIGRATIONS=on (or unset it). Nothing was changed and the active release was not touched.\", \"outcome\": \"DEPLOYMENT_FAILED\", \"swapped\": false, \"migrationsCom"
+    }
+  ]
+}

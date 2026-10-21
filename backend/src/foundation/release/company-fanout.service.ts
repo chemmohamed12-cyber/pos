@@ -9,6 +9,7 @@ import { isValidCompanyTransition, CompanyStatus } from '../company/company-stat
 import { DatabaseRegistryService } from '../database-registry/database-registry.service';
 import { runMigrationsForDatabase } from '../release-orchestration/company-migration-runner';
 import { BackupManagerService } from './backup-manager.service';
+import { CompanySchemaCheckResult, checkCompanySchema, summarizeFindings } from './company-schema-check';
 import { createMigrationDataSource, discoverMigrationTags } from './migration-datasource';
 
 /**
@@ -39,12 +40,21 @@ export interface PlannedCompany {
   tags: string[];
   /** Names of the migrations that will run (or, in dry-run, would run). */
   pending: string[];
+  /** Read-only schema check of this Company database against the candidate's entity registry (taken at plan time, i.e. BEFORE any migration). */
+  schema?: CompanySchemaCheckResult;
 }
 
 export interface SkippedCompany {
   companyId: string;
   companyName: string | null;
   reason: string;
+  /** The Company lifecycle status that made it skipped (`null` = registry row without a Company). */
+  status?: string | null;
+  /**
+   * DECOMMISSIONED = out of scope (never migrated, never blocks). Anything else that is not READY is STALE: it cannot be migrated now and would later run the new
+   * code on the old schema unless it is caught up before it is reactivated.
+   */
+  scope?: 'out_of_scope' | 'stale';
 }
 
 export interface CompanyFanoutPlan {
@@ -134,7 +144,21 @@ export function tagsReceivedByCompany(byTag: Map<string, Set<string>>, executed:
 export function summarizePlan(plan: CompanyFanoutPlan): Record<string, unknown> {
   return {
     mode: plan.mode,
-    companies: plan.planned.map((c) => ({ companyId: c.companyId, name: c.companyName, database: c.databaseName, tags: c.tags, pendingCount: c.pending.length, pending: c.pending })),
+    companies: plan.planned.map((c) => ({
+      companyId: c.companyId,
+      name: c.companyName,
+      database: c.databaseName,
+      tags: c.tags,
+      pendingCount: c.pending.length,
+      pending: c.pending,
+      ...(c.schema ? { schemaCheck: { ran: c.schema.ran, checkedTables: c.schema.checkedTables, ...(c.schema.error ? { error: c.schema.error } : {}), ...summarizeFindings(c.schema.findings) } } : {}),
+    })),
+    counts: {
+      companiesEvaluated: plan.planned.length,
+      companiesWithPendingMigrations: plan.planned.filter((c) => c.pending.length > 0).length,
+      companiesSkippedStale: plan.skipped.filter((c) => c.scope !== 'out_of_scope').length,
+      companiesOutOfScope: plan.skipped.filter((c) => c.scope === 'out_of_scope').length,
+    },
     skipped: plan.skipped,
     blockers: plan.blockers,
     scope: plan.scope,
@@ -183,16 +207,17 @@ export class CompanyFanoutService {
     for (const reg of await this.registry.findAllActive()) {
       const company = await this.companies.findById(reg.companyId);
       if (!company) {
-        plan.skipped.push({ companyId: reg.companyId, companyName: null, reason: 'registry row without a Company' });
+        plan.skipped.push({ companyId: reg.companyId, companyName: null, reason: 'registry row without a Company', status: null, scope: 'stale' });
         continue;
       }
       if (company.status !== 'READY') {
-        plan.skipped.push({ companyId: company.id, companyName: company.name, reason: `Company status is ${company.status}, not READY` });
+        plan.skipped.push({ companyId: company.id, companyName: company.name, reason: `Company status is ${company.status}, not READY`, status: company.status, scope: company.status === 'DECOMMISSIONED' ? 'out_of_scope' : 'stale' });
         continue;
       }
       try {
         const evaluated = await this.evaluate(company.id, candidatePath, scope, byTag);
-        plan.planned.push({ companyId: company.id, companyName: company.name, databaseName: reg.databaseName, ...evaluated });
+        const schema = await this.schemaCheck(company.id, candidatePath, evaluated.tags);
+        plan.planned.push({ companyId: company.id, companyName: company.name, databaseName: reg.databaseName, ...evaluated, schema });
       } catch (err) {
         plan.blockers.push(`Company "${company.name}" (${company.id}) could not be evaluated: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -216,6 +241,23 @@ export class CompanyFanoutService {
     } finally {
       if (ds.isInitialized) await ds.destroy();
     }
+  }
+
+  /** Read-only schema check of one Company database against the candidate (see company-schema-check.ts). Never throws: an unrunnable check is `ran: false`, never "clean". */
+  async schemaCheck(companyId: string, candidatePath: string, tags: readonly string[]): Promise<CompanySchemaCheckResult> {
+    try {
+      const cfg = await this.registry.getConnectionConfigForCompany(companyId);
+      return await checkCompanySchema(candidatePath, cfg, tags, this.config.releaseBuild.nodeBin);
+    } catch (err) {
+      return { ran: false, checkedTables: 0, findings: { missingTables: [], missingColumns: {} }, error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300) };
+    }
+  }
+
+  /** Post-migration schema check of every planned Company, re-derived from the database (never from the migration run's own report). */
+  async verifySchema(plan: CompanyFanoutPlan, candidatePath: string): Promise<Record<string, CompanySchemaCheckResult>> {
+    const out: Record<string, CompanySchemaCheckResult> = {};
+    for (const c of plan.planned) out[c.companyName] = await this.schemaCheck(c.companyId, candidatePath, c.tags);
+    return out;
   }
 
   // ───────────────────────────────────────────── restore points ─────────────────────────────────────────────

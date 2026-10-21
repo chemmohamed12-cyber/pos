@@ -30,6 +30,10 @@
  *   node company-migration-catchup.js --app-root <ACTIVE root> --apply --actor-email <admin e-mail> --release-id <uuid> \
  *        --confirm-databases <db1,db2,...> --i-confirm-restore-points
  *
+ * Schema (CTO 2026-10-21): when the installed build carries the shared schema check, the plan also lists each Company's schema findings, and after the migration step the
+ * Companies are RE-CHECKED against the new code's entity registry: a Company that is migrated but still does not match is FAILED, never SUCCESS. A Company with nothing
+ * pending but a schema that differs is reported as SCHEMA_DRIFT (no migration can repair it; nothing is changed; exit 2) instead of NOTHING_TO_DO.
+ *
  * Exit codes: 0 success or nothing to do | 2 migration failed / verification failed (STATUS: FAILED) | 3 refused before any change | 4 finished but some Companies were skipped
  * (not READY) and still need attention (STATUS: PARTIAL) | 1 unexpected error.
  */
@@ -115,6 +119,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       return out(report);
     }
 
+    const hasSchemaFindings = (c) => !!c.schema && c.schema.ran && (c.schema.findings.missingTables.length > 0 || Object.keys(c.schema.findings.missingColumns).length > 0);
+    const driftNoPending = before.planned.filter((c) => c.pending.length === 0 && hasSchemaFindings(c));
+    if (withPending.length === 0 && before.blockers.length === 0 && driftNoPending.length > 0) {
+      report.status = 'SCHEMA_DRIFT';
+      report.schemaDriftCompanies = driftNoPending.map((c) => c.databaseName).sort();
+      report.note = 'No Company has pending migrations, but the listed Companies do not match the schema the installed build queries. No migration can repair that; NOTHING was changed. Investigate (see before.companies[].schemaCheck) before any manual action.';
+      out(report);
+      console.log('STATUS: SCHEMA_DRIFT');
+      process.exitCode = 2;
+      return;
+    }
     if (withPending.length === 0 && before.blockers.length === 0) {
       report.status = 'NOTHING_TO_DO';
       report.note = 'No Company database has pending migrations; nothing was changed.';
@@ -199,9 +214,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     report.stillPendingAfterVerify = await fanout.verify(before, APP_ROOT); // must be empty
     const afterPlan = await fanout.plan(APP_ROOT);
     report.after = summarizePlan(afterPlan);
+    const schemaAfterBad = typeof fanout.verifySchema === 'function' ? await fanout.verifySchema(before, APP_ROOT) : null;
+    if (schemaAfterBad) {
+      report.schemaAfter = Object.fromEntries(Object.entries(schemaAfterBad).map(([k, v]) => [k, { ran: v.ran, checkedTables: v.checkedTables, missingTables: v.findings.missingTables.slice(0, 20), missingColumns: v.findings.missingColumns, ...(v.error ? { error: v.error } : {}) }]));
+    }
+    const schemaBadAfter = schemaAfterBad ? Object.values(schemaAfterBad).some((v) => !v.ran || v.findings.missingTables.length > 0 || Object.keys(v.findings.missingColumns).length > 0) : false;
     const ids = before.planned.map((c) => c.companyId);
     report.companyStatusAfter = (await ds.query('SELECT name, status FROM companies WHERE id = ANY($1)', [ids])).map((r) => ({ company: r.name, status: r.status }));
-    const failed = !result.ok || Object.keys(report.stillPendingAfterVerify).length > 0 || afterPlan.planned.some((c) => c.pending.length > 0) || report.companyStatusAfter.some((c) => c.status !== 'READY');
+    const failed = !result.ok || Object.keys(report.stillPendingAfterVerify).length > 0 || afterPlan.planned.some((c) => c.pending.length > 0) || report.companyStatusAfter.some((c) => c.status !== 'READY') || schemaBadAfter;
     const skipped = before.skipped.length > 0;
     report.status = failed ? 'FAILED' : skipped ? 'PARTIAL' : 'SUCCESS';
     if (failed) report.recovery = 'See the runbook section "Failed or partial run". Do not re-run blindly: run Stage A, read which Company stopped and why (result.failed[].error), fix the cause, then re-run Stage B (idempotent).';

@@ -152,12 +152,21 @@ export const configurationValidationSchema = Joi.object({
   // null → audit + log only.
   RELEASE_NOTIFY_WEBHOOK: Joi.string().uri().allow(null, '').default(null),
 
-  // Company fan-out (CTO 2026-10-08). Whether a staged deploy also upgrades the EXISTING READY Company databases, not only the Platform database.
-  //   off     = Platform only; no Company database is read or written (audited as such). The default — the capability is enabled deliberately.
-  //   dry-run = plan only: discover READY Companies, derive each one's tags, report each one's pending migrations. Reads, never writes.
+  // Company migration gate (CTO 2026-10-21 - Company Migration Reliability). A release is never reported successful, and never swapped in, while a Company database that
+  // is in scope still needs migrations. Whatever the value, the engine ALWAYS plans the Companies read-only first.
+  //   unset   = SAFE DEFAULT: `on` when RELEASE_STAGED_ACTIVATION=true (the default), otherwise `off` (the legacy path has no pre-swap point; recorded in the audit).
   //   on      = back up each affected Company, move it READY -> MIGRATING, migrate it, MIGRATING -> READY; stop at the first failure (pre-swap, ACTIVE untouched).
-  // Requires RELEASE_STAGED_ACTIVATION=true (the legacy in-place path has no pre-swap point at which to run it).
-  RELEASE_COMPANY_MIGRATIONS: Joi.string().valid('off', 'dry-run', 'on').default('off'),
+  //   dry-run = PLAN ONLY: read-only plan + schema check of every Company, then the deploy STOPS before any change (no backup, no migration, no swap); the release stays `backup_verified`.
+  //   off     = Platform only, by explicit choice - but ENFORCED: if any in-scope Company still needs migrations (or has schema drift) the deploy is BLOCKED before anything is changed.
+  // `on` / `dry-run` require RELEASE_STAGED_ACTIVATION=true (the legacy in-place path has no pre-swap point at which to run them).
+  RELEASE_COMPANY_MIGRATIONS: Joi.string().valid('off', 'dry-run', 'on'),
+  // Companies that are not READY (SUSPENDED, DEGRADED, FAILED, MIGRATING, PROVISIONING) cannot be migrated now and would later run the new code on the old schema.
+  //   block = the deploy is refused while any such Company exists (DECOMMISSIONED Companies are out of scope). The default.
+  //   allow = the deploy proceeds, each such Company is listed in the audit evidence as STALE and must be caught up before it is reactivated.
+  RELEASE_COMPANY_SKIPPED_POLICY: Joi.string().valid('block', 'allow').default('block'),
+  // Read-only schema check of every in-scope Company database against the candidate's own entity registry (catches a Company whose migration list looks complete
+  // but whose tables/columns are not what the new code queries).  enforce = a finding blocks the swap; report = recorded in the audit only.
+  RELEASE_COMPANY_SCHEMA_CHECK: Joi.string().valid('enforce', 'report').default('enforce'),
   // How each affected Company gets its restore point before it is migrated.
   //   create         = the engine takes (and verifies) a `pre_update` backup of that Company's own database first.
   //   require-recent = a verified backup of that Company no older than RELEASE_COMPANY_BACKUP_MAX_AGE_HOURS must already exist.
