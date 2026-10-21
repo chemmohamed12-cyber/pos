@@ -4,6 +4,7 @@ import { AppConfigService } from '../configuration/app-config.service';
 import { AuditService } from '../audit/audit.service';
 import { readAppVersion } from './app-version';
 import { compareVersions } from './version-compare';
+import { releaseOperationLock } from './release-operation-lock';
 import { Release } from './release.entity';
 import { CompanyBackupEvidence, CompanyFanoutBlockedError, CompanyFanoutService, summarizePlan, summarizeResult } from './company-fanout.service';
 import { hasFindings } from './company-schema-check';
@@ -73,6 +74,7 @@ export class CompanyCatchUpService {
     // host, cut off while the candidate was prepared, stayed `deploying` for good and blocked every catch-up). Only a newer version is a live deploy.
     const live = inFlight.filter((r) => compareVersions(r.version, installedBuild) > 0);
     const stale = inFlight.filter((r) => compareVersions(r.version, installedBuild) <= 0);
+    if (releaseOperationLock.deployInProgress) throw new CatchUpRefusedError('A deploy is in progress in this application; catch-up refuses to run next to it.');
     if (live.length > 0) throw new CatchUpRefusedError(`A deploy is in progress (${live.map((r) => `${r.version}: ${r.status}`).join(', ')}); catch-up refuses to run next to it.`);
     if (stale.length > 0) this.logger.warn(`catch-up ignores ${stale.length} stale in-flight release row(s) older than the live build ${installedBuild}: ${stale.map((r) => `${r.version}=${r.status}`).join(', ')}`);
     const plan = await this.fanout.plan(this.config.releaseExecution.appRoot);
@@ -81,11 +83,14 @@ export class CompanyCatchUpService {
 
   async run(actorUserId: string, confirmDatabases: readonly string[]): Promise<CatchUpResult> {
     if (this.running) throw new CatchUpRefusedError('A catch-up is already running.');
+    // taken BEFORE any await: a deploy that starts a moment later is refused, and one already running refuses the catch-up in prepare()
     this.running = true;
+    releaseOperationLock.beginCatchUp();
     try {
       return await this.runLocked(actorUserId, confirmDatabases);
     } finally {
       this.running = false;
+      releaseOperationLock.endCatchUp();
     }
   }
 

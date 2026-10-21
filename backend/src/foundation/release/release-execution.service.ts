@@ -33,6 +33,7 @@ import { ModuleLifecycleService } from '../module-lifecycle/module-lifecycle.ser
 import { evaluateCompanyGate, evaluatePostMigrationGate } from './company-migration-gate';
 import { summarizeFindings } from './company-schema-check';
 import { CompanyFanoutService, CompanyFanoutBlockedError, CompanyFanoutMode, CompanyFanoutPlan, CompanyFanoutResult, CompanyBackupEvidence, summarizePlan, summarizeResult } from './company-fanout.service';
+import { releaseOperationLock } from './release-operation-lock';
 
 /**
  * Release Center — Execution Layer. The orchestrator for the CTO
@@ -337,6 +338,17 @@ export class ReleaseExecutionService {
    * verified backup) stops before anything is touched at all.
    */
   async deployRelease(releaseId: string, actorUserId: string): Promise<Release> {
+    // A deploy and a Company catch-up never run together (both change Company databases): refuse BEFORE anything is touched.
+    if (releaseOperationLock.catchUpRunning) throw new ConflictException('A Company catch-up is running; a deploy cannot start next to it. Wait for it to finish.');
+    releaseOperationLock.beginDeploy();
+    try {
+      return await this.deployReleaseUnlocked(releaseId, actorUserId);
+    } finally {
+      releaseOperationLock.endDeploy();
+    }
+  }
+
+  private async deployReleaseUnlocked(releaseId: string, actorUserId: string): Promise<Release> {
     const releaseRepo = this.dataSource.getRepository(Release);
     const release = await releaseRepo.findOne({ where: { id: releaseId } });
     if (!release) throw new NotFoundException(`Release "${releaseId}" not found.`);

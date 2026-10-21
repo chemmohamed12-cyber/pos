@@ -2,6 +2,7 @@ import { CompanyCatchUpService, CatchUpRefusedError } from './company-catch-up.s
 import { CompanyFanoutBlockedError, CompanyFanoutPlan, CompanyFanoutResult, PlannedCompany } from './company-fanout.service';
 import { CompanySchemaCheckResult } from './company-schema-check';
 import { Release } from './release.entity';
+import { releaseOperationLock } from './release-operation-lock';
 
 /**
  * Company catch-up (1.1.12): the explicit, confirmed, audited remediation for a LIVE release whose Companies are behind. Pinned here: every refusal happens BEFORE any
@@ -60,6 +61,29 @@ describe('CompanyCatchUpService', () => {
     const f = build({ inFlight: [{ version: '99.0.0', status: 'migrating' }] });
     await expect(f.svc.run('a', ['db_A', 'db_B'])).rejects.toThrow(/deploy is in progress \(99.0.0: migrating\)/);
     nothingChanged(f);
+  });
+
+  it('refuses while a deploy runs IN this application (no release row needed), and releases the lock after the run - success or refusal', async () => {
+    const f = build();
+    releaseOperationLock.beginDeploy();
+    await expect(f.svc.run('a', ['db_A', 'db_B'])).rejects.toThrow(/deploy is in progress in this application/);
+    expect(await f.svc.preview()).toEqual({ databasesNeedingCatchUp: [], refusal: expect.stringContaining('deploy is in progress') });
+    nothingChanged(f);
+    releaseOperationLock.endDeploy();
+    expect(releaseOperationLock.catchUpRunning).toBe(false); // the refused run released it
+    await f.svc.run('a', ['db_A', 'db_B']);
+    expect(releaseOperationLock.catchUpRunning).toBe(false);
+  });
+
+  it('while the catch-up runs the lock is held (a deploy would be refused)', async () => {
+    const f = build();
+    let heldDuring = false;
+    f.fanout.migrate.mockImplementation(async () => {
+      heldDuring = releaseOperationLock.catchUpRunning;
+      return okResult(['A', 'B']);
+    });
+    await f.svc.run('a', ['db_A', 'db_B']);
+    expect(heldDuring).toBe(true);
   });
 
   it('a stale in-flight row of a version OLDER than the live build (a deploy cut off long ago, as 1.1.6 on the host) does NOT block the catch-up', async () => {
