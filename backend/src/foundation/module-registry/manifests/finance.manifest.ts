@@ -98,6 +98,9 @@ export const financeManifest: ModuleManifest = {
     { node: 'finance.payment.view', title_code: 'perm.finance.payment.view', parent: 'finance.payment' },
     { node: 'finance.payment.create', title_code: 'perm.finance.payment.create', parent: 'finance.payment' },
     { node: 'finance.payment.reverse', title_code: 'perm.finance.payment.reverse', parent: 'finance.payment' },
+    // T2-S (2026-10-21): reversing a SUPPLIER payment is a Finance act (money returns to the bank), separate from recording one (procurement.supplier_payment.create)
+    { node: 'finance.supplier_payment', title_code: 'perm.finance.supplier_payment', parent: 'finance' },
+    { node: 'finance.supplier_payment.reverse', title_code: 'perm.finance.supplier_payment.reverse', parent: 'finance.supplier_payment' },
 
     { node: 'finance.ledger', title_code: 'perm.finance.ledger', parent: 'finance' },
     { node: 'finance.ledger.view', title_code: 'perm.finance.ledger.view', parent: 'finance.ledger' },

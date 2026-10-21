@@ -106,6 +106,12 @@ export interface FinanceTreasuryContract {
   ): Promise<{ id: string }>;
 
   /**
+   * T2 / T2-S — the OWNER-driven reversal of a single cash leg (appends the offsetting leg, flips the original, publishes nothing: the owning document publishes its own mirror
+   * event). Used by the owning document of a payment (customer or supplier); never by a raw Treasury reversal.
+   */
+  reverseOwnedLeg(transactionId: string, reason: string, actorUserId: string, manager: EntityManager): Promise<{ id: string }>;
+
+  /**
    * OP-Procurement/AP Blueprint §8, CTO ratification Decision 1 (Option A,
    * approved 2026-09-18) — the payable-side counterpart to `cashIn`, for
    * `procurement`'s `SupplierPaymentService` to reach Treasury through

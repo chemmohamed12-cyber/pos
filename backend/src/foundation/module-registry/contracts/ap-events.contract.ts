@@ -120,6 +120,8 @@ export const AP_EVENT_TOPICS = {
   purchaseReturnPosted: 'procurement.purchase_return.posted',
   supplierInvoiceCostAdjustmentVoided: 'finance.supplier_invoice.cost_adjustment_voided',
   supplierPaymentRecorded: 'finance.supplier_payment.recorded',
+  /** T2-S: a supplier payment reversed through its owning document (Dr bank / Cr AP). */
+  supplierPaymentReversed: 'finance.supplier_payment.reversed',
   debitNoteIssued: 'finance.supplier_debit_note.issued',
   creditNoteReceived: 'finance.supplier_credit_note.received',
   apOpeningBalanceRecorded: 'finance.ap.opening_balance.recorded',

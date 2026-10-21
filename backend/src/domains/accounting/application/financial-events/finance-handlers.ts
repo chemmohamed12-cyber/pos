@@ -1,5 +1,6 @@
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { HandlerContext, HandlerResult, JournalDraftLine } from './handler-registry';
+import { handleSupplierPaymentReversed } from './supplier-payment-reversed.handler';
 import { handleSupplierInvoicePosted, handleSupplierInvoiceVoided, handleSupplierPaymentRecorded } from './supplier-invoice.handler';
 import { handlePurchaseReturnPosted, handleSupplierCreditNoteReturnSettled } from './purchase-return.handler';
 import { handleSupplierCreditNoteTax } from './supplier-credit-note-tax.handler';
@@ -381,6 +382,8 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   'finance.supplier_invoice.posted': handleSupplierInvoicePosted,
   'finance.supplier_invoice.voided': handleSupplierInvoiceVoided,
   'finance.supplier_payment.recorded': handleSupplierPaymentRecorded,
+  // T2-S (2026-10-21) - a supplier payment reversed through its owning document: Dr bank / Cr AP
+  'finance.supplier_payment.reversed': handleSupplierPaymentReversed,
   // ADR-054/ADR-057 — GRNI's own leg: Dr Inventory / Cr GRNI at receipt (the FIRST GL entry
   // Procurement's purchased value now hits, before the invoice clears GRNI above).
   'procurement.goods_receipt.posted': handleGoodsReceiptPosted,

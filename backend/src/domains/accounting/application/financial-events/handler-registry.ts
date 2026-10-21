@@ -121,6 +121,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   // Phase D-1 - a posted Purchase Return (GRNI path)
   'procurement.purchase_return.posted',
   'finance.supplier_payment.recorded',
+  // T2-S (2026-10-21) - a supplier payment reversed through its owning document: Dr bank / Cr AP
+  'finance.supplier_payment.reversed',
   // ADR-054/ADR-057 — GRNI (Goods Received Not Invoiced): the Goods Receipt leg, Dr Inventory / Cr GRNI
   'procurement.goods_receipt.posted',
   // ADR-061 — Manufacturing Work Order movements (§13's accounting table)
