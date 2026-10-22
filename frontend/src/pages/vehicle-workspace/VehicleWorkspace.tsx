@@ -11,6 +11,7 @@ import {
   TABS,
   availableActions,
   currentTrip,
+  collectionOf,
   custodyRowStatus,
   filterByTab,
   isCashOnDelivery,
@@ -33,9 +34,18 @@ interface Vehicle {
   code: string;
   plateNumber: string;
   driverUserId: string | null;
+  driverName: string | null;
   branch: string | null;
   status: 'active' | 'retired';
   custodyAccountId: string | null;
+  warehouseId: string | null;
+}
+interface WorkspacePayload {
+  vehicle: Vehicle;
+  overview: { custodyBalance: string | null; activeShipmentsCount: number; stock: StockRow[] };
+  shipments: Array<WsShipment & { collectionVisible: boolean; collection: WsCollection | null }>;
+  truncated: boolean;
+  collectionsComplete: boolean;
 }
 interface Overview {
   warehouseId: string | null;
@@ -63,8 +73,6 @@ interface Product {
 }
 type Section = 'shipments' | 'custody' | 'expenses' | 'summary';
 type CustodyFilter = 'all' | CustodyRowStatus;
-
-const COLLECTION_LOOKUP_CAP = 60;
 
 const STATE_LABEL: Record<string, [string, string]> = {
   created: ['جديدة', 'New'],
@@ -119,19 +127,17 @@ export function VehicleWorkspace() {
   const [overviewFailed, setOverviewFailed] = useState(false);
   const [shipments, setShipments] = useState<WsShipment[] | null>(null);
   const [collections, setCollections] = useState<Map<string, WsCollection | null> | null>(null);
-  const [collectionsTruncated, setCollectionsTruncated] = useState(false);
+  const [collectionsComplete, setCollectionsComplete] = useState(false);
+  const [truncated, setTruncated] = useState(false);
   const [driverName, setDriverName] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [notMine, setNotMine] = useState(false);
   const [section, setSection] = useState<Section>('shipments');
   const [tab, setTab] = useState<TabKey>('all');
   const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const loadSeq = useRef(0);
-  const canRef = useRef(can); // `can` is re-created on every auth render; read it through a ref so a re-render never re-triggers the load
-  canRef.current = can;
 
   const load = useCallback(
     async (initial: boolean) => {
@@ -139,48 +145,20 @@ export function VehicleWorkspace() {
       if (initial) setError(null);
       setRefreshing(true);
       try {
-        const vehicles = await api.get<Vehicle[]>('/shipments/vehicles');
-        const v = vehicles.find((x) => x.id === vehicleId);
-        if (!v) throw new ApiError(404, 'NOT_FOUND', 'Vehicle not found.');
-        // UI hint only (the vehicle list/overview endpoints are not scoped server-side — see the Stage B report): a user who is neither this vehicle's driver nor allowed to view vehicles does not get its screen
-        if (v.driverUserId !== user?.id && !canRef.current('logistics.vehicle.view', 'read-only') && !canRef.current('wf.logistics.shipment.board_all', 'read-only')) {
-          if (seq === loadSeq.current) {
-            setVehicle(null);
-            setNotMine(true);
-          }
-          return;
-        }
-        const [ov, all] = await Promise.all([
-          api.get<Overview>(`/shipments/vehicles/${v.id}/overview`).then((o) => ({ ok: true as const, o })).catch(() => ({ ok: false as const, o: null })),
-          api.get<WsShipment[]>('/shipments'),
-        ]);
-        const mine = all.filter((s) => s.vehicleId === v.id);
-        // cash records: only for shipments that carry a cash-on-delivery amount; a rejected lookup for EVERY shipment means "not readable by this role" (null), never an empty list
-        const cod = mine.filter(isCashOnDelivery).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        const lookup = cod.slice(0, COLLECTION_LOOKUP_CAP);
-        const settled = await Promise.allSettled(lookup.map((s) => api.get<WsCollection | null>(`/delivery/collections?shipmentId=${s.id}`)));
-        let map: Map<string, WsCollection | null> | null = null;
-        if (lookup.length === 0) map = new Map();
-        else if (settled.some((r) => r.status === 'fulfilled')) {
-          map = new Map();
-          settled.forEach((r, i) => {
-            if (r.status === 'fulfilled') map!.set(lookup[i].id, r.value ?? null);
-          });
-          if (settled.some((r) => r.status === 'rejected')) map = null; // partial failure: do not present an incomplete set as complete
-        }
-        let name: string | null = null;
-        if (v.driverUserId) {
-          if (v.driverUserId === user?.id) name = user.fullName;
-          else name = await api.get<Array<{ id: string; fullName: string }>>('/admin/users').then((us) => us.find((u) => u.id === v.driverUserId)?.fullName ?? null).catch(() => null);
-        }
+        // Stage C (F-1, F-3..F-5): ONE server-side, permission-checked read model - vehicle (with the driver's name), overview, the vehicle's shipments (filtered and scoped on the
+        // server) and their collection records (batched; hidden ones are flagged, never zero). A vehicle the user may not read answers "not found".
+        const w = await api.get<WorkspacePayload>(`/vehicle-workspace/${vehicleId}`);
+        const map = new Map<string, WsCollection | null>();
+        for (const r of w.shipments) if (r.collectionVisible) map.set(r.id, r.collection ?? null);
         if (seq !== loadSeq.current) return;
-        setVehicle(v);
-        setOverview(ov.o);
-        setOverviewFailed(!ov.ok);
-        setShipments(mine);
+        setVehicle(w.vehicle);
+        setOverview({ warehouseId: w.vehicle.warehouseId, custodyAccountId: w.vehicle.custodyAccountId, stock: w.overview.stock, custodyBalance: w.overview.custodyBalance, activeShipmentsCount: w.overview.activeShipmentsCount });
+        setOverviewFailed(false);
+        setShipments(w.shipments);
         setCollections(map);
-        setCollectionsTruncated(cod.length > COLLECTION_LOOKUP_CAP);
-        setDriverName(name);
+        setCollectionsComplete(w.collectionsComplete);
+        setTruncated(w.truncated);
+        setDriverName(w.vehicle.driverName);
         setLoadedAt(new Date());
         setError(null);
       } catch (e) {
@@ -189,7 +167,7 @@ export function VehicleWorkspace() {
         if (seq === loadSeq.current) setRefreshing(false);
       }
     },
-    [vehicleId, user],
+    [vehicleId],
   );
   useEffect(() => {
     void load(true);
@@ -197,22 +175,8 @@ export function VehicleWorkspace() {
 
   const counts = useMemo(() => (shipments ? tabCounts(shipments) : null), [shipments]);
   const trip = useMemo(() => (shipments ? currentTrip(shipments) : []), [shipments]);
-  const summary = useMemo(() => (shipments ? tripSummary(shipments, collections) : null), [shipments, collections]);
+  const summary = useMemo(() => (shipments ? tripSummary(shipments, collectionsComplete ? collections : null) : null), [shipments, collections, collectionsComplete]);
 
-  if (notMine) {
-    return (
-      <div className="vw-root">
-        <div className="vw-pad">
-          <div className="vw-banner warn" role="alert">
-            {tr('هذه السيارة غير معيّنة لك ولا تملك صلاحية عرض السيارات.', 'This vehicle is not assigned to you and you are not allowed to view vehicles.')}
-          </div>
-          <Link to="/my-vehicle" className="vw-link">
-            {tr('سيارتي', 'My vehicle')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
   if (error && !vehicle) {
     return (
       <div className="vw-root">
@@ -330,6 +294,7 @@ export function VehicleWorkspace() {
               onTab={setTab}
               unknown={unknownStateCount(shipments)}
               collections={collections}
+              truncated={truncated}
               onOpen={setOpenId}
               openId={openId}
             />
@@ -341,7 +306,7 @@ export function VehicleWorkspace() {
               overviewFailed={overviewFailed}
               shipments={shipments}
               collections={collections}
-              truncated={collectionsTruncated}
+              collectionsComplete={collectionsComplete}
               filter={custodyFilter}
               onFilter={setCustodyFilter}
               onOpen={(id) => {
@@ -360,7 +325,7 @@ export function VehicleWorkspace() {
             stock={overview ? overview.stock : null}
             isMine={open.driverUserId === user?.id}
             canActAny={can('wf.logistics.shipment.act_any', 'editable')}
-            collection={collections ? collections.get(open.id) ?? null : undefined}
+            collection={collectionOf(collections, open.id)}
             onClose={() => setOpenId(null)}
             onChanged={() => void load(false)}
           />
@@ -395,6 +360,7 @@ function ShipmentsSection(props: {
   onTab: (k: TabKey) => void;
   unknown: number;
   collections: Map<string, WsCollection | null> | null;
+  truncated: boolean;
   onOpen: (id: string) => void;
   openId: string | null;
 }) {
@@ -412,6 +378,11 @@ function ShipmentsSection(props: {
           {tr('تسليم جزئي', 'Partial delivery')} <span className="vw-count">{tr('غير متاح', 'n/a')}</span>
         </span>
       </div>
+      {props.truncated && (
+        <div className="vw-banner warn" role="status">
+          {tr('عُرضت أحدث الشحنات فقط — القائمة مقطوعة وليست كاملة.', 'Only the latest shipments are shown - the list is cut off, not complete.')}
+        </div>
+      )}
       {props.unknown > 0 && (
         <div className="vw-banner warn" role="status">
           {tr(`${props.unknown} شحنة بحالة غير معروفة للنظام — تظهر ضمن «الكل» فقط.`, `${props.unknown} shipment(s) have a state this screen does not know — shown under “All” only.`)}
@@ -422,7 +393,7 @@ function ShipmentsSection(props: {
       ) : (
         <ul className="vw-list">
           {rows.map((s) => {
-            const c = props.collections ? props.collections.get(s.id) ?? null : undefined;
+            const c = collectionOf(props.collections, s.id);
             return (
               <li key={s.id}>
                 <button type="button" className={`vw-card ${props.openId === s.id ? 'selected' : ''}`} onClick={() => props.onOpen(s.id)}>
@@ -467,22 +438,22 @@ function CustodySection(props: {
   overviewFailed: boolean;
   shipments: WsShipment[];
   collections: Map<string, WsCollection | null> | null;
-  truncated: boolean;
+  collectionsComplete: boolean;
   filter: CustodyFilter;
   onFilter: (f: CustodyFilter) => void;
   onOpen: (id: string) => void;
 }) {
   const tr = useTr();
   const cod = props.shipments.filter(isCashOnDelivery);
-  const rows = cod.map((s) => ({ s, c: props.collections ? props.collections.get(s.id) ?? null : undefined }));
+  const rows = cod.map((s) => ({ s, c: collectionOf(props.collections, s.id) }));
   const statusOf = (c: WsCollection | null | undefined): CustodyRowStatus | null => (c === undefined ? null : custodyRowStatus(c));
   const countBy = (st: CustodyRowStatus) => rows.filter((r) => statusOf(r.c) === st).length;
   const filtered = props.filter === 'all' ? rows : rows.filter((r) => statusOf(r.c) === props.filter);
   const chips: Array<{ key: CustodyFilter; ar: string; en: string; n: number | null }> = [
     { key: 'all', ar: 'الكل', en: 'All', n: rows.length },
-    { key: 'no_collection', ar: 'بدون تحصيل مسجل', en: 'No collection recorded', n: props.collections ? countBy('no_collection') : null },
-    { key: 'recorded_pending_remittance', ar: 'تحصيل بانتظار التوريد', en: 'Recorded — awaiting remittance', n: props.collections ? countBy('recorded_pending_remittance') : null },
-    { key: 'remitted', ar: 'تم التوريد', en: 'Remitted', n: props.collections ? countBy('remitted') : null },
+    { key: 'no_collection', ar: 'بدون تحصيل مسجل', en: 'No collection recorded', n: props.collectionsComplete ? countBy('no_collection') : null },
+    { key: 'recorded_pending_remittance', ar: 'تحصيل بانتظار التوريد', en: 'Recorded — awaiting remittance', n: props.collectionsComplete ? countBy('recorded_pending_remittance') : null },
+    { key: 'remitted', ar: 'تم التوريد', en: 'Remitted', n: props.collectionsComplete ? countBy('remitted') : null },
   ];
   const balance = props.overview?.custodyBalance ?? null;
   return (
@@ -500,14 +471,9 @@ function CustodySection(props: {
         )}
         <p className="vw-note">{tr('الرصيد الدفتري من سجل الخزينة كما هو. تفصيل التحصيلات والمصروفات والتسويات على مستوى العهدة قادم في مرحلة لاحقة.', 'The book balance exactly as the Treasury ledger reports it. A per-custody breakdown of collections, expenses and settlements comes in a later stage.')}</p>
       </div>
-      {!props.collections && cod.length > 0 && (
+      {!props.collectionsComplete && cod.length > 0 && (
         <div className="vw-banner warn" role="status">
-          {tr('سجلات التحصيل غير متاحة لصلاحياتك أو تعذّر تحميلها كاملة — لا تُعرض أرقام تحصيل.', 'Collection records are not available for your role or could not be loaded completely — no collection figures are shown.')}
-        </div>
-      )}
-      {props.truncated && (
-        <div className="vw-banner warn" role="status">
-          {tr(`عُرضت سجلات التحصيل لأحدث ${COLLECTION_LOOKUP_CAP} شحنة بتحصيل عند التسليم فقط.`, `Collection records were looked up for the latest ${COLLECTION_LOOKUP_CAP} cash-on-delivery shipments only.`)}
+          {tr('بعض سجلات التحصيل غير متاحة لصلاحياتك — تظهر «غير متاح» ولا تُحتسب في الأرقام.', 'Some collection records are not available for your role - they show "not available" and are not counted in the figures.')}
         </div>
       )}
       <div className="vw-chips" role="tablist" aria-label={tr('تصفية العهد', 'Filter custody')}>

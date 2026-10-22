@@ -59,6 +59,6 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
   ],
   controllers: [ShipmentController],
   providers: [ShipmentService, VehicleAccessService, { provide: LOGISTICS_SHIPMENT_CONTRACT, useExisting: ShipmentService }],
-  exports: [ShipmentService, LOGISTICS_SHIPMENT_CONTRACT],
+  exports: [ShipmentService, VehicleAccessService, LOGISTICS_SHIPMENT_CONTRACT],
 })
 export class ShipmentModule {}

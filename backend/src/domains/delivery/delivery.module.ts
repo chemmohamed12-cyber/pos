@@ -4,6 +4,8 @@ import { DeliveryOutcome } from './infrastructure/delivery-outcome.entity';
 import { Collection } from './infrastructure/collection.entity';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
+import { VehicleWorkspaceService } from './application/vehicle-workspace.service';
+import { VehicleWorkspaceController } from './interface/vehicle-workspace.controller';
 import { ShipmentModule } from '../shipment/shipment.module';
 import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
@@ -42,8 +44,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [DeliveryController],
-  providers: [DeliveryService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
+  controllers: [DeliveryController, VehicleWorkspaceController],
+  providers: [DeliveryService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
   exports: [DeliveryService, LOGISTICS_DELIVERY_CONTRACT],
 })
 export class DeliveryModule {}

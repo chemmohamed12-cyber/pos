@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABS, availableActions, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
+import { TABS, availableActions, collectionOf, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
 import type { WsCollection, WsShipment } from '../src/pages/vehicle-workspace/workspaceModel';
 
 const mk = (id: string, state: string, extra: Partial<WsShipment> = {}): WsShipment => ({
@@ -77,4 +77,12 @@ test('current trip = open shipments, oldest first; availability is null when the
   assert.equal(vehicleAvailability(null, 'p1'), null);
   assert.equal(vehicleAvailability([{ productId: 'p2', onHand: 1, reserved: 0, available: 1 }], 'p1'), null);
   assert.equal(vehicleAvailability([{ productId: 'p1', onHand: 4, reserved: 1, available: 3 }], 'p1')?.available, 3);
+});
+
+test('collectionOf distinguishes "not visible" (undefined) from "visible, none recorded" (null) and a record', () => {
+  const m = new Map<string, WsCollection | null>([['a', col('a', 'pending')], ['b', null]]);
+  assert.equal(collectionOf(m, 'a')?.remittanceStatus, 'pending');
+  assert.equal(collectionOf(m, 'b'), null);
+  assert.equal(collectionOf(m, 'hidden'), undefined);
+  assert.equal(collectionOf(null, 'a'), undefined);
 });

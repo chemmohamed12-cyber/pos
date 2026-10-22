@@ -182,3 +182,12 @@ export function vehicleAvailability(stock: readonly StockRow[] | null, productId
   if (!stock) return null;
   return stock.find((r) => r.productId === productId) ?? null;
 }
+
+/**
+ * The collection of one shipment from the server's batched, permission-checked read: `undefined` = this user may not see it ("not available" - never shown as none or zero),
+ * `null` = visible and none recorded, otherwise the record.
+ */
+export function collectionOf(map: ReadonlyMap<string, WsCollection | null> | null, shipmentId: string): WsCollection | null | undefined {
+  if (!map || !map.has(shipmentId)) return undefined;
+  return map.get(shipmentId) ?? null;
+}

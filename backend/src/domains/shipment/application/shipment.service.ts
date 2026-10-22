@@ -606,6 +606,61 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     };
   }
 
+  /**
+   * Vehicle Driver Workspace, Stage C / F-4 (2026-10-22) — the shipments of ONE vehicle, filtered on the server (the board read had no vehicle filter, so the screen downloaded every
+   * shipment and filtered in the browser). Same scope rule as the board: whoever may see every shipment of the Company (`board_all`, `read_any`, `act_any`) gets all of this
+   * vehicle's shipments, everyone else only the ones they are the assigned driver of. States come from ONE batched read of the process instances (not one per row); newest
+   * first, capped at `limit` (default 300) with an explicit `truncated` flag so a cut-off list is never presented as complete. Read-only.
+   */
+  async listShipmentsForVehicle(
+    vehicleId: string,
+    actorUserId: string,
+    opts: { limit?: number } = {},
+    manager?: EntityManager,
+  ): Promise<{ rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null }>; truncated: boolean }> {
+    const limit = Math.min(500, Math.max(1, opts.limit ?? 300));
+    const runner = manager ?? this.dataSource;
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const seesAll = access.allows('logistics.shipment.board_all') || access.allows('logistics.shipment.read_any') || access.allows('logistics.shipment.act_any');
+    const found = await runner.getRepository(Shipment).find({
+      where: seesAll ? { vehicleId } : { vehicleId, driverUserId: actorUserId },
+      order: { createdAt: 'DESC' },
+      take: limit + 1,
+    });
+    const truncated = found.length > limit;
+    const shipments = truncated ? found.slice(0, limit) : found;
+    const stateRows: Array<{ id: string; state: string }> = shipments.length
+      ? await runner.query(
+          `SELECT "entityId"::text AS id, "currentState" AS state FROM "process_instances" WHERE "definitionKey" = $1 AND "entityType" = $2 AND "entityId"::text = ANY($3::text[])`,
+          [SHIPMENT_PROCESS.key, ENTITY_TYPE, shipments.map((s) => s.id)],
+        )
+      : [];
+    const stateById = new Map(stateRows.map((r) => [r.id, r.state]));
+    const orderCache = new Map<string, { customerName: string | null; governorate: string | null; totalAmount: string | null }>();
+    const rows = [];
+    for (const s of shipments) {
+      let extra = { customerName: null as string | null, governorate: null as string | null, totalAmount: null as string | null };
+      if (s.salesOrderId) {
+        const cached = orderCache.get(s.salesOrderId);
+        if (cached) extra = cached;
+        else {
+          const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
+          const customer = order ? await this.customers.getCustomerSnapshot(order.customerId, manager) : null;
+          extra = { customerName: customer?.name ?? null, governorate: customer?.governorate ?? null, totalAmount: order?.totalAmount ?? null };
+          orderCache.set(s.salesOrderId, extra);
+        }
+      }
+      rows.push({ ...s, state: stateById.get(s.id) ?? 'created', ...extra });
+    }
+    return { rows, truncated };
+  }
+
+  /** F-3: a driver's display NAME (and nothing else about the user) for the workspace header — resolved on the server so the screen needs no user-list permission. */
+  async getUserDisplayName(userId: string): Promise<string | null> {
+    const found = await this.users.findByIds([userId]);
+    return found[0]?.fullName ?? null;
+  }
+
   private async buildUserNameMap(): Promise<Map<string, string>> {
     const all = await this.users.listAll();
     return new Map(all.map((u) => [u.id, u.fullName]));
