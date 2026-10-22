@@ -99,6 +99,7 @@ import { PendingWork } from './pages/PendingWork';
 import { Guide } from './pages/Guide';
 import { ReleaseCenter } from './pages/ReleaseCenter';
 import { Organization } from './pages/Organization';
+import { OrganizationReport } from './pages/OrganizationReport';
 import { CompanyUsers } from './pages/CompanyUsers';
 import { CompanyRoles } from './pages/CompanyRoles';
 import { AcceptInvitation } from './pages/AcceptInvitation';
@@ -243,6 +244,7 @@ function AppRoutes() {
         <Route path="guide" element={<Guide />} />
         <Route path="release-center" element={<ReleaseCenter />} />
         <Route path="organization" element={<Organization />} />
+        <Route path="organization/report" element={<OrganizationReport />} />
         <Route path="company-users" element={<CompanyUsers />} />
         <Route path="company-roles" element={<CompanyRoles />} />
         <Route path="reports-overview" element={<ReportsCover />} />

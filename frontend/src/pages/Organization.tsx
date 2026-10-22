@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -226,6 +227,9 @@ export function Organization() {
     <div>
       <div className="page-header">
         <h1>{t('nav.organization')}</h1>
+        <Link className="btn btn-secondary" to="/organization/report">
+          {tr('التقرير التنظيمي', 'Organizational report')}
+        </Link>
         <label style={{ fontSize: '0.9rem' }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> {tr('عرض المؤرشف', 'Show archived')}
         </label>

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { ShipmentService } from '../application/shipment.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -93,6 +93,13 @@ class CreateVehicleDto {
   @IsOptional()
   @IsString()
   parentWarehouseId?: string;
+}
+
+class ApplyVehicleMappingDto {
+  /** The vehicles the owner confirmed from the mapping report; only an unambiguous `proposed` match is ever applied. */
+  @IsArray()
+  @IsString({ each: true })
+  vehicleIds!: string[];
 }
 
 class UpdateVehicleDto {
@@ -313,6 +320,27 @@ export class ShipmentController {
   async vehicleBranchMappingReport(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
     return this.shipments.vehicleBranchMappingReport(req.companyContext.dataSource.manager);
+  }
+
+  /** Owner-confirmed application of the mapping report: each listed vehicle is re-checked (still unassigned, exactly one branch with that name, inside the caller's scope) and then edited through the normal audited path. Ambiguous / unmatched / no-text vehicles are skipped with a reason, never guessed. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Post('vehicles-branch-mapping-apply')
+  async applyVehicleBranchMapping(@Req() req: CompanyScopedRequest, @Body() dto: ApplyVehicleMappingDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const report = await this.shipments.vehicleBranchMappingReport(manager);
+    const applied: Array<{ vehicleId: string; code: string; orgUnitId: string }> = [];
+    const skipped: Array<{ vehicleId: string; reason: string }> = [];
+    for (const id of dto.vehicleIds) {
+      const row = report.rows.find((r) => r.vehicleId === id);
+      if (!row) { skipped.push({ vehicleId: id, reason: 'not_found_or_already_assigned' }); continue; }
+      if (row.status !== 'proposed') { skipped.push({ vehicleId: id, reason: row.status }); continue; }
+      const orgUnitId = await this.orgContext.resolveBranch(req, { requested: row.candidates[0].id });
+      await this.shipments.updateVehicle(id, { orgUnitId }, req.user.id, manager);
+      applied.push({ vehicleId: id, code: row.code, orgUnitId: orgUnitId! });
+    }
+    return { applied, skipped };
   }
 
   @UseGuards(PermissionGuard)

@@ -134,3 +134,4 @@ src/domains/inventory-warehouse/interface/warehouse-branch.real-pg.spec.ts
 src/domains/sales-orders/interface/branch-stamping.real-pg.spec.ts
 src/domains/procurement/interface/procurement-branch.real-pg.spec.ts
 src/domains/reports/interface/org-report.real-pg.spec.ts
+src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts

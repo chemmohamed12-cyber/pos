@@ -128,6 +128,19 @@ describe('Vehicle branch — validated organizational reference (real Postgres)'
     expect(await q(dsA, `SELECT 1 FROM vehicles WHERE code LIKE 'L-%' AND "orgUnitId" IS NOT NULL`)).toHaveLength(0); // report only
   });
 
+  it('owner-confirmed application of the report: only an unambiguous proposed match is applied (through the audited edit); everything else is skipped with a reason', async () => {
+    scope = unrestricted();
+    const idOf = async (code: string) => (await q(dsA, `SELECT id FROM vehicles WHERE code = $1`, [code]))[0].id as string;
+    const result = await controller.applyVehicleBranchMapping(req(dsA), { vehicleIds: [await idOf('L-1'), await idOf('L-2'), await idOf('L-3'), await idOf('L-4'), randomUUID()] });
+    expect(result.applied).toEqual([expect.objectContaining({ code: 'L-1', orgUnitId: ids.cairo })]);
+    expect(result.skipped.map((s) => s.reason).sort()).toEqual(['ambiguous', 'no_text', 'not_found_or_already_assigned', 'unmatched']);
+    const l1 = (await q(dsA, `SELECT "orgUnitId", branch FROM vehicles WHERE code = 'L-1'`))[0];
+    expect(l1).toEqual({ orgUnitId: ids.cairo, branch: 'Cairo' });
+    expect((await q(dsA, `SELECT 1 FROM vehicles WHERE code IN ('L-2','L-3','L-4') AND "orgUnitId" IS NOT NULL`))).toHaveLength(0);
+    const again = await controller.applyVehicleBranchMapping(req(dsA), { vehicleIds: [await idOf('L-1')] }); // idempotent
+    expect(again.applied).toEqual([]);
+  });
+
   it('cross-branch isolation: a caller scoped to one branch lists only that branch’s vehicles (plus unlinked legacy ones) and gets 404 on another branch’s vehicle', async () => {
     const cairoVehicle = (await controller.createVehicle(req(dsA), { code: 'V-CAIRO-2', plateNumber: 'F 1', orgUnitId: ids.cairo } as never)).id;
     scope = restrictedTo(ids.tanta);
