@@ -3,6 +3,8 @@ import { DataSource, EntityManager, Not } from 'typeorm';
 import { DeliveryOutcome } from '../infrastructure/delivery-outcome.entity';
 import { Collection } from '../infrastructure/collection.entity';
 import { ShipmentCustody } from '../infrastructure/shipment-custody.entity';
+import { ShipmentLineDelivery } from '../infrastructure/shipment-line-delivery.entity';
+import { computeDeliveryProgress } from './line-delivery-progress';
 import { DeliveryOutcomeType } from '../domain/delivery-outcome-type';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -69,6 +71,17 @@ export class DeliveryService implements LogisticsDeliveryContract {
       // Stage C / F-2 (2026-10-22): a cash-on-delivery shipment is never confirmed delivered without the collection that the delivery is for (enforced here, on the server — a UI
       // restriction is not enough). The collection keeps its own lifecycle (recorded -> remitted -> GL at remittance); this only refuses a "delivered" outcome that has none.
       if (outcome === 'delivered') {
+        // Stage C / C2 (D-1): once per-line delivery events exist, the shipment can only be confirmed delivered when every line is accounted for (delivered + returned == shipped); with
+        // no events the legacy whole-shipment flow is unchanged. Serialised with the line recording by the same per-shipment lock.
+        await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:lines:${shipmentId}`]);
+        const lineEvents = await txManager.getRepository(ShipmentLineDelivery).find({ where: { shipmentId } });
+        if (lineEvents.length > 0) {
+          const lineSnap = await this.shipments.getShipmentLinesSnapshot(shipmentId, txManager);
+          const open = computeDeliveryProgress(lineSnap?.lines ?? [], lineEvents).lines.filter((l) => l.outstanding > 0);
+          if (open.length > 0) {
+            throw new ConflictException(`Shipment "${shipmentId}" still has ${open.length} line(s) not accounted for (delivered or returned) - record them before confirming the delivery. Nothing was changed.`);
+          }
+        }
         const snapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
         if (snapshot && snapshot.codAmount !== null && Number(snapshot.codAmount) > 0) {
           const collected = await this.getCollectionForShipmentUnscoped(shipmentId, txManager); // latest NON-rejected one

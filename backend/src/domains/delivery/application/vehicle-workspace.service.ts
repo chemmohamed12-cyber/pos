@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Collection } from '../infrastructure/collection.entity';
+import { ShipmentLineDelivery } from '../infrastructure/shipment-line-delivery.entity';
+import { computeDeliveryProgress } from './line-delivery-progress';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { VehicleAccessService } from '../../shipment/application/vehicle-access.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -93,6 +95,16 @@ export class VehicleWorkspaceService {
       return { expected: exp === null ? null : money(exp), recorded: money(sum('recorded')), confirmed: money(sum('confirmed')), rejected: money(sum('rejected')), counted: money(counted), remaining: exp === null ? null : money(Math.max(0, exp - counted)) };
     };
 
+    // Stage C / C2: per-line delivery progress, batched for every shipment returned (lines are a frozen snapshot of the shipment, events are append-only). "Partially delivered" is
+    // DERIVED here from real events - never stored, never a shipment state.
+    const shipmentIds = list.rows.map((s) => s.id);
+    const lineRows: Array<{ id: string; shipmentId: string; productId: string; quantity: number }> = shipmentIds.length
+      ? await (manager ?? this.dataSource).query(`SELECT "id","shipmentId","productId","quantity" FROM "shipment_lines" WHERE "shipmentId" = ANY($1::uuid[])`, [shipmentIds])
+      : [];
+    const eventRows: ShipmentLineDelivery[] = shipmentIds.length
+      ? await (manager ?? this.dataSource).getRepository(ShipmentLineDelivery).createQueryBuilder('e').where('e."shipmentId" IN (:...ids)', { ids: shipmentIds }).getMany()
+      : [];
+
     const rows = list.rows.map((s) => {
       const c = byShipment.get(s.id);
       const collection: WorkspaceCollection | null = c ? view(c) : null;
@@ -114,6 +126,10 @@ export class VehicleWorkspaceService {
         collection: visible.has(s.id) ? collection : null,
         // Stage C / C1: every instalment (rejected ones included, flagged) and the server-computed totals; `null` when this user may not see the collections of this shipment.
         collections: visible.has(s.id) ? list.map(view) : null,
+        lineProgress: computeDeliveryProgress(
+          lineRows.filter((l) => l.shipmentId === s.id),
+          eventRows.filter((e) => e.shipmentId === s.id),
+        ),
         collectionTotals: visible.has(s.id) ? totalsOf(list, s.codAmount) : null,
       };
     });

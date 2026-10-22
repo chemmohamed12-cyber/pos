@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { DeliveryService } from '../application/delivery.service';
+import { LineDeliveryService } from '../application/line-delivery.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -36,6 +37,29 @@ class RecordCollectionDto {
   clientKey?: string;
 }
 
+class RecordLineDeliveryDto {
+  @IsUUID()
+  shipmentId!: string;
+
+  @IsUUID()
+  shipmentLineId!: string;
+
+  @IsIn(['delivered', 'returned'])
+  kind!: 'delivered' | 'returned';
+
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  clientKey?: string;
+}
+
 class RejectCollectionDto {
   @IsString()
   reason!: string;
@@ -57,7 +81,10 @@ class RemitCollectionDto {
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class DeliveryController {
-  constructor(private readonly delivery: DeliveryService) {}
+  constructor(
+    private readonly delivery: DeliveryService,
+    private readonly lineDeliveries: LineDeliveryService,
+  ) {}
 
   @Post('outcomes')
   async recordOutcome(@Req() req: CompanyScopedRequest, @Body() dto: RecordOutcomeDto) {
@@ -69,6 +96,19 @@ export class DeliveryController {
   async recordCollection(@Req() req: CompanyScopedRequest, @Body() dto: RecordCollectionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.delivery.recordCollection(dto.shipmentId, dto.amount, dto.method, req.user.id, req.companyContext.dataSource.manager, dto.clientKey ?? null);
+  }
+
+  /** Stage C / C2 (D-1): record units of one shipment line handed over or brought back (driver or admin; append-only). */
+  @Post('line-events')
+  async recordLineEvent(@Req() req: CompanyScopedRequest, @Body() dto: RecordLineDeliveryDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.lineDeliveries.record(dto, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @Get('line-events')
+  async lineEvents(@Req() req: CompanyScopedRequest, @Query('shipmentId', ParseUUIDPipe) shipmentId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.lineDeliveries.getProgress(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('outcomes')
