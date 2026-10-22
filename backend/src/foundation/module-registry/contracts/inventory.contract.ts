@@ -137,6 +137,8 @@ export interface InventoryLogisticsContract {
     parentWarehouseId: string | null,
     kind: 'main' | 'operational',
     manager?: EntityManager,
+    /** Org engine Stage 2 — owning branch (validated by the caller); an operational custody sub-location inherits its custodian's branch. */
+    orgUnitId?: string | null,
   ): Promise<{ id: string }>;
 
   listWarehouses(manager?: EntityManager): Promise<WarehouseView[]>;

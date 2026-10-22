@@ -82,7 +82,7 @@ export interface FinanceTreasuryContract {
    * `manager?` added — the concrete `TreasuryService.createAccount`
    * gained it during `treasury.controller.ts`'s own retrofit.
    */
-  createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager): Promise<{ id: string }>;
+  createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager, orgUnitId?: string | null): Promise<{ id: string }>;
 
   /**
    * P4 Tranche-2 (delivery domain) — only `.id` of the created transaction is ever read.

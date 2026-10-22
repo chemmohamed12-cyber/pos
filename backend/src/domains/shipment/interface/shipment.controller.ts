@@ -6,6 +6,7 @@ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/c
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
 
 class CreateShipmentDto {
   @IsString()
@@ -67,6 +68,10 @@ class UpdateShippingCompanyDto {
 }
 
 class CreateVehicleDto {
+  @IsOptional()
+  @IsString()
+  orgUnitId?: string;
+
   @IsString()
   code!: string;
 
@@ -91,6 +96,10 @@ class CreateVehicleDto {
 }
 
 class UpdateVehicleDto {
+  @IsOptional()
+  @IsString()
+  orgUnitId?: string;
+
   @IsOptional()
   @IsString()
   plateNumber?: string;
@@ -183,7 +192,10 @@ class TransitionDto {
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class ShipmentController {
-  constructor(private readonly shipments: ShipmentService) {}
+  constructor(
+    private readonly shipments: ShipmentService,
+    private readonly orgContext: OrgContextService,
+  ) {}
 
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateShipmentDto) {
@@ -273,6 +285,8 @@ export class ShipmentController {
   @Post('vehicles')
   async createVehicle(@Req() req: CompanyScopedRequest, @Body() dto: CreateVehicleDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    // Org engine Stage 2 — the branch is resolved and validated on the server (active branch, inside the caller's scope); required once the Company has branches.
+    const orgUnitId = await this.orgContext.resolveBranch(req, { requested: dto.orgUnitId, required: true });
     return this.shipments.createVehicle(
       dto.code,
       dto.plateNumber,
@@ -282,7 +296,17 @@ export class ShipmentController {
       req.user.id,
       dto.parentWarehouseId ?? null,
       req.companyContext.dataSource.manager,
+      orgUnitId,
     );
+  }
+
+  /** Legacy free-text branch -> validated branch: a report only, nothing is applied or guessed. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Get('vehicles-branch-mapping-report')
+  async vehicleBranchMappingReport(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.vehicleBranchMappingReport(req.companyContext.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -290,7 +314,8 @@ export class ShipmentController {
   @Post('vehicles/:id')
   async updateVehicle(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    return this.shipments.updateVehicle(id, dto, req.user.id, req.companyContext.dataSource.manager);
+    const orgUnitId = dto.orgUnitId ? await this.orgContext.resolveBranch(req, { requested: dto.orgUnitId }) : undefined;
+    return this.shipments.updateVehicle(id, { plateNumber: dto.plateNumber, branch: dto.branch, ...(orgUnitId ? { orgUnitId } : {}) }, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('vehicles/:id/overview')

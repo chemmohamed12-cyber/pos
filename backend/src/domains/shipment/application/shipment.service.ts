@@ -122,14 +122,16 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     driverUserId: string | null,
     actorUserId: string,
     manager?: EntityManager,
+    /** Org engine Stage 2 — the custodian's branch, inherited by its custody sub-location and custody treasury account. */
+    orgUnitId: string | null = null,
   ): Promise<{ warehouseId: string; custodyAccountId: string }> {
     await this.numbering.registerDocumentType('shipping_sub_location', 'SLOC', false, manager);
     await this.numbering.registerDocumentType('shipping_custody_account', 'CUST', false, manager);
     const warehouseCode = await this.numbering.getNextNumber('shipping_sub_location', manager);
     const custodyCode = await this.numbering.getNextNumber('shipping_custody_account', manager);
 
-    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational', manager);
-    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(manager), actorUserId, manager);
+    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational', manager, orgUnitId);
+    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(manager), actorUserId, manager, orgUnitId);
     return { warehouseId: warehouse.id, custodyAccountId: custodyAccount.id };
   }
 
@@ -981,6 +983,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     actorUserId: string,
     parentWarehouseId: string | null = null,
     manager?: EntityManager,
+    /** Org engine Stage 2 — the VALIDATED branch (resolved by `OrgContextService`); `null` for a Company without branches. */
+    orgUnitId: string | null = null,
   ): Promise<Vehicle> {
     const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const existing = await repo.findOne({ where: { code } });
@@ -993,7 +997,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         plateNumber,
         driverUserId,
         shippingCompanyId,
-        branch,
+        branch: orgUnitId ? await this.branchNameOf(orgUnitId, manager) : branch, // legacy text mirrors the branch name once a branch is assigned
+        orgUnitId,
         warehouseId: null,
         custodyAccountId: null,
         settlementAccountId: null,
@@ -1008,6 +1013,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       driverUserId,
       actorUserId,
       manager,
+      orgUnitId,
     );
     saved.warehouseId = warehouseId;
     saved.custodyAccountId = custodyAccountId;
@@ -1022,7 +1028,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         resourceId: saved.id,
         result: 'success',
         correlationId: null,
-        after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId },
+        after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId, orgUnitId },
       },
       manager,
     );
@@ -1039,13 +1045,35 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     return vehicle;
   }
 
-  /** CTO directive §2 — "تعديل" (edit): plate number and branch. Driver changes go through `setVehicleDriver` (its own audited action). */
-  async updateVehicle(vehicleId: string, updates: { plateNumber?: string; branch?: string | null }, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
-    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+  private async branchNameOf(orgUnitId: string, manager?: EntityManager): Promise<string | null> {
+    const rows: Array<{ name: string }> = await (manager ?? this.dataSource).query(`SELECT "name" FROM "org_units" WHERE "id" = $1`, [orgUnitId]);
+    return rows[0]?.name ?? null;
+  }
+
+  /**
+   * CTO directive §2 — "تعديل" (edit): plate number and branch. Driver changes go through `setVehicleDriver` (its own audited action).
+   * Org engine Stage 2: `orgUnitId` is the VALIDATED branch (resolved by the controller); a change is propagated to the vehicle's custody sub-location and custody
+   * treasury account so custody stays inside the branch. The legacy `branch` text is only accepted for a vehicle in a Company without branches (resolved `orgUnitId` null).
+   */
+  async updateVehicle(
+    vehicleId: string,
+    updates: { plateNumber?: string; branch?: string | null; orgUnitId?: string | null },
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<Vehicle> {
+    const runner = manager ?? this.dataSource;
+    const repo = runner.getRepository(Vehicle);
     const vehicle = await this.getVehicle(vehicleId, manager);
-    const before = { plateNumber: vehicle.plateNumber, branch: vehicle.branch };
+    const before = { plateNumber: vehicle.plateNumber, branch: vehicle.branch, orgUnitId: vehicle.orgUnitId };
     if (updates.plateNumber !== undefined) vehicle.plateNumber = updates.plateNumber;
-    if (updates.branch !== undefined) vehicle.branch = updates.branch;
+    if (updates.orgUnitId !== undefined && updates.orgUnitId !== vehicle.orgUnitId) {
+      vehicle.orgUnitId = updates.orgUnitId;
+      if (updates.orgUnitId) vehicle.branch = await this.branchNameOf(updates.orgUnitId, manager);
+      if (vehicle.warehouseId) await runner.query(`UPDATE "warehouses" SET "orgUnitId" = $1 WHERE "id" = $2`, [updates.orgUnitId, vehicle.warehouseId]);
+      if (vehicle.custodyAccountId) await runner.query(`UPDATE "treasury_accounts" SET "orgUnitId" = $1 WHERE "id" = $2`, [updates.orgUnitId, vehicle.custodyAccountId]);
+    } else if (updates.branch !== undefined && !vehicle.orgUnitId) {
+      vehicle.branch = updates.branch;
+    }
     const saved = await repo.save(vehicle);
     await this.audit.record(
       {
@@ -1057,11 +1085,35 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         result: 'success',
         correlationId: null,
         before,
-        after: updates,
+        after: { plateNumber: saved.plateNumber, branch: saved.branch, orgUnitId: saved.orgUnitId },
       },
       manager,
     );
     return saved;
+  }
+
+  /**
+   * Legacy mapping report (org engine D-8). For every vehicle that still has no validated branch: the old free text and what it could correspond to. NOTHING is applied
+   * here — `proposed` (one active branch has exactly that name) still needs an owner to confirm through the normal edit; `ambiguous` / `unmatched` / `no_text` are never guessed.
+   */
+  async vehicleBranchMappingReport(manager?: EntityManager): Promise<{
+    branchesAvailable: number;
+    rows: Array<{ vehicleId: string; code: string; plateNumber: string; legacyText: string | null; status: 'proposed' | 'ambiguous' | 'unmatched' | 'no_text'; candidates: Array<{ id: string; name: string }> }>;
+  }> {
+    const runner = manager ?? this.dataSource;
+    const vehicles = await runner.getRepository(Vehicle).find({ order: { code: 'ASC' } });
+    const branches: Array<{ id: string; name: string }> = await runner.query(`SELECT "id","name" FROM "org_units" WHERE "type" = 'branch' AND "status" = 'active'`);
+    const norm = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+    const rows = vehicles
+      .filter((v) => !v.orgUnitId)
+      .map((v) => {
+        const text = v.branch && v.branch.trim() ? v.branch : null;
+        if (!text) return { vehicleId: v.id, code: v.code, plateNumber: v.plateNumber, legacyText: null, status: 'no_text' as const, candidates: [] };
+        const candidates = branches.filter((b) => norm(b.name) === norm(text));
+        const status = candidates.length === 1 ? ('proposed' as const) : candidates.length > 1 ? ('ambiguous' as const) : ('unmatched' as const);
+        return { vehicleId: v.id, code: v.code, plateNumber: v.plateNumber, legacyText: text, status, candidates };
+      });
+    return { branchesAvailable: branches.length, rows };
   }
 
   /** CTO directive §2 — "تغيير السائق" (change driver), its own explicit action distinct from a general edit. */

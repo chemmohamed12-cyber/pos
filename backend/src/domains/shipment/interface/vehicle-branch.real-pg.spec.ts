@@ -1,0 +1,134 @@
+import { randomUUID } from 'crypto';
+import { DataSource } from 'typeorm';
+import { ShipmentService } from '../application/shipment.service';
+import { ShipmentController } from './shipment.controller';
+import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
+import { TreasuryService } from '../../treasury/application/treasury.service';
+import { AuditService } from '../../../foundation/audit/audit.service';
+import { NumberingService } from '../../../foundation/numbering/numbering.service';
+import { OrganizationService } from '../../../foundation/organization/organization.service';
+import { AccessScope, AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
+import { CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
+import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
+
+/**
+ * Org engine Stage 2 (real PostgreSQL) — the vehicle's branch is a validated organizational reference, resolved on the server: required once the Company has active
+ * branches, validated (exists in THIS Company, active, type branch, inside the caller's scope), inherited by the custody sub-location and the custody treasury
+ * account, and a Company without branches keeps working exactly as before. The legacy free text is never auto-mapped.
+ */
+describe('Vehicle branch — validated organizational reference (real Postgres)', () => {
+  jest.setTimeout(300_000);
+  let h: TwoCompanyHarness;
+  let dsA: DataSource;
+  let dsB: DataSource;
+  let controller: ShipmentController;
+  let service: ShipmentService;
+  let scope: AccessScope;
+  const ids: Record<string, string> = {};
+  const userId = randomUUID();
+
+  const req = (ds: DataSource) => ({ user: { id: userId, email: 'x@test.local', companyId: 'c' }, companyContext: { companyId: 'c', dataSource: ds } }) as unknown as CompanyScopedRequest;
+  const unrestricted = (): AccessScope => ({ userId, unrestricted: true, unitIds: new Set<string>() });
+  const restrictedTo = (...units: string[]): AccessScope => ({ userId, unrestricted: false, unitIds: new Set(units) });
+  const q = async (ds: DataSource, sql: string, p: unknown[] = []) => ds.query(sql, p);
+
+  beforeAll(async () => {
+    h = await setUpTwoCompanyHarness({ namePrefix: 'vehicle_branch', extraCompanyTags: ['sales', 'inventory', 'finance', 'logistics'] });
+    dsA = await h.connections.getDataSource(h.companyAId);
+    dsB = await h.connections.getDataSource(h.companyBId);
+    for (const ds of [dsA, dsB]) {
+      await ds.query(`INSERT INTO "warehouses" ("id","code","name","status","kind") VALUES ($1,'WH-MAIN','Main Warehouse','active','main')`, [randomUUID()]);
+    }
+    const inert = {} as never;
+    const audit = new AuditService(h.controlPlane);
+    const numbering = new NumberingService(h.controlPlane);
+    const inventory = new InventoryService(h.controlPlane, audit, inert, inert, numbering, inert, undefined);
+    const treasury = new TreasuryService(h.controlPlane, numbering, audit, inert, inert);
+    service = new ShipmentService(h.controlPlane, numbering, inert, inert, audit, inert, inventory, inert, treasury, inert, inert, inert);
+    const scopes = new AccessScopeService(inert, inert);
+    jest.spyOn(scopes, 'forRequest').mockImplementation(async () => scope);
+    controller = new ShipmentController(service, new OrgContextService(scopes));
+  });
+  afterAll(async () => h.teardown());
+
+  it('a Company WITHOUT branches keeps working as before: no branch needed, legacy text accepted', async () => {
+    scope = unrestricted();
+    const v = await controller.createVehicle(req(dsA), { code: 'V-LEGACY', plateNumber: 'A 1', branch: 'Old free text' } as never);
+    expect(v.orgUnitId).toBeNull();
+    expect(v.branch).toBe('Old free text');
+  });
+
+  it('once branches exist: a branch is required — even for an unrestricted administrator (no silent default)', async () => {
+    const org = new OrganizationService(dsA);
+    ids.root = (await org.createUnit('company', 'Mother')).id;
+    ids.cairo = (await org.createUnit('branch', 'Cairo', ids.root)).id;
+    ids.tanta = (await org.createUnit('branch', 'Tanta', ids.root)).id;
+    ids.dept = (await org.createUnit('department', 'Ops', ids.cairo)).id;
+    scope = unrestricted();
+    await expect(controller.createVehicle(req(dsA), { code: 'V-NOBRANCH', plateNumber: 'B 1' } as never)).rejects.toThrow(/Select the branch/i);
+    expect(await q(dsA, `SELECT 1 FROM vehicles WHERE code = 'V-NOBRANCH'`)).toHaveLength(0); // nothing half-created
+  });
+
+  it('a caller who can reach exactly one branch gets it (single-branch rule); a caller with none is refused', async () => {
+    scope = restrictedTo(ids.tanta);
+    const v = await controller.createVehicle(req(dsA), { code: 'V-TANTA', plateNumber: 'C 1' } as never);
+    expect(v.orgUnitId).toBe(ids.tanta);
+    scope = restrictedTo();
+    await expect(controller.createVehicle(req(dsA), { code: 'V-NONE', plateNumber: 'C 2' } as never)).rejects.toThrow(/No branch is available/i);
+  });
+
+  it('the chosen branch is inherited by the custody sub-location and the custody treasury account, and mirrored into the legacy text', async () => {
+    scope = unrestricted();
+    const v = await controller.createVehicle(req(dsA), { code: 'V-CAIRO', plateNumber: 'D 1', orgUnitId: ids.cairo } as never);
+    expect(v.orgUnitId).toBe(ids.cairo);
+    expect(v.branch).toBe('Cairo');
+    expect((await q(dsA, `SELECT "orgUnitId" FROM warehouses WHERE id = $1`, [v.warehouseId]))[0].orgUnitId).toBe(ids.cairo);
+    expect((await q(dsA, `SELECT "orgUnitId" FROM treasury_accounts WHERE id = $1`, [v.custodyAccountId]))[0].orgUnitId).toBe(ids.cairo);
+  });
+
+  it('server-side validation: foreign Company id -> 404, department -> 400, archived -> 400, outside the caller scope -> 404, malformed -> 400', async () => {
+    const foreign = (await new OrganizationService(dsB).createUnit('branch', 'Beta branch')).id;
+    scope = unrestricted();
+    await expect(controller.createVehicle(req(dsA), { code: 'V-X1', plateNumber: 'E', orgUnitId: foreign } as never)).rejects.toThrow(/Not Found/i);
+    await expect(controller.createVehicle(req(dsA), { code: 'V-X2', plateNumber: 'E', orgUnitId: ids.dept } as never)).rejects.toThrow(/not a branch/i);
+    await expect(controller.createVehicle(req(dsA), { code: 'V-X3', plateNumber: 'E', orgUnitId: 'not-a-uuid' } as never)).rejects.toThrow(/not valid/i);
+    const org = new OrganizationService(dsA);
+    const spare = (await org.createUnit('branch', 'Spare', ids.root)).id;
+    await org.archiveUnit(spare);
+    await expect(controller.createVehicle(req(dsA), { code: 'V-X4', plateNumber: 'E', orgUnitId: spare } as never)).rejects.toThrow(/archived/i);
+    scope = restrictedTo(ids.tanta);
+    await expect(controller.createVehicle(req(dsA), { code: 'V-X5', plateNumber: 'E', orgUnitId: ids.cairo } as never)).rejects.toThrow(/Not Found/i);
+    expect(await q(dsA, `SELECT 1 FROM vehicles WHERE code LIKE 'V-X%'`)).toHaveLength(0);
+  });
+
+  it('moving a vehicle to another branch moves its custody sub-location and account with it (audited)', async () => {
+    scope = unrestricted();
+    const v = (await q(dsA, `SELECT id, "warehouseId", "custodyAccountId" FROM vehicles WHERE code = 'V-CAIRO'`))[0];
+    const moved = await controller.updateVehicle(req(dsA), v.id, { orgUnitId: ids.tanta } as never);
+    expect(moved.orgUnitId).toBe(ids.tanta);
+    expect(moved.branch).toBe('Tanta');
+    expect((await q(dsA, `SELECT "orgUnitId" FROM warehouses WHERE id = $1`, [v.warehouseId]))[0].orgUnitId).toBe(ids.tanta);
+    expect((await q(dsA, `SELECT "orgUnitId" FROM treasury_accounts WHERE id = $1`, [v.custodyAccountId]))[0].orgUnitId).toBe(ids.tanta);
+    expect(await q(dsA, `SELECT 1 FROM audit_records WHERE action = 'shipment.vehicle.updated' AND "resourceId" = $1`, [v.id])).toHaveLength(1);
+  });
+
+  it('legacy mapping report: exact name -> proposed, unknown -> unmatched, no text -> no_text, duplicate names -> ambiguous; nothing is applied', async () => {
+    await q(dsA, `INSERT INTO org_units (type, name, "parentId") VALUES ('branch','Twin',$1),('branch','Twin',$1)`, [ids.root]);
+    for (const [code, text] of [['L-1', 'cairo'], ['L-2', 'Nowhere'], ['L-3', null], ['L-4', 'Twin']] as const) {
+      await q(dsA, `INSERT INTO vehicles (code, "plateNumber", branch, status) VALUES ($1,'P',$2,'active')`, [code, text]);
+    }
+    const report = await service.vehicleBranchMappingReport(dsA.manager);
+    const by = Object.fromEntries(report.rows.map((r) => [r.code, r]));
+    expect(by['L-1']).toMatchObject({ status: 'proposed', candidates: [expect.objectContaining({ id: ids.cairo })] });
+    expect(by['L-2'].status).toBe('unmatched');
+    expect(by['L-3'].status).toBe('no_text');
+    expect(by['L-4'].status).toBe('ambiguous');
+    expect(by['V-LEGACY'].status).toBe('unmatched'); // the free text created before branches existed
+    expect(await q(dsA, `SELECT 1 FROM vehicles WHERE code LIKE 'L-%' AND "orgUnitId" IS NOT NULL`)).toHaveLength(0); // report only
+  });
+
+  it('Company B is untouched by all of the above', async () => {
+    expect(await q(dsB, `SELECT 1 FROM vehicles`)).toHaveLength(0);
+  });
+});

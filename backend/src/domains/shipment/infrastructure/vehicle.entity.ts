@@ -30,9 +30,14 @@ export class Vehicle {
   @Column({ type: 'uuid', nullable: true })
   shippingCompanyId!: string | null;
 
-  /** Free text for V1 (CTO's own field list is just "Branch") — not a full Branch entity, no such concept exists elsewhere in this codebase yet. */
+  /** LEGACY free text (V1). Kept for compatibility and audited migration (org engine D-8): when `orgUnitId` is set this mirrors the branch NAME at the time of assignment; it is no longer the source of truth. */
   @Column({ type: 'varchar', length: 128, nullable: true })
   branch!: string | null;
+
+  /** Org engine Stage 2 — the validated owning branch (`org_units`, type `branch`). `null` = unassigned legacy vehicle or a Company without branches. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  orgUnitId!: string | null;
 
   /** Auto-created Operational Sub-location (CTO directive §4) — this vehicle's own goods-in-transit location. */
   @Column({ type: 'uuid', nullable: true })

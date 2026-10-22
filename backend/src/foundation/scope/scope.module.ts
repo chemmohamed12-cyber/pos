@@ -5,12 +5,13 @@ import { ScopeService } from './scope.service';
 import { ScopeResolver } from './scope-resolver.service';
 import { AccessScopeService } from './access-scope.service';
 import { WarehouseScopeGuard } from './warehouse-scope.guard';
+import { OrgContextService } from './org-context.service';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { OrganizationModule } from '../organization/organization.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ScopeAssignment]), AuthorizationModule, OrganizationModule],
-  providers: [ScopeService, ScopeResolver, AccessScopeService, WarehouseScopeGuard],
-  exports: [ScopeService, ScopeResolver, AccessScopeService, WarehouseScopeGuard],
+  providers: [ScopeService, ScopeResolver, AccessScopeService, WarehouseScopeGuard, OrgContextService],
+  exports: [ScopeService, ScopeResolver, AccessScopeService, WarehouseScopeGuard, OrgContextService],
 })
 export class ScopeModule {}
