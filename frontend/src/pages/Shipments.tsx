@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { nameOf, currentLang, EVENT_AND_ACTION_NAMES } from '../lib/displayNames';
 import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
+import { isNewShippingOrder } from '../lib/orderStage';
+import { useSearchParams } from 'react-router-dom';
 
 /** A direct sale (customer takes the goods at the company) has no route/driver leg: right after preparation its shipment is simply READY for the counter hand-over. */
 function shipmentStateCode(state: string, directSale: boolean): string {
@@ -677,7 +679,9 @@ export function Shipments() {
   const [companies, setCompanies] = useState<ShippingCompany[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [selectedBucketKey, setSelectedBucketKey] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  // `/shipments?bucket=new` (from the Shipping cover) opens the new shipping orders directly.
+  const [selectedBucketKey, setSelectedBucketKey] = useState<string | null>(searchParams.get('bucket') === 'new' ? 'new' : null);
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -718,7 +722,7 @@ export function Shipments() {
   }, []);
 
   const newOrders = useMemo(
-    () => shipments.filter((s) => !s.shippingCompanyId && !s.vehicleId && s.shippingMethod !== 'direct_sale' && (s.state === 'created' || s.state === 'assigned')),
+    () => shipments.filter(isNewShippingOrder),
     [shipments],
   );
 
@@ -830,7 +834,16 @@ export function Shipments() {
         <div className="custodian-pill">
           <button
             className={selectedBucketKey === 'new' ? 'count-in-progress count-active' : newOrders.length > 0 ? 'count-in-progress' : 'count-zero'}
-            onClick={() => setSelectedBucketKey(selectedBucketKey === 'new' ? null : 'new')}
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              // Opens the new shipping orders: a single new order opens straight into its detail, several show the list of just those.
+              if (selectedBucketKey === 'new' && newOrders.length !== 1) {
+                setSelectedBucketKey(null);
+                return;
+              }
+              setSelectedBucketKey('new');
+              if (newOrders.length === 1) setSelectedShipmentId(newOrders[0].id);
+            }}
           >
             {t('panel.new_shipping_orders')}: {newOrders.length}
           </button>

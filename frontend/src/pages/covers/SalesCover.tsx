@@ -5,7 +5,11 @@ import { SectionCover } from '../../components/SectionCover';
 import { MiniBarChart } from '../../components/MiniBarChart';
 
 interface SalesOrder {
+  id: string;
   status: string;
+}
+interface FulfillmentOrderRef {
+  salesOrderId: string;
 }
 interface SalesOrderReportRow {
   createdAt: string;
@@ -49,9 +53,17 @@ export function SalesCover() {
         ]);
         const thisMonth = new Date().toISOString().slice(0, 7);
         const thisMonthOrders = salesOrdersReport.filter((r) => r.createdAt.slice(0, 7) === thisMonth);
+        // "Approved, awaiting preparation" = released orders the warehouse has NOT received yet: once a fulfilment order exists (receive) the order leaves this tile. Where
+        // the viewer cannot read fulfilment orders, fall back to the released count rather than hiding the tile.
+        let received: Set<string> | null = null;
+        try {
+          received = new Set((await api.get<FulfillmentOrderRef[]>('/fulfillment/orders')).map((fo) => fo.salesOrderId));
+        } catch {
+          received = null;
+        }
         setKpis({
           open: orders.filter((o) => OPEN_ORDER_STATES.includes(o.status)).length,
-          released: orders.filter((o) => o.status === 'released').length,
+          released: orders.filter((o) => o.status === 'released' && !(received && received.has(o.id))).length,
           pendingDeposits: salesOrdersReport.filter((r) => r.status === 'deposit_verification' || r.depositStatus === 'submitted').length,
           monthTotal: thisMonthOrders.reduce((sum, r) => sum + Number(r.totalAmount), 0).toFixed(2),
         });

@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { SectionCover, type SectionKpi } from '../../components/SectionCover';
+import { useLanguage } from '../../context/LanguageContext';
+import { isNewShippingOrder } from '../../lib/orderStage';
 
 interface Shipment {
   state: string;
+  shippingCompanyId: string | null;
+  vehicleId: string | null;
+  shippingMethod?: string | null;
 }
 interface PendingCollection {
   id: string;
@@ -24,7 +29,9 @@ const IN_TRANSIT_STATES = ['picked_up', 'in_transit', 'out_for_delivery'];
 /** CTO directive ("Section Cover / Main Dashboard System") — the Shipping section's own landing page: shipments in transit, pending remittances, and total money currently under custody, all from the exact endpoints `Shipments.tsx` itself already reads. */
 export function ShippingCover() {
   const { can } = useAuth();
-  const [kpis, setKpis] = useState<{ inTransit: number; pendingRemittances: number | null; custodyBalance: string | null } | null>(null);
+  const { preload } = useLanguage();
+  preload(['panel.new_shipping_orders']);
+  const [kpis, setKpis] = useState<{ newOrders: number; inTransit: number; pendingRemittances: number | null; custodyBalance: string | null } | null>(null);
 
   const canReviewFinance = can('logistics.collection.view');
 
@@ -50,6 +57,7 @@ export function ShippingCover() {
         const custodyBalance = overviews.reduce((sum, o) => sum + Number(o.custodyBalance ?? 0), 0).toFixed(2);
 
         setKpis({
+          newOrders: shipments.filter(isNewShippingOrder).length,
           inTransit: shipments.filter((s) => IN_TRANSIT_STATES.includes(s.state)).length,
           pendingRemittances,
           custodyBalance,
@@ -62,6 +70,7 @@ export function ShippingCover() {
 
   const kpiTiles: SectionKpi[] = [];
   if (kpis) {
+    kpiTiles.push({ labelCode: 'panel.new_shipping_orders', value: kpis.newOrders, to: '/shipments?bucket=new', tone: kpis.newOrders > 0 ? 'warning' : 'default' });
     kpiTiles.push({ labelCode: 'nav.shipments', value: kpis.inTransit, to: '/shipments' });
     if (kpis.pendingRemittances !== null) {
       kpiTiles.push({

@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
+import { orderStage, type OrderStage } from '../../lib/orderStage';
 import { DepositPanel } from '../../components/DepositPanel';
 import { ReserveStockPanel } from '../../components/ReserveStockPanel';
 import { fmtDateTime } from '../../lib/formatDateTime';
@@ -142,6 +143,8 @@ export function SalesOrdersDetail() {
   // not just the Shipments screen. Non-critical: most orders won't have
   // one yet, and a failure here should never block the rest of the page.
   const [shipment, setShipment] = useState<ShipmentSummary | null>(null);
+  // Where a released order is now (preparation / shipping / delivered): read from the fulfilment order, its pack task and the shipment the system already keeps.
+  const [stage, setStage] = useState<{ stage: OrderStage; shipmentState: string | null } | null>(null);
   const loadShipment = useCallback(async () => {
     if (!id) return;
     try {
@@ -149,6 +152,21 @@ export function SalesOrdersDetail() {
       setShipment(data);
     } catch {
       // Non-critical — no RSH yet is the normal case for most orders.
+    }
+  }, [id]);
+  const loadStage = useCallback(async () => {
+    if (!id) return;
+    try {
+      const [fo, ship] = await Promise.all([
+        api.get<{ id: string } | null>(`/fulfillment/orders/by-sales-order?salesOrderId=${id}`).catch(() => null),
+        api.get<{ id: string } | null>(`/shipments/by-sales-order/${id}`).catch(() => null),
+      ]);
+      const shipmentState = ship ? (await api.get<{ state: string }>(`/shipments/${ship.id}`)).state : null;
+      let packClosed = false;
+      if (fo) packClosed = (await api.get<Array<{ fulfillmentOrderId: string; state: string }>>('/fulfillment/pack-tasks')).some((p) => p.fulfillmentOrderId === fo.id && p.state === 'closed');
+      setStage({ stage: orderStage({ hasFulfillmentOrder: !!fo, packClosed, shipmentState }), shipmentState });
+    } catch {
+      setStage(null); // Non-critical: the approval status is still shown.
     }
   }, [id]);
 
@@ -169,8 +187,9 @@ export function SalesOrdersDetail() {
     loadEditHistory();
     loadDeposit();
     loadShipment();
+    loadStage();
     loadInvoice();
-  }, [load, loadEditHistory, loadDeposit, loadShipment, loadInvoice]);
+  }, [load, loadEditHistory, loadDeposit, loadShipment, loadStage, loadInvoice]);
 
   useEffect(() => {
     (async () => {
@@ -258,6 +277,11 @@ export function SalesOrdersDetail() {
     'deposit.status.rejected',
     ...availableActions.map((a) => `sales_order_approval.action.${a.action}`),
     ...(order ? [`sales_order_approval.state.${order.status}`] : []),
+    'order_stage.in_preparation',
+    'order_stage.ready_for_shipping',
+    'order_stage.in_shipping',
+    'order_stage.delivered',
+    'shipment_lifecycle.state.ready_for_handover',
   ]);
 
   // Draft Order Deletion (CTO directive §2) — ownership/status gating is
@@ -408,7 +432,19 @@ export function SalesOrdersDetail() {
           <div className="detail-field">
             <div className="label">{t('field.status')}</div>
             <div className="value">
-              <StatusBadge code={`sales_order_approval.state.${order.status}`} />
+              {order.status === 'released' && stage && stage.stage !== 'awaiting_preparation' ? (
+                <>
+                  <StatusBadge code={`order_stage.${stage.stage}`} />
+                  {stage.stage === 'in_shipping' && stage.shipmentState && (
+                    <>
+                      {' '}
+                      <StatusBadge code={`shipment_lifecycle.state.${stage.shipmentState === 'created' && order.shippingMethod === 'direct_sale' ? 'ready_for_handover' : stage.shipmentState}`} />
+                    </>
+                  )}
+                </>
+              ) : (
+                <StatusBadge code={`sales_order_approval.state.${order.status}`} />
+              )}
             </div>
           </div>
           <div className="detail-field">
@@ -507,7 +543,8 @@ export function SalesOrdersDetail() {
       <ReserveStockPanel salesOrderId={order.id} orderStatus={order.status} lines={order.lines} />
       <DepositPanel salesOrderId={order.id} orderStatus={order.status} onChanged={load} />
 
-      {order.status === 'released' && (
+      {/* The "waiting for preparation" notice only while the order is still with Fulfilment; once prepared / shipping it is replaced by the stage badge and the shipping order below. */}
+      {order.status === 'released' && (!stage || stage.stage === 'awaiting_preparation' || stage.stage === 'in_preparation') && (
         <div className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>{t('panel.released_for_fulfillment')}</h3>
           <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>

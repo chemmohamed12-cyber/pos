@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { fmtDate } from '../../lib/formatDateTime';
 import { loadingLabel } from '../../lib/displayNames';
+import { COMPLETED_ORDER_STATES } from '../../lib/orderStage';
 
 interface SalesOrder {
   id: string;
@@ -26,7 +27,7 @@ interface SalesOrdersPage {
   total: number;
 }
 
-type Bucket = 'draft' | 'supervisor_review' | 'manager_approval' | 'deposit_verification' | 'all';
+type Bucket = 'draft' | 'supervisor_review' | 'manager_approval' | 'deposit_verification' | 'incomplete' | 'completed' | 'all';
 
 const PAGE_SIZE = 50;
 
@@ -80,6 +81,8 @@ export function SalesOrdersList() {
     'sales_order_approval.state.supervisor_review',
     'sales_order_approval.state.manager_approval',
     'sales_order_approval.state.deposit_verification',
+    'panel.orders_completed',
+    'panel.orders_incomplete',
   ]);
 
   useEffect(() => {
@@ -117,11 +120,15 @@ export function SalesOrdersList() {
     { key: 'supervisor_review', labelKey: 'sales_order_approval.state.supervisor_review' },
     { key: 'manager_approval', labelKey: 'sales_order_approval.state.manager_approval' },
     { key: 'deposit_verification', labelKey: 'sales_order_approval.state.deposit_verification' },
+    { key: 'incomplete', labelKey: 'panel.orders_incomplete' },
+    { key: 'completed', labelKey: 'panel.orders_completed' },
   ];
 
-  const countFor = (b: Bucket) => (orders ? orders.filter((o) => o.status === b).length : 0);
+  // Completed = approved and sent to preparation (released); incomplete = everything still in the approval chain, i.e. not yet sent.
+  const matches = (o: SalesOrder, b: Bucket) => (b === 'completed' ? COMPLETED_ORDER_STATES.includes(o.status) : b === 'incomplete' ? !COMPLETED_ORDER_STATES.includes(o.status) : o.status === b);
+  const countFor = (b: Bucket) => (orders ? orders.filter((o) => matches(o, b)).length : 0);
   const visibleOrders =
-    bucket === 'all' ? allOrdersPage?.rows ?? [] : orders && bucket ? orders.filter((o) => o.status === bucket) : [];
+    bucket === 'all' ? allOrdersPage?.rows ?? [] : orders && bucket ? orders.filter((o) => matches(o, bucket)) : [];
   const totalPages = useMemo(
     () => (allOrdersPage ? Math.max(1, Math.ceil(allOrdersPage.total / PAGE_SIZE)) : 1),
     [allOrdersPage],
