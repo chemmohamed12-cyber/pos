@@ -41,7 +41,7 @@ interface OrderDetail {
   salesRepName: string | null;
   createdByName: string | null;
   warehouseName: string | null;
-  shippingMethod: 'company_vehicles' | 'shipping_company' | null;
+  shippingMethod: 'company_vehicles' | 'shipping_company' | 'direct_sale' | null;
   totalAmount: string;
   status: string;
   createdAt: string;
@@ -249,6 +249,7 @@ export function SalesOrdersDetail() {
     'field.shipping_method',
     'shipping_method.company_vehicles',
     'shipping_method.shipping_company',
+    'shipping_method.direct_sale',
     'field.deposit_status',
     'action.delete',
     'panel.confirm_delete_draft',

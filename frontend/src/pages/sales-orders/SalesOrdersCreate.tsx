@@ -77,6 +77,7 @@ export function SalesOrdersCreate() {
     'field.shipping_method',
     'shipping_method.company_vehicles',
     'shipping_method.shipping_company',
+    'shipping_method.direct_sale',
     'field.available_stock',
     'field.total_items',
     'field.total_discount',
@@ -126,7 +127,7 @@ export function SalesOrdersCreate() {
   const [generalListItems, setGeneralListItems] = useState<Map<string, string>>(new Map());
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
-  const [shippingMethod, setShippingMethod] = useState<'' | 'company_vehicles' | 'shipping_company'>('');
+  const [shippingMethod, setShippingMethod] = useState<'' | 'company_vehicles' | 'shipping_company' | 'direct_sale'>('');
   const [stockByKey, setStockByKey] = useState<Map<string, number>>(new Map());
   const [reps, setReps] = useState<AdminUser[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -525,7 +526,7 @@ export function SalesOrdersCreate() {
             <label>{t('field.shipping_method')}</label>
             <select
               value={shippingMethod}
-              onChange={(e) => setShippingMethod(e.target.value as 'company_vehicles' | 'shipping_company')}
+              onChange={(e) => setShippingMethod(e.target.value as 'company_vehicles' | 'shipping_company' | 'direct_sale')}
               required
             >
               <option value="" disabled>
@@ -533,6 +534,7 @@ export function SalesOrdersCreate() {
               </option>
               <option value="company_vehicles">{t('shipping_method.company_vehicles')}</option>
               <option value="shipping_company">{t('shipping_method.shipping_company')}</option>
+              <option value="direct_sale">{t('shipping_method.direct_sale')}</option>
             </select>
           </div>
 

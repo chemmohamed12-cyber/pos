@@ -19,7 +19,7 @@ interface Order {
   customerId: string;
   customerAddress: string | null;
   customerGovernorate: string | null;
-  shippingMethod: 'company_vehicles' | 'shipping_company' | null;
+  shippingMethod: 'company_vehicles' | 'shipping_company' | 'direct_sale' | null;
   totalAmount: string;
   status: string;
   createdAt: string;
@@ -44,7 +44,7 @@ export function SalesOrderPrint() {
 
   preload([
     'document.sales_order_title', 'field.customer', 'field.governorate', 'field.address',
-    'field.rep_sequence_number', 'field.shipping_method', 'field.deposit_status', 'field.total_amount',
+    'field.rep_sequence_number', 'field.shipping_method', 'shipping_method.company_vehicles', 'shipping_method.shipping_company', 'shipping_method.direct_sale', 'field.deposit_status', 'field.total_amount',
   ]);
 
   useEffect(() => {

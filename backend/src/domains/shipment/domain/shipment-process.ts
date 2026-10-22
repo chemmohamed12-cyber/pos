@@ -30,5 +30,7 @@ export const SHIPMENT_PROCESS: ProcessDefinition = {
     { from: 'out_for_delivery', to: 'failed', action: 'fail_delivery' },
     { from: 'failed', to: 'assigned', action: 'retry' },
     { from: 'in_transit', to: 'returned', action: 'return_to_sender' },
+    // Direct sale from the company (shipping method `direct_sale`): the customer takes the goods at the company's own counter — no driver, route, custody or transit, so one step takes the shipment from `created` straight to `delivered`.
+    { from: 'created', to: 'delivered', action: 'direct_handover' },
   ],
 };

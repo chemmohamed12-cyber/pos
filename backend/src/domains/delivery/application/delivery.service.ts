@@ -68,6 +68,11 @@ export class DeliveryService implements LogisticsDeliveryContract {
     manager?: EntityManager,
   ): Promise<DeliveryOutcome> {
     const record = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      // Direct sale from the company: the only outcome is the counter hand-over (the stock/COGS exit below is the same as any delivery); there is no failed/refused/returned leg because nothing ever left the warehouse.
+      const directSale = await this.shipments.isDirectSale(shipmentId, txManager);
+      if (directSale && outcome !== 'delivered') {
+        throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - only a hand-over ("delivered") can be recorded.`);
+      }
       // Stage C / F-2 (2026-10-22): a cash-on-delivery shipment is never confirmed delivered without the collection that the delivery is for (enforced here, on the server — a UI
       // restriction is not enough). The collection keeps its own lifecycle (recorded -> remitted -> GL at remittance); this only refuses a "delivered" outcome that has none.
       if (outcome === 'delivered') {
@@ -92,7 +97,7 @@ export class DeliveryService implements LogisticsDeliveryContract {
           }
         }
       }
-      const action = OUTCOME_TO_SHIPMENT_ACTION[outcome];
+      const action = directSale ? 'direct_handover' : OUTCOME_TO_SHIPMENT_ACTION[outcome];
       if (action) {
         await this.shipments.transitionShipment(shipmentId, action, actorUserId, txManager);
       }

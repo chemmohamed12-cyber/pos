@@ -29,7 +29,9 @@ import { LogisticsShipmentContract } from '../../../foundation/module-registry/c
 import { UsersService } from '../../../foundation/identity/users.service';
 
 const ENTITY_TYPE = 'shipment';
-const DRIVER_ACTIONS = new Set(['pickup', 'depart', 'arrive_for_delivery', 'deliver', 'fail_delivery']);
+const DRIVER_ACTIONS = new Set(['pickup', 'depart', 'arrive_for_delivery', 'deliver', 'fail_delivery', 'direct_handover']);
+/** The Sales Order shipping method meaning "the customer takes the goods at the company's own counter" - no driver, route, carrier or custody leg (see `isDirectSale`). Compared by value so Shipment never imports Sales' domain file. */
+const DIRECT_SALE_METHOD = 'direct_sale';
 const CUSTODY_ACCOUNT_TYPE_CODE = 'custody';
 const SHIPPING_ORDER_DOCUMENT_TYPE = 'shipping_order';
 
@@ -273,11 +275,29 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     return (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { salesOrderId } });
   }
 
+  /**
+   * Direct sale from the company - the owning Sales Order's shipping method is `direct_sale`. Derived live from the order
+   * (single source of truth, no second copy on the shipment to drift); a legacy shipment without an order is never one.
+   */
+  async isDirectSale(shipmentId: string, manager?: EntityManager): Promise<boolean> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
+    if (!shipment?.salesOrderId) return false;
+    const order = await this.salesOrders.getOrderSnapshot(shipment.salesOrderId, manager);
+    return order?.shippingMethod === DIRECT_SALE_METHOD;
+  }
+
+  private async assertNotDirectSale(shipmentId: string, what: string, manager?: EntityManager): Promise<void> {
+    if (await this.isDirectSale(shipmentId, manager)) {
+      throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - ${what} does not apply (the goods are handed over at the company's own counter).`);
+    }
+  }
+
   async assignDriver(shipmentId: string, driverUserId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     if (!access.allows('logistics.shipment.assign_driver')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign a driver to a shipment.');
     }
+    await this.assertNotDirectSale(shipmentId, 'assigning a driver', manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
@@ -321,6 +341,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     if (shippingCompanyId && vehicleId) {
       throw new BadRequestException('A shipment is routed through a shipping company or a vehicle, never both.');
     }
+    if (shippingCompanyId || vehicleId) await this.assertNotDirectSale(shipmentId, 'routing through a shipping company or vehicle', manager);
 
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
@@ -392,6 +413,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     manager?: EntityManager,
   ): Promise<Shipment> {
     await this.assertDriverOrAdmin(shipmentId, actorUserId, manager);
+    await this.assertNotDirectSale(shipmentId, 'a carrier waybill', manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
@@ -443,7 +465,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
     const isAdmin = access.allows('logistics.shipment.act_any');
-    if (!isAssignedDriver && !isAdmin) {
+    // A direct sale has no driver at all: the hand-over (and any collection) is done at the company's counter, so the warehouse staff who work the shipments board may act as well as an admin.
+    const isCounterStaff = !isAssignedDriver && !isAdmin && access.allows('logistics.shipment.board_all') && (await this.isDirectSale(shipmentId, manager));
+    if (!isAssignedDriver && !isAdmin && !isCounterStaff) {
       throw new ForbiddenException('Only the assigned driver (or an admin) may act on this shipment.');
     }
   }
@@ -518,6 +542,15 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       }
     }
 
+    // Direct sale from the company: the only lifecycle action is the counter hand-over; every driver/transit/failure action (and the hand-over on any other shipment) is refused up front.
+    const directSale = await this.isDirectSale(shipmentId, manager);
+    if (directSale && action !== 'direct_handover') {
+      throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - action "${action}" does not apply; it is completed by the counter hand-over.`);
+    }
+    if (!directSale && action === 'direct_handover') {
+      throw new ConflictException(`Shipment "${shipmentId}" is not a direct sale from the company - the counter hand-over does not apply.`);
+    }
+
     const run = async (m: EntityManager): Promise<string> => {
       await this.processEngine.transition(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, action, actorUserId, m);
       const newState = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, m);
@@ -556,7 +589,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async listShipments(
     actorUserId: string,
     manager?: EntityManager,
-  ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>> {
+  ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }>> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipments = access.allows('logistics.shipment.board_all')
@@ -592,12 +625,12 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     s: Shipment,
     repNameById: Map<string, string>,
     manager?: EntityManager,
-  ): Promise<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }> {
+  ): Promise<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }> {
     const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id, manager);
     const salesRepName = s.salesRepUserId ? repNameById.get(s.salesRepUserId) ?? null : null;
-    if (!s.salesOrderId) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
+    if (!s.salesOrderId) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName, shippingMethod: null };
     const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
-    if (!order) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
+    if (!order) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName, shippingMethod: null };
     const customer = await this.customers.getCustomerSnapshot(order.customerId, manager);
     return {
       ...s,
@@ -606,6 +639,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       governorate: customer?.governorate ?? null,
       totalAmount: order.totalAmount,
       salesRepName,
+      shippingMethod: order.shippingMethod ?? null,
     };
   }
 
@@ -686,7 +720,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     options: { page: number; pageSize: number },
     manager?: EntityManager,
   ): Promise<{
-    rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>;
+    rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }>;
     total: number;
   }> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);

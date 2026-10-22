@@ -539,7 +539,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * remittance was never granted per-order Scope, same reason
    * `getCustomerSnapshot` is itself unscoped).
    */
-  async getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null } | null> {
+  async getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null; shippingMethod: string | null } | null> {
     const order = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     if (!order) return null;
     return {
@@ -549,6 +549,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       salesRepUserId: order.salesRepUserId,
       totalAmount: order.totalAmount,
       branchOrgUnitId: order.branchOrgUnitId ?? null,
+      shippingMethod: order.shippingMethod,
     };
   }
 

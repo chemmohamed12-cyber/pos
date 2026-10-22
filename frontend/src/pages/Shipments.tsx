@@ -6,6 +6,11 @@ import { StatusBadge } from '../components/StatusBadge';
 import { nameOf, currentLang, EVENT_AND_ACTION_NAMES } from '../lib/displayNames';
 import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
+/** A direct sale (customer takes the goods at the company) has no route/driver leg: right after preparation its shipment is simply READY for the counter hand-over. */
+function shipmentStateCode(state: string, directSale: boolean): string {
+  return directSale && state === 'created' ? 'shipment_lifecycle.state.ready_for_handover' : `shipment_lifecycle.state.${state}`;
+}
+
 interface Shipment {
   id: string;
   waybillNumber: string;
@@ -28,6 +33,8 @@ interface Shipment {
   governorate: string | null;
   totalAmount: string | null;
   salesRepName: string | null;
+  /** The owning Sales Order's shipping method; `direct_sale` = handed over at the company's own counter (no driver/route/custody). */
+  shippingMethod?: string | null;
 }
 interface AdminUser {
   id: string;
@@ -162,7 +169,7 @@ function ShipmentDetail({
         // المندوب سابقًا يجب أن تظهر بوضوح، وتكون هي الـDefault Route": a
         // shipment with no route assigned yet defaults to whatever the Sales
         // Order's own pre-determined shipping method was, not a blank choice.
-        if (!shipment.shippingCompanyId && !shipment.vehicleId && o?.shippingMethod) {
+        if (!shipment.shippingCompanyId && !shipment.vehicleId && o?.shippingMethod && o.shippingMethod !== 'direct_sale') {
           setRouteChoice(o.shippingMethod === 'company_vehicles' ? 'vehicle' : 'company');
         }
       }
@@ -181,7 +188,10 @@ function ShipmentDetail({
       : '—';
 
   const routeLocked = shipment.state !== 'created' && shipment.state !== 'assigned';
+  /** Direct sale from the company: one counter hand-over step replaces route/driver/transit/custody. */
+  const directSale = (shipment.shippingMethod ?? order?.shippingMethod) === 'direct_sale';
   const isMyShipment = shipment.driverUserId === user?.id;
+  const canHandOver = isMyShipment || can('wf.logistics.shipment.act_any', 'editable') || can('wf.logistics.shipment.board_all', 'editable');
 
   async function saveRoute() {
     setBusy('route');
@@ -303,7 +313,7 @@ function ShipmentDetail({
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>
-          {shipment.rshNumber ?? shipment.waybillNumber} <StatusBadge code={`shipment_lifecycle.state.${shipment.state}`} />
+          {shipment.rshNumber ?? shipment.waybillNumber} <StatusBadge code={shipmentStateCode(shipment.state, directSale)} />
         </h3>
         <div className="detail-grid">
           <div className="kpi-tile">
@@ -377,6 +387,14 @@ function ShipmentDetail({
         ) : null;
       })()}
 
+      {directSale && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>{t('shipping_method.direct_sale')}</h3>
+          <div className="empty-state">{t('panel.direct_sale_notice')}</div>
+        </div>
+      )}
+
+      {!directSale && (
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t('field.shipping_company')} / {t('field.vehicle')}</h3>
         <div style={{ marginBottom: 12 }}>
@@ -439,6 +457,7 @@ function ShipmentDetail({
           <div className="empty-state">{t('panel.close_vehicle_custody_blocked')}</div>
         ) : null}
       </div>
+      )}
 
       {shipment.shippingCompanyId && (
         <div className="card" style={{ marginBottom: 20 }}>
@@ -480,7 +499,7 @@ function ShipmentDetail({
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t('field.actions')}</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          {!shipment.driverUserId && can('wf.logistics.shipment.assign_driver', 'editable') && (
+          {!directSale && !shipment.driverUserId && can('wf.logistics.shipment.assign_driver', 'editable') && (
             <>
               <div className="form-field" style={{ marginBottom: 0 }}>
                 <label>{t('field.driver')}</label>
@@ -508,6 +527,18 @@ function ShipmentDetail({
                 </button>
               ))}
 
+          {directSale && canHandOver && shipment.state === 'created' && (
+            <>
+              <div className="form-field" style={{ marginBottom: 0, width: 140 }}>
+                <label>{t('field.collected_amount')}</label>
+                <input type="number" min={0} step="0.01" value={collectionAmount} onChange={(e) => setCollectionAmount(e.target.value)} />
+              </div>
+              <button className="btn btn-primary" disabled={busy === 'deliver'} onClick={confirmDelivered}>
+                {t('shipment_lifecycle.action.direct_handover')}
+              </button>
+            </>
+          )}
+
           {(isMyShipment || can('wf.logistics.shipment.act_any', 'editable')) && shipment.state === 'out_for_delivery' && (
             <>
               <div className="form-field" style={{ marginBottom: 0, width: 140 }}>
@@ -527,7 +558,7 @@ function ShipmentDetail({
             </>
           )}
 
-          {(shipment.state === 'failed' || shipment.shippingCompanyId || shipment.vehicleId) && shipment.state !== 'delivered' && shipment.state !== 'returned' && (
+          {!directSale && (shipment.state === 'failed' || shipment.shippingCompanyId || shipment.vehicleId) && shipment.state !== 'delivered' && shipment.state !== 'returned' && (
             <a href="/custody-returns" className="btn btn-secondary">
               {t('action.initiate_shipping_return')}
             </a>
@@ -606,6 +637,10 @@ export function Shipments() {
     'panel.bucket_returned',
     'field.select_rsh',
     'action.assign_route',
+    'shipping_method.direct_sale',
+    'shipment_lifecycle.state.ready_for_handover',
+    'shipment_lifecycle.action.direct_handover',
+    'panel.direct_sale_notice',
     'action.reassign_route',
     'panel.order_tracking',
     'field.current_custodian',
@@ -683,7 +718,7 @@ export function Shipments() {
   }, []);
 
   const newOrders = useMemo(
-    () => shipments.filter((s) => !s.shippingCompanyId && !s.vehicleId && (s.state === 'created' || s.state === 'assigned')),
+    () => shipments.filter((s) => !s.shippingCompanyId && !s.vehicleId && s.shippingMethod !== 'direct_sale' && (s.state === 'created' || s.state === 'assigned')),
     [shipments],
   );
 
@@ -924,7 +959,7 @@ export function Shipments() {
                 <td>{s.governorate ?? '—'}</td>
                 <td>{s.salesRepName ?? '—'}</td>
                 <td>
-                  <StatusBadge code={`shipment_lifecycle.state.${s.state}`} />
+                  <StatusBadge code={shipmentStateCode(s.state, s.shippingMethod === 'direct_sale')} />
                 </td>
                 <td>{fmtDate(s.createdAt)}</td>
                 <td>{s.waybillNumber}</td>

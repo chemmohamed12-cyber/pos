@@ -179,7 +179,7 @@ export interface SalesOrdersReadContract {
    * contract method" precedent as `warehouseId` on `getOrder` above,
    * not a new method.
    */
-  getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null } | null>;
+  getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null; /** `direct_sale` marks a hand-over at the company's own counter (no driver/custody leg). Optional so older fakes keep compiling. */ shippingMethod?: string | null } | null>;
   /** P4 Tranche-2 (returns domain) — narrowed from the real `Promise<SalesOrderLine | null>` to the 4 fields actually read. */
   getOrderLineById(lineId: string, manager?: EntityManager): Promise<{ salesOrderId: string; productId: string; quantity: number; lineTotal: string } | null>;
   /** P4 Tranche-2 (returns domain) — real return is already a primitive `Promise<string>`. */
