@@ -6,6 +6,7 @@ import { TrackingEvent } from './infrastructure/tracking-event.entity';
 import { ShippingCompany } from './infrastructure/shipping-company.entity';
 import { Vehicle } from './infrastructure/vehicle.entity';
 import { ShipmentService } from './application/shipment.service';
+import { VehicleAccessService } from './application/vehicle-access.service';
 import { ShipmentController } from './interface/shipment.controller';
 import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { ProcessEngineModule } from '../../foundation/process-engine/process-engine.module';
@@ -57,7 +58,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [ShipmentController],
-  providers: [ShipmentService, { provide: LOGISTICS_SHIPMENT_CONTRACT, useExisting: ShipmentService }],
+  providers: [ShipmentService, VehicleAccessService, { provide: LOGISTICS_SHIPMENT_CONTRACT, useExisting: ShipmentService }],
   exports: [ShipmentService, LOGISTICS_SHIPMENT_CONTRACT],
 })
 export class ShipmentModule {}

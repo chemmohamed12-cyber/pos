@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
 import { ShipmentService } from '../application/shipment.service';
+import { VehicleAccessService } from '../application/vehicle-access.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -183,7 +184,10 @@ class TransitionDto {
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
 @RequireModule('logistics')
 export class ShipmentController {
-  constructor(private readonly shipments: ShipmentService) {}
+  constructor(
+    private readonly shipments: ShipmentService,
+    private readonly vehicleAccess: VehicleAccessService,
+  ) {}
 
   @Post()
   async create(@Req() req: CompanyScopedRequest, @Body() dto: CreateShipmentDto) {
@@ -236,7 +240,9 @@ export class ShipmentController {
 
   @Get('shipping-companies/:id/overview')
   async getShippingCompanyOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
-    if (!req.companyContext) throw new UnauthorizedException();
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    // F-1: a company's custody balance and stock are for fleet readers only (no "assigned driver" of a shipping company)
+    await this.vehicleAccess.assertCanReadFleet(req.user.id, 'Shipping company', req.companyContext.dataSource.manager);
     return this.shipments.getCustodianOverview('company', id, req.companyContext.dataSource.manager);
   }
 
@@ -262,10 +268,12 @@ export class ShipmentController {
 
   // ---- Company Vehicles (CTO directive §2) ----
 
+  /** F-1: a fleet reader sees every vehicle; anyone else (a driver) only the vehicles they are the assigned driver of. */
   @Get('vehicles')
   async listVehicles(@Req() req: CompanyScopedRequest) {
-    if (!req.companyContext) throw new UnauthorizedException();
-    return this.shipments.listVehicles(req.companyContext.dataSource.manager);
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    return this.vehicleAccess.visibleVehicles(await this.shipments.listVehicles(manager), req.user.id, manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -293,10 +301,13 @@ export class ShipmentController {
     return this.shipments.updateVehicle(id, dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
+  /** F-1: the assigned driver or a fleet reader; any other user gets "not found" (the vehicle is not revealed). */
   @Get('vehicles/:id/overview')
   async getVehicleOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
-    if (!req.companyContext) throw new UnauthorizedException();
-    return this.shipments.getCustodianOverview('vehicle', id, req.companyContext.dataSource.manager);
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    await this.vehicleAccess.assertCanReadVehicle(await this.shipments.getVehicle(id, manager), req.user.id, manager);
+    return this.shipments.getCustodianOverview('vehicle', id, manager);
   }
 
   @UseGuards(PermissionGuard)
