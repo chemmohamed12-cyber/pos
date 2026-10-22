@@ -824,6 +824,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     fulfillmentOrderId: string;
     shippingCompanyId: string | null;
     vehicleId: string | null;
+    driverUserId: string | null;
     codAmount: string | null;
     salesOrderId: string | null;
   } | null> {
@@ -834,6 +835,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       fulfillmentOrderId: shipment.fulfillmentOrderId,
       shippingCompanyId: shipment.shippingCompanyId,
       vehicleId: shipment.vehicleId,
+      driverUserId: shipment.driverUserId,
       codAmount: shipment.codAmount,
       // Returns Engine Phase B — `Shipment.salesOrderId` already exists on
       // the entity (RSH migration) but this snapshot never surfaced it,

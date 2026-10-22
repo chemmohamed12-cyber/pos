@@ -225,8 +225,9 @@ export class CustomerAccountsService {
 
       const fulfillmentOrder = await this.fulfillment.getFulfillmentOrderBySalesOrderId(order.id, manager);
       const shipment = fulfillmentOrder ? await this.shipments.getShipmentByFulfillmentOrderId(fulfillmentOrder.id, manager) : null;
-      const collection = shipment ? await this.delivery.getCollectionForShipmentUnscoped(shipment.id, manager) : null;
-      if (shipment && collection) {
+      // Stage C / C1: a shipment may carry several collections; a rejected one was never collected and is left out of the statement.
+      const collections = shipment ? (await this.delivery.listCollectionsForShipmentUnscoped(shipment.id, manager)).filter((c) => c.verificationStatus !== 'rejected') : [];
+      for (const collection of collections) {
         totalCollected += Number(collection.amount);
         if (collection.remittanceStatus === 'remitted') totalRemitted += Number(collection.amount);
         entries.push({
@@ -235,7 +236,7 @@ export class CustomerAccountsService {
           salesOrderId: order.id,
           orderNumber: order.orderNumber,
           reference: collection.id,
-          description: `Collection (${collection.method}) — waybill ${shipment.waybillNumber}`,
+          description: `Collection (${collection.method}) — waybill ${shipment!.waybillNumber}`,
           amount: collection.amount,
           status: collection.remittanceStatus,
         });

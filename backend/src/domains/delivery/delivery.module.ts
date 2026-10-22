@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryOutcome } from './infrastructure/delivery-outcome.entity';
 import { Collection } from './infrastructure/collection.entity';
+import { ShipmentCustody } from './infrastructure/shipment-custody.entity';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
 import { VehicleWorkspaceService } from './application/vehicle-workspace.service';
@@ -12,6 +13,7 @@ import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
 import { TreasuryModule } from '../treasury/treasury.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { AuditModule } from '../../foundation/audit/audit.module';
+import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { EventsModule } from '../../foundation/events/events.module';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { AuthorizationModule } from '../../foundation/authorization/authorization.module';
@@ -23,13 +25,14 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeliveryOutcome, Collection]),
+    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody]),
     ShipmentModule,
     FulfillmentModule,
     SalesOrdersModule,
     TreasuryModule,
     InventoryWarehouseModule,
     AuditModule,
+    NumberingModule,
     EventsModule,
     AuthenticationModule,
     AuthorizationModule,

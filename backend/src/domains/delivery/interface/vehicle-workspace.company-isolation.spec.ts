@@ -169,4 +169,24 @@ describe('F-3/F-4/F-5 — vehicle workspace read model — real-Postgres, A/B', 
     const b = await (await dsOf('B')).query(`SELECT count(*)::int AS n FROM "shipments"`);
     expect(b[0].n).toBe(0);
   });
+
+  it('W8 (C1) several instalments are listed with their verification status and the SERVER computes the totals in whole cents: a rejected one counts for nothing; hidden ones carry no totals', async () => {
+    const ds = await dsOf('A');
+    const s = await newShipment(ids.v1, users.driver1, 'out_for_delivery', '1000.00', 1, 'w8-instalments');
+    const ins = (amount: string, status: string) =>
+      ds.query(`INSERT INTO "collections" ("id","shipmentId","amount","method","collectorUserId","verificationStatus","occurredAt") VALUES ($1,$2,$3,'cash',$4,$5, now() + ($6 || ' seconds')::interval)`, [randomUUID(), s, amount, sys, status, String(Math.floor(Math.random() * 1000))]);
+    await ins('300.10', 'recorded');
+    await ins('200.20', 'confirmed');
+    await ins('99.99', 'rejected');
+    const w = await get('A', users.driver1, ids.v1);
+    const row = w.shipments.find((x) => x.id === s)!;
+    expect(row.collections).toHaveLength(3);
+    expect(row.collections!.map((c) => c.verificationStatus).sort()).toEqual(['confirmed', 'recorded', 'rejected']);
+    expect(row.collectionTotals).toEqual({ expected: '1000.00', recorded: '300.10', confirmed: '200.20', rejected: '99.99', counted: '500.30', remaining: '499.70' });
+    expect(row.collection?.verificationStatus).not.toBe('rejected'); // the single-collection field is the latest one that still counts
+    const hidden = (await get('A', users.warehouseWorker, ids.v1)).shipments.find((x) => x.id === s)!;
+    expect(hidden.collectionVisible).toBe(false);
+    expect(hidden.collections).toBeNull();
+    expect(hidden.collectionTotals).toBeNull();
+  });
 });

@@ -63,6 +63,8 @@ export interface CollectionViewContract {
   id: string;
   amount: string;
   remittanceStatus: 'pending' | 'remitted';
+  /** Stage C / C1: operational confirmation of the collected cash (a `rejected` collection never counts as collected). */
+  verificationStatus: 'recorded' | 'confirmed' | 'rejected';
   occurredAt: Date;
   method: string;
   custodyAccountId: string | null;
@@ -70,6 +72,8 @@ export interface CollectionViewContract {
 
 export interface LogisticsDeliveryContract {
   getCollectionForShipmentUnscoped(shipmentId: string, manager?: EntityManager): Promise<CollectionViewContract | null>;
+  /** Stage C / C1: a shipment can carry several collections (their sum never exceeds the expected cash-on-delivery amount). Rejected ones are included, oldest first. */
+  listCollectionsForShipmentUnscoped(shipmentId: string, manager?: EntityManager): Promise<CollectionViewContract[]>;
   listAllCollections(manager?: EntityManager): Promise<CollectionViewContract[]>;
 }
 export const LOGISTICS_DELIVERY_CONTRACT = Symbol('LOGISTICS_DELIVERY_CONTRACT');

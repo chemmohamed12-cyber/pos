@@ -529,7 +529,8 @@ describe('H3 — Release Engine migration selection / upgrade / undo / failure s
       const rel = await mkRelease(env, filesFor(rootFull, N1_ONLY_IDS), randomUUID());
       const fwd = makeService(env, rootFull);
       await fwd.priv.runReleaseMigrations(rel, rootFull, discoverMigrationTags(rootFull));
-      const executedBeforeUndo = (await executedNames(env.ds)).length;
+      const executedNamesBefore = executedNames(env.ds);
+      const executedBeforeUndo = (await executedNamesBefore).length;
 
       const restore = { preflight: jest.fn(async () => ({ status: 'failed' })) };
       const undo = makeService(env, rootFull, [], restore);
@@ -537,7 +538,18 @@ describe('H3 — Release Engine migration selection / upgrade / undo / failure s
         await expect(undo.priv.undoReleaseMigrations(rel, 'actor', null)).rejects.toThrow(/No migration .* was found in the source code/);
       });
       expect(restore.preflight).toHaveBeenCalledTimes(1);
-      expect((await executedNames(env.ds)).length).toBe(executedBeforeUndo);
+      // Undo runs newest-first, so the old registry can legitimately revert the newest migrations that live in tags it knows before it stops at the first one it cannot resolve.
+      // Expectation computed from the data (not assumed to be zero): that leading run is the only thing allowed to be gone.
+      const executedNow = new Set(await executedNames(env.ds));
+      const stamp = (n: string) => Number(n.match(/(\d{13})$/)?.[1] ?? 0);
+      const newestFirst = (await executedNamesBefore).sort((x, y) => stamp(y) - stamp(x));
+      const oldKnown = new Set(namesOnDisk(rootFull, OLD_REGISTRY));
+      let leadingKnown = 0;
+      for (const n of newestFirst) {
+        if (!oldKnown.has(n)) break;
+        leadingKnown++;
+      }
+      expect(executedNow.size).toBe(executedBeforeUndo - leadingKnown);
       await undo.priv.undoReleaseMigrations(rel, 'actor', null); // the fixed registry resolves it
       expect((await executedNames(env.ds)).length).toBeLessThan(executedBeforeUndo);
     });

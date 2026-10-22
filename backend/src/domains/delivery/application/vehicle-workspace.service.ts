@@ -13,7 +13,24 @@ export interface WorkspaceCollection {
   remittanceStatus: 'pending' | 'remitted';
   remittedAt: Date | null;
   occurredAt: Date;
+  /** Stage C / C1: recorded (driver) -> confirmed | rejected (someone else). */
+  verificationStatus: 'recorded' | 'confirmed' | 'rejected';
+  rejectionReason: string | null;
 }
+
+/** Server-computed totals of one shipment's collections (whole-cent arithmetic; a rejected collection counts for nothing). */
+export interface WorkspaceCollectionTotals {
+  expected: string | null;
+  recorded: string;
+  confirmed: string;
+  rejected: string;
+  /** recorded + confirmed - what still counts toward the expected total. */
+  counted: string;
+  remaining: string | null;
+}
+
+const cents = (a: string): number => Math.round(Number(a) * 100);
+const money = (c: number): string => (c / 100).toFixed(2);
 
 /**
  * Vehicle Driver Workspace, Stage C / F-3, F-4, F-5 (2026-10-22) — ONE permission-checked, read-only read model for the workspace screen, replacing what the browser used to assemble
@@ -53,13 +70,33 @@ export class VehicleWorkspaceService {
     const collectionRows: Collection[] = ids.length
       ? await (manager ?? this.dataSource).getRepository(Collection).createQueryBuilder('c').where('c."shipmentId" IN (:...ids)', { ids }).getMany()
       : [];
-    const byShipment = new Map(collectionRows.map((c) => [c.shipmentId, c]));
+    const byShipment = new Map<string, Collection>();
+    const allByShipment = new Map<string, Collection[]>();
+    for (const c of [...collectionRows].sort((x, y) => x.occurredAt.getTime() - y.occurredAt.getTime())) {
+      allByShipment.set(c.shipmentId, [...(allByShipment.get(c.shipmentId) ?? []), c]);
+      if (c.verificationStatus !== 'rejected') byShipment.set(c.shipmentId, c); // the latest one that still counts
+    }
+    const view = (c: Collection): WorkspaceCollection => ({
+      id: c.id,
+      amount: c.amount,
+      method: c.method,
+      remittanceStatus: c.remittanceStatus,
+      remittedAt: c.remittedAt,
+      occurredAt: c.occurredAt,
+      verificationStatus: c.verificationStatus,
+      rejectionReason: c.rejectionReason,
+    });
+    const totalsOf = (list: Collection[], expected: string | null): WorkspaceCollectionTotals => {
+      const sum = (st: string) => list.filter((c) => c.verificationStatus === st).reduce((t, c) => t + cents(c.amount), 0);
+      const counted = sum('recorded') + sum('confirmed');
+      const exp = expected !== null && Number(expected) > 0 ? cents(expected) : null;
+      return { expected: exp === null ? null : money(exp), recorded: money(sum('recorded')), confirmed: money(sum('confirmed')), rejected: money(sum('rejected')), counted: money(counted), remaining: exp === null ? null : money(Math.max(0, exp - counted)) };
+    };
 
     const rows = list.rows.map((s) => {
       const c = byShipment.get(s.id);
-      const collection: WorkspaceCollection | null = c
-        ? { id: c.id, amount: c.amount, method: c.method, remittanceStatus: c.remittanceStatus, remittedAt: c.remittedAt, occurredAt: c.occurredAt }
-        : null;
+      const collection: WorkspaceCollection | null = c ? view(c) : null;
+      const list = allByShipment.get(s.id) ?? [];
       return {
         id: s.id,
         waybillNumber: s.waybillNumber,
@@ -75,6 +112,9 @@ export class VehicleWorkspaceService {
         createdAt: s.createdAt,
         collectionVisible: visible.has(s.id),
         collection: visible.has(s.id) ? collection : null,
+        // Stage C / C1: every instalment (rejected ones included, flagged) and the server-computed totals; `null` when this user may not see the collections of this shipment.
+        collections: visible.has(s.id) ? list.map(view) : null,
+        collectionTotals: visible.has(s.id) ? totalsOf(list, s.codAmount) : null,
       };
     });
 

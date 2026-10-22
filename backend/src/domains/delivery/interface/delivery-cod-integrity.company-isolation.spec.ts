@@ -85,7 +85,7 @@ describe('F-2 — cash-on-delivery integrity is enforced on the server — real-
     } as unknown as FulfillmentContract;
     const salesOrders = { getOrderSnapshot: async () => null } as unknown as SalesOrdersReadContract;
     const inventory = { fulfillReservationsForOrder: async () => undefined } as never;
-    service = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inventory, audit, events, inert, inert);
+    service = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inventory, audit, events, numbering, inert, inert);
   });
 
   afterAll(async () => {
@@ -104,8 +104,8 @@ describe('F-2 — cash-on-delivery integrity is enforced on the server — real-
     const s = await newShipment('A', '500.00');
     const before = await fingerprint('A', s);
     for (const bad of ['0', '0.00', '-5', '10.123', 'abc', '']) await expect(collect('A', s, bad)).rejects.toThrow(/positive number with at most two decimals/);
-    await expect(collect('A', s, '500.01')).rejects.toThrow(/exceeds the cash-on-delivery amount 500.00/);
-    await expect(collect('A', s, '9999.00')).rejects.toThrow(/exceeds the cash-on-delivery amount/);
+    await expect(collect('A', s, '500.01')).rejects.toThrow(/would exceed the cash-on-delivery amount 500.00/);
+    await expect(collect('A', s, '9999.00')).rejects.toThrow(/would exceed the cash-on-delivery amount/);
     expect(await fingerprint('A', s)).toEqual(before);
   });
 
@@ -148,7 +148,7 @@ describe('F-2 — cash-on-delivery integrity is enforced on the server — real-
     const after = await fingerprint('A');
     expect(after.collections - before.collections).toBe(1);
     expect(after.custodyTxns - before.custodyTxns).toBe(1);
-    await expect(collect('A', s, '700.00')).rejects.toThrow(/already has a recorded collection/);
+    await expect(collect('A', s, '700.00')).rejects.toThrow(/would exceed the cash-on-delivery amount 700.00/); // D-2: the expected amount is fully collected
   });
 
   it('D7 atomic: a failure after the custody cash-in (at the event publish) rolls the cash-in back too — no orphan custody movement, and a retry then succeeds once', async () => {
