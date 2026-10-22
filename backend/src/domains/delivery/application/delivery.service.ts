@@ -63,6 +63,19 @@ export class DeliveryService implements LogisticsDeliveryContract {
     manager?: EntityManager,
   ): Promise<DeliveryOutcome> {
     const record = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      // Stage C / F-2 (2026-10-22): a cash-on-delivery shipment is never confirmed delivered without the collection that the delivery is for (enforced here, on the server — a UI
+      // restriction is not enough). The collection keeps its own lifecycle (recorded -> remitted -> GL at remittance); this only refuses a "delivered" outcome that has none.
+      if (outcome === 'delivered') {
+        const snapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+        if (snapshot && snapshot.codAmount !== null && Number(snapshot.codAmount) > 0) {
+          const collected = await this.getCollectionForShipmentUnscoped(shipmentId, txManager);
+          if (!collected) {
+            throw new ConflictException(
+              `Shipment "${shipmentId}" is cash on delivery (${snapshot.codAmount}): record the collection before confirming the delivery. Nothing was changed.`,
+            );
+          }
+        }
+      }
       const action = OUTCOME_TO_SHIPMENT_ACTION[outcome];
       if (action) {
         await this.shipments.transitionShipment(shipmentId, action, actorUserId, txManager);
@@ -139,38 +152,46 @@ export class DeliveryService implements LogisticsDeliveryContract {
     // fabricated cash collection against any shipment.
     await this.shipments.assertDriverOrAdmin(shipmentId, collectorUserId, manager);
 
-    // Shipping Screen Redesign directive §8/§13 — idempotency: nothing
-    // previously stopped a double-click (or a retried request) from
-    // calling this endpoint twice for the same shipment and posting two
-    // Treasury cash-in entries for one real-world collection. A shipment
-    // has at most one real COD collection event, same invariant
-    // `ReturnsService.initiateCustodyReturn` already relies on via this
-    // exact method — reused here as a guard, not duplicated.
-    const existing = await this.getCollectionForShipmentUnscoped(shipmentId, manager);
-    if (existing) {
-      throw new ConflictException(`Shipment "${shipmentId}" already has a recorded collection (${existing.id}) — cannot record a second one.`);
-    }
-
-    const custodian = await this.shipments.getCustodianForShipment(shipmentId, manager);
-    let custodyTransactionId: string | null = null;
-    if (custodian) {
-      const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId, manager);
-      const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipmentSnapshot!.fulfillmentOrderId, manager);
-      const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId, manager);
-      const custodyTxn = await this.treasury.cashIn(
-        custodian.custodyAccountId,
-        amount,
-        orderSnapshot?.customerId ?? null,
-        fulfillmentOrder.salesOrderId,
-        shipmentId,
-        'cod_collection_custody',
-        collectorUserId,
-        manager,
-      );
-      custodyTransactionId = custodyTxn.id;
-    }
-
+    // Stage C / F-2 (2026-10-22): the whole recording is ONE transaction serialised per shipment. Before, the custody `cash_in` committed first and the collection row afterwards (a
+    // failure in between left cash in the custody account with no collection record) and the "already collected?" check was an unlocked read, so concurrent submits could post
+    // the cash twice. Now: lock -> check -> validate -> custody cash_in -> collection row -> event, all or nothing; a second/concurrent submit finds the first and is refused.
     const collection = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:collection:${shipmentId}`]);
+
+      // Shipping Screen Redesign directive §8/§13 — idempotency: a shipment has at most one real COD collection event (the invariant `ReturnsService.initiateCustodyReturn` relies on).
+      const existing = await this.getCollectionForShipmentUnscoped(shipmentId, txManager);
+      if (existing) {
+        throw new ConflictException(`Shipment "${shipmentId}" already has a recorded collection (${existing.id}) — cannot record a second one.`);
+      }
+
+      // The collected amount must be a positive 2-decimal figure and — for a shipment that carries a cash-on-delivery amount — may not exceed it (D-2: confirmed collections never
+      // exceed the expected amount; an over-collection policy is a separate owner decision). Refused BEFORE any Treasury posting.
+      if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+        throw new BadRequestException('The collected amount must be a positive number with at most two decimals.');
+      }
+      const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+      if (shipmentSnapshot && shipmentSnapshot.codAmount !== null && Number(shipmentSnapshot.codAmount) > 0 && Number(amount) > Number(shipmentSnapshot.codAmount)) {
+        throw new ConflictException(`The collected amount ${amount} exceeds the cash-on-delivery amount ${shipmentSnapshot.codAmount} of this shipment. Nothing was recorded.`);
+      }
+
+      const custodian = await this.shipments.getCustodianForShipment(shipmentId, txManager);
+      let custodyTransactionId: string | null = null;
+      if (custodian) {
+        const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipmentSnapshot!.fulfillmentOrderId, txManager);
+        const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId, txManager);
+        const custodyTxn = await this.treasury.cashIn(
+          custodian.custodyAccountId,
+          amount,
+          orderSnapshot?.customerId ?? null,
+          fulfillmentOrder.salesOrderId,
+          shipmentId,
+          'cod_collection_custody',
+          collectorUserId,
+          txManager,
+        );
+        custodyTransactionId = custodyTxn.id;
+      }
+
       const repo = txManager.getRepository(Collection);
       const saved = await repo.save(
         repo.create({
@@ -182,14 +203,10 @@ export class DeliveryService implements LogisticsDeliveryContract {
           custodyTransactionId,
         }),
       );
-      // Finance-ready event (ADR-018) — amount, currency-implicit (EGP, same as Deposit Control),
-      // party, and date all present without a Finance callback into Delivery.
+      // Finance-ready event (ADR-018) — amount, currency-implicit (EGP, same as Deposit Control), party, and date all present without a Finance callback into Delivery.
       //
-      // ADR-042 D3 (F09) — purely operational, by design: this topic NEVER gets a GL handler (that
-      // is `collection.remitted`'s job, at `remitCollection` time — see ADR-042 D3a-D3h for the full
-      // reasoning). The `idempotencyKey` below is still added (ADR-042 D0) purely for hygiene: even
-      // an `IGNORED` (handler-less) `FinancialEvent` row should carry the right identity, so a
-      // future reader never sees a wrong dedup on this topic's own audit trail.
+      // ADR-042 D3 (F09) — purely operational, by design: this topic NEVER gets a GL handler (that is `collection.remitted`'s job, at `remitCollection` time — see ADR-042 D3a-D3h).
+      // The `idempotencyKey` below is still added (ADR-042 D0) purely for hygiene: even an `IGNORED` (handler-less) `FinancialEvent` row should carry the right identity.
       await this.events.publish(txManager, 'collection.recorded', {
         idempotencyKey: `collection:${saved.id}:recorded`,
         shipmentId,
@@ -212,7 +229,7 @@ export class DeliveryService implements LogisticsDeliveryContract {
         resourceId: collection.id,
         result: 'success',
         correlationId: null,
-        after: { shipmentId, amount, method, custodyAccountId: collection.custodyAccountId, custodyTransactionId },
+        after: { shipmentId, amount, method, custodyAccountId: collection.custodyAccountId, custodyTransactionId: collection.custodyTransactionId },
       },
       manager,
     );
