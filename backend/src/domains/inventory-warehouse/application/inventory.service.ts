@@ -186,6 +186,15 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return warehouse;
   }
 
+  /** Org engine Stage 5 — effective owning branch of a warehouse: its own `orgUnitId`, else (an operational custody sub-location) its parent warehouse's. Read-only. */
+  async getWarehouseBranchId(warehouseId: string, manager?: EntityManager): Promise<string | null> {
+    const rows: Array<{ own: string | null; parentUnit: string | null }> = await (manager ?? this.dataSource).query(
+      `SELECT w."orgUnitId" AS own, p."orgUnitId" AS "parentUnit" FROM "warehouses" w LEFT JOIN "warehouses" p ON p."id" = w."parentWarehouseId" WHERE w."id" = $1`,
+      [warehouseId],
+    );
+    return rows[0] ? (rows[0].own ?? rows[0].parentUnit ?? null) : null;
+  }
+
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — active/inactive toggle, audited like every other status change in this codebase. */
   async setWarehouseStatus(warehouseId: string, status: WarehouseStatus, actorUserId: string | null, manager?: EntityManager): Promise<Warehouse> {
     const warehouse = await this.getWarehouse(warehouseId, manager);

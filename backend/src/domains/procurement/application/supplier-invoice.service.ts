@@ -17,6 +17,7 @@ import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/a
 import { InvoiceAllocationService } from './invoice-allocation.service';
 import { InvoicePolicyService } from './invoice-policy.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { purchaseOrderBranchOf } from './procurement-org';
 
 const ENTITY_TYPE = 'supplier_invoice';
 const PO_ENTITY_TYPE = 'purchase_order';
@@ -404,7 +405,7 @@ export class SupplierInvoiceService {
       await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoicePosted, {
         idempotencyKey: `procurement:supplier_invoice:${invoice.id}:posted`,
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: await purchaseOrderBranchOf(m, invoice.purchaseOrderId),
         currency: 'EGP',
         sourceEntityType: 'supplier_invoice' as const,
         sourceEntityId: invoice.id,
@@ -445,7 +446,7 @@ export class SupplierInvoiceService {
         await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjusted, {
           idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjusted`,
           businessDate: new Date().toISOString().slice(0, 10),
-          orgUnitId: null,
+          orgUnitId: await purchaseOrderBranchOf(m, invoice.purchaseOrderId),
           currency: 'EGP',
           sourceEntityType: 'supplier_invoice' as const,
           sourceEntityId: invoice.id,
@@ -509,7 +510,7 @@ export class SupplierInvoiceService {
         await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceVoided, {
           idempotencyKey: `procurement:supplier_invoice:${invoice.id}:voided`,
           businessDate: new Date().toISOString().slice(0, 10),
-          orgUnitId: null,
+          orgUnitId: await purchaseOrderBranchOf(m, invoice.purchaseOrderId),
           currency: 'EGP',
           sourceEntityType: 'supplier_invoice' as const,
           sourceEntityId: invoice.id,
@@ -530,7 +531,7 @@ export class SupplierInvoiceService {
           await this.events.publish(m, AP_EVENT_TOPICS.supplierInvoiceCostAdjustmentVoided, {
             idempotencyKey: `procurement:supplier_invoice:${invoice.id}:cost_adjustment_voided`,
             businessDate: new Date().toISOString().slice(0, 10),
-            orgUnitId: null,
+            orgUnitId: await purchaseOrderBranchOf(m, invoice.purchaseOrderId),
             currency: 'EGP',
             sourceEntityType: 'supplier_invoice' as const,
             sourceEntityId: invoice.id,

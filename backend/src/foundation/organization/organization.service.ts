@@ -295,6 +295,19 @@ export class OrganizationService {
     return this.dataSource.transaction(run);
   }
 
+  /** Org engine Stage 6 — the branch a unit belongs to: the unit itself if it is a branch, else its nearest `branch` ancestor (e.g. an HR department -> its branch). `null` when none (flat / legacy tree). */
+  async getBranchOf(unitId: string, manager?: EntityManager): Promise<OrgUnit | null> {
+    const repo = (manager ?? this.dataSource).getRepository(OrgUnit);
+    let current = await repo.findOne({ where: { id: unitId } });
+    const seen = new Set<string>();
+    while (current && !seen.has(current.id)) {
+      if (current.type === 'branch') return current;
+      seen.add(current.id);
+      current = current.parentId ? await repo.findOne({ where: { id: current.parentId } }) : null;
+    }
+    return null;
+  }
+
   async assignMember(userId: string, orgUnitId: string, manager?: EntityManager): Promise<void> {
     const runner = manager ?? this.dataSource;
     const unit = await runner.getRepository(OrgUnit).findOne({ where: { id: orgUnitId } });

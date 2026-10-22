@@ -199,6 +199,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
           vehicleId,
           rshNumber,
           salesOrderId: fulfillmentOrder.salesOrderId,
+          branchOrgUnitId: orderSnapshot?.branchOrgUnitId ?? null, // Org engine Stage 5 — inherited from the sales order
           salesOrderNumber: orderSnapshot?.orderNumber ?? null,
           salesRepUserId: orderSnapshot?.salesRepUserId ?? null,
         }),

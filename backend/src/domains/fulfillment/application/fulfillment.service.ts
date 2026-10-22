@@ -66,13 +66,14 @@ export class FulfillmentService implements FulfillmentContract {
     // AddFulfillmentOrderNumber1755850300000) — issued before the
     // transaction, same ordering `SalesOrdersService.createOrder` uses.
     const orderNumber = await this.numbering.getNextNumber('fulfillment_order', manager);
+    const branchOrgUnitId = await this.inventory.getWarehouseBranchId(warehouseId, manager); // Org engine Stage 5 — same branch as the order's warehouse
 
     const { fulfillmentOrder, pickTask } = await (manager ?? this.dataSource).transaction(async (txManager) => {
       const foRepo = txManager.getRepository(FulfillmentOrder);
       const pickRepo = txManager.getRepository(PickTask);
       const lineRepo = txManager.getRepository(PickTaskLine);
 
-      const fo = await foRepo.save(foRepo.create({ salesOrderId, warehouseId, orderNumber }));
+      const fo = await foRepo.save(foRepo.create({ salesOrderId, warehouseId, orderNumber, branchOrgUnitId }));
       const pick = await pickRepo.save(pickRepo.create({ fulfillmentOrderId: fo.id, assignedToUserId: null }));
 
       // CTO directive ("PRIORITY: ITEM PREPARATION") — one Pick Task Line
