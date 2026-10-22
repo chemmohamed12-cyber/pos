@@ -7,6 +7,8 @@ import { ShipmentLineDelivery } from './infrastructure/shipment-line-delivery.en
 import { LineDeliveryService } from './application/line-delivery.service';
 import { CustodyExpense } from './infrastructure/custody-expense.entity';
 import { CustodyExpenseService } from './application/custody-expense.service';
+import { CustodyHandover } from './infrastructure/custody-handover.entity';
+import { CustodyHandoverService } from './application/custody-handover.service';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
@@ -30,7 +32,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense]),
+    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense, CustodyHandover]),
     ShipmentModule,
     FulfillmentModule,
     SalesOrdersModule,
@@ -54,7 +56,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [DeliveryController, VehicleWorkspaceController],
-  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
+  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, CustodyHandoverService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
   exports: [DeliveryService, LOGISTICS_DELIVERY_CONTRACT],
 })
 export class DeliveryModule {}

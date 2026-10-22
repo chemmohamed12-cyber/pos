@@ -4,6 +4,8 @@ import { Collection } from '../infrastructure/collection.entity';
 import { ShipmentLineDelivery } from '../infrastructure/shipment-line-delivery.entity';
 import { CustodyExpense } from '../infrastructure/custody-expense.entity';
 import { computeDeliveryProgress } from './line-delivery-progress';
+import { CustodyHandoverService } from './custody-handover.service';
+import { computeCustodyReconciliation } from './custody-reconciliation';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { VehicleAccessService } from '../../shipment/application/vehicle-access.service';
 import { AuthorizationService } from '../../../foundation/authorization/authorization.service';
@@ -53,6 +55,7 @@ export class VehicleWorkspaceService {
     private readonly vehicleAccess: VehicleAccessService,
     private readonly authorization: AuthorizationService,
     private readonly permissions: PermissionService,
+    private readonly custodyHandovers: CustodyHandoverService,
   ) {}
 
   async getWorkspace(vehicleId: string, actorUserId: string, opts: { limit?: number } = {}, manager?: EntityManager) {
@@ -145,7 +148,19 @@ export class VehicleWorkspaceService {
       };
     });
 
+    // Stage C / C4: the vehicle's custody reconciliation (all of its collections, expenses and handovers) - shown to who may see all collections and to the vehicle's own driver;
+    // anyone else gets null ("not available"), never a partial figure.
+    let reconciliation: ReturnType<typeof computeCustodyReconciliation> | null = null;
+    let handoverRows: Array<{ id: string; handoverNumber: string; amount: string; status: string; createdAt: Date }> | null = null;
+    if (seesAllCollections || vehicle.driverUserId === actorUserId) {
+      const facts = await this.custodyHandovers.loadFacts(vehicleId, manager ?? this.dataSource.manager);
+      reconciliation = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance });
+      handoverRows = facts.handovers.map((x) => ({ id: x.id, handoverNumber: x.handoverNumber, amount: x.amount, status: x.status, createdAt: x.createdAt }));
+    }
+
     return {
+      reconciliation,
+      handovers: handoverRows,
       vehicle: {
         id: vehicle.id,
         code: vehicle.code,

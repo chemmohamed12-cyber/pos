@@ -3,6 +3,7 @@ import { Collection } from './infrastructure/collection.entity';
 import { ShipmentCustody } from './infrastructure/shipment-custody.entity';
 import { ShipmentLineDelivery } from './infrastructure/shipment-line-delivery.entity';
 import { CustodyExpense } from './infrastructure/custody-expense.entity';
+import { CustodyHandover } from './infrastructure/custody-handover.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Delivery's own
@@ -13,4 +14,4 @@ import { CustodyExpense } from './infrastructure/custody-expense.entity';
  * a genuine production gap, not a test-harness artifact: any Company
  * DataSource would have thrown the same error on a live request.
  */
-export const DELIVERY_COMPANY_ENTITIES = [DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense];
+export const DELIVERY_COMPANY_ENTITIES = [DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense, CustodyHandover];

@@ -3,6 +3,7 @@ import { IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min } from '
 import { DeliveryService } from '../application/delivery.service';
 import { LineDeliveryService } from '../application/line-delivery.service';
 import { CustodyExpenseService } from '../application/custody-expense.service';
+import { CustodyHandoverService } from '../application/custody-handover.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -101,6 +102,31 @@ class CancelExpenseDto {
   reason!: string;
 }
 
+class DeclareHandoverDto {
+  @IsUUID()
+  vehicleId!: string;
+
+  @IsNumberString()
+  amount!: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  clientKey?: string;
+}
+
+class DecideHandoverDto {
+  @IsIn(['confirmed', 'rejected'])
+  decision!: 'confirmed' | 'rejected';
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 class RejectCollectionDto {
   @IsString()
   reason!: string;
@@ -126,6 +152,7 @@ export class DeliveryController {
     private readonly delivery: DeliveryService,
     private readonly lineDeliveries: LineDeliveryService,
     private readonly expenses: CustodyExpenseService,
+    private readonly handovers: CustodyHandoverService,
   ) {}
 
   @Post('outcomes')
@@ -192,6 +219,28 @@ export class DeliveryController {
   async cancelExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelExpenseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.expenses.cancel(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  // ---- Stage C / C4: driver cash handover + server-side custody reconciliation ----
+
+  @Post('custody-handovers')
+  async declareHandover(@Req() req: CompanyScopedRequest, @Body() dto: DeclareHandoverDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.handovers.declare(dto.vehicleId, dto.amount, dto.note ?? null, dto.clientKey ?? null, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.collection.post', 'editable')
+  @Post('custody-handovers/:id/decide')
+  async decideHandover(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideHandoverDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.handovers.decide(id, dto.decision, dto.reason ?? null, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @Get('custody-reconciliation/:vehicleId')
+  async reconciliation(@Req() req: CompanyScopedRequest, @Param('vehicleId', ParseUUIDPipe) vehicleId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.handovers.getReconciliation(vehicleId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('outcomes')

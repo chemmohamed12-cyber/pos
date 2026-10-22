@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { DataSource, EntityManager } from 'typeorm';
 import { CustodyExpense } from '../infrastructure/custody-expense.entity';
 import { DeliveryService } from './delivery.service';
+import { CustodyHandoverService, vehicleCashLockKey } from './custody-handover.service';
+import { computeCustodyReconciliation } from './custody-reconciliation';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
@@ -49,6 +51,7 @@ export class CustodyExpenseService implements OnModuleInit {
     private readonly approvals: ApprovalEngineService,
     private readonly config: ConfigurationEngineService,
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
+    private readonly handovers: CustodyHandoverService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -210,6 +213,17 @@ export class CustodyExpenseService implements OnModuleInit {
       if (!locked) throw new NotFoundException(`Expense "${id}" not found.`);
       if (locked.status === 'posted') return locked;
       if (locked.status !== 'approved') throw new ConflictException(`Only an approved expense can be posted - this one is "${locked.status}".`);
+      // Stage C / C4: serialised with handover declarations - an expense may not take the cash below what the driver has already declared/confirmed as handed over.
+      if (locked.vehicleId) {
+        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [vehicleCashLockKey(locked.vehicleId)]);
+        const facts = await this.handovers.loadFacts(locked.vehicleId, tx);
+        const r = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: null });
+        const handedOver = Math.round(Number(r.handovers.handedOver) * 100);
+        const remainingAfter = Math.round(Number(r.derived.cashInDriverHand) * 100) + handedOver - Math.round(Number(locked.amount) * 100); // counted - posted - this expense
+        if (handedOver > 0 && handedOver > remainingAfter) {
+          throw new ConflictException(`Posting ${locked.amount} would take the cash below what was already handed over (${r.handovers.handedOver}). Nothing was posted.`);
+        }
+      }
       const leg = await this.treasury.cashOutForCustodyExpense(
         locked.custodyAccountId,
         locked.amount,

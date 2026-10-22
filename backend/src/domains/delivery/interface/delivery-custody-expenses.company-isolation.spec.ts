@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { DeliveryService } from '../application/delivery.service';
 import { CustodyExpenseService } from '../application/custody-expense.service';
+import { CustodyHandoverService } from '../application/custody-handover.service';
+import { VehicleAccessService } from '../../shipment/application/vehicle-access.service';
+import { RolePermission } from '../../../foundation/permission/role-permission.entity';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { TreasuryService } from '../../treasury/application/treasury.service';
 import { JournalEntryService, JOURNAL_ENTRY_DOCUMENT_TYPE } from '../../accounting/application/journal-entry.service';
@@ -111,7 +114,7 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     const salesOrders = { getOrderSnapshot: async () => null } as unknown as SalesOrdersReadContract;
     const delivery = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inert, audit, events, numbering, inert, inert);
     const approvals = new ApprovalEngineService(ambient, new ProcessEngineService(ambient), new AuditService(ambient), events, new PermissionService(inert, new AuthorizationService(inert, inert)), { get: () => 24 } as never);
-    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury);
+    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury, new CustodyHandoverService(h.controlPlane, shipments, new VehicleAccessService(authorization, new PermissionService(dsA.getRepository(RolePermission), authorization)), authorization, audit, numbering));
     await expenses.onModuleInit();
 
     cfg['accounting.treasury_disbursement_reason_accounts'] = { custody_fuel: '5900', custody_toll: '5900', SALARY_ADVANCE: '5900' };
