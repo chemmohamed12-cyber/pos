@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABS, availableActions, collectionOf, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
+import { TABS, availableActions, canRecordCollection, collectionDecisionOptions, newClientKey, openExpenseCount, collectionOf, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
 import type { WsCollection, WsShipment } from '../src/pages/vehicle-workspace/workspaceModel';
 
 const mk = (id: string, state: string, extra: Partial<WsShipment> = {}): WsShipment => ({
@@ -85,4 +85,39 @@ test('collectionOf distinguishes "not visible" (undefined) from "visible, none r
   assert.equal(collectionOf(m, 'b'), null);
   assert.equal(collectionOf(m, 'hidden'), undefined);
   assert.equal(collectionOf(null, 'a'), undefined);
+});
+
+test('deliver is enabled for cash on delivery only once a collection exists, and disabled while lines are outstanding', () => {
+  const base = { state: 'out_for_delivery', isMine: true, canActAny: false, codAmount: '500.00' };
+  assert.equal(availableActions({ ...base })[0].disabledReason, 'cash_on_delivery');
+  assert.equal(availableActions({ ...base, codCollected: true })[0].enabled, true);
+  const lines = availableActions({ ...base, codCollected: true, linesOutstanding: true })[0];
+  assert.equal(lines.enabled, false);
+  assert.equal(lines.disabledReason, 'lines_outstanding');
+});
+
+test('canRecordCollection follows the server totals: remaining > 0, or the legacy single collection when no amount is expected', () => {
+  const t = (remaining: string | null, counted: string) => ({ expected: '100.00', recorded: counted, confirmed: '0.00', rejected: '0.00', counted, remaining });
+  assert.equal(canRecordCollection('100.00', t('40.00', '60.00')), true);
+  assert.equal(canRecordCollection('100.00', t('0.00', '100.00')), false);
+  assert.equal(canRecordCollection(null, t(null, '0.00')), true);
+  assert.equal(canRecordCollection(null, t(null, '10.00')), false);
+  assert.equal(canRecordCollection('100.00', null), false);
+  assert.equal(canRecordCollection('100.00', undefined), false);
+});
+
+test('collection decision options: only another user with the permission, only while recorded and not remitted', () => {
+  const c = (v: 'recorded' | 'confirmed' | 'rejected', r: 'pending' | 'remitted') => ({ ...col('1', r), verificationStatus: v });
+  assert.deepEqual(collectionDecisionOptions(c('recorded', 'pending'), true, false), ['confirm', 'reject']);
+  assert.deepEqual(collectionDecisionOptions(c('recorded', 'pending'), true, true), []);
+  assert.deepEqual(collectionDecisionOptions(c('recorded', 'pending'), false, false), []);
+  assert.deepEqual(collectionDecisionOptions(c('confirmed', 'pending'), true, false), []);
+  assert.deepEqual(collectionDecisionOptions(c('recorded', 'remitted'), true, false), []);
+});
+
+test('open expense count and client keys', () => {
+  const e = (status: string) => ({ id: status, expenseNumber: 'x', category: 'custody_fuel', amount: '1.00', reason: 'r', incurredOn: '2026-10-22', status: status as never, claimedByUserId: 'u', decisionNote: null });
+  assert.equal(openExpenseCount([e('pending_approval'), e('approved'), e('posted'), e('rejected'), e('cancelled')]), 2);
+  assert.match(newClientKey(), /^[A-Za-z0-9_.:-]{8,64}$/);
+  assert.notEqual(newClientKey(), newClientKey());
 });

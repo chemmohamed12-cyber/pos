@@ -80,7 +80,7 @@ export interface ActionAvailability {
   key: ActionKey;
   enabled: boolean;
   /** Why a shown action is disabled (never hide an action the state allows without saying why). */
-  disabledReason?: 'cash_on_delivery' | 'not_permitted';
+  disabledReason?: 'cash_on_delivery' | 'not_permitted' | 'lines_outstanding';
 }
 
 /**
@@ -90,14 +90,24 @@ export interface ActionAvailability {
  * A shipment with cash on delivery keeps its delivery in the existing Shipments screen in Stage B: that screen records the collection together with the delivery, and the
  * workspace has no collection write yet (Stage C), so offering a bare "delivered" here would create a delivered shipment without its collection.
  */
-export function availableActions(input: { state: string; isMine: boolean; canActAny: boolean; codAmount: string | null }): ActionAvailability[] {
+export function availableActions(input: {
+  state: string;
+  isMine: boolean;
+  canActAny: boolean;
+  codAmount: string | null;
+  /** Stage C: true when at least one collection that still counts exists for this cash-on-delivery shipment (undefined/false = none). */
+  codCollected?: boolean;
+  /** Stage C / C2: true when per-line delivery events exist and some line is still outstanding. */
+  linesOutstanding?: boolean;
+}): ActionAvailability[] {
   const permitted = input.isMine || input.canActAny;
   const cod = input.codAmount !== null && Number(input.codAmount) > 0;
   const plan: ActionKey[] =
     input.state === 'assigned' ? ['pickup'] : input.state === 'picked_up' ? ['depart'] : input.state === 'in_transit' ? ['arrive_for_delivery'] : input.state === 'out_for_delivery' ? ['deliver', 'fail_delivery'] : [];
   return plan.map((key) => {
     if (!permitted) return { key, enabled: false, disabledReason: 'not_permitted' as const };
-    if (key === 'deliver' && cod) return { key, enabled: false, disabledReason: 'cash_on_delivery' as const };
+    if (key === 'deliver' && cod && !input.codCollected) return { key, enabled: false, disabledReason: 'cash_on_delivery' as const };
+    if (key === 'deliver' && input.linesOutstanding) return { key, enabled: false, disabledReason: 'lines_outstanding' as const };
     return { key, enabled: true };
   });
 }
@@ -112,6 +122,10 @@ export interface WsCollection {
   remittedAt: string | null;
   custodyAccountId: string | null;
   occurredAt: string;
+  /** Stage C / C1: recorded (driver) -> confirmed | rejected (someone else). Optional only so older payloads still type-check. */
+  verificationStatus?: 'recorded' | 'confirmed' | 'rejected';
+  rejectionReason?: string | null;
+  collectorUserId?: string;
 }
 
 export type CustodyRowStatus = 'no_collection' | 'recorded_pending_remittance' | 'remitted';
@@ -190,4 +204,88 @@ export function vehicleAvailability(stock: readonly StockRow[] | null, productId
 export function collectionOf(map: ReadonlyMap<string, WsCollection | null> | null, shipmentId: string): WsCollection | null | undefined {
   if (!map || !map.has(shipmentId)) return undefined;
   return map.get(shipmentId) ?? null;
+}
+
+/** Server-computed totals of one shipment's collections (whole-cent arithmetic on the server; the client only displays them). */
+export interface WsCollectionTotals {
+  expected: string | null;
+  recorded: string;
+  confirmed: string;
+  rejected: string;
+  counted: string;
+  remaining: string | null;
+}
+
+export interface WsLineProgressRow {
+  shipmentLineId: string;
+  productId: string;
+  shipped: number;
+  delivered: number;
+  returned: number;
+  outstanding: number;
+}
+export interface WsLineProgress {
+  status: 'none' | 'in_progress' | 'complete' | 'partial';
+  lines: WsLineProgressRow[];
+}
+
+export type WsExpenseStatus = 'pending_approval' | 'approved' | 'rejected' | 'posted' | 'cancelled';
+export interface WsExpense {
+  id: string;
+  expenseNumber: string;
+  category: string;
+  amount: string;
+  reason: string;
+  incurredOn: string;
+  status: WsExpenseStatus;
+  claimedByUserId: string;
+  decisionNote: string | null;
+}
+
+export interface WsHandover {
+  id: string;
+  handoverNumber: string;
+  amount: string;
+  status: 'declared' | 'confirmed' | 'rejected';
+  createdAt: string;
+}
+
+/** Mirror of the server's `CustodyReconciliation` - displayed as received, never recomputed here. */
+export interface WsReconciliation {
+  collections: { recorded: string; confirmed: string; rejected: string; counted: string; remitted: string; notYetRemitted: string };
+  expenses: { pendingApproval: string; approvedNotPosted: string; posted: string; rejectedOrCancelled: string };
+  handovers: { declared: string; confirmed: string; rejected: string; handedOver: string };
+  derived: { cashInDriverHand: string; cashInDriverHandFormula: string; expectedCustodyAccountBalance: string; expectedCustodyAccountFormula: string; ledgerDifference: string | null };
+}
+
+/** May another instalment be recorded? Only while the server-computed remaining amount is positive; with no expected amount the legacy single-collection rule applies. */
+export function canRecordCollection(expectedCod: string | null, totals: WsCollectionTotals | null | undefined): boolean {
+  if (!totals) return false;
+  if (expectedCod === null || Number(expectedCod) <= 0) return Number(totals.counted) === 0;
+  return totals.remaining !== null && Number(totals.remaining) > 0;
+}
+
+/** Which actions the verification step offers for one collection (the server re-checks maker != checker and the permission). */
+export function collectionDecisionOptions(c: WsCollection, canDecide: boolean, isCollector: boolean): Array<'confirm' | 'reject'> {
+  if (!canDecide || isCollector) return [];
+  return (c.verificationStatus ?? 'recorded') === 'recorded' && c.remittanceStatus !== 'remitted' ? ['confirm', 'reject'] : [];
+}
+
+export function expenseNeedsApproval(e: WsExpense): boolean {
+  return e.status === 'pending_approval';
+}
+export function expenseReadyToPost(e: WsExpense): boolean {
+  return e.status === 'approved';
+}
+
+/** Expenses of the whole workspace that still wait for a person: the number on the "Expenses" badge. */
+export function openExpenseCount(expenses: readonly WsExpense[]): number {
+  return expenses.filter((e) => e.status === 'pending_approval' || e.status === 'approved').length;
+}
+
+/** A retry-safe idempotency key for one submit (generated once per form open; the same key is re-sent on a network retry). */
+export function newClientKey(): string {
+  const g = globalThis as { crypto?: { randomUUID?: () => string } };
+  if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+  return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`.slice(0, 40).padEnd(8, '0');
 }

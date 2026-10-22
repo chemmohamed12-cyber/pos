@@ -21,6 +21,7 @@ export interface WorkspaceCollection {
   /** Stage C / C1: recorded (driver) -> confirmed | rejected (someone else). */
   verificationStatus: 'recorded' | 'confirmed' | 'rejected';
   rejectionReason: string | null;
+  collectorUserId: string;
 }
 
 /** Server-computed totals of one shipment's collections (whole-cent arithmetic; a rejected collection counts for nothing). */
@@ -91,6 +92,7 @@ export class VehicleWorkspaceService {
       occurredAt: c.occurredAt,
       verificationStatus: c.verificationStatus,
       rejectionReason: c.rejectionReason,
+      collectorUserId: c.collectorUserId,
     });
     const totalsOf = (list: Collection[], expected: string | null): WorkspaceCollectionTotals => {
       const sum = (st: string) => list.filter((c) => c.verificationStatus === st).reduce((t, c) => t + cents(c.amount), 0);

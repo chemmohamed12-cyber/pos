@@ -22,11 +22,18 @@ import {
   vehicleAvailability,
   type ActionKey,
   type CustodyRowStatus,
+  openExpenseCount,
   type StockRow,
   type TabKey,
   type WsCollection,
+  type WsCollectionTotals,
+  type WsExpense,
+  type WsHandover,
+  type WsLineProgress,
+  type WsReconciliation,
   type WsShipment,
 } from './workspaceModel';
+import { CollectionsPanel, ExpensesPanel, LineProgressPanel, ReconciliationPanel } from './CustodyPanels';
 import './vehicle-workspace.css';
 
 interface Vehicle {
@@ -40,12 +47,23 @@ interface Vehicle {
   custodyAccountId: string | null;
   warehouseId: string | null;
 }
+/** One workspace row as the server returns it (Stage C): the shipment plus its permission-checked custody facts. `null` = not visible to this user. */
+type WsRow = WsShipment & {
+  collectionVisible: boolean;
+  collection: WsCollection | null;
+  collections: WsCollection[] | null;
+  collectionTotals: WsCollectionTotals | null;
+  lineProgress: WsLineProgress;
+  expenses: WsExpense[] | null;
+};
 interface WorkspacePayload {
   vehicle: Vehicle;
   overview: { custodyBalance: string | null; activeShipmentsCount: number; stock: StockRow[] };
-  shipments: Array<WsShipment & { collectionVisible: boolean; collection: WsCollection | null }>;
+  shipments: WsRow[];
   truncated: boolean;
   collectionsComplete: boolean;
+  reconciliation: WsReconciliation | null;
+  handovers: WsHandover[] | null;
 }
 interface Overview {
   warehouseId: string | null;
@@ -115,7 +133,8 @@ function stateTone(state: string): string {
  * linked to them, an honest placeholder for expenses, and a trip summary. Everything shown is read from endpoints that already exist (`/shipments/vehicles`, the vehicle
  * overview, `/shipments`, `/shipments/:id/detail|tracking`, `/delivery/collections`, `/products/all`); the only writes are the existing shipment actions
  * (`/shipments/:id/transition`, `/delivery/outcomes`), validated again by the server. No money is computed here and an unreadable figure is shown as "not available",
- * never as zero. Stage C (custody records, partial collections, expenses, handovers) is NOT part of this screen.
+ * never as zero. Stage C adds the custody workflow (several collections with confirmation, per-item delivery, expenses with a separate approver, driver handover and the server-side
+ * reconciliation) - every figure for it comes from the server's `/vehicle-workspace/:id` read model.
  */
 export function VehicleWorkspace() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -125,7 +144,9 @@ export function VehicleWorkspace() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [overviewFailed, setOverviewFailed] = useState(false);
-  const [shipments, setShipments] = useState<WsShipment[] | null>(null);
+  const [shipments, setShipments] = useState<WsRow[] | null>(null);
+  const [reconciliation, setReconciliation] = useState<WsReconciliation | null>(null);
+  const [handovers, setHandovers] = useState<WsHandover[] | null>(null);
   const [collections, setCollections] = useState<Map<string, WsCollection | null> | null>(null);
   const [collectionsComplete, setCollectionsComplete] = useState(false);
   const [truncated, setTruncated] = useState(false);
@@ -155,6 +176,8 @@ export function VehicleWorkspace() {
         setOverview({ warehouseId: w.vehicle.warehouseId, custodyAccountId: w.vehicle.custodyAccountId, stock: w.overview.stock, custodyBalance: w.overview.custodyBalance, activeShipmentsCount: w.overview.activeShipmentsCount });
         setOverviewFailed(false);
         setShipments(w.shipments);
+        setReconciliation(w.reconciliation);
+        setHandovers(w.handovers);
         setCollections(map);
         setCollectionsComplete(w.collectionsComplete);
         setTruncated(w.truncated);
@@ -200,6 +223,10 @@ export function VehicleWorkspace() {
   }
 
   const open = shipments.find((s) => s.id === openId) ?? null;
+  const expensesVisible = shipments.every((s) => s.expenses !== null || !s.collectionVisible);
+  const allExpenses = shipments.flatMap((s) => (s.expenses ?? []).map((e) => ({ ...e, shipmentLabel: s.rshNumber ?? s.waybillNumber })));
+  const isDriverOfVehicle = vehicle.driverUserId === user?.id;
+  const canActAnyUser = can('wf.logistics.shipment.act_any', 'editable');
   const goShipments = (key: TabKey) => {
     setTab(key);
     setSection('shipments');
@@ -211,7 +238,7 @@ export function VehicleWorkspace() {
   const navItems: Array<{ key: Section; ar: string; en: string; badge: number | null; icon: string }> = [
     { key: 'shipments', ar: 'الشحنات', en: 'Shipments', badge: counts.all, icon: '📦' },
     { key: 'custody', ar: 'العهد', en: 'Custody', badge: summary.cashOnDelivery, icon: '💼' },
-    { key: 'expenses', ar: 'المصروفات', en: 'Expenses', badge: null, icon: '🧾' },
+    { key: 'expenses', ar: 'المصروفات', en: 'Expenses', badge: openExpenseCount(allExpenses), icon: '🧾' },
     { key: 'summary', ar: 'ملخص الرحلة', en: 'Trip summary', badge: null, icon: '📊' },
   ];
 
@@ -315,8 +342,27 @@ export function VehicleWorkspace() {
               }}
             />
           )}
-          {section === 'expenses' && <ExpensesSection />}
-          {section === 'summary' && <SummarySection summary={summary} overview={overview} unknown={unknownStateCount(shipments)} onShipments={goShipments} onCustody={goCustody} />}
+          {section === 'custody' && (
+            <ReconciliationPanel
+              vehicleId={vehicle.id}
+              reconciliation={reconciliation}
+              handovers={handovers}
+              canDeclare={isDriverOfVehicle || canActAnyUser}
+              canDecide={can('logistics.collection.post', 'editable')}
+              onChanged={() => void load(false)}
+            />
+          )}
+          {section === 'expenses' && (
+            <ExpensesPanel
+              expenses={expensesVisible ? allExpenses : null}
+              openShipments={shipments.filter((s) => s.collectionVisible && s.state !== 'delivered' && s.state !== 'returned').map((s) => ({ id: s.id, label: `${s.rshNumber ?? s.waybillNumber} — ${s.customerName ?? ''}` }))}
+              canApprove={can('finance.cash_document.approve', 'editable')}
+              canPost={can('finance.cash_document.execute', 'editable')}
+              userId={user?.id}
+              onChanged={() => void load(false)}
+            />
+          )}
+          {section === 'summary' && <SummarySection summary={summary} overview={overview} unknown={unknownStateCount(shipments)} reconciliation={reconciliation} lineStatuses={shipments.map((s) => s.lineProgress.status)} onShipments={goShipments} onCustody={goCustody} />}
         </main>
         {open && (
           <ShipmentSheet
@@ -326,6 +372,9 @@ export function VehicleWorkspace() {
             isMine={open.driverUserId === user?.id}
             canActAny={can('wf.logistics.shipment.act_any', 'editable')}
             collection={collectionOf(collections, open.id)}
+            row={open}
+            userId={user?.id}
+            canDecideCollection={can('logistics.collection.post', 'editable')}
             onClose={() => setOpenId(null)}
             onChanged={() => void load(false)}
           />
@@ -354,7 +403,7 @@ function StateChip({ state }: { state: string }) {
 }
 
 function ShipmentsSection(props: {
-  shipments: WsShipment[];
+  shipments: WsRow[];
   counts: Record<TabKey, number>;
   tab: TabKey;
   onTab: (k: TabKey) => void;
@@ -469,7 +518,7 @@ function CustodySection(props: {
             {money(balance)}
           </div>
         )}
-        <p className="vw-note">{tr('الرصيد الدفتري من سجل الخزينة كما هو. تفصيل التحصيلات والمصروفات والتسويات على مستوى العهدة قادم في مرحلة لاحقة.', 'The book balance exactly as the Treasury ledger reports it. A per-custody breakdown of collections, expenses and settlements comes in a later stage.')}</p>
+        <p className="vw-note">{tr('الرصيد الدفتري من سجل الخزينة كما هو. تفصيل التحصيلات والمصروفات والتسليمات في قسم «تسوية العهدة» أدناه.', 'The book balance exactly as the Treasury ledger reports it. The breakdown of collections, expenses and handovers is in the "Custody reconciliation" section below.')}</p>
       </div>
       {!props.collectionsComplete && cod.length > 0 && (
         <div className="vw-banner warn" role="status">
@@ -532,23 +581,12 @@ function CustodySection(props: {
   );
 }
 
-function ExpensesSection() {
-  const tr = useTr();
-  return (
-    <section>
-      <div className="vw-panel vw-unsupported" role="status">
-        <div className="vw-panel-title">{tr('مصروفات العهدة', 'Custody expenses')}</div>
-        <p>{tr('تسجيل المصروفات غير متاح بعد في هذا الإصدار. لا توجد مصروفات مسجلة ولا يمكن إنشاؤها من هذه الشاشة.', 'Expense recording is not available yet in this release. No expenses are recorded and none can be created from this screen.')}</p>
-        <p className="vw-note">{tr('عند إتاحته سيمر كل مصروف بسبب إلزامي ومراجعة معتمد آخر، ويستخدم تصنيفات وحسابات معتمدة من المالية فقط.', 'When it is available, every expense will carry a mandatory reason, a separate approver and only finance-approved categories and accounts.')}</p>
-      </div>
-    </section>
-  );
-}
-
 function SummarySection(props: {
   summary: ReturnType<typeof tripSummary>;
   overview: Overview | null;
   unknown: number;
+  reconciliation: WsReconciliation | null;
+  lineStatuses: string[];
   onShipments: (k: TabKey) => void;
   onCustody: (f: CustodyFilter) => void;
 }) {
@@ -576,7 +614,7 @@ function SummarySection(props: {
         {tile(tr('تم التسليم', 'Delivered'), s.delivered, () => props.onShipments('delivered'), 'ok')}
         {tile(tr('تعذر التسليم', 'Delivery failed'), s.failed, () => props.onShipments('failed'), s.failed > 0 ? 'bad' : '')}
         {tile(tr('مرتجعات', 'Returned'), s.returned, () => props.onShipments('returned'))}
-        {unsupported(tr('تسليم جزئي', 'Partial deliveries'))}
+        {tile(tr('تسليم جزئي (من سجلات البنود)', 'Partially delivered (from item records)'), props.lineStatuses.filter((x) => x === 'partial').length, () => props.onShipments('all'), 'warn')}
       </div>
       <h2 className="vw-h2">{tr('التحصيلات والعهدة', 'Collections and custody')}</h2>
       <div className="vw-tiles">
@@ -584,9 +622,24 @@ function SummarySection(props: {
         {tile(tr('تحصيلات مسجلة', 'Collections recorded'), s.collectionsRecorded, () => props.onCustody('all'))}
         {tile(tr('تحصيلات بانتظار التوريد', 'Awaiting remittance'), s.collectionsPendingRemittance, () => props.onCustody('recorded_pending_remittance'), s.collectionsPendingRemittance ? 'warn' : '')}
         {tile(tr('تحصيلات تم توريدها', 'Remitted'), s.collectionsRemitted, () => props.onCustody('remitted'))}
-        {unsupported(tr('تحصيلات بانتظار التأكيد', 'Collections awaiting confirmation'))}
-        {unsupported(tr('مصروفات بانتظار المراجعة', 'Expenses awaiting review'))}
-        {unsupported(tr('نقدية تم تسليمها (إقرار السائق)', 'Cash handed over (driver declaration)'))}
+        {props.reconciliation ? (
+          <>
+            <div className="vw-tile" role="note">
+              <span className="vw-tile-value" dir="ltr">{money(props.reconciliation.collections.recorded)}</span>
+              <span className="vw-tile-label">{tr('تحصيلات بانتظار التأكيد', 'Collections awaiting confirmation')}</span>
+            </div>
+            <div className="vw-tile" role="note">
+              <span className="vw-tile-value" dir="ltr">{money(props.reconciliation.expenses.pendingApproval)}</span>
+              <span className="vw-tile-label">{tr('مصروفات بانتظار الاعتماد', 'Expenses awaiting approval')}</span>
+            </div>
+            <div className="vw-tile" role="note">
+              <span className="vw-tile-value" dir="ltr">{money(props.reconciliation.handovers.handedOver)}</span>
+              <span className="vw-tile-label">{tr('نقدية تم تسليمها (إقرار السائق)', 'Cash handed over (driver declaration)')}</span>
+            </div>
+          </>
+        ) : (
+          unsupported(tr('تسوية العهدة غير متاحة لصلاحياتك', 'Custody reconciliation is not available for your role'))
+        )}
       </div>
       <div className="vw-panel">
         <div className="vw-panel-title">{tr('رصيد حساب عهدة السيارة (الخزينة)', 'Vehicle custody account balance (Treasury)')}</div>
@@ -611,6 +664,9 @@ function ShipmentSheet(props: {
   canActAny: boolean;
   /** undefined = collection records not available; null = none recorded. */
   collection: WsCollection | null | undefined;
+  row: WsRow;
+  userId: string | undefined;
+  canDecideCollection: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -636,7 +692,9 @@ function ShipmentSheet(props: {
     loadDetail();
   }, [loadDetail]);
 
-  const actions = availableActions({ state: s.state, isMine: props.isMine, canActAny: props.canActAny, codAmount: s.codAmount });
+  const counted = (props.row.collections ?? []).some((c) => c.verificationStatus !== 'rejected');
+  const linesOutstanding = props.row.lineProgress.status === 'in_progress';
+  const actions = availableActions({ state: s.state, isMine: props.isMine, canActAny: props.canActAny, codAmount: s.codAmount, codCollected: counted, linesOutstanding });
 
   async function run(key: ActionKey) {
     if (busyRef.current) return; // duplicate-submit guard (a second tap while the first request is in flight is ignored)
@@ -763,31 +821,27 @@ function ShipmentSheet(props: {
             })}
           </ul>
         )}
-        <p className="vw-note">{tr('الكمية المسلّمة والمتبقية لكل صنف غير مسجلة بعد في النظام — لا تُعرض.', 'Delivered and remaining quantities per item are not recorded in the system yet — not shown.')}</p>
+        <LineProgressPanel
+          shipment={s}
+          progress={props.row.lineProgress}
+          nameOf={productLabel}
+          canAct={props.isMine || props.canActAny}
+          onChanged={() => {
+            props.onChanged();
+            loadDetail();
+          }}
+        />
 
         <h3 className="vw-h3">{tr('النقد المسجل', 'Recorded cash')}</h3>
-        {props.collection === undefined ? (
-          <div className="vw-na">{tr('سجل التحصيل غير متاح لصلاحياتك', 'The collection record is not available for your role')}</div>
-        ) : props.collection ? (
-          <dl className="vw-kv">
-            <div>
-              <dt>{tr('المبلغ المسجل', 'Recorded amount')}</dt>
-              <dd dir="ltr">{money(props.collection.amount)}</dd>
-            </div>
-            <div>
-              <dt>{tr('طريقة الدفع', 'Method')}</dt>
-              <dd>{props.collection.method}</dd>
-            </div>
-            <div>
-              <dt>{tr('التوريد', 'Remittance')}</dt>
-              <dd>{props.collection.remittanceStatus === 'remitted' ? tr('تم التوريد', 'Remitted') : tr('بانتظار التوريد', 'Awaiting remittance')}</dd>
-            </div>
-          </dl>
-        ) : isCashOnDelivery(s) ? (
-          <div className="vw-empty">{tr('لم يُسجل تحصيل لهذه الشحنة بعد.', 'No collection has been recorded for this shipment yet.')}</div>
-        ) : (
-          <div className="vw-empty">{tr('لا يوجد تحصيل عند التسليم لهذه الشحنة.', 'This shipment has no cash on delivery.')}</div>
-        )}
+        <CollectionsPanel
+          shipment={s}
+          collections={props.row.collectionVisible ? props.row.collections ?? [] : undefined}
+          totals={props.row.collectionTotals}
+          canRecord={props.isMine || props.canActAny}
+          canDecide={props.canDecideCollection}
+          userId={props.userId}
+          onChanged={props.onChanged}
+        />
 
         <h3 className="vw-h3">{tr('سجل الحالة', 'Status history')}</h3>
         {tracking === null ? (
@@ -844,15 +898,8 @@ function ShipmentSheet(props: {
                 >
                   {busy === a.key ? '…' : tr(ACTION_LABEL[a.key][0], ACTION_LABEL[a.key][1])}
                 </button>
-                {a.disabledReason === 'cash_on_delivery' && (
-                  <div className="vw-note">
-                    {tr('هذه الشحنة بتحصيل عند التسليم: يُسجَّل التسليم مع التحصيل من ', 'This shipment has cash on delivery: delivery is recorded together with the collection in the ')}
-                    <Link to="/shipments" className="vw-inline-link">
-                      {tr('شاشة الشحنات', 'shipping screen')}
-                    </Link>
-                    {tr(' حتى تتوفر مرحلة التحصيل في هذه الشاشة.', ' until collections are available in this screen.')}
-                  </div>
-                )}
+                {a.disabledReason === 'cash_on_delivery' && <div className="vw-note">{tr('هذه الشحنة بتحصيل عند التسليم: سجّل التحصيل أولًا (أعلاه) ثم سجّل التسليم.', 'This shipment has cash on delivery: record the collection first (above), then record the delivery.')}</div>}
+                {a.disabledReason === 'lines_outstanding' && <div className="vw-note">{tr('هناك بنود لم تُسجَّل كمسلّمة أو مرتجعة بعد.', 'Some items are not yet recorded as delivered or returned.')}</div>}
                 {a.disabledReason === 'not_permitted' && <div className="vw-note">{tr('ليست شحنتك ولا تملك صلاحية التنفيذ نيابة عن السائق.', 'This is not your shipment and you cannot act for the driver.')}</div>}
               </div>
             ))}
