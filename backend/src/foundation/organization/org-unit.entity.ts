@@ -1,5 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
+export type OrgUnitStatus = 'active' | 'archived';
 export type OrgUnitType = 'company' | 'branch' | 'department' | 'team' | 'warehouse';
 
 /**
@@ -30,6 +31,13 @@ export class OrgUnit {
   @Index()
   @Column({ type: 'uuid', nullable: true })
   parentId!: string | null;
+
+  /** Stage 1 (org engine): 'active' | 'archived'. A unit that records point to is archived, never deleted. */
+  @Column({ type: 'varchar', length: 16, default: 'active' })
+  status!: OrgUnitStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  archivedAt!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

@@ -86,7 +86,7 @@ describe('OrganizationController — Company-scoped (F-1 / AZ-03)', () => {
     expect(await controller.listUnits(reqA)).toEqual([expect.objectContaining({ id: branch.id, name: 'Alpha Cairo' })]);
     expect(await controller.listUnits(reqB)).toEqual([]); // Company B sees nothing of A
     // Company B's own unit stays in B
-    const bUnit = await controller.createUnit(reqB, { type: 'warehouse', name: 'Beta Main WH' });
+    const bUnit = await controller.createUnit(reqB, { type: 'branch', name: 'Beta Main WH' });
     expect((await controller.listUnits(reqA)).map((u) => u.name)).toEqual(['Alpha Cairo']);
     expect((await controller.listUnits(reqB)).map((u) => u.name)).toEqual(['Beta Main WH']);
     expect(bUnit.id).not.toBe(branch.id);

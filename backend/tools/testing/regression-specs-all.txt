@@ -127,3 +127,4 @@ src/domains/procurement/interface/procurement-multi-order-invoice.company-isolat
 src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
 src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts
 src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts
+src/foundation/organization/organization-integrity.real-pg.spec.ts
