@@ -130,3 +130,4 @@ src/domains/procurement/interface/procurement-credit-notes.company-isolation.spe
 src/foundation/organization/organization-integrity.real-pg.spec.ts
 src/domains/shipment/interface/vehicle-branch.real-pg.spec.ts
 src/foundation/scope/org-context.real-pg.spec.ts
+src/domains/inventory-warehouse/interface/warehouse-branch.real-pg.spec.ts

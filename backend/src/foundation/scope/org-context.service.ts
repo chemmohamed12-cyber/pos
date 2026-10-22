@@ -8,6 +8,8 @@ export interface ResolveBranchOptions {
   requested?: string | null;
   /** The business process needs an organizational reference. Enforced only when the Company has active branches (CTO D-4). */
   required?: boolean;
+  /** A Company WITHOUT active branches keeps the pre-engine behaviour: any existing active unit may still be named (legacy flat trees). Ignored once branches exist. */
+  legacyUnitWhenBranchless?: boolean;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,7 +41,10 @@ export class OrgContextService {
       const unit = (await manager.query(`SELECT "id","type","status" FROM "org_units" WHERE "id" = $1`, [requested]))[0] as { id: string; type: string; status: string } | undefined;
       if (!unit) throw new NotFoundException();
       this.scopes.assertUnit(scope, unit.id);
-      if (unit.type !== 'branch') throw new BadRequestException('The selected unit is not a branch. / الوحدة المحددة ليست فرعاً.');
+      if (unit.type !== 'branch') {
+        const anyBranch = opts.legacyUnitWhenBranchless ? (await manager.query(`SELECT 1 FROM "org_units" WHERE "type" = 'branch' AND "status" = 'active' LIMIT 1`)).length > 0 : true;
+        if (anyBranch) throw new BadRequestException('The selected unit is not a branch. / الوحدة المحددة ليست فرعاً.');
+      }
       if (unit.status !== 'active') throw new BadRequestException('The selected branch is archived. / الفرع المحدد مؤرشف.');
       return unit.id;
     }

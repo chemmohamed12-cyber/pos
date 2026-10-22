@@ -23,6 +23,7 @@ interface OrgUnit {
   id: string;
   type: string;
   name: string;
+  status?: 'active' | 'archived';
 }
 interface AdminUser {
   id: string;
@@ -41,6 +42,9 @@ export function Warehouses() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [units, setUnits] = useState<OrgUnit[]>([]);
   const [orgUnitId, setOrgUnitId] = useState('');
+  const activeBranches = units.filter((u) => u.type === 'branch' && (u.status ?? 'active') === 'active');
+  const hasBranches = activeBranches.length > 0;
+  const unitChoices = hasBranches ? activeBranches : units.filter((u) => (u.status ?? 'active') === 'active');
   const [busyLink, setBusyLink] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -78,7 +82,10 @@ export function Warehouses() {
     try {
       const data = await api.get<Warehouse[]>('/inventory/warehouses');
       setWarehouses(data);
-      setUnits(await api.get<OrgUnit[]>('/organization/units').catch(() => [] as OrgUnit[]));
+      const loadedUnits = await api.get<OrgUnit[]>('/organization/units').catch(() => [] as OrgUnit[]);
+      setUnits(loadedUnits);
+      const branchList = loadedUnits.filter((u) => u.type === 'branch' && (u.status ?? 'active') === 'active');
+      if (branchList.length === 1) setOrgUnitId((prev) => prev || branchList[0].id);
       if (canPlatform('platform.user.view')) {
         const u = await api.get<AdminUser[]>('/admin/users');
         setUsers(u);
@@ -189,10 +196,10 @@ export function Warehouses() {
               </select>
             </div>
             <div className="form-field" style={{ marginBottom: 0, minWidth: 200 }}>
-              <label>{ar ? 'الوحدة التنظيمية (النطاق)' : 'Organization unit (scope)'}</label>
-              <select value={orgUnitId} onChange={(e) => setOrgUnitId(e.target.value)}>
-                <option value="">{ar ? '— بدون —' : '— none —'}</option>
-                {units.map((u) => (
+              <label>{hasBranches ? (ar ? 'الفرع المالك' : 'Owning branch') : ar ? 'الوحدة التنظيمية (النطاق)' : 'Organization unit (scope)'}</label>
+              <select value={orgUnitId} onChange={(e) => setOrgUnitId(e.target.value)} required={hasBranches} data-testid="warehouse-branch-select">
+                <option value="">{hasBranches ? (ar ? '— اختر الفرع —' : '— select branch —') : ar ? '— بدون —' : '— none —'}</option>
+                {unitChoices.map((u) => (
                   <option key={u.id} value={u.id}>{u.name} ({nameOf(ORG_UNIT_TYPES, u.type, currentLang())})</option>
                 ))}
               </select>
@@ -234,8 +241,8 @@ export function Warehouses() {
                 <td>
                   {can('inventory.warehouse.edit', 'editable') ? (
                     <select value={w.orgUnitId ?? ''} disabled={busyLink === w.id} onChange={(e) => linkUnit(w, e.target.value)} aria-label={ar ? 'الوحدة التنظيمية' : 'Organization unit'}>
-                      <option value="">{ar ? '— بدون (يراه الجميع) —' : '— none (visible to everyone) —'}</option>
-                      {units.map((u) => (
+                      <option value="">{ar ? '— غير مرتبط (يراه الجميع) —' : '— unassigned (visible to everyone) —'}</option>
+                      {[...unitChoices, ...units.filter((u) => u.id === w.orgUnitId && !unitChoices.some((c) => c.id === u.id))].map((u) => (
                         <option key={u.id} value={u.id}>{u.name} ({nameOf(ORG_UNIT_TYPES, u.type, currentLang())})</option>
                       ))}
                     </select>
