@@ -118,6 +118,21 @@ export interface FinanceTreasuryContract {
    * this contract instead of importing the concrete `TreasuryService`.
    * Only `.id` of the created transaction is ever read by callers.
    */
+  /**
+   * Vehicle Driver Workspace, Stage C / C3 - the cash leg of an APPROVED custody expense: pays out of the vehicle's custody account through the existing Treasury cash-out (balance
+   * check, per-account lock, Financial Event, audit). The expense category is a reason code of the company's disbursement posting profile (`counter`): an unmapped reason, or a
+   * custody account that is not GL-mapped, is refused (fail closed) - no account is chosen or guessed here.
+   */
+  cashOutForCustodyExpense(
+    accountId: string,
+    amount: string,
+    reference: string | null,
+    reason: string | null,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<{ id: string }>;
+
   cashOutForSupplier(
     accountId: string,
     amount: string,

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, Unauthor
 import { IsIn, IsInt, IsNumberString, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { DeliveryService } from '../application/delivery.service';
 import { LineDeliveryService } from '../application/line-delivery.service';
+import { CustodyExpenseService } from '../application/custody-expense.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -60,6 +61,46 @@ class RecordLineDeliveryDto {
   clientKey?: string;
 }
 
+class ClaimExpenseDto {
+  @IsUUID()
+  shipmentId!: string;
+
+  @IsString()
+  category!: string;
+
+  @IsNumberString()
+  amount!: string;
+
+  @IsString()
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  incurredOn?: string;
+
+  @IsOptional()
+  @IsUUID()
+  evidenceAssetId?: string;
+
+  @IsOptional()
+  @IsString()
+  clientKey?: string;
+}
+
+class DecideExpenseDto {
+  @IsIn(['approved', 'rejected'])
+  decision!: 'approved' | 'rejected';
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+class CancelExpenseDto {
+  @IsString()
+  reason!: string;
+}
+
 class RejectCollectionDto {
   @IsString()
   reason!: string;
@@ -84,6 +125,7 @@ export class DeliveryController {
   constructor(
     private readonly delivery: DeliveryService,
     private readonly lineDeliveries: LineDeliveryService,
+    private readonly expenses: CustodyExpenseService,
   ) {}
 
   @Post('outcomes')
@@ -109,6 +151,47 @@ export class DeliveryController {
   async lineEvents(@Req() req: CompanyScopedRequest, @Query('shipmentId', ParseUUIDPipe) shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.lineDeliveries.getProgress(shipmentId, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  // ---- Stage C / C3: custody expenses (claim -> separate approval -> explicit posting) ----
+
+  @Get('custody-expense-categories')
+  expenseCategories() {
+    return { categories: this.expenses.listCategories() };
+  }
+
+  @Post('custody-expenses')
+  async claimExpense(@Req() req: CompanyScopedRequest, @Body() dto: ClaimExpenseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.claim(dto, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @Get('custody-expenses')
+  async listExpenses(@Req() req: CompanyScopedRequest, @Query('shipmentId', ParseUUIDPipe) shipmentId: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.listForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.cash_document.approve', 'editable')
+  @Post('custody-expenses/:id/decide')
+  async decideExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideExpenseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.decide(id, req.user.id, dto.decision, dto.note, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.cash_document.execute', 'editable')
+  @Post('custody-expenses/:id/post')
+  async postExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.post(id, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @Post('custody-expenses/:id/cancel')
+  async cancelExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelExpenseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.cancel(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('outcomes')

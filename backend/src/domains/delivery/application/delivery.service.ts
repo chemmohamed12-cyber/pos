@@ -278,6 +278,14 @@ export class DeliveryService implements LogisticsDeliveryContract {
     return collection;
   }
 
+  /** Stage C / C3: the custody record of a shipment for the expense flow - same lazy creation as the first collection. The caller holds its own transaction. */
+  async openCustody(shipmentId: string, actorUserId: string, txManager: EntityManager): Promise<ShipmentCustody> {
+    const snapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+    if (!snapshot) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
+    const expected = snapshot.codAmount !== null && Number(snapshot.codAmount) > 0 ? snapshot.codAmount : null;
+    return this.ensureCustodyRecord(shipmentId, snapshot, expected, actorUserId, txManager);
+  }
+
   /**
    * Stage C / C1 - the per-shipment custody record, created by the first collection (never for a shipment that carries no cash). Runs inside the caller's transaction, which already
    * holds the per-shipment advisory lock, so two collections cannot both create it; the unique index on `shipmentId` is the backstop. Vehicle, driver and the vehicle's free-text

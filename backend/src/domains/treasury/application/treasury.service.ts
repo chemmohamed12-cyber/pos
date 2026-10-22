@@ -749,6 +749,18 @@ export class TreasuryService implements FinanceTreasuryContract {
    * `TreasuryService` directly. Same non-emitting contract semantics and
    * additive `manager?` as `cashOut`/`cashIn`.
    */
+  async cashOutForCustodyExpense(
+    accountId: string,
+    amount: string,
+    reference: string | null,
+    reason: string | null,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<TreasuryTransaction> {
+    return this.cashOutDirect(accountId, amount, null, null, reference, reason, actorUserId, manager, counter);
+  }
+
   async cashOutForSupplier(
     accountId: string,
     amount: string,

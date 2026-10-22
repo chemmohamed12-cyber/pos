@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Collection } from '../infrastructure/collection.entity';
 import { ShipmentLineDelivery } from '../infrastructure/shipment-line-delivery.entity';
+import { CustodyExpense } from '../infrastructure/custody-expense.entity';
 import { computeDeliveryProgress } from './line-delivery-progress';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { VehicleAccessService } from '../../shipment/application/vehicle-access.service';
@@ -105,6 +106,11 @@ export class VehicleWorkspaceService {
       ? await (manager ?? this.dataSource).getRepository(ShipmentLineDelivery).createQueryBuilder('e').where('e."shipmentId" IN (:...ids)', { ids: shipmentIds }).getMany()
       : [];
 
+    // Stage C / C3: the expense claims of the shipments whose cash this user may see (same visibility as the collections - expenses are part of the same custody).
+    const expenseRows: CustodyExpense[] = ids.length
+      ? await (manager ?? this.dataSource).getRepository(CustodyExpense).createQueryBuilder('x').where('x."shipmentId" IN (:...ids)', { ids }).orderBy('x."createdAt"', 'ASC').getMany()
+      : [];
+
     const rows = list.rows.map((s) => {
       const c = byShipment.get(s.id);
       const collection: WorkspaceCollection | null = c ? view(c) : null;
@@ -126,6 +132,11 @@ export class VehicleWorkspaceService {
         collection: visible.has(s.id) ? collection : null,
         // Stage C / C1: every instalment (rejected ones included, flagged) and the server-computed totals; `null` when this user may not see the collections of this shipment.
         collections: visible.has(s.id) ? list.map(view) : null,
+        expenses: visible.has(s.id)
+          ? expenseRows
+              .filter((x) => x.shipmentId === s.id)
+              .map((x) => ({ id: x.id, expenseNumber: x.expenseNumber, category: x.category, amount: x.amount, reason: x.reason, incurredOn: x.incurredOn, status: x.status, claimedByUserId: x.claimedByUserId, decisionNote: x.decisionNote }))
+          : null,
         lineProgress: computeDeliveryProgress(
           lineRows.filter((l) => l.shipmentId === s.id),
           eventRows.filter((e) => e.shipmentId === s.id),

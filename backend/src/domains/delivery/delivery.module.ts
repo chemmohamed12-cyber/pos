@@ -5,6 +5,9 @@ import { Collection } from './infrastructure/collection.entity';
 import { ShipmentCustody } from './infrastructure/shipment-custody.entity';
 import { ShipmentLineDelivery } from './infrastructure/shipment-line-delivery.entity';
 import { LineDeliveryService } from './application/line-delivery.service';
+import { CustodyExpense } from './infrastructure/custody-expense.entity';
+import { CustodyExpenseService } from './application/custody-expense.service';
+import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
 import { VehicleWorkspaceService } from './application/vehicle-workspace.service';
@@ -27,7 +30,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery]),
+    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense]),
     ShipmentModule,
     FulfillmentModule,
     SalesOrdersModule,
@@ -35,6 +38,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     InventoryWarehouseModule,
     AuditModule,
     NumberingModule,
+    ApprovalEngineModule,
     EventsModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -50,7 +54,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [DeliveryController, VehicleWorkspaceController],
-  providers: [DeliveryService, LineDeliveryService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
+  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
   exports: [DeliveryService, LOGISTICS_DELIVERY_CONTRACT],
 })
 export class DeliveryModule {}
