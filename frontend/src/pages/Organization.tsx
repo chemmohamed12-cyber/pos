@@ -331,7 +331,7 @@ export function Organization() {
               </li>
             )}
           </ul>
-          {!impact.canArchive && <div className="error-text">{impact.reasons.join(' ')}</div>}
+          {!impact.canArchive && <div className="error-text">{impact.reasons.map((r) => r.split(' / ')[ar ? 1 : 0] ?? r).join(' ')}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" disabled={busy || !impact.canArchive} onClick={confirmArchive}>
               {tr('تأكيد الأرشفة', 'Confirm archive')}

@@ -108,7 +108,7 @@ export function ShippingMethods() {
       const [companies, vehicleData, users, units] = await Promise.all([
         api.get<ShippingCompany[]>('/shipments/shipping-companies'),
         api.get<Vehicle[]>('/shipments/vehicles'),
-        api.get<AdminUser[]>('/admin/users'),
+        api.get<AdminUser[]>('/admin/users').catch(() => [] as AdminUser[]), // drivers are optional context: a caller without the platform user-view permission still gets the vehicles
         api.get<Array<BranchUnit & { type: string; status?: string }>>('/organization/units').catch(() => []),
       ]);
       const activeBranches = units.filter((u) => u.type === 'branch' && (u.status ?? 'active') === 'active');

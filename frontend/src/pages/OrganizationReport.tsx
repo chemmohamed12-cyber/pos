@@ -61,7 +61,7 @@ export function OrganizationReport() {
   }
 
   useEffect(() => {
-    api.get<Unit[]>('/organization/units').then(setUnits).catch(() => undefined);
+    api.get<Array<Unit & { status?: string }>>('/organization/units').then((all) => setUnits(all.filter((u) => (u.status ?? 'active') === 'active'))).catch(() => undefined);
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
