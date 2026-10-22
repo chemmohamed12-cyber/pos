@@ -274,10 +274,16 @@ export class ShipmentController {
 
   // ---- Company Vehicles (CTO directive §2) ----
 
+  /** Org engine Stage 3 — a vehicle of a branch the caller cannot reach answers 404, like a missing one. An unlinked (legacy) vehicle is visible to everyone. */
+  private async assertVehicleInScope(req: CompanyScopedRequest, id: string): Promise<void> {
+    const vehicle = await this.shipments.getVehicle(id, req.companyContext!.dataSource.manager);
+    await this.orgContext.assertVisible(req, vehicle.orgUnitId);
+  }
+
   @Get('vehicles')
   async listVehicles(@Req() req: CompanyScopedRequest) {
     if (!req.companyContext) throw new UnauthorizedException();
-    return this.shipments.listVehicles(req.companyContext.dataSource.manager);
+    return this.orgContext.filterVisible(req, await this.shipments.listVehicles(req.companyContext.dataSource.manager));
   }
 
   @UseGuards(PermissionGuard)
@@ -314,6 +320,7 @@ export class ShipmentController {
   @Post('vehicles/:id')
   async updateVehicle(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     const orgUnitId = dto.orgUnitId ? await this.orgContext.resolveBranch(req, { requested: dto.orgUnitId }) : undefined;
     return this.shipments.updateVehicle(id, { plateNumber: dto.plateNumber, branch: dto.branch, ...(orgUnitId ? { orgUnitId } : {}) }, req.user.id, req.companyContext.dataSource.manager);
   }
@@ -321,6 +328,7 @@ export class ShipmentController {
   @Get('vehicles/:id/overview')
   async getVehicleOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.getCustodianOverview('vehicle', id, req.companyContext.dataSource.manager);
   }
 
@@ -329,6 +337,7 @@ export class ShipmentController {
   @Post('vehicles/:id/driver')
   async setVehicleDriver(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleDriverDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleDriver(id, dto.driverUserId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -337,6 +346,7 @@ export class ShipmentController {
   @Post('vehicles/:id/status')
   async setVehicleStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleStatusDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -345,6 +355,7 @@ export class ShipmentController {
   @Post('vehicles/:id/settlement-account')
   async setVehicleSettlementAccount(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleSettlementAccountDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleSettlementAccount(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 

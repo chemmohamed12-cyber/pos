@@ -128,6 +128,21 @@ describe('Vehicle branch — validated organizational reference (real Postgres)'
     expect(await q(dsA, `SELECT 1 FROM vehicles WHERE code LIKE 'L-%' AND "orgUnitId" IS NOT NULL`)).toHaveLength(0); // report only
   });
 
+  it('cross-branch isolation: a caller scoped to one branch lists only that branch’s vehicles (plus unlinked legacy ones) and gets 404 on another branch’s vehicle', async () => {
+    const cairoVehicle = (await controller.createVehicle(req(dsA), { code: 'V-CAIRO-2', plateNumber: 'F 1', orgUnitId: ids.cairo } as never)).id;
+    scope = restrictedTo(ids.tanta);
+    const codes = (await controller.listVehicles(req(dsA))).map((v) => v.code);
+    expect(codes).toContain('V-TANTA');
+    expect(codes).toContain('V-LEGACY'); // unlinked = visible to everyone (D-5)
+    expect(codes).not.toContain('V-CAIRO-2');
+    await expect(controller.setVehicleStatus(req(dsA), cairoVehicle, { status: 'retired' } as never)).rejects.toThrow(/Not Found/i);
+    await expect(controller.getVehicleOverview(req(dsA), cairoVehicle)).rejects.toThrow(/Not Found/i);
+    await expect(controller.updateVehicle(req(dsA), cairoVehicle, { plateNumber: 'HACK' } as never)).rejects.toThrow(/Not Found/i);
+    expect((await q(dsA, `SELECT status, "plateNumber" FROM vehicles WHERE id = $1`, [cairoVehicle]))[0]).toEqual({ status: 'active', plateNumber: 'F 1' });
+    scope = unrestricted();
+    expect((await controller.listVehicles(req(dsA))).map((v) => v.code)).toContain('V-CAIRO-2');
+  });
+
   it('Company B is untouched by all of the above', async () => {
     expect(await q(dsB, `SELECT 1 FROM vehicles`)).toHaveLength(0);
   });

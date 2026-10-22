@@ -55,6 +55,17 @@ export class OrgContextService {
     );
   }
 
+  /** Rows the caller may see: a record with no org link is visible to everyone (legacy NULL semantics, D-5); otherwise its unit must be inside the caller's scope. */
+  async filterVisible<T extends { orgUnitId?: string | null }>(req: CompanyScopedRequest, rows: T[]): Promise<T[]> {
+    const scope = await this.scopes.forRequest(req);
+    return scope.unrestricted ? rows : rows.filter((r) => this.scopes.allowsUnit(scope, r.orgUnitId));
+  }
+
+  /** 404 when the record's org unit is outside the caller's scope (anti-enumeration); a record with no org link is not a scope matter. */
+  async assertVisible(req: CompanyScopedRequest, orgUnitId: string | null | undefined): Promise<void> {
+    this.scopes.assertUnit(await this.scopes.forRequest(req), orgUnitId);
+  }
+
   /** Validated branch for a write that fixes the org context of a NEW record whose parent already has one: the parent's branch wins, a conflicting request is refused. */
   inheritBranch(parentBranchId: string | null | undefined, requested: string | null | undefined): string | null {
     if (parentBranchId && requested && requested !== parentBranchId) {
