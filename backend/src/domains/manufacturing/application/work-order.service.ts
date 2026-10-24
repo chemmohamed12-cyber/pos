@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { WorkOrder } from '../infrastructure/work-order.entity';
@@ -6,6 +6,7 @@ import { WorkOrderComponent } from '../infrastructure/work-order-component.entit
 import { WorkOrderOperation } from '../infrastructure/work-order-operation.entity';
 import { WorkOrderResult } from '../infrastructure/work-order-result.entity';
 import { RoutingService } from './routing.service';
+import { ProcessDefinitionService } from './process-definition.service';
 import { WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE } from '../domain/work-order-process';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
@@ -40,6 +41,7 @@ export class WorkOrderService {
     @Inject(SALES_BOM_CONTRACT) private readonly bom: SalesBomContract,
     @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation: InventoryValuationContract,
     private readonly routings: RoutingService,
+    @Optional() private readonly processes?: ProcessDefinitionService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -235,6 +237,30 @@ export class WorkOrderService {
   }
 
   /**
+   * Manufacturing Engine S4 - an order that runs the product's ACTIVE process version instead of the flat BOM. The version and the alternate choices are fixed here; `release`
+   * snapshots the raw requirements from the version (not from the BOM). Everything after (issue, output, scrap, completion) is the unchanged order lifecycle.
+   */
+  async createProcessWorkOrder(finishedProductId: string, quantityPlanned: number, warehouseId: string, choices: Record<string, string> | null, actorUserId: string | null, manager?: EntityManager): Promise<WorkOrder> {
+    if (!this.processes) throw new ConflictException('Process definitions are not available in this installation.');
+    if (!Number.isInteger(quantityPlanned) || quantityPlanned <= 0) throw new ConflictException('quantityPlanned must be a positive whole number.');
+    const version = await this.processes.getActiveVersion(finishedProductId, manager);
+    if (!version) throw new ConflictException(`Product "${finishedProductId}" has no ACTIVE process version - activate one (Manufacturing > Processes) first.`);
+    const requirements = await this.processes.resolveRawRequirements(version.id, choices, manager); // also validates the choices
+    if (requirements.length === 0) throw new ConflictException(`Process version ${version.versionNo} needs no raw material from stock - nothing to reserve or issue.`);
+    return (manager ?? this.dataSource).transaction(async (txManager) => {
+      const workOrderNumber = await this.numbering.getNextNumber('work_order', txManager);
+      const repo = txManager.getRepository(WorkOrder);
+      const wo = await repo.save(repo.create({ workOrderNumber, finishedProductId, quantityPlanned, warehouseId, createdByUserId: actorUserId, processVersionId: version.id, processChoices: choices ?? null }));
+      await this.processEngine.start(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, txManager);
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'manufacturing.work_order.created', resource: 'work_order', resourceId: wo.id, result: 'success', correlationId: null, after: { workOrderNumber, finishedProductId, quantityPlanned, warehouseId, processVersionId: version.id, versionNo: version.versionNo } },
+        txManager,
+      );
+      return wo;
+    });
+  }
+
+  /**
    * ADR-061 §2/§3/§6 — takes the BOM snapshot, reserves every component
    * (Option A generic reference, see `stock-reservation.entity.ts`), and
    * auto-creates the Work Order's dedicated WIP sub-warehouse. Warehouse
@@ -248,14 +274,15 @@ export class WorkOrderService {
     const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'draft') throw new ConflictException(`Work Order "${workOrderId}" cannot be released from state "${state}".`);
 
-    const bomLines = await this.bom.getBomForAssembly(wo.finishedProductId, manager);
+    // S4: a process-bound order snapshots its raw requirements from the (immutable) process version; the Basic Profile keeps the flat BOM.
+    const bomLines = wo.processVersionId && this.processes ? await this.processes.resolveRawRequirements(wo.processVersionId, wo.processChoices, manager) : await this.bom.getBomForAssembly(wo.finishedProductId, manager);
     if (!bomLines || bomLines.length === 0) {
       throw new ConflictException(`Finished product "${wo.finishedProductId}" has no Bill of Materials — cannot release a Work Order for it.`);
     }
 
     // ADR-061 Addendum 1 (A1) — resolved BEFORE any release side effect (WIP warehouse creation): an
     // active routing is snapshotted below; a routing pointing at an inactive Work Center fails here.
-    const routingOperations = await this.routings.getActiveOperationsForRelease(wo.finishedProductId, manager);
+    const routingOperations = wo.processVersionId ? null : await this.routings.getActiveOperationsForRelease(wo.finishedProductId, manager);
 
     const wipCode = `WIP-${wo.workOrderNumber}`;
     let wipWarehouse = await this.inventory.findOperationalSubLocation(wo.warehouseId, wipCode, manager);
@@ -1048,6 +1075,20 @@ export class WorkOrderService {
       throw new ConflictException(
         `Cannot complete Work Order "${workOrderId}" — ${open.length} routing operation(s) are not completed (first open: ${open[0].sequence} "${open[0].name}").`,
       );
+    }
+
+    // S4: a process-bound order closes only when every non-optional operation has a completed run and nothing is still running.
+    if (wo.processVersionId) {
+      const open: Array<{ code: string; why: string }> = await (manager ?? this.dataSource).query(
+        `SELECT o."code", CASE WHEN EXISTS (SELECT 1 FROM "mfg_operation_runs" r WHERE r."workOrderId" = $1 AND r."operationId" = o."id" AND r."status" = 'running') THEN 'still running' ELSE 'not completed' END AS why
+           FROM "mfg_process_operations" o
+          WHERE o."versionId" = $2
+            AND ( EXISTS (SELECT 1 FROM "mfg_operation_runs" r WHERE r."workOrderId" = $1 AND r."operationId" = o."id" AND r."status" = 'running')
+               OR (o."optional" = false AND NOT EXISTS (SELECT 1 FROM "mfg_operation_runs" r WHERE r."workOrderId" = $1 AND r."operationId" = o."id" AND r."status" = 'completed')) )
+          ORDER BY o."sequenceNo", o."code"`,
+        [workOrderId, wo.processVersionId],
+      );
+      if (open.length > 0) throw new ConflictException(`Cannot complete Work Order "${workOrderId}" - process operation(s) not done: ${open.map((o) => `${o.code} (${o.why})`).join(', ')}.`);
     }
 
     await (manager ?? this.dataSource).transaction(async (txManager) => {

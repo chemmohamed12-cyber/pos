@@ -440,6 +440,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', module: 'manufacturing', feature: 'manufacturing.work_orders', permissionNode: 'manufacturing.work_order' },
       { to: '/manufacturing/boms', code: 'nav.manufacturing_boms', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
       { to: '/manufacturing/routings', code: 'nav.manufacturing_routings', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
+      { to: '/manufacturing/processes', code: 'nav.manufacturing_processes', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
       { to: '/manufacturing/work-centers', code: 'nav.manufacturing_work_centers', module: 'manufacturing', permissionNode: 'manufacturing.work_center' },
       { to: '/manufacturing/assembly', code: 'nav.manufacturing_assembly', module: 'manufacturing', permissionNode: 'inventory.assembly' },
     ],

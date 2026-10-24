@@ -10,6 +10,12 @@ import { WorkOrderResult } from './infrastructure/work-order-result.entity';
 import { ProductUnitConversion } from './infrastructure/product-unit-conversion.entity';
 import { UnitConversionService } from './application/unit-conversion.service';
 import { UnitConversionController } from './interface/unit-conversion.controller';
+import { OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput } from './infrastructure/process-definition.entity';
+import { OperationRun, OperationFlow } from './infrastructure/operation-run.entity';
+import { ProcessExecutionService } from './application/process-execution.service';
+import { ProcessOrderController } from './interface/process-order.controller';
+import { ProcessDefinitionService } from './application/process-definition.service';
+import { ProcessDefinitionController } from './interface/process-definition.controller';
 import { WorkCenterService } from './application/work-center.service';
 import { RoutingService } from './application/routing.service';
 import { ManufacturingBomController } from './interface/manufacturing-bom.controller';
@@ -42,7 +48,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion]),
+    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion, OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput, OperationRun, OperationFlow]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -57,9 +63,11 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController, UnitConversionController],
+  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController, UnitConversionController, ProcessDefinitionController, ProcessOrderController],
   providers: [
     UnitConversionService,
+    ProcessDefinitionService,
+    ProcessExecutionService,
     WorkOrderService,
     WorkCenterService,
     RoutingService,
@@ -68,6 +76,6 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     // implementation, mirroring `GRNI_LEDGER_CONTRACT: useExisting: GrniLedgerService` exactly.
     { provide: MANUFACTURING_WIP_CONTRACT, useExisting: ManufacturingWipLedgerService },
   ],
-  exports: [UnitConversionService, WorkOrderService, RoutingService, WorkCenterService, MANUFACTURING_WIP_CONTRACT],
+  exports: [UnitConversionService, ProcessDefinitionService, ProcessExecutionService, WorkOrderService, RoutingService, WorkCenterService, MANUFACTURING_WIP_CONTRACT],
 })
 export class ManufacturingModule {}

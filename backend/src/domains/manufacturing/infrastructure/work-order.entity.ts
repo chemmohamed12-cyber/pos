@@ -29,6 +29,14 @@ export class WorkOrder {
   @Column({ type: 'int', default: 0 })
   quantityScrapped!: number;
 
+  /** Manufacturing Engine S4 - the process version this order runs; null = the unchanged Basic Profile (flat BOM + routing snapshot). */
+  @Column({ type: 'uuid', nullable: true })
+  processVersionId!: string | null;
+
+  /** S4 - the alternate chosen per alternate group (`{ "<operationCode>|<group>": "<componentProductId>" }`), fixed at creation so reservations match what will be issued. */
+  @Column({ type: 'jsonb', nullable: true })
+  processChoices!: Record<string, string> | null;
+
   /** The real (non-WIP) execution warehouse (§3). */
   @Index()
   @Column('uuid')

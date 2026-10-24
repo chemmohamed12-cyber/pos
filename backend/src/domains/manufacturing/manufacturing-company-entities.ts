@@ -6,6 +6,8 @@ import { RoutingOperation } from './infrastructure/routing-operation.entity';
 import { WorkOrderOperation } from './infrastructure/work-order-operation.entity';
 import { WorkOrderResult } from './infrastructure/work-order-result.entity';
 import { ProductUnitConversion } from './infrastructure/product-unit-conversion.entity';
+import { OperationRun, OperationFlow } from './infrastructure/operation-run.entity';
+import { OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput } from './infrastructure/process-definition.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Manufacturing's own
@@ -17,4 +19,4 @@ import { ProductUnitConversion } from './infrastructure/product-unit-conversion.
  * 2026-10-06 (ADR-061 Addendum 1): Work Centers, Routings (+ operations) and the Work Order
  * operation snapshot join the registry so they live in each Company's own database.
  */
-export const MANUFACTURING_COMPANY_ENTITIES = [WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion];
+export const MANUFACTURING_COMPANY_ENTITIES = [WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion, OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput, OperationRun, OperationFlow];

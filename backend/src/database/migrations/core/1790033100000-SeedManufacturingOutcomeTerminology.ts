@@ -7,6 +7,7 @@ export class SeedManufacturingOutcomeTerminology1790033100000 implements Migrati
   private readonly rows: Array<[string, string, string, string]> = [
     ['movement_type.work_order_scrap', 'movement_type', 'هالك أمر تشغيل', 'Work order scrap'],
     ['movement_type.work_order_recovery', 'movement_type', 'استرداد خامة من هالك', 'Work order material recovery'],
+    ['nav.manufacturing_processes', 'field', 'تعريفات العمليات', 'Process definitions'],
     ['policy.manufacturing_scrap_loss_account_code.label', 'field', 'حساب خسارة هالك التصنيع', 'Manufacturing scrap loss account'],
     ['policy.manufacturing_scrap_loss_account_code.help', 'panel', 'الطرف المدين عند تسجيل هالك أمر تشغيل (دائن: الإنتاج تحت التشغيل). عادةً حساب مصروف.', 'Debit side when work-order scrap is recognised (credit: WIP). Typically an expense account.'],
   ];

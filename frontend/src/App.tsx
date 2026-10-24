@@ -46,6 +46,7 @@ import { HrCover } from './pages/covers/HrCover';
 import { WorkOrders } from './pages/manufacturing/WorkOrders';
 import { WorkOrderDetail } from './pages/manufacturing/WorkOrderDetail';
 import { ManufacturingBoms } from './pages/manufacturing/ManufacturingBoms';
+import { Processes } from './pages/manufacturing/Processes';
 import { Routings } from './pages/manufacturing/Routings';
 import { WorkCenters } from './pages/manufacturing/WorkCenters';
 import { Assembly } from './pages/manufacturing/Assembly';
@@ -284,6 +285,7 @@ function AppRoutes() {
         <Route path="manufacturing/work-orders/:id" element={<WorkOrderDetail />} />
         <Route path="manufacturing/boms" element={<ManufacturingBoms />} />
         <Route path="manufacturing/routings" element={<Routings />} />
+        <Route path="manufacturing/processes" element={<Processes />} />
         <Route path="manufacturing/work-centers" element={<WorkCenters />} />
         <Route path="manufacturing/assembly" element={<Assembly />} />
         <Route path="attendance" element={<AttendanceCover />} />
