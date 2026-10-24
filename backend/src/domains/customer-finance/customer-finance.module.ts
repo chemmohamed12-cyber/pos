@@ -9,6 +9,9 @@ import { CustomerLedgerService } from './application/customer-ledger.service';
 import { InvoiceService } from './application/invoices.service';
 import { PaymentsService } from './application/payments.service';
 import { FINANCE_COLLECTION_CONTRACT } from '../../foundation/module-registry/contracts/collection.contract';
+import { CustomerStatementService } from './application/customer-statement.service';
+import { CustomerStatementExportService } from './application/customer-statement-export.service';
+import { CustomerStatementController } from './interface/customer-statement.controller';
 import { InvoicesController } from './interface/invoices.controller';
 import { PaymentsController } from './interface/payments.controller';
 import { CustomerLedgerController } from './interface/customer-ledger.controller';
@@ -66,12 +69,14 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [InvoicesController, PaymentsController, CustomerLedgerController],
+  controllers: [InvoicesController, PaymentsController, CustomerLedgerController, CustomerStatementController],
   providers: [
     CustomerLedgerService,
     InvoiceService,
     PaymentsService,
     { provide: FINANCE_COLLECTION_CONTRACT, useExisting: PaymentsService },
+    CustomerStatementService,
+    CustomerStatementExportService,
     { provide: FINANCE_CUSTOMER_LEDGER_CONTRACT, useExisting: CustomerLedgerService },
     { provide: FINANCE_INVOICE_CONTRACT, useExisting: InvoiceService },
   ],
