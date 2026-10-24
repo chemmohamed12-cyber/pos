@@ -1,0 +1,1 @@
+src/domains/customer-finance/interface/payment-reversal.company-isolation.spec.ts

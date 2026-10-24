@@ -283,6 +283,7 @@ export class PaymentsService implements FinanceCollectionContract {
     reason: string,
     actorUserId: string,
     manager?: EntityManager,
+    opts?: { completeOrphaned?: boolean },
   ): Promise<{ reversalId: string; reversalNumber: string; paymentId: string; amount: string; invoicesReopened: string[] }> {
     const why = (reason ?? '').trim();
     if (why.length < 3) throw new BadRequestException('A reason is required to reverse a payment.');
@@ -316,7 +317,11 @@ export class PaymentsService implements FinanceCollectionContract {
       }
 
       const { glAccountCode } = await this.treasury.requireGlMappedAccount(payment.treasuryAccountId, m);
-      const reversalLeg = await this.treasury.reverseOwnedLeg(payment.treasuryTransactionId, `payment ${payment.paymentNumber}: ${why}`, actorUserId, m);
+      // Customer-statement hotfix (D2): `completeOrphaned` finishes the DOCUMENT side of a payment whose Treasury leg was already reversed by a raw Treasury reversal (the
+      // pre-T2 path). The existing offset leg is adopted — NO second Treasury movement is created. Refused when the GL already booked that raw reversal.
+      const reversalLeg = opts?.completeOrphaned
+        ? await this.treasury.findRawReversalOfOwnedLeg(payment.treasuryTransactionId, m)
+        : await this.treasury.reverseOwnedLeg(payment.treasuryTransactionId, `payment ${payment.paymentNumber}: ${why}`, actorUserId, m);
 
       await this.numbering.registerDocumentType(PAYMENT_REVERSAL_DOCUMENT_TYPE, PAYMENT_REVERSAL_PREFIX, true, m);
       const reversalNumber = await this.numbering.getNextNumber(PAYMENT_REVERSAL_DOCUMENT_TYPE, m);
@@ -337,7 +342,7 @@ export class PaymentsService implements FinanceCollectionContract {
             paymentId,
             treasuryTransactionId: reversalLeg.id,
             reference: reversalNumber,
-            reason: `Reversal of payment ${payment.paymentNumber}: ${why}`,
+            reason: `Reversal of payment ${payment.paymentNumber}: ${why}${opts?.completeOrphaned ? ' (document side completed after a Treasury reversal)' : ''}`,
             createdByUserId: actorUserId,
           },
           m,
@@ -370,7 +375,7 @@ export class PaymentsService implements FinanceCollectionContract {
         {
           actorUserId,
           organizationId: null,
-          action: 'customer_finance.payment.reversed',
+          action: opts?.completeOrphaned ? 'customer_finance.payment.reversal_completed' : 'customer_finance.payment.reversed',
           resource: 'customer_payment',
           resourceId: paymentId,
           result: 'success',
@@ -523,6 +528,11 @@ export class PaymentsService implements FinanceCollectionContract {
     return all
       .filter((i) => (i.state === 'posted' || i.state === 'partially_paid') && Number(i.remaining) > 0)
       .map((i) => ({ id: i.id, invoiceNumber: i.invoiceNumber, remaining: i.remaining, state: i.state }));
+  }
+
+  /** Customer-statement hotfix (D2) — completes the document side of a payment whose Treasury leg was reversed by a raw Treasury reversal; see `reversePayment`'s `completeOrphaned`. */
+  async completeOrphanedReversal(paymentId: string, reason: string, actorUserId: string, manager?: EntityManager) {
+    return this.reversePayment(paymentId, reason, actorUserId, manager, { completeOrphaned: true });
   }
 
   /** CUS-01 — what is still UNAPPLIED on a payment: Σ(credit − debit) of its ledger rows that carry no invoice (derived, never stored; no status filter — same discipline as every balance here). */

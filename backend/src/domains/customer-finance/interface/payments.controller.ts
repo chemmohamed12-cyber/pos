@@ -165,6 +165,25 @@ export class PaymentsController {
     return result;
   }
 
+  /**
+   * Customer-statement hotfix (D2) — completes the DOCUMENT side (Customer Ledger mirror, invoice status, GL mirror event) of a payment whose Treasury leg was already
+   * reversed by a raw Treasury reversal. Adopts the existing offset leg: it never creates a second Treasury reversal, and is refused if the GL already booked the raw one.
+   */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.payment.reverse', 'editable')
+  @Post('payments/:id/complete-reversal')
+  async completeReversal(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: ReversePaymentDto, @Headers('idempotency-key') idempotencyKey?: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const result = await this.idempotency.withIdempotencyInTransaction(
+      'payments.complete-reversal',
+      idempotencyKey,
+      (txManager) => this.payments.completeOrphanedReversal(id, dto.reason, req.user!.id, txManager),
+      req.companyContext.dataSource.manager,
+    );
+    await this.events.dispatchAfterCommit(req.companyContext.dataSource.manager);
+    return result;
+  }
+
   /** CUS-01 — settle (part of) an unapplied receipt against an invoice. */
   @UseGuards(PermissionGuard)
   @RequirePermission('finance.payment.create', 'editable')

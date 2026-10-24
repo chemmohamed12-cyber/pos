@@ -1131,6 +1131,28 @@ export class TreasuryService implements FinanceTreasuryContract {
    * (the owning document publishes its own mirror event). Joins the caller's transaction. Refuses a transfer leg, an already-reversed leg, and (for a
    * receipt) a reversal the account cannot fund — money that is no longer there cannot be handed back.
    */
+  /**
+   * Customer-statement hotfix (D2). The single offset leg of an owned movement that was reversed by a RAW Treasury reversal (the path T2 now refuses). Used only by
+   * `PaymentsService.completeOrphanedReversal` to adopt that leg instead of creating a second one. Refused unless the original is `reversed`, has exactly one offset leg, and
+   * the General Ledger has NOT already booked that raw reversal (a POSTED `treasury.cash.recorded` for the offset leg would be double-reversed by the document mirror).
+   */
+  async findRawReversalOfOwnedLeg(transactionId: string, manager: EntityManager): Promise<TreasuryTransaction> {
+    const repo = manager.getRepository(TreasuryTransaction);
+    const original = await repo.findOne({ where: { id: transactionId } });
+    if (!original) throw new NotFoundException(`Treasury transaction "${transactionId}" not found.`);
+    if (original.status !== 'reversed') throw new ConflictException(`Treasury transaction "${original.transactionNumber}" is "${original.status}", not reversed — use the normal payment reversal.`);
+    const legs = await repo.find({ where: { reversalOfTransactionId: transactionId } });
+    if (legs.length !== 1) throw new ConflictException(`Treasury transaction "${original.transactionNumber}" has ${legs.length} offset legs — it needs an accounting review. Nothing was changed.`);
+    const posted = (await manager.query(
+      `SELECT count(*)::int AS n FROM "accounting_financial_events" WHERE "eventType" = 'treasury.cash.recorded' AND "sourceEntityId"::text = $1 AND "status" = 'POSTED'`,
+      [legs[0].id],
+    )) as Array<{ n: number }>;
+    if (posted[0].n > 0) {
+      throw new ConflictException(`The General Ledger already booked the raw reversal ${legs[0].transactionNumber}; completing the document side would reverse it twice. It needs an accounting adjustment. Nothing was changed.`);
+    }
+    return legs[0];
+  }
+
   async reverseOwnedLeg(transactionId: string, reason: string, actorUserId: string, manager: EntityManager): Promise<TreasuryTransaction> {
     return this.run(manager, async (m) => {
       const repo = m.getRepository(TreasuryTransaction);

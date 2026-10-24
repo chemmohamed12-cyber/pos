@@ -260,6 +260,70 @@ describe('T2 — customer payment reversal through the owning document — real-
     expect(await state('A', inv)).toBe('posted');
   });
 
+  /** Simulates the legacy (pre-T2) raw Treasury reversal: an offset leg exists and the original is `reversed`, but the document side (ledger, invoice, GL mirror) was never reversed. */
+  async function legacyRawReversal(k: Key, treasuryTransactionId: string): Promise<string> {
+    const ds = await dsOf(k);
+    const orig = (await ds.query(`SELECT "treasuryAccountId", amount, reference FROM "treasury_transactions" WHERE id = $1`, [treasuryTransactionId]))[0];
+    const legId = randomUUID();
+    await ds.query(
+      `INSERT INTO "treasury_transactions" ("id","transactionNumber","type","treasuryAccountId","amount","reference","reason","movementDate","createdByUserId","reversalOfTransactionId","status")
+       VALUES ($1,$2,'cash_out',$3,$4,$5,'Reversal: legacy raw',now(),$6,$7,'posted')`,
+      [legId, `LEG-${legId.slice(0, 8)}`, orig.treasuryAccountId, orig.amount, orig.reference, actor, treasuryTransactionId],
+    );
+    await ds.query(`UPDATE "treasury_transactions" SET status = 'reversed' WHERE id = $1`, [treasuryTransactionId]);
+    return legId;
+  }
+
+  it('R9 D2 repair — the document side of a legacy raw Treasury reversal is completed WITHOUT a second Treasury leg; ledger, invoice and GL agree with Treasury afterwards', async () => {
+    const inv = await newInvoice('A', '400.00');
+    const p = await pay('A', inv, '150.00');
+    const balBefore = await bal('A');
+    const legId = await legacyRawReversal('A', p.treasuryTransactionId!);
+    // legacy state: Treasury says the money is gone, ledger/invoice/GL still say paid
+    expect(await bal('A')).toBe((Number(balBefore) - 150).toFixed(2));
+    expect(await remaining('A', inv)).toBe('250.00');
+
+    const ds = await dsOf('A');
+    const txBefore = Number((await ds.query(`SELECT count(*)::int AS n FROM "treasury_transactions"`))[0].n);
+    const r = await payments.completeOrphanedReversal(p.id, 'document side of the raw reversal', actor, ds.manager);
+    expect(r.reversalNumber).toMatch(/^PREV/);
+    // no second Treasury movement; the existing offset leg is the one linked to the reversal row
+    expect(Number((await ds.query(`SELECT count(*)::int AS n FROM "treasury_transactions"`))[0].n)).toBe(txBefore);
+    const row = await ds.query(`SELECT "treasuryReversalTransactionId" AS t FROM "customer_payment_reversals" WHERE "paymentId" = $1`, [p.id]);
+    expect(row[0].t).toBe(legId);
+    expect(await bal('A')).toBe((Number(balBefore) - 150).toFixed(2)); // Treasury unchanged by the completion
+    expect(await remaining('A', inv)).toBe('400.00');
+    expect(await state('A', inv)).toBe('posted');
+    const ledgerNet = await ds.query(`SELECT COALESCE(SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END),0)::numeric(14,2)::text AS n FROM "customer_ledger_entries" WHERE "paymentId" = $1`, [p.id]);
+    expect(ledgerNet[0].n).toBe('0.00');
+    // GL bank for this payment returns to zero, matching Treasury; a second attempt is refused (UNIQUE per payment) and creates nothing
+    await expect(payments.completeOrphanedReversal(p.id, 'again', actor, ds.manager)).rejects.toThrow(/already reversed/);
+    expect(Number((await ds.query(`SELECT count(*)::int AS n FROM "treasury_transactions"`))[0].n)).toBe(txBefore);
+  });
+
+  it('R10 D2 repair is refused when the payment was NOT raw-reversed, and when the GL already booked the raw reversal (no double reversal); nothing changes', async () => {
+    const inv = await newInvoice('A', '90.00');
+    const ds = await dsOf('A');
+    const p1 = await pay('A', inv, '30.00');
+    const f1 = await fingerprint('A');
+    await expect(payments.completeOrphanedReversal(p1.id, 'not reversed in treasury', actor, ds.manager)).rejects.toThrow(/not reversed/);
+    expect(await fingerprint('A')).toEqual(f1);
+
+    const p2 = await pay('A', inv, '20.00');
+    const legId = await legacyRawReversal('A', p2.treasuryTransactionId!);
+    await ds.query(
+      `INSERT INTO "accounting_financial_events" ("id","eventType","sourceDomain","sourceEntityType","sourceEntityId","idempotencyKey","businessDate","transactionCurrencyCode","payload","payloadVersion","status")
+       VALUES ($1,'treasury.cash.recorded','treasury','treasury_transaction',$2,$3,$4,'EGP','{}'::jsonb,1,'POSTED')`,
+      [randomUUID(), legId, `r10-${legId}`, new Date().toISOString().slice(0, 10)],
+    );
+    const f2 = await fingerprint('A');
+    await expect(payments.completeOrphanedReversal(p2.id, 'gl already booked', actor, ds.manager)).rejects.toThrow(/already booked/);
+    expect(await fingerprint('A')).toEqual(f2);
+    // leave the database consistent for R8: remove the synthetic event and complete the document side properly
+    await ds.query(`DELETE FROM "accounting_financial_events" WHERE "idempotencyKey" = $1`, [`r10-${legId}`]);
+    await payments.completeOrphanedReversal(p2.id, 'completed after the synthetic event was removed', actor, ds.manager);
+  });
+
   it('R8 reconciliation after everything: Treasury == GL (bank 1102), AR ledger total == GL AR, every journal balanced, no non-POSTED event, Company B untouched', async () => {
     const ds = await dsOf('A');
     // funding rows created by `fund`/non-emitting cash-out are Treasury-only by design; compare the payment-owned effect through the ledger instead
