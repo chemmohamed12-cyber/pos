@@ -60,14 +60,14 @@ No balance was edited by hand and no duplicate reversal exists.
 | Suite | Result |
 |---|---|
 | Unit (database-free): `customer-statement-rules.spec` (14), `customer-statement-permissions.spec` (8), `statement-pdf.spec` (7: bidi layout, brackets, faces, pagination, AR+EN PDF), `treasury-ledger-labels.spec` (10) | all PASS |
-| Real-PG `customer-statement.company-isolation.spec` S1–S9 (opening balance, inclusive last day, equal-timestamp order, reconciliation, reversal separation & filters, descriptions, A/B isolation, CSV/XLSX/PDF render, read-only proof) | 9/9 PASS |
+| Real-PG `customer-statement.company-isolation.spec` S1–S10 (opening balance, inclusive last day, equal-timestamp order, reconciliation, reversal separation & filters, descriptions, A/B isolation, CSV/XLSX/PDF render, read-only proof) | 10/10 PASS (S10 = returns / applications / currency indicators) |
 | Real-PG `payment-reversal.company-isolation.spec` R1–R11 (T2 reversal, repair R9/R10, aging boundaries + indicators R11, statement flag/net-out) | 10/10 PASS (R1–R10 + R11; R8 reconciliation included) |
-| Real-PG regression set `tools/testing/regression-specs-cs-all.txt` (treasury ×4, customer ledger, invoices, payments, on-account, payment reversal, statement) | see §9 (filled when the run finished) |
+| Real-PG regression set `tools/testing/regression-specs-cs-all.txt` (treasury ×4, customer ledger, invoices, payments, on-account, payment reversal, statement) | 10/10 specs PASS |
 | `tsc --noEmit` backend + frontend; backend ESLint on all changed folders | clean (frontend has no ESLint config) |
 | Browser acceptance on `daii_dev` (private ports 3640/5640): statement, drawer, repair, dashboard, PDF/Excel/CSV over HTTP, legacy-vs-new single-day check (legacy endpoint 0 rows, new 7) | PASS |
 
 ## 9. Regression-set result
-(see the line appended below by the run owner / final section)
+`REGRESSION DONE: 10/10 passed` on the isolated cluster (treasury ×4, customer ledger, invoices, payments, on-account, payment reversal, statement). The statement spec was re-run alone after the returns/collections case S10 was added: 10/10 (S1–S10). Payment-reversal spec: 10/10.
 
 ## 10. Known limits and findings for the consolidation team
 1. **No company profile/logo/address store exists** in the system (only the company name) — the PDF letterhead shows the name; logo, tax number and contact data need a separate decision.

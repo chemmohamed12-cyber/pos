@@ -183,6 +183,23 @@ describe('Customer statement — real-Postgres, A/B', () => {
     }
   });
 
+  it('S10 indicators: returns count only the return credit itself (not its later application), payment applications never count as collections, advances stay out of "invoiced"', async () => {
+    const ds = await dsOf('A');
+    await entry('A', { type: 'return_credit_note', dir: 'credit', amount: '12.00', at: '2026-10-10T10:00:00Z', reason: 'Sales return credit', number: 'CLE-T-RT1' });
+    await entry('A', { type: 'return_credit_note', dir: 'credit', amount: '12.00', at: '2026-10-11T10:00:00Z', reason: 'Return credit applied to invoice', number: 'CLE-T-RT2' });
+    await entry('A', { type: 'payment_application', dir: 'debit', amount: '9.00', at: '2026-10-12T10:00:00Z', reason: 'Application of PAY-1', number: 'CLE-T-AP1' });
+    await entry('A', { type: 'payment_application', dir: 'credit', amount: '9.00', at: '2026-10-12T10:00:01Z', reason: 'Application of PAY-1', number: 'CLE-T-AP2' });
+    const sum = await statements.getAccountSummary(cust.A, actor, { asOf: '2026-10-31', from: '2026-10-01', to: '2026-10-31' }, ds.manager);
+    expect(sum.returnsInPeriod).toBe('12.00');
+    expect(sum.invoicedInPeriod).toBe('50.00'); // only the 2026-10-05 invoice
+    expect(sum.collectedInPeriod).toBe('22.00'); // deposit 5 + payment 7 + COD 10; the application pair (debit 9 / credit 9) is excluded
+    const st = await statements.getStatement(cust.A, actor, { from: '2026-10-01', to: '2026-10-31' }, ds.manager);
+    expect(st.currency.code).toBe('EGP');
+    expect(st.currency.note.en).toMatch(/no mixed currencies/);
+    expect(st.rows.find((r) => r.entryNumber === 'CLE-T-RT1')!.description.en).toBe('Credit note — sales return');
+    expect(st.reconciliation.matches).toBe(true);
+  });
+
   it('S9 the statement reads only: no ledger, treasury or event row changed while every screen/export above was produced', async () => {
     const ds = await dsOf('A');
     const n = async (sql: string) => Number((await ds.query(sql))[0].n);
