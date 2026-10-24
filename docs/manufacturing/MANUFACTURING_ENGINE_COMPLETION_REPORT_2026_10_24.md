@@ -41,8 +41,8 @@ UIs (all browser-verified on a dev preview): Work-order *Production results* pan
 
 ## Risks / remaining decisions (for the owners)
 1. **Costed operations** (labour / machine / overhead / standard cost / variance) — not built, by order; needs the separate cost-policy ratification (blocks the costed half of case 6).
-2. **Legacy `POST /inventory/assemble`** still exists for API/test consumers; the UI no longer uses it. Owner to decide retirement (two endpoints = a latent parallel path).
-3. D-ME-1…5 sign-offs (scrap fully expensed — no "normal loss" capitalisation; integer base-unit scaling; additive model; class semantics; quick-assembly re-base).
+2. **DECIDED 2026-10-24 (owner): retire after consolidation.** Legacy `POST /inventory/assemble` still exists for API/test consumers; the UI no longer uses it. Owner to decide retirement (two endpoints = a latent parallel path).
+3. **APPROVED 2026-10-24 (owner)** — D-ME-1…5 (scrap fully expensed — no "normal loss" capitalisation; integer base-unit scaling; additive model; class semantics; quick-assembly re-base).
 4. Allocation basis is weight × quantity only; other bases (market value, net realisable value) would be a policy change.
 5. Alternates are chosen per order at creation (explicit, no silent default); changing them later requires a new order.
 6. Release/deploy: migrations `1790033000000…1790033400000` (+ core `1790033100000`) must travel together in order; no package was built.
