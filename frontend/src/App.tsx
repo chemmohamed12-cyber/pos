@@ -39,6 +39,7 @@ import { TreasuryDocumentDetail } from './pages/treasury/TreasuryDocumentDetail'
 import { BankStatements } from './pages/treasury/BankStatements';
 import { BankStatementDetail } from './pages/treasury/BankStatementDetail';
 import { CashSessions } from './pages/treasury/CashSessions';
+import { TreasuryBalances } from './pages/TreasuryBalances';
 import { HrEmployees } from './pages/hr/HrEmployees';
 import { HrDepartments } from './pages/hr/HrDepartments';
 import { HrLeaveRequests } from './pages/hr/HrLeaveRequests';
@@ -268,7 +269,9 @@ function AppRoutes() {
         <Route path="movement-center/:id" element={<WarehouseTransactionDetail />} />
         <Route path="stock-count" element={<StockCountStart />} />
         <Route path="stock-count/:id" element={<StockCountEntry />} />
-        <Route path="treasury/accounts" element={<TreasuryAccounts />} />
+        <Route path="treasury/settings" element={<TreasuryAccounts />} />
+        <Route path="treasury/balances" element={<TreasuryBalances />} />
+        <Route path="treasury/accounts" element={<Navigate to="/treasury/settings" replace />} />
         <Route path="treasury/ledger" element={<TreasuryLedger />} />
         <Route path="treasury/workspace" element={<TreasuryWorkspace />} />
         <Route path="treasury/documents" element={<TreasuryDocuments />} />

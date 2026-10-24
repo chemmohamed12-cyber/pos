@@ -1,6 +1,9 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, Req, UnauthorizedException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req, Res, UnauthorizedException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { TreasuryService } from '../application/treasury.service';
+import { LedgerReportFilters, TreasuryLedgerReportService } from '../application/treasury-ledger-report.service';
+import { CompanyService } from '../../../foundation/company/company.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -100,6 +103,19 @@ class TransferDto {
   reason?: string;
 }
 
+class LedgerReportQuery implements LedgerReportFilters {
+  @IsOptional() @IsString() from?: string;
+  @IsOptional() @IsString() to?: string;
+  @IsOptional() @IsUUID() accountId?: string;
+  @IsOptional() @IsIn(['receipt', 'payment', 'transfer']) family?: string;
+  @IsOptional() @IsString() kind?: string;
+  @IsOptional() @IsIn(['posted', 'reversed']) status?: string;
+  @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() page?: string;
+  @IsOptional() @IsString() pageSize?: string;
+  @IsOptional() @IsIn(['csv', 'xlsx']) format?: string;
+}
+
 class ReverseDto {
   @IsString()
   reason!: string;
@@ -145,6 +161,8 @@ export class TreasuryController {
     private readonly treasury: TreasuryService,
     private readonly idempotency: IdempotencyService,
     private readonly events: EventBusService,
+    private readonly ledgerReport: TreasuryLedgerReportService,
+    private readonly companies: CompanyService,
   ) {}
 
   @RequirePermission('finance.cash_account.manage', 'editable')
@@ -286,6 +304,39 @@ export class TreasuryController {
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, Number(pageSize) || 50));
     return this.treasury.listLedgerPage({ accountId, customerId, salesOrderId }, { page: parsedPage, pageSize: parsedPageSize }, manager);
+  }
+
+
+  /** Treasury Hotfix — the reviewable Financial Movement Ledger: filters, server-side pagination, party/document resolution and totals over ALL matching rows. */
+  @RequirePermission('finance', 'editable')
+  @Get('ledger/report')
+  async ledgerReportRows(@Req() req: CompanyScopedRequest, @Query() q: LedgerReportQuery) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    if (q.accountId) await this.treasury.assertLedgerAccountAccess(q.accountId, req.user.id, manager);
+    const page = Math.max(1, Number(q.page) || 1);
+    const pageSize = Math.min(200, Math.max(1, Number(q.pageSize) || 50));
+    return this.ledgerReport.report(req.user.id, q, { page, pageSize }, manager);
+  }
+
+  /** Excel/CSV of ALL rows matching the filters (not the visible page), under the same permission and scope as the screen. */
+  @RequirePermission('finance', 'editable')
+  @Get('ledger/export')
+  async ledgerExport(@Req() req: CompanyScopedRequest, @Query() q: LedgerReportQuery, @Res() res: Response) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    if (q.accountId) await this.treasury.assertLedgerAccountAccess(q.accountId, req.user.id, manager);
+    const company = await this.companies.findById(req.companyContext.companyId);
+    const out = await this.ledgerReport.export(req.user.id, q, q.format === 'csv' ? 'csv' : 'xlsx', company?.name ?? '—', manager);
+    res.set({ 'Content-Type': out.contentType, 'Content-Disposition': `attachment; filename="${out.filename}"` });
+    res.send(out.buffer);
+  }
+
+  @RequirePermission('finance', 'editable')
+  @Get('transactions/:id/details')
+  async transactionDetails(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.ledgerReport.details(req.user.id, id, req.companyContext.dataSource.manager);
   }
 
   // AUDIT-SEC-28 (S21, 2026-09-10): same gap — `reverseTransaction` had

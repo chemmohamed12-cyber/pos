@@ -34,7 +34,7 @@ export const SETUP_STAGES: Array<{ key: string; titleCode: string; steps: GuideS
       { labelCode: 'nav.dimensions', to: '/accounting/dimensions' },
     ],
   },
-  { key: 'treasury', titleCode: 'guide.stage.treasury', steps: [{ labelCode: 'nav.treasury_accounts', to: '/treasury/accounts', check: '/treasury/accounts' }] },
+  { key: 'treasury', titleCode: 'guide.stage.treasury', steps: [{ labelCode: 'nav.treasury_settings', to: '/treasury/settings', check: '/treasury/accounts' }] },
   {
     key: 'master_data',
     titleCode: 'guide.stage.master_data',

@@ -4,6 +4,7 @@ import { TreasuryAccount } from './infrastructure/treasury-account.entity';
 import { TreasuryAccountType } from './infrastructure/treasury-account-type.entity';
 import { TreasuryTransaction } from './infrastructure/treasury-transaction.entity';
 import { TreasuryService } from './application/treasury.service';
+import { TreasuryLedgerReportService } from './application/treasury-ledger-report.service';
 import { TreasuryController } from './interface/treasury.controller';
 import { AuditModule } from '../../foundation/audit/audit.module';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
@@ -36,7 +37,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [TreasuryController],
-  providers: [TreasuryService, { provide: FINANCE_TREASURY_CONTRACT, useExisting: TreasuryService }],
+  providers: [TreasuryService, TreasuryLedgerReportService, { provide: FINANCE_TREASURY_CONTRACT, useExisting: TreasuryService }],
   exports: [TreasuryService, FINANCE_TREASURY_CONTRACT],
 })
 export class TreasuryModule {}

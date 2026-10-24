@@ -251,7 +251,6 @@ export function TreasuryAccounts() {
                   <tr>
                     <th>{t('field.account_code')}</th>
                     <th>{t('field.account_name')}</th>
-                    <th>{t('field.balance')}</th>
                     <th>{t('field.gl_mapping')}</th>
                     <th>{t('field.status')}</th>
                     <th>{t('field.actions')}</th>
@@ -262,7 +261,6 @@ export function TreasuryAccounts() {
                     <tr key={a.id}>
                       <td>{a.code}</td>
                       <td>{a.name}</td>
-                      <td style={{ fontWeight: 600 }}>{a.balance}</td>
                       <td>
                         {a.glAccountCode ? (
                           <span>

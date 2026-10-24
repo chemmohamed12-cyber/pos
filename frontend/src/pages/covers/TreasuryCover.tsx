@@ -51,13 +51,14 @@ export function TreasuryCover() {
         { to: '/treasury/documents', labelCode: 'nav.treasury_documents' },
         { to: '/treasury/bank-statements', labelCode: 'nav.treasury_bank_statements' },
         { to: '/treasury/cash-sessions', labelCode: 'nav.treasury_cash_sessions' },
-        { to: '/treasury/accounts', labelCode: 'nav.treasury_accounts' },
+        { to: '/treasury/settings', labelCode: 'nav.treasury_settings' },
+        { to: '/treasury/balances', labelCode: 'nav.treasury_balances' },
         { to: '/treasury/ledger', labelCode: 'nav.treasury_ledger' },
       ]}
       kpis={
         kpis
           ? [
-              { labelCode: 'field.total_treasury_balance', value: kpis.totalBalance, to: '/treasury/accounts' },
+              { labelCode: 'field.total_treasury_balance', value: kpis.totalBalance, to: '/treasury/balances' },
               { labelCode: 'field.todays_transactions', value: kpis.todaysCount, to: '/treasury/ledger' },
             ]
           : undefined

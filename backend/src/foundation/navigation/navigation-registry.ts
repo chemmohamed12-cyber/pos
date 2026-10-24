@@ -158,7 +158,9 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       { to: '/treasury/documents', code: 'nav.treasury_documents', module: 'finance', permissionNode: 'finance.cash_document.view' },
       { to: '/treasury/bank-statements', code: 'nav.treasury_bank_statements', module: 'finance', permissionNode: 'finance.bank_statement.view' },
       { to: '/treasury/cash-sessions', code: 'nav.treasury_cash_sessions', module: 'finance', permissionNode: 'finance.cash_session.view' },
-      { to: '/treasury/accounts', code: 'nav.treasury_accounts', module: 'finance', permissionNode: 'finance' },
+      // Treasury Hotfix — one screen per job: settings (setup/GL mapping/status), balances (read-only), ledger (movements).
+      { to: '/treasury/settings', code: 'nav.treasury_settings', module: 'finance', permissionNode: 'finance' },
+      { to: '/treasury/balances', code: 'nav.treasury_balances', module: 'finance', permissionNode: 'finance' },
       { to: '/treasury/ledger', code: 'nav.treasury_ledger', module: 'finance', permissionNode: 'finance' },
     ],
   },
