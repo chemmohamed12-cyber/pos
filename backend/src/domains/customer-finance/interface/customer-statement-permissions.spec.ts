@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { NotFoundException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { CustomerStatementController } from './customer-statement.controller';
 import { PaymentsController } from './payments.controller';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
@@ -42,5 +44,25 @@ describe('Customer statement — server-side authorization contract', () => {
     const r = required(PaymentsController.prototype as unknown as Record<string, object>, 'completeReversal');
     expect(r?.nodeKey).toBe('finance.payment.reverse');
     expect(r?.access).toBe('editable');
+  });
+  describe('the permission guard actually enforces it on these handlers (denial is a 404, never data)', () => {
+    const ctxFor = (method: string) =>
+      ({
+        getHandler: () => (CustomerStatementController.prototype as unknown as Record<string, () => void>)[method],
+        getClass: () => CustomerStatementController,
+        switchToHttp: () => ({ getRequest: () => ({ user: { id: 'u1' }, companyContext: { dataSource: { manager: {} } } }) }),
+      }) as never;
+    const guardWith = (allowed: boolean, seen: Array<[string, string]>) =>
+      new PermissionGuard(new Reflector(), { hasAtLeast: async (_u: string, node: string, access: string) => (seen.push([node, access]), allowed) } as never);
+
+    it.each(['statement', 'export', 'summary', 'details'])('%s: a caller without accounting.ar.view is refused before the handler runs', async (method) => {
+      const seen: Array<[string, string]> = [];
+      await expect(guardWith(false, seen).canActivate(ctxFor(method))).rejects.toBeInstanceOf(NotFoundException);
+      expect(seen).toEqual([['accounting.ar.view', 'read-only']]);
+    });
+
+    it('a caller holding accounting.ar.view passes', async () => {
+      await expect(guardWith(true, []).canActivate(ctxFor('statement'))).resolves.toBe(true);
+    });
   });
 });
