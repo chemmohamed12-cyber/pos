@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { loadingLabel } from '../../lib/displayNames';
+import { ProductUnits } from './ProductUnits';
 
 interface BomListEntry {
   finishedProductId: string;
@@ -33,7 +34,9 @@ interface Product {
 }
 interface DraftLine {
   componentProductId: string;
-  quantityPerUnit: number;
+  /** Decimal typed by the user, in `unitCode` (blank = the component's base unit); the server converts it exactly to whole base units (S2 / D-ME-2). */
+  quantity: string;
+  unitCode: string;
 }
 
 type Mode = { kind: 'none' } | { kind: 'view'; productId: string } | { kind: 'edit'; productId: string; isNew: boolean };
@@ -50,10 +53,21 @@ export function ManufacturingBoms() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'none' });
   const [detail, setDetail] = useState<BomView | null>(null);
-  const [draft, setDraft] = useState<DraftLine[]>([{ componentProductId: '', quantityPerUnit: 1 }]);
+  const [draft, setDraft] = useState<DraftLine[]>([{ componentProductId: '', quantity: '1', unitCode: '' }]);
   const [newProductId, setNewProductId] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [convs, setConvs] = useState<Record<string, string[]>>({});
+
+  async function loadConvs(productId: string) {
+    if (!productId || convs[productId]) return;
+    try {
+      const v = await api.get<{ conversions: Array<{ unitCode: string }> }>(`/manufacturing/unit-conversions/${productId}`);
+      setConvs((prev) => ({ ...prev, [productId]: v.conversions.map((c) => c.unitCode) }));
+    } catch {
+      setConvs((prev) => ({ ...prev, [productId]: [] }));
+    }
+  }
 
   preload([
     'nav.manufacturing_boms',
@@ -118,7 +132,8 @@ export function ManufacturingBoms() {
     setDetail(null);
     const data = await loadDetail(productId);
     if (!data) return;
-    setDraft(data.components.map((c) => ({ componentProductId: c.componentProductId, quantityPerUnit: c.quantityPerUnit })));
+    setDraft(data.components.map((c) => ({ componentProductId: c.componentProductId, quantity: String(c.quantityPerUnit), unitCode: '' })));
+    data.components.forEach((c) => void loadConvs(c.componentProductId));
     setMode({ kind: 'edit', productId, isNew: false });
   }
 
@@ -126,14 +141,14 @@ export function ManufacturingBoms() {
     if (!newProductId) return;
     setError(null);
     setDetail(null);
-    setDraft([{ componentProductId: '', quantityPerUnit: 1 }]);
+    setDraft([{ componentProductId: '', quantity: '1', unitCode: '' }]);
     setMode({ kind: 'edit', productId: newProductId, isNew: true });
     setNewProductId('');
   }
 
   async function save() {
     if (mode.kind !== 'edit') return;
-    const components = draft.filter((l) => l.componentProductId && l.quantityPerUnit > 0);
+    const components = draft.filter((l) => l.componentProductId && Number(l.quantity) > 0).map((l) => ({ componentProductId: l.componentProductId, quantity: l.quantity.trim(), ...(l.unitCode ? { unitCode: l.unitCode } : {}) }));
     if (components.length === 0) return;
     setSaving(true);
     setError(null);
@@ -218,7 +233,10 @@ export function ManufacturingBoms() {
               <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 10 }}>
                 <div className="form-field" style={{ flex: 1, marginBottom: 0 }}>
                   <label>{t('field.component')}</label>
-                  <select value={line.componentProductId} onChange={(e) => setDraft((prev) => prev.map((l, idx) => (idx === i ? { ...l, componentProductId: e.target.value } : l)))}>
+                  <select value={line.componentProductId} onChange={(e) => {
+                      void loadConvs(e.target.value);
+                      setDraft((prev) => prev.map((l, idx) => (idx === i ? { ...l, componentProductId: e.target.value, unitCode: '' } : l)));
+                    }}>
                     <option value="">—</option>
                     {products
                       .filter((p) => p.id !== mode.productId)
@@ -231,10 +249,17 @@ export function ManufacturingBoms() {
                 </div>
                 <div className="form-field" style={{ width: 120, marginBottom: 0 }}>
                   <label>{t('field.quantity_per_unit')}</label>
-                  <input type="number" min={1} step={1} value={line.quantityPerUnit} onChange={(e) => setDraft((prev) => prev.map((l, idx) => (idx === i ? { ...l, quantityPerUnit: Number(e.target.value) } : l)))} />
+                  <input inputMode="decimal" value={line.quantity} onChange={(e) => setDraft((prev) => prev.map((l, idx) => (idx === i ? { ...l, quantity: e.target.value } : l)))} />
                 </div>
-                <div style={{ width: 70 }} className="muted">
-                  {comp?.unit ?? ''}
+                <div style={{ width: 110 }}>
+                  <select value={line.unitCode} onChange={(e) => setDraft((prev) => prev.map((l, idx) => (idx === i ? { ...l, unitCode: e.target.value } : l)))} data-testid="bom-unit-select">
+                    <option value="">{comp?.unit || '—'}</option>
+                    {(convs[line.componentProductId] ?? []).map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {draft.length > 1 && (
                   <button className="btn btn-secondary" type="button" onClick={() => setDraft((prev) => prev.filter((_, idx) => idx !== i))}>
@@ -245,7 +270,7 @@ export function ManufacturingBoms() {
             );
           })}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-secondary" type="button" onClick={() => setDraft((prev) => [...prev, { componentProductId: '', quantityPerUnit: 1 }])}>
+            <button className="btn btn-secondary" type="button" onClick={() => setDraft((prev) => [...prev, { componentProductId: '', quantity: '1', unitCode: '' }])}>
               + {t('action.add_component')}
             </button>
             <button className="btn btn-primary" type="button" disabled={saving} onClick={save}>
@@ -341,6 +366,8 @@ export function ManufacturingBoms() {
           </tbody>
         </table>
       )}
+
+      <ProductUnits products={products} />
     </div>
   );
 }

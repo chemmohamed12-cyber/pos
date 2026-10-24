@@ -1,1 +1,2 @@
 src/domains/manufacturing/interface/manufacturing-outcomes.company-isolation.spec.ts
+src/domains/manufacturing/interface/manufacturing-units.company-isolation.spec.ts

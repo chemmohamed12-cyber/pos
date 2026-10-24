@@ -32,3 +32,8 @@ S1 outcomes/scrap/recovery + accounting · S2 units & pack conversion · S3 BOM 
 - Alpha test data (prefix MFG-S1): products MFG-S1-FIN/C1/C2, BOM (2xC1 + 1xC2), WO-2026-000001 (plan 10, 2 scrapped = 40.00, journal Dr 5299 / Cr 1150), 100 each of C1 @5 and C2 @10 received.
 - Ports 3500/5173 are held by another session's main-checkout servers; S1 was verified on this worktree's backend :3501 + vite :5174 (VITE_API_TARGET=:3501).
 - Browser-verified: outcomes panel renders (AR), scrap form posts, WO shows quantityScrapped, GL journal visible on the order.
+
+## Dev-environment record — S2 (2026-10-24)
+- New migration `manufacturing/1790033200000-CreateProductUnitConversions` applied to daii_dev + the 9 company_* dev DBs (`product_unit_conversions`, additive).
+- API: `GET/POST /manufacturing/unit-conversions/:productId`, `GET .../:productId/convert?quantity=&unitCode=`, `DELETE .../:productId/:unitCode` (BOM permission nodes). BOM create/replace now accept per line either `quantityPerUnit` (unchanged) or `quantity` (decimal string) + `unitCode`, converted exactly; not-exact -> 409, nothing rounded.
+- Real-PG spec `manufacturing-units.company-isolation.spec.ts` 7/7. UI: unit selector per recipe line + "Product units & pack conversions" card on /manufacturing/boms. Browser-verified: dozen=12 on MFG-S1-C1, recipe line 1.5 dozen saved as 18.

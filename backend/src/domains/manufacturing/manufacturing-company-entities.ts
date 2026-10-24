@@ -5,6 +5,7 @@ import { Routing } from './infrastructure/routing.entity';
 import { RoutingOperation } from './infrastructure/routing-operation.entity';
 import { WorkOrderOperation } from './infrastructure/work-order-operation.entity';
 import { WorkOrderResult } from './infrastructure/work-order-result.entity';
+import { ProductUnitConversion } from './infrastructure/product-unit-conversion.entity';
 
 /**
  * ADR-074 (2026-09-25, CTO Decision: Hybrid B). Manufacturing's own
@@ -16,4 +17,4 @@ import { WorkOrderResult } from './infrastructure/work-order-result.entity';
  * 2026-10-06 (ADR-061 Addendum 1): Work Centers, Routings (+ operations) and the Work Order
  * operation snapshot join the registry so they live in each Company's own database.
  */
-export const MANUFACTURING_COMPANY_ENTITIES = [WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult];
+export const MANUFACTURING_COMPANY_ENTITIES = [WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion];

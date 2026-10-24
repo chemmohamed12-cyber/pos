@@ -7,6 +7,9 @@ import { Routing } from './infrastructure/routing.entity';
 import { RoutingOperation } from './infrastructure/routing-operation.entity';
 import { WorkOrderOperation } from './infrastructure/work-order-operation.entity';
 import { WorkOrderResult } from './infrastructure/work-order-result.entity';
+import { ProductUnitConversion } from './infrastructure/product-unit-conversion.entity';
+import { UnitConversionService } from './application/unit-conversion.service';
+import { UnitConversionController } from './interface/unit-conversion.controller';
 import { WorkCenterService } from './application/work-center.service';
 import { RoutingService } from './application/routing.service';
 import { ManufacturingBomController } from './interface/manufacturing-bom.controller';
@@ -39,7 +42,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult]),
+    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -54,8 +57,9 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController],
+  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController, UnitConversionController],
   providers: [
+    UnitConversionService,
     WorkOrderService,
     WorkCenterService,
     RoutingService,
@@ -64,6 +68,6 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     // implementation, mirroring `GRNI_LEDGER_CONTRACT: useExisting: GrniLedgerService` exactly.
     { provide: MANUFACTURING_WIP_CONTRACT, useExisting: ManufacturingWipLedgerService },
   ],
-  exports: [WorkOrderService, RoutingService, WorkCenterService, MANUFACTURING_WIP_CONTRACT],
+  exports: [UnitConversionService, WorkOrderService, RoutingService, WorkCenterService, MANUFACTURING_WIP_CONTRACT],
 })
 export class ManufacturingModule {}
