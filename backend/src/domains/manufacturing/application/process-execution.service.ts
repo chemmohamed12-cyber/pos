@@ -23,6 +23,10 @@ export interface OperationLedgerRow {
   yielded: Array<{ productId: string; sku: string | null; quantity: number; valueBase: string }>;
   /** Material value consumed by this operation and not (yet) carried out by its outputs - what is "inside" the operation right now. */
   wipValueBase: string;
+  /** Scrap / rework / rejected / held recorded against this operation (quantity only - no cost element). */
+  outcomes: Array<{ outcomeClass: string; quantity: number }>;
+  /** What the definition plans for this order: inputs under its alternate choices and outputs, in whole base units for the full plan. */
+  plan: { inputs: Array<{ productId: string; sku: string | null; quantity: number }>; outputs: Array<{ productId: string; sku: string | null; quantity: number; intermediate: boolean }> };
 }
 
 export interface ProcessExecutionView {
@@ -58,6 +62,7 @@ export class ProcessExecutionService {
     const def = await this.definitions.get(wo.processVersionId, manager);
     const runs = await m.getRepository(OperationRun).find({ where: { workOrderId }, order: { startedAt: 'ASC' } });
     const flows = await m.getRepository(OperationFlow).find({ where: { workOrderId } });
+    const results = await m.query(`SELECT "operationId", "outcomeClass", SUM("quantity")::int AS quantity FROM "work_order_results" WHERE "workOrderId" = $1 AND "operationId" IS NOT NULL GROUP BY 1, 2`, [workOrderId]) as Array<{ operationId: string; outcomeClass: string; quantity: number }>;
     const skuOf = new Map<string, string | null>();
     const ids = [...new Set(flows.map((f) => f.productId))];
     if (ids.length) for (const p of (await m.query(`SELECT "id","sku" FROM "products" WHERE "id" = ANY($1)`, [ids])) as Array<{ id: string; sku: string }>) skuOf.set(p.id, p.sku);
@@ -106,6 +111,13 @@ export class ProcessExecutionService {
         consumed: sum(opFlows.filter((f) => f.direction === 'in')),
         yielded: sum(opFlows.filter((f) => f.direction === 'out')),
         wipValueBase: Math.max(0, valueIn - valueOut).toFixed(4),
+        outcomes: results.filter((r) => r.operationId === o.id).map((r) => ({ outcomeClass: r.outcomeClass, quantity: r.quantity })),
+        plan: {
+          inputs: def.inputs
+            .filter((i) => i.operationCode === o.code && (!i.alternateGroup || wo.processChoices?.[`${o.code}|${i.alternateGroup}`] === i.componentProductId))
+            .map((i) => ({ productId: i.componentProductId, sku: i.componentSku, quantity: i.quantityPerUnit * wo.quantityPlanned })),
+          outputs: def.outputs.filter((x) => x.operationCode === o.code).map((x) => ({ productId: x.productId, sku: x.sku, quantity: x.quantityPerUnit * wo.quantityPlanned, intermediate: x.intermediate })),
+        },
       };
     });
     const intermediates = new Set(def.outputs.filter((x) => x.intermediate).map((x) => x.productId));
@@ -277,6 +289,18 @@ export class ProcessExecutionService {
       await this.audit.record({ actorUserId, organizationId: null, action: 'manufacturing.process.operation_completed', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: run.id, after: { operationCode: op.code, runNo: run.runNo, valueIn: valueIn.toFixed(4) } }, tx);
       return saved;
     });
+  }
+
+  /** Scrap found while a run is in progress: the order-level scrap (pooled cost -> loss account, S1) tagged to the operation. */
+  async recordScrapAt(workOrderId: string, runId: string, quantity: number, reason: string, actorUserId: string | null, requestId: string = randomUUID(), manager?: EntityManager) {
+    const { op } = await this.runContext(workOrderId, runId, manager ?? this.dataSource.manager);
+    return this.workOrders.recordScrap(workOrderId, quantity, reason, actorUserId, requestId, manager, op.id);
+  }
+
+  /** Rework / rejected / held units found by a run (a quality operation typically): quantity-only tracking, blocks closing until resolved. */
+  async recordOutcomeAt(workOrderId: string, runId: string, outcomeClass: 'rework' | 'rejected' | 'held', quantity: number, reason: string, actorUserId: string | null, requestId: string = randomUUID(), manager?: EntityManager) {
+    const { op } = await this.runContext(workOrderId, runId, manager ?? this.dataSource.manager);
+    return this.workOrders.recordTrackedOutcome(workOrderId, outcomeClass, quantity, reason, actorUserId, requestId, manager, op.id);
   }
 
   // ---- internals ----

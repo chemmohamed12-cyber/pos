@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { WorkOrderOutcomes, type WorkOrderResultRow } from './WorkOrderOutcomes';
+import { ProcessExecutionPanel } from './ProcessExecutionPanel';
 import { useParams, Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
@@ -64,6 +65,7 @@ interface WorkOrderDetail {
   finishedProductId: string;
   quantityPlanned: number;
   quantityProduced: number;
+  processVersionId?: string | null;
   quantityScrapped: number;
   results: WorkOrderResultRow[];
   warehouseId: string;
@@ -449,6 +451,8 @@ export function WorkOrderDetail() {
           </div>
         </div>
       )}
+
+      {wo.processVersionId && <ProcessExecutionPanel workOrderId={wo.id} state={wo.state} remainingPlanned={remainingPlanned} onChanged={load} />}
 
       <WorkOrderOutcomes workOrderId={wo.id} state={wo.state} remainingPlanned={remainingPlanned} results={wo.results ?? []} products={products} onChanged={load} />
 

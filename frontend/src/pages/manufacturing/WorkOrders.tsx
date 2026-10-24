@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { NewProcessOrder } from './NewProcessOrder';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
@@ -133,6 +134,8 @@ export function WorkOrders() {
       <div className="page-header">
         <h1>{t('nav.manufacturing_work_orders')}</h1>
       </div>
+
+      <NewProcessOrder />
 
       <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={onCreate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>

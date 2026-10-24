@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsInt, IsObject, IsOptional, IsPositive, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsObject, IsOptional, IsPositive, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -31,6 +31,38 @@ class StartDto {
   @IsString()
   @MaxLength(128)
   requestId?: string;
+}
+
+class OutputUnitsDto {
+  @IsInt()
+  @IsPositive()
+  units!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  requestId?: string;
+}
+
+class RunScrapDto {
+  @IsInt()
+  @IsPositive()
+  quantity!: number;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(255)
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  requestId?: string;
+}
+
+class RunOutcomeDto extends RunScrapDto {
+  @IsIn(['rework', 'rejected', 'held'])
+  outcomeClass!: 'rework' | 'rejected' | 'held';
 }
 
 class FlowDto {
@@ -112,6 +144,33 @@ export class ProcessOrderController {
   async yield(@Param('id', ParseUUIDPipe) id: string, @Param('runId', ParseUUIDPipe) runId: string, @Body() dto: FlowDto, @Req() req: CompanyScopedRequest) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.execution.recordYield(id, runId, dto.productId, dto.quantity, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.finished_goods_receive', 'editable')
+  @Post(':id/output')
+  async output(@Param('id', ParseUUIDPipe) id: string, @Body() dto: OutputUnitsDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.receiveProcessOutputs(id, dto.units, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/runs/:runId/scrap')
+  async scrap(@Param('id', ParseUUIDPipe) id: string, @Param('runId', ParseUUIDPipe) runId: string, @Body() dto: RunScrapDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.execution.recordScrapAt(id, runId, dto.quantity, dto.reason, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/runs/:runId/outcome')
+  async outcome(@Param('id', ParseUUIDPipe) id: string, @Param('runId', ParseUUIDPipe) runId: string, @Body() dto: RunOutcomeDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.execution.recordOutcomeAt(id, runId, dto.outcomeClass, dto.quantity, dto.reason, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
   }
 
   @UseGuards(RequireFeatureGuard, PermissionGuard)

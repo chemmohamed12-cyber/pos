@@ -81,7 +81,7 @@ export function Assembly() {
     setError(null);
     setReference(null);
     try {
-      const result = await api.post<{ assemblyReference: string }>('/inventory/assemble', {
+      const result = await api.post<{ assemblyReference: string }>('/manufacturing/quick-assembly', {
         warehouseId,
         finishedProductId: productId,
         quantity: Number(quantity),

@@ -13,6 +13,8 @@ import { UnitConversionController } from './interface/unit-conversion.controller
 import { OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput } from './infrastructure/process-definition.entity';
 import { OperationRun, OperationFlow } from './infrastructure/operation-run.entity';
 import { ProcessExecutionService } from './application/process-execution.service';
+import { QuickAssemblyService } from './application/quick-assembly.service';
+import { QuickAssemblyController } from './interface/quick-assembly.controller';
 import { ProcessOrderController } from './interface/process-order.controller';
 import { ProcessDefinitionService } from './application/process-definition.service';
 import { ProcessDefinitionController } from './interface/process-definition.controller';
@@ -63,11 +65,12 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController, UnitConversionController, ProcessDefinitionController, ProcessOrderController],
+  controllers: [WorkOrderController, ManufacturingBomController, WorkCenterController, RoutingController, UnitConversionController, ProcessDefinitionController, ProcessOrderController, QuickAssemblyController],
   providers: [
     UnitConversionService,
     ProcessDefinitionService,
     ProcessExecutionService,
+    QuickAssemblyService,
     WorkOrderService,
     WorkCenterService,
     RoutingService,
