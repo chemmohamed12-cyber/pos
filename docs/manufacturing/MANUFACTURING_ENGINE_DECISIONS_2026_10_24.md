@@ -25,3 +25,10 @@ Taken under the owner's direct execution order of 2026-10-24 (shared dev environ
 
 ## Execution order (each slice: real-PG tests + browser preview before the next)
 S1 outcomes/scrap/recovery + accounting · S2 units & pack conversion · S3 BOM versions/alternates/multi-level · S4 process graph, runs, per-operation ledger · S5 multi-output + recovery + quality operation (no cost element) · S6 quick-assembly re-base · seven industrial cases · regression + report.
+
+## Dev-environment record — S1 (2026-10-24)
+- Migrations applied (known, verifiable): `manufacturing/1790033000000-CreateWorkOrderResults` to daii_dev + the 9 `company_*` dev DBs; `core/1790033100000-SeedManufacturingOutcomeTerminology` to daii_dev.
+- Alpha (company_f3ea8a2e…) dev configuration changed: `accounting.manufacturing_scrap_loss_account_code` = 5299; `accounting.inventory_manual_receipt_reason_accounts` = {mfg_s1_test: 3101}.
+- Alpha test data (prefix MFG-S1): products MFG-S1-FIN/C1/C2, BOM (2xC1 + 1xC2), WO-2026-000001 (plan 10, 2 scrapped = 40.00, journal Dr 5299 / Cr 1150), 100 each of C1 @5 and C2 @10 received.
+- Ports 3500/5173 are held by another session's main-checkout servers; S1 was verified on this worktree's backend :3501 + vite :5174 (VITE_API_TARGET=:3501).
+- Browser-verified: outcomes panel renders (AR), scrap form posts, WO shows quantityScrapped, GL journal visible on the order.

@@ -500,6 +500,8 @@ export const accountingManifest: ModuleManifest = {
     { key: 'accounting.inventory_physical_count_variance', type: 'enum', allowed: ['allowed', 'warn', 'refused'], default: 'allowed', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_gain_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     { key: 'accounting.inventory_adjustment_loss_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
+    // Manufacturing Engine S1 (2026-10-24): debit side of recognised production scrap (Dr this / Cr WIP); credited back by a recovery. Empty = scrap events are REJECTED (fail closed).
+    { key: 'accounting.manufacturing_scrap_loss_account_code', type: 'string', default: '', scope_levels: ['platform', 'edition', 'installation'] },
     // D3-B (2026-10-04) — manual-receipt Reason Code → Offset GL account, as a JSON map `{ "<reasonCode>": "<glAccountCode>" }`.
     // The set of allowed reasons IS this map (nothing is hard-coded, no speculative catalog): default `{}` = no reason is
     // allowed yet = every manual receipt is rejected before mutation. Each target account must exist, be active, postable
