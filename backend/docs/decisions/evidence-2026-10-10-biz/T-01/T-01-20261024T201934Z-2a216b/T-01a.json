@@ -1,9 +1,0 @@
-{
-  "outcome": {
-    "ok": false,
-    "kind": "ConflictException:409",
-    "message": "Insufficient stock for 1 line(s) — nothing was posted: T01-P1 (T01-P1 Product): requested 6, available 5, short by 1"
-  },
-  "fingerprintDiff": [],
-  "onHandP1": 5
-}

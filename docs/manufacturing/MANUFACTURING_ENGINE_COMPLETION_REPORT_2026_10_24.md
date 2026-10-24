@@ -49,3 +49,25 @@ UIs (all browser-verified on a dev preview): Work-order *Production results* pan
 
 ## Hand-off for consolidation
 Commits on `feature/manufacturing-engine-design`: 57bc78e (S1), cb3b571, d6b434e (S2), 8c37b10 (S3+S4), f32517b (S5+S6) and the closing commit. Regression list: `backend/tools/testing/regression-specs-mfg-engine.txt`; shared test kit: `manufacturing-engine-test-kit.ts`.
+
+---
+# Closing addendum — test-data cleanup & consolidation readiness (2026-10-24, after owner sign-off)
+
+## Test-data cleanup (executed, verified)
+Method: discovery by **ids** (products by SKU prefix `MFG-S1-` / `ELEC-` cross-checked by creation time; orders, movements, events, journals derived from those ids and their idempotency keys; every table scanned for references), dry-run in a rolled-back transaction, then one transaction per database in foreign-key order. Script guards abort if any journal numbered after the test's, or any work order outside the test set, exists.
+
+| Database | Result |
+|---|---|
+| `company_f3ea8a2e…` (Alpha) | **Removed**: 8 test products; 3 work orders (+6 components, 2 results, 3 process instances); 1 process version (4 operations, 3 edges, 4 inputs, 3 outputs), 3 operation runs, 7 flows; 3 WIP sub-warehouses; 24 stock movements, 24 valuation movements, 12 valuation states, 6 reservations; 1 BOM (+2 components), 1 unit conversion, 8 price-list items; 13 financial events, 13 journal entries (JV-2026-000012…24, 26 lines) and 34 outbox rows. **Numbering reset**: JV counter 24 → 11 (nothing else had posted after the test's entries), work-order counter 3 → 0. |
+| `daii_dev` | **Removed**: the two installation-scope config values set for the tests — `accounting.manufacturing_scrap_loss_account_code` = 5299 and `accounting.inventory_manual_receipt_reason_accounts` = `{mfg_s1_test: 3101}` (both set by this task; the reason map was empty before). |
+| 8 other company dev DBs, `daii_dev` data tables | Never held test data (discovery: no products, orders or references). |
+
+**Kept on purpose:** (1) the engine's own schema, the six seeded operation types and the `config_keys` registry row for the new policy key — they are product, not test data; (2) the 25 pre-existing Alpha products, the 13 − 3 pre-existing warehouses and JV-2026-000001…11; (3) **audit records** (≈130 rows in the test window, 62 referencing test ids): the audit log is hash-chained (`prevHash`/`hash`), so deleting rows would break chain verification — the entries stay as the (truthful) record that the tests ran and were cleaned; (4) login/refresh-token rows of the existing admin user (normal use, not task data).
+**Post-clean verification:** discovery re-run on every database returns no products / work orders / references; all new manufacturing tables count 0; policy keys absent from `config_values`. The isolated test cluster (5546) holds only harness databases that each spec drops on teardown (no teardown warnings in any run).
+**Repository hygiene:** a stray evidence folder written by the oversell spec into `backend/docs/decisions/evidence-2026-10-10-biz/T-01/` during the regression run was removed from the commits; working tree clean.
+
+## Consolidation tasks (kept pending by design — nothing removed now)
+1. After consolidation starts: move `t01-t02-oversell` and `inventory-valuation` specs to `manufacturing/quick-assembly` (`QuickAssemblyService`), then delete `POST /inventory/assemble` and `InventoryService.assembleProduct`.
+2. Before deleting any movement type (`assembly_consumption`, `assembly_output`): grep every consumer (reports, migrations `WidenStockMovementType`, terminology, specs); delete only types with no remaining use — historical rows keep them.
+3. After the switch re-verify: no duplicated stock or valuation movement per assembly, and a failed assembly leaves nothing (already proven for the new path by S6-2).
+4. Not started: the comprehensive Audit; no merge into the Protected Baseline; no release/deploy.
