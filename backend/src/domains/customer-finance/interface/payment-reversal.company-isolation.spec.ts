@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { PaymentsService } from '../application/payments.service';
+import { CustomerStatementService } from '../application/customer-statement.service';
 import { CustomersService } from '../../crm/application/customers.service';
 import { CustomerLedgerService } from '../application/customer-ledger.service';
 import { InvoiceService } from '../application/invoices.service';
@@ -33,6 +34,7 @@ describe('T2 — customer payment reversal through the owning document — real-
   let treasury: TreasuryService;
   let events: EventBusService;
   let invoices: InvoiceService;
+  let statements: CustomerStatementService;
   const actor = randomUUID();
   const year = new Date().toISOString().slice(0, 4);
   type Key = 'A' | 'B';
@@ -88,7 +90,7 @@ describe('T2 — customer payment reversal through the owning document — real-
   }
 
   beforeAll(async () => {
-    h = await setUpTwoCompanyHarness({ namePrefix: 't2_pay_reversal', extraCompanyTags: ['sales', 'inventory', 'finance', 'procurement', 'accounting'] });
+    h = await setUpTwoCompanyHarness({ namePrefix: 't2_pay_reversal', extraCompanyTags: ['sales', 'inventory', 'logistics', 'finance', 'procurement', 'accounting'] });
     const inert = {} as never;
     const audit = new AuditService(h.controlPlane);
     const numbering = new NumberingService(h.controlPlane);
@@ -108,6 +110,7 @@ describe('T2 — customer payment reversal through the owning document — real-
     const customerLedger = new CustomerLedgerService(h.controlPlane, numbering, audit, customers);
     invoices = new InvoiceService(h.controlPlane, numbering, processEngine, audit, inert, customers, customerLedger, events, inert);
     payments = new PaymentsService(h.controlPlane, numbering, audit, treasury, customerLedger, invoices, events, customers);
+    statements = new CustomerStatementService(h.controlPlane, customers, customerLedger);
     await seed('A');
     await seed('B');
   });
@@ -284,6 +287,10 @@ describe('T2 — customer payment reversal through the owning document — real-
     expect(await remaining('A', inv)).toBe('250.00');
 
     const ds = await dsOf('A');
+    // the statement SHOWS the mismatch (never hides it) until the document side is completed
+    const stmtBefore = await statements.getStatement(ctx.A.customerId, actor, {}, ds.manager);
+    expect(stmtBefore.warnings.map((w) => w.code)).toContain('cash_reversed_not_in_ledger');
+    expect(stmtBefore.rows.some((r) => r.flags.includes('cash_reversed_not_in_ledger'))).toBe(true);
     const txBefore = Number((await ds.query(`SELECT count(*)::int AS n FROM "treasury_transactions"`))[0].n);
     const r = await payments.completeOrphanedReversal(p.id, 'document side of the raw reversal', actor, ds.manager);
     expect(r.reversalNumber).toMatch(/^PREV/);
@@ -296,6 +303,12 @@ describe('T2 — customer payment reversal through the owning document — real-
     expect(await state('A', inv)).toBe('posted');
     const ledgerNet = await ds.query(`SELECT COALESCE(SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END),0)::numeric(14,2)::text AS n FROM "customer_ledger_entries" WHERE "paymentId" = $1`, [p.id]);
     expect(ledgerNet[0].n).toBe('0.00');
+    const stmtAfter = await statements.getStatement(ctx.A.customerId, actor, {}, ds.manager);
+    const payEntries = stmtAfter.rows.filter((r) => r.documentNumber === p.paymentNumber).map((r) => r.entryNumber);
+    expect(stmtAfter.warnings.flatMap((w) => w.entryNumbers).filter((n) => payEntries.includes(n))).toHaveLength(0); // the flag for THIS payment is gone
+    expect(stmtAfter.rows.filter((r) => r.entryNumber && r.flags.length && r.documentNumber === p.paymentNumber)).toHaveLength(0);
+    expect(stmtAfter.rows.filter((r) => r.documentNumber === p.paymentNumber).every((r) => r.nettedOut)).toBe(true); // original credit + reversal debit are cancelled out together
+    expect(stmtAfter.reconciliation.matches).toBe(true);
     // GL bank for this payment returns to zero, matching Treasury; a second attempt is refused (UNIQUE per payment) and creates nothing
     await expect(payments.completeOrphanedReversal(p.id, 'again', actor, ds.manager)).rejects.toThrow(/already reversed/);
     expect(Number((await ds.query(`SELECT count(*)::int AS n FROM "treasury_transactions"`))[0].n)).toBe(txBefore);
@@ -322,6 +335,44 @@ describe('T2 — customer payment reversal through the owning document — real-
     // leave the database consistent for R8: remove the synthetic event and complete the document side properly
     await ds.query(`DELETE FROM "accounting_financial_events" WHERE "idempotencyKey" = $1`, [`r10-${legId}`]);
     await payments.completeOrphanedReversal(p2.id, 'completed after the synthetic event was removed', actor, ds.manager);
+  });
+
+  it('R11 account indicators: aging bands (0-30 / 31-60 / 61-90 / 90+) at exact day boundaries, not-yet-due vs overdue, unapplied credit, gross vs net overdue, alerts', async () => {
+    const ds = await dsOf('A');
+    const c2 = randomUUID();
+    await ds.query(`INSERT INTO "customers" ("id","code","name","creditLimit") VALUES ($1,'T2-AGING','Aging Customer','500.00')`, [c2]);
+    const asOf = '2026-10-24';
+    const inv = async (total: string, due: string) => {
+      const id = randomUUID();
+      await ds.query(
+        `INSERT INTO "sales_invoices" ("id","invoiceNumber","customerId","salesOrderId","subtotal","totalAmount","dueDate","createdByUserId") VALUES ($1,$2,$3,$4,$5,$5,$6::timestamptz,$7)`,
+        [id, `AG-${id.slice(0, 8)}`, c2, randomUUID(), total, `${due}T00:00:00Z`, actor],
+      );
+      await ds.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'sales_invoice_lifecycle','sales_invoice',$2,'posted')`, [randomUUID(), id]);
+      return id;
+    };
+    await inv('100.00', '2026-11-03'); // not yet due
+    const i2 = await inv('200.00', '2026-09-23'); // 31 days late
+    await inv('300.00', '2026-07-16'); // 100 days late
+    await inv('400.00', '2026-09-24'); // 30 days late (edge of 0-30)
+    await payments.recordPayment(c2, i2, '50.00', 'bank_transfer', ctx.A.bank1102, null, actor, ds.manager);
+    await payments.recordOnAccountPayment(c2, null, '25.00', 'bank_transfer', ctx.A.bank1102, null, actor, ds.manager);
+    const sum = await statements.getAccountSummary(c2, actor, { asOf }, ds.manager);
+    expect(sum.aging).toEqual({ '0-30': '500.00', '31-60': '150.00', '61-90': '0.00', '90+': '300.00' });
+    expect(sum.notYetDue).toBe('100.00');
+    expect(sum.overdue).toBe('850.00');
+    expect(sum.totalOpen).toBe('950.00');
+    expect(sum.unappliedCredit).toBe('25.00');
+    expect(sum.overdueNetOfUnappliedCredit).toBe('825.00');
+    expect(sum.openInvoices).toBe(4);
+    expect(sum.alerts.hasOverdue).toBe(true);
+    expect(sum.creditLimit).toBe('500.00');
+    expect(sum.nextDueDate).toBe('2026-11-03');
+    expect(sum.collectedInPeriod).toBe('75.00'); // 50 invoice payment + 25 on-account, payment application excluded
+    // the same figures one day later move the edge invoice into 31-60 (boundary: 30 → 31 days late)
+    const next = await statements.getAccountSummary(c2, actor, { asOf: '2026-10-25' }, ds.manager);
+    expect(next.aging['0-30']).toBe('100.00'); // only the not-yet-due one remains in the first band (the 30-day invoice is now 31 days late)
+    expect(next.aging['31-60']).toBe('550.00');
   });
 
   it('R8 reconciliation after everything: Treasury == GL (bank 1102), AR ledger total == GL AR, every journal balanced, no non-POSTED event, Company B untouched', async () => {

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, EntityNotFoundError } from 'typeorm';
 import { SALES_CUSTOMERS_CONTRACT, SalesCustomersContract } from '../../../foundation/module-registry/contracts/sales.contract';
 import { utcDayEndExclusiveSql } from '../../../foundation/localization/business-date';
 import {
@@ -115,8 +115,18 @@ export class CustomerStatementService {
     return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   }
 
+  /** The customer's own scope check, with a missing / out-of-scope / other-company customer reported as a plain 404 (never a 500). */
+  private async assertCustomer(customerId: string, actorUserId: string, manager?: EntityManager) {
+    try {
+      return await this.customers.getCustomer(customerId, actorUserId, manager);
+    } catch (e) {
+      if (e instanceof EntityNotFoundError) throw new NotFoundException(`Customer "${customerId}" not found.`);
+      throw e;
+    }
+  }
+
   async getStatement(customerId: string, actorUserId: string, filters: StatementFilters, manager?: EntityManager): Promise<CustomerStatement> {
-    const customer = await this.customers.getCustomer(customerId, actorUserId, manager); // scope check — 404 outside the caller's reach
+    const customer = await this.assertCustomer(customerId, actorUserId, manager); // scope check — 404 outside the caller's reach
     const runner = this.em(manager);
     const from = this.day(filters.from);
     const to = this.day(filters.to);
@@ -274,7 +284,7 @@ export class CustomerStatementService {
     const runner = this.em(manager);
     const found = (await runner.query(`SELECT "customerId" FROM "customer_ledger_entries" WHERE "id" = $1`, [entryId])) as Array<{ customerId: string }>;
     if (found.length === 0) throw new NotFoundException(`Ledger entry "${entryId}" not found.`);
-    await this.customers.getCustomer(found[0].customerId, actorUserId, manager); // scope
+    await this.assertCustomer(found[0].customerId, actorUserId, manager); // scope
     const r = (await runner.query(
       `SELECT e.*, e."amount"::text AS "amountText", inv."invoiceNumber", inv."dueDate" AS "invoiceDueDate", p."paymentNumber", so."orderNumber", sh."waybillNumber",
               tt."transactionNumber" AS "treasuryNumber", tt."status" AS "treasuryStatus", u."fullName" AS "createdByName",
@@ -325,7 +335,7 @@ export class CustomerStatementService {
    * nothing is stored. Set-based (no per-invoice round trips).
    */
   async getAccountSummary(customerId: string, actorUserId: string, opts: { asOf?: string; from?: string; to?: string }, manager?: EntityManager) {
-    await this.customers.getCustomer(customerId, actorUserId, manager);
+    await this.assertCustomer(customerId, actorUserId, manager);
     const runner = this.em(manager);
     const asOf = this.day(opts.asOf) ?? new Date().toISOString().slice(0, 10);
     const from = this.day(opts.from);

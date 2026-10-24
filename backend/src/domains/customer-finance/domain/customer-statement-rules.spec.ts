@@ -76,7 +76,7 @@ describe('customer statement — pure rules', () => {
       );
       expect(r.bands).toEqual({ '0-30': '1000.00', '31-60': '500.00', '61-90': '600.00', '90+': '700.00' });
       expect(r.notYetDue).toBe('300.00');
-      expect(r.overdue).toBe('2200.00');
+      expect(r.overdue).toBe('2500.00');
       expect(r.totalOpen).toBe('2800.00');
     });
   });

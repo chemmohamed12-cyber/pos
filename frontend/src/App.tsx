@@ -144,7 +144,6 @@ import { CustodyStatementPrint } from './pages/print/CustodyStatementPrint';
 import { InvoicePrint } from './pages/print/InvoicePrint';
 import { PaymentReceiptPrint } from './pages/print/PaymentReceiptPrint';
 import { CollectionReceiptPrint } from './pages/print/CollectionReceiptPrint';
-import { CustomerStatementPrint } from './pages/print/CustomerStatementPrint';
 import { SalesCover } from './pages/covers/SalesCover';
 import { ShippingCover } from './pages/covers/ShippingCover';
 import { CatalogCover } from './pages/covers/CatalogCover';
@@ -364,7 +363,7 @@ function AppRoutes() {
       <Route path="print/invoice/:id" element={<RequireAuth><InvoicePrint /></RequireAuth>} />
       <Route path="print/payment/:id" element={<RequireAuth><PaymentReceiptPrint /></RequireAuth>} />
       <Route path="print/collection/:shipmentId" element={<RequireAuth><CollectionReceiptPrint /></RequireAuth>} />
-      <Route path="print/customer-statement/:id" element={<RequireAuth><CustomerStatementPrint /></RequireAuth>} />
+      <Route path="print/customer-statement/:id" element={<Navigate to="/customer-statement" replace />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

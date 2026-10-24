@@ -1,168 +1,164 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { Link, useSearchParams } from 'react-router-dom';
+import { api, ApiError, downloadBlob } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
-import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
-import { fmtDateTime } from '../lib/formatDateTime';
+import { fmtDate } from '../lib/formatDateTime';
+import { LedgerEntryDrawer } from '../components/LedgerEntryDrawer';
 
+interface Bi {
+  ar: string;
+  en: string;
+}
 interface Customer {
   id: string;
   code: string;
   name: string;
 }
-interface LedgerEntry {
-  id: string;
+interface Row {
+  entryId: string;
   entryNumber: string;
+  date: string;
+  dueDate: string | null;
   entryType: string;
-  direction: 'debit' | 'credit';
-  amount: string;
-  entryDate: string;
-  salesOrderId: string | null;
-  invoiceId: string | null;
-  reference: string | null;
-  reason: string | null;
+  typeLabel: Bi;
+  description: Bi;
+  documentType: string | null;
+  documentNumber: string | null;
+  documentLink: string | null;
+  debit: string;
+  credit: string;
+  balance: string;
   status: 'posted' | 'reversed';
-  createdByUserId: string;
+  isReversalLeg: boolean;
+  nettedOut: boolean;
+  flags: string[];
+}
+interface Statement {
+  reference: string;
+  referenceNote: Bi;
+  generatedAt: string;
+  customer: { id: string; code: string; name: string; phone: string | null; address: string | null; governorate: string | null; taxRegistrationNumber: string | null; creditLimit: string | null; paymentTermsDays: number | null };
+  period: { from: string | null; to: string | null };
+  currency: { code: string; note: Bi };
+  isComplete: boolean;
+  openingBalance: string;
+  rows: Row[];
+  totals: { debit: string; credit: string };
+  totalsExcludingReversals: { debit: string; credit: string };
+  filteredTotals: { debit: string; credit: string } | null;
+  closingBalance: string;
+  reversedCount: number;
+  reconciliation: { ledgerBalanceAtPeriodEnd: string; matches: boolean };
+  warnings: Array<{ code: string; ar: string; en: string; entryNumbers: string[] }>;
 }
 
-const ENTRY_TYPES = [
-  'sales_invoice',
-  'deposit',
-  'payment',
-  'cod_collection',
-  'return_credit_note',
-  'debit_note',
-  'adjustment',
-  'opening_balance',
-  'refund',
+const TYPES: Array<[string, string, string]> = [
+  ['sales_invoice', 'فاتورة مبيعات', 'Sales invoice'],
+  ['payment', 'دفعة عميل', 'Customer payment'],
+  ['deposit', 'عربون عميل', 'Customer deposit'],
+  ['cod_collection', 'تحصيل عند التسليم', 'Collection on delivery'],
+  ['return_credit_note', 'إشعار دائن مرتجع', 'Return credit note'],
+  ['payment_application', 'تسوية دفعة على فاتورة', 'Payment applied to invoice'],
+  ['payment_reversal', 'عكس دفعة', 'Payment reversal'],
+  ['debit_note', 'إشعار مدين', 'Debit note'],
+  ['adjustment', 'تسوية', 'Adjustment'],
+  ['opening_balance', 'رصيد افتتاحي', 'Opening balance'],
+  ['refund', 'رد مبلغ للعميل', 'Refund to customer'],
 ];
 
+const money = (v: string) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 /**
- * ERP UI Integration (CTO directive) — "كشف حساب العميل": a dedicated
- * statement screen, separate from the Customer Account dashboard's own
- * ledger tab, with real Date From/To + Document Type filters, Search,
- * Print, and Export. Reads the SAME `GET /customer-finance/ledger/:id`
- * the Customer Account page uses — one source of truth, computed running
- * balance client-side from that same ordered feed.
+ * The OFFICIAL customer account statement: a period statement computed on the server (opening balance before the period, whole last day included, deterministic order,
+ * server-side running balance, closing balance reconciled with the ledger engine) with PDF / Excel / CSV / print output from the very same payload.
  */
 export function CustomerStatement() {
-  const { t, preload } = useLanguage();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  preload([
-    'nav.customer_statement',
-    'field.customer',
-    'field.document_type',
-    'field.all_document_types',
-    'field.date_from',
-    'field.date_to',
-    'field.date',
-    'field.type',
-    'field.reference',
-    'field.debit',
-    'field.credit',
-    'field.running_balance',
-    'field.status',
-    'field.recorded_by',
-    'action.search',
-    'action.print',
-    'action.export',
-    'panel.select_customer_to_view_statement',
-    'panel.no_ledger_entries_yet',
-    'customer_ledger_entry_type.sales_invoice',
-    'customer_ledger_entry_type.deposit',
-    'customer_ledger_entry_type.payment',
-    'customer_ledger_entry_type.cod_collection',
-    'customer_ledger_entry_type.return_credit_note',
-    'customer_ledger_entry_type.debit_note',
-    'customer_ledger_entry_type.adjustment',
-    'customer_ledger_entry_type.opening_balance',
-    'customer_ledger_entry_type.refund',
-  ]);
-
+  const { lang } = useLanguage();
+  const ar = lang === 'ar';
+  const [params, setParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const customerId = searchParams.get('customerId') ?? '';
-  const entryType = searchParams.get('entryType') ?? '';
-  const [dateFrom, setDateFrom] = useState(searchParams.get('from') ?? '');
-  const [dateTo, setDateTo] = useState(searchParams.get('to') ?? '');
-  const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
+  const customerId = params.get('customerId') ?? '';
+  const [from, setFrom] = useState(params.get('from') ?? '');
+  const [to, setTo] = useState(params.get('to') ?? '');
+  const [entryType, setEntryType] = useState(params.get('entryType') ?? '');
+  const [status, setStatus] = useState(params.get('status') ?? '');
+  const [statement, setStatement] = useState<Statement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [openEntry, setOpenEntry] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Customer[]>('/customers').then(setCustomers).catch(() => undefined);
   }, []);
 
-  async function search() {
+  const qs = (extra: Record<string, string> = {}) => {
+    const p = new URLSearchParams();
+    Object.entries({ from, to, entryType, status, ...extra }).forEach(([k, v]) => v && p.set(k, v));
+    return p.toString();
+  };
+
+  async function generate() {
     if (!customerId) return;
     setError(null);
+    setBusy('load');
     try {
-      const params = new URLSearchParams();
-      if (entryType) params.set('entryType', entryType);
-      if (dateFrom) params.set('from', dateFrom);
-      if (dateTo) params.set('to', dateTo);
-      const qs = params.toString();
-      const data = await api.get<LedgerEntry[]>(`/customer-finance/ledger/${customerId}${qs ? `?${qs}` : ''}`);
-      setEntries(data);
+      setStatement(await api.get<Statement>(`/customer-finance/statement/${customerId}?${qs()}`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load statement.');
+      setStatement(null);
+      setError(err instanceof ApiError ? err.message : 'Failed to load the statement.');
+    } finally {
+      setBusy(null);
     }
   }
 
   useEffect(() => {
-    if (customerId) search();
+    setStatement(null);
+    if (customerId) generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
 
-  function setParam(key: string, value: string) {
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setSearchParams(next);
+  function pickCustomer(id: string) {
+    const next = new URLSearchParams(params);
+    if (id) next.set('customerId', id);
+    else next.delete('customerId');
+    setParams(next);
   }
 
-  let running = 0;
-  const rows = (entries ?? []).map((e) => {
-    running += e.direction === 'debit' ? Number(e.amount) : -Number(e.amount);
-    return { ...e, runningBalance: running.toFixed(2) };
-  });
-
-  function exportCsv() {
-    const header = ['Date', 'Type', 'Reference', 'Debit', 'Credit', 'Running Balance', 'Status'];
-    const lines = rows.map((r) => [
-      new Date(r.entryDate).toISOString(),
-      t(`customer_ledger_entry_type.${r.entryType}`),
-      r.entryNumber,
-      r.direction === 'debit' ? r.amount : '',
-      r.direction === 'credit' ? r.amount : '',
-      r.runningBalance,
-      r.status,
-    ]);
-    const csv = [header, ...lines].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `customer-statement-${customerId}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function file(format: 'pdf' | 'xlsx' | 'csv', docLang: 'ar' | 'en', mode: 'download' | 'print' = 'download') {
+    if (!customerId) return;
+    setBusy(`${format}-${docLang}`);
+    setError(null);
+    try {
+      const blob = await downloadBlob(`/customer-finance/statement/${customerId}/export?${qs({ format, lang: docLang })}`);
+      const url = URL.createObjectURL(blob);
+      if (mode === 'print') {
+        window.open(url, '_blank'); // the browser's PDF viewer prints with the same fonts and pagination
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `customer-statement-${statement?.customer.code ?? customerId}-${docLang}.${format}`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Export failed.');
+    } finally {
+      setBusy(null);
+    }
   }
 
-  const selectedCustomer = customers.find((c) => c.id === customerId);
-
+  const s = statement;
   return (
     <div>
       <div className="page-header">
-        <h1>{t('nav.customer_statement')}</h1>
+        <h1>{ar ? 'كشف حساب العميل' : 'Customer account statement'}</h1>
       </div>
 
-      {error && <div className="error-text">{error}</div>}
-
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.customer')}</label>
-            <select value={customerId} onChange={(e) => setParam('customerId', e.target.value)} style={{ minWidth: 220 }}>
+          <div className="form-field" style={{ marginBottom: 0, minWidth: 240 }}>
+            <label>{ar ? 'العميل' : 'Customer'}</label>
+            <select value={customerId} onChange={(e) => pickCustomer(e.target.value)}>
               <option value="">—</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -172,85 +168,168 @@ export function CustomerStatement() {
             </select>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.document_type')}</label>
-            <select value={entryType} onChange={(e) => setParam('entryType', e.target.value)}>
-              <option value="">{t('field.all_document_types')}</option>
-              {ENTRY_TYPES.map((et) => (
-                <option key={et} value={et}>
-                  {t(`customer_ledger_entry_type.${et}`)}
+            <label>{ar ? 'من تاريخ' : 'From'}</label>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label>{ar ? 'إلى تاريخ (شامل اليوم كاملًا)' : 'To (whole day included)'}</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label>{ar ? 'نوع الحركة' : 'Movement type'}</label>
+            <select value={entryType} onChange={(e) => setEntryType(e.target.value)}>
+              <option value="">{ar ? 'الكل' : 'All'}</option>
+              {TYPES.map(([k, a, e]) => (
+                <option key={k} value={k}>
+                  {ar ? a : e}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.date_from')}</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <label>{ar ? 'الحالة' : 'Status'}</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">{ar ? 'الكل' : 'All'}</option>
+              <option value="posted">{ar ? 'مرحّلة' : 'Posted'}</option>
+              <option value="reversed">{ar ? 'معكوسة' : 'Reversed'}</option>
+            </select>
           </div>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>{t('field.date_to')}</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </div>
-          <button className="btn btn-primary" disabled={!customerId} onClick={search}>
-            {t('action.search')}
+          <button className="btn btn-primary" disabled={!customerId || busy === 'load'} onClick={generate}>
+            {ar ? 'إعداد الكشف' : 'Generate'}
           </button>
-          <button className="btn btn-secondary" disabled={!customerId} onClick={() => window.open(`/print/customer-statement/${customerId}?entryType=${entryType}&from=${dateFrom}&to=${dateTo}`, '_blank')}>
-            {t('action.print')}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>{ar ? 'إخراج الكشف (نفس الفترة والفلاتر):' : 'Output (same period and filters):'}</span>
+          <button className="btn btn-secondary" disabled={!s || !!busy} onClick={() => file('pdf', ar ? 'ar' : 'en', 'print')}>
+            {ar ? 'طباعة' : 'Print'}
           </button>
-          <button className="btn btn-secondary" disabled={!customerId || rows.length === 0} onClick={exportCsv}>
-            {t('action.export')}
-          </button>
+          <button className="btn btn-secondary" disabled={!s || !!busy} onClick={() => file('pdf', 'ar')}>PDF عربي</button>
+          <button className="btn btn-secondary" disabled={!s || !!busy} onClick={() => file('pdf', 'en')}>PDF English</button>
+          <button className="btn btn-secondary" disabled={!s || !!busy} onClick={() => file('xlsx', ar ? 'ar' : 'en')}>Excel</button>
+          <button className="btn btn-secondary" disabled={!s || !!busy} onClick={() => file('csv', ar ? 'ar' : 'en')}>CSV</button>
         </div>
       </div>
 
-      {!customerId ? (
-        <div className="empty-state">{t('panel.select_customer_to_view_statement')}</div>
-      ) : entries === null ? (
-        <div className="empty-state">{loadingLabel()}</div>
-      ) : rows.length === 0 ? (
-        <div className="empty-state">{t('panel.no_ledger_entries_yet')}</div>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>{t('field.date')}</th>
-              <th>{t('field.type')}</th>
-              <th>{t('field.reference')}</th>
-              <th>{t('field.debit')}</th>
-              <th>{t('field.credit')}</th>
-              <th>{t('field.running_balance')}</th>
-              <th>{t('field.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                style={{ cursor: r.invoiceId || r.salesOrderId ? 'pointer' : 'default', opacity: r.status === 'reversed' ? 0.5 : 1 }}
-                onClick={() => {
-                  if (r.invoiceId) navigate(`/invoices/${r.invoiceId}`);
-                  else if (r.salesOrderId) navigate(`/sales-orders/${r.salesOrderId}`);
-                }}
-              >
-                <td>{fmtDateTime(r.entryDate)}</td>
-                <td>{t(`customer_ledger_entry_type.${r.entryType}`)}</td>
-                <td>{r.entryNumber}</td>
-                <td>{r.direction === 'debit' ? r.amount : '—'}</td>
-                <td>{r.direction === 'credit' ? r.amount : '—'}</td>
-                <td>{r.runningBalance}</td>
-                <td>{nameOf(STATUS_NAMES, r.status, currentLang())}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {error && <div className="error-text">{error}</div>}
+      {!customerId && <div className="empty-state">{ar ? 'اختر عميلًا لإعداد كشف الحساب.' : 'Select a customer to prepare the statement.'}</div>}
+      {customerId && !s && !error && <div className="empty-state">…</div>}
 
-      {selectedCustomer && (
-        <div style={{ marginTop: 16 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(`/customers/${customerId}/account`)}>
-            {t('action.view_customer_account')}
-          </button>
+      {s && (
+        <div className="card" id="statement-document">
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div>
+              <h2 style={{ margin: 0 }}>{s.customer.name}</h2>
+              <div style={{ opacity: 0.8 }}>{s.customer.code}</div>
+              {(s.customer.address || s.customer.governorate) && <div>{[s.customer.address, s.customer.governorate].filter(Boolean).join('، ')}</div>}
+              <div style={{ fontSize: '0.9rem' }}>
+                {s.customer.taxRegistrationNumber && <span>{ar ? 'الرقم الضريبي' : 'Tax no.'}: {s.customer.taxRegistrationNumber} · </span>}
+                {s.customer.phone && <span>{ar ? 'الهاتف' : 'Phone'}: {s.customer.phone} · </span>}
+                {s.customer.paymentTermsDays != null && <span>{ar ? 'شروط السداد' : 'Terms'}: {s.customer.paymentTermsDays} {ar ? 'يوم' : 'days'}</span>}
+              </div>
+            </div>
+            <div style={{ fontSize: '0.9rem', textAlign: ar ? 'start' : 'end' }}>
+              <div>
+                <strong>{ar ? 'مرجع الكشف' : 'Statement ref.'}:</strong> {s.reference}
+              </div>
+              <div>
+                <strong>{ar ? 'الفترة' : 'Period'}:</strong> {s.period.from ?? (ar ? 'من أول حركة' : 'from the first entry')} {ar ? 'إلى' : 'to'} {s.period.to ?? (ar ? 'حتى الآن' : 'to date')}
+              </div>
+              <div>
+                <strong>{ar ? 'العملة' : 'Currency'}:</strong> {s.currency.code} · {ar ? 'تاريخ الإعداد' : 'Generated'}: {fmtDate(s.generatedAt)}
+              </div>
+              <div style={{ opacity: 0.7, maxWidth: 360 }}>{s.referenceNote[lang]}</div>
+            </div>
+          </div>
+
+          {s.warnings.map((w) => (
+            <div key={w.code} className="error-text" style={{ marginBottom: 8 }}>
+              {w[lang]} ({w.entryNumbers.join(', ')})
+            </div>
+          ))}
+          {!s.isComplete && (
+            <div style={{ color: '#b45309', marginBottom: 8 }}>
+              {ar ? 'عرض مصفّى بحسب النوع/الحالة: الأرصدة الجارية تخص الدفتر الكامل، والإجماليات للفترة كاملة.' : 'Filtered view: running balances belong to the full ledger, totals cover the whole period.'}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div className="kpi-tile"><div className="label">{ar ? 'الرصيد الافتتاحي' : 'Opening balance'}</div><div className="value">{money(s.openingBalance)}</div></div>
+            <div className="kpi-tile"><div className="label">{ar ? 'إجمالي المدين' : 'Total debit'}</div><div className="value">{money(s.totals.debit)}</div></div>
+            <div className="kpi-tile"><div className="label">{ar ? 'إجمالي الدائن' : 'Total credit'}</div><div className="value">{money(s.totals.credit)}</div></div>
+            <div className="kpi-tile"><div className="label">{ar ? 'الرصيد الختامي' : 'Closing balance'}</div><div className="value">{money(s.closingBalance)}</div></div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{ar ? 'التاريخ' : 'Date'}</th>
+                  <th>{ar ? 'نوع الحركة' : 'Type'}</th>
+                  <th>{ar ? 'البيان' : 'Description'}</th>
+                  <th>{ar ? 'رقم المستند' : 'Document'}</th>
+                  <th>{ar ? 'الاستحقاق' : 'Due'}</th>
+                  <th>{ar ? 'مدين' : 'Debit'}</th>
+                  <th>{ar ? 'دائن' : 'Credit'}</th>
+                  <th>{ar ? 'الرصيد' : 'Balance'}</th>
+                  <th>{ar ? 'الحالة' : 'Status'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ background: 'rgba(100,116,139,.12)', fontWeight: 600 }}>
+                  <td colSpan={7}>{ar ? 'الرصيد الافتتاحي' : 'Opening balance'}</td>
+                  <td>{money(s.openingBalance)}</td>
+                  <td />
+                </tr>
+                {s.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="empty-state">{ar ? 'لا توجد حركات في هذه الفترة.' : 'No movements in this period.'}</td>
+                  </tr>
+                )}
+                {s.rows.map((r) => (
+                  <tr key={r.entryId} onClick={() => setOpenEntry(r.entryId)} style={{ cursor: 'pointer', opacity: r.nettedOut ? 0.6 : 1 }} data-testid={`stmt-row-${r.entryNumber}`}>
+                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.date)}</td>
+                    <td>{r.typeLabel[lang]}</td>
+                    <td>
+                      {r.description[lang]}
+                      {r.flags.length > 0 && <span style={{ color: '#b91c1c' }}> ⚠</span>}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {r.documentNumber ? r.documentLink ? <Link to={r.documentLink}>{r.documentNumber}</Link> : r.documentNumber : ar ? 'غير محدد' : '—'}
+                    </td>
+                    <td>{r.dueDate ?? ''}</td>
+                    <td>{r.debit === '0.00' ? '' : money(r.debit)}</td>
+                    <td>{r.credit === '0.00' ? '' : money(r.credit)}</td>
+                    <td style={{ fontWeight: 600 }}>{money(r.balance)}</td>
+                    <td>{r.status === 'reversed' ? (ar ? 'معكوس' : 'Reversed') : r.isReversalLeg ? (ar ? 'قيد عكس' : 'Reversal') : ar ? 'مرحّل' : 'Posted'}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'rgba(100,116,139,.18)', fontWeight: 700 }}>
+                  <td colSpan={5}>{ar ? 'الرصيد الختامي' : 'Closing balance'}</td>
+                  <td>{money(s.totals.debit)}</td>
+                  <td>{money(s.totals.credit)}</td>
+                  <td>{money(s.closingBalance)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: '0.85rem', opacity: 0.85 }}>
+            <div>
+              {ar ? 'بعد استبعاد المعكوس وقيود العكس' : 'Excluding reversed rows and reversal entries'}: {ar ? 'مدين' : 'debit'} {money(s.totalsExcludingReversals.debit)} · {ar ? 'دائن' : 'credit'} {money(s.totalsExcludingReversals.credit)} · {ar ? 'عدد الحركات المعكوسة' : 'reversed rows'}: {s.reversedCount}
+            </div>
+            <div>
+              {ar ? 'مطابقة الرصيد مع دفتر العميل' : 'Reconciled with the customer ledger'}:{' '}
+              <strong style={{ color: s.reconciliation.matches ? '#166534' : '#b91c1c' }}>
+                {s.reconciliation.matches ? (ar ? 'مطابق' : 'matches') : ar ? 'غير مطابق' : 'MISMATCH'} ({money(s.reconciliation.ledgerBalanceAtPeriodEnd)})
+              </strong>
+            </div>
+            <div>{s.currency.note[lang]}</div>
+          </div>
         </div>
       )}
+
+      {openEntry && <LedgerEntryDrawer entryId={openEntry} onClose={() => setOpenEntry(null)} onOpen={setOpenEntry} onChanged={generate} />}
     </div>
   );
 }

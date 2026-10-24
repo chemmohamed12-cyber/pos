@@ -79,3 +79,7 @@ src/domains/shipment/domain/shipment-process.direct-handover.spec.ts
 src/domains/manufacturing/application/process-readiness.spec.ts
 src/database/seed-helpers/terminology-ownership.spec.ts
 src/database/payroll-seed-tag.spec.ts
+src/domains/customer-finance/domain/customer-statement-rules.spec.ts
+src/domains/customer-finance/interface/customer-statement-permissions.spec.ts
+src/domains/customer-finance/application/statement-pdf.spec.ts
+src/domains/treasury/application/treasury-ledger-labels.spec.ts

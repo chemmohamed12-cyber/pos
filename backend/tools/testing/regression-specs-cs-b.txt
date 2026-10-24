@@ -1,0 +1,1 @@
+src/domains/customer-finance/interface/customer-statement.company-isolation.spec.ts

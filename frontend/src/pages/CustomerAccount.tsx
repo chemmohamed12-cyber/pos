@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { CustomerProfileTab } from './CustomerProfileTab';
+import { LedgerEntryDrawer } from '../components/LedgerEntryDrawer';
 import { PAYMENT_METHODS, STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../lib/displayNames';
 import { fmtDate, fmtDateTime } from '../lib/formatDateTime';
 
@@ -113,7 +114,46 @@ interface TreasuryAccount {
   name: string;
 }
 
-type Tab = 'ledger' | 'invoices' | 'ar_aging' | 'profile';
+type Tab = 'ledger' | 'invoices' | 'ar_aging' | 'credit' | 'profile';
+
+interface Bilingual {
+  ar: string;
+  en: string;
+}
+interface AccountSummary {
+  balance: string;
+  creditLimit: string | null;
+  availableCredit: string | null;
+  overdue: string;
+  overdueNetOfUnappliedCredit: string;
+  notYetDue: string;
+  totalOpen: string;
+  openInvoices: number;
+  unappliedCredit: string;
+  aging: Record<'0-30' | '31-60' | '61-90' | '90+', string>;
+  invoicedInPeriod: string;
+  collectedInPeriod: string;
+  returnsInPeriod: string;
+  lastInvoiceDate: string | null;
+  lastPaymentDate: string | null;
+  nextDueDate: string | null;
+  alerts: { overCreditLimit: boolean; hasOverdue: boolean };
+  definitions: Record<string, Bilingual>;
+}
+interface RecentRow {
+  entryId: string;
+  date: string;
+  typeLabel: Bilingual;
+  description: Bilingual;
+  documentNumber: string | null;
+  documentLink: string | null;
+  debit: string;
+  credit: string;
+  balance: string;
+  nettedOut: boolean;
+  flags: string[];
+}
+const money = (v: string) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
  * Customer Financial Account / Invoice / AR (CTO directive §11 — Customer
@@ -127,7 +167,8 @@ type Tab = 'ledger' | 'invoices' | 'ar_aging' | 'profile';
 export function CustomerAccount() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
+  const ar = lang === 'ar';
 
   preload([
     'panel.customer_profile',
@@ -233,6 +274,9 @@ export function CustomerAccount() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('ledger');
+  const [summary, setSummary] = useState<AccountSummary | null>(null);
+  const [recent, setRecent] = useState<RecentRow[] | null>(null);
+  const [openEntry, setOpenEntry] = useState<string | null>(null);
 
   const [newInvoiceOrderId, setNewInvoiceOrderId] = useState('');
   const [voidReason, setVoidReason] = useState<Record<string, string>>({});
@@ -260,6 +304,10 @@ export function CustomerAccount() {
       api.get<{ name: string | null }>(`/customers/${id}/primary-rep`),
       api.get<UnappliedPayment[]>(`/payments/unapplied?customerId=${id}`).catch(() => [] as UnappliedPayment[]),
     ]);
+    // The single-source indicators and the latest movements of the official statement engine (read-only; absent without the `accounting.ar.view` permission).
+    const fromYear = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    api.get<AccountSummary>(`/customer-finance/account-summary/${id}?from=${fromYear}`).then(setSummary).catch(() => setSummary(null));
+    api.get<{ rows: RecentRow[] }>(`/customer-finance/statement/${id}`).then((r) => setRecent([...r.rows].slice(-10).reverse())).catch(() => setRecent(null));
     setCustomer(customerData);
     setStatement(statementData);
     setInvoices(invoicesData);
@@ -425,8 +473,6 @@ export function CustomerAccount() {
   if (!customer || !statement) return <div className="empty-state">{loadingLabel()}</div>;
 
   const ordersWithoutOpenInvoice = orders.filter((o) => !invoices.some((inv) => inv.salesOrderId === o.id && inv.state !== 'void'));
-  const lastInvoice = [...invoices].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-  const lastPayment = [...payments].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())[0];
 
   return (
     <div>
@@ -443,160 +489,193 @@ export function CustomerAccount() {
       {error && <div className="error-text">{error}</div>}
       {notice && <div style={{ color: 'var(--success, #2e7d32)', marginBottom: 12 }}>{notice}</div>}
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.phone')}</div>
-            <div>{customer.phone ?? '—'}</div>
+      {summary && (summary.alerts.overCreditLimit || summary.alerts.hasOverdue) && (
+        <div className="error-text" style={{ marginBottom: 12 }} data-testid="account-alerts">
+          {summary.alerts.overCreditLimit && <div>{ar ? `تنبيه: الرصيد (${money(summary.balance)}) تجاوز حد الائتمان (${money(summary.creditLimit ?? '0')}).` : `Alert: the balance (${money(summary.balance)}) exceeds the credit limit (${money(summary.creditLimit ?? '0')}).`}</div>}
+          {summary.alerts.hasOverdue && <div>{ar ? `تنبيه: توجد مديونية متأخرة بقيمة ${money(summary.overdue)}.` : `Alert: overdue receivables of ${money(summary.overdue)}.`}</div>}
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            {(
+              [
+                [t('field.phone'), customer.phone ?? '—'],
+                [t('field.governorate'), customer.governorate ?? '—'],
+                [t('field.address'), customer.address ?? '—'],
+                [t('field.sales_representative'), primaryRep ?? '—'],
+                [t('field.status'), nameOf(STATUS_NAMES, customer.status, currentLang())],
+                [t('field.account_type'), t(`account_type.${customer.accountType}`)],
+                [t('field.financial_status'), t(`financial_status.${customer.financialStatus}`)],
+                [t('field.payment_terms_days'), customer.paymentTermsDays ?? '—'],
+              ] as Array<[string, React.ReactNode]>
+            ).map(([label, value]) => (
+              <div key={label}>
+                <div style={{ color: '#6b7280', fontSize: 12 }}>{label}</div>
+                <div>{value}</div>
+              </div>
+            ))}
           </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.governorate')}</div>
-            <div>{customer.governorate ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.address')}</div>
-            <div>{customer.address ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.sales_representative')}</div>
-            <div>{primaryRep ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.status')}</div>
-            <div>{nameOf(STATUS_NAMES, customer.status, currentLang())}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.account_type')}</div>
-            <div>{t(`account_type.${customer.accountType}`)}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.financial_status')}</div>
-            <div>{t(`financial_status.${customer.financialStatus}`)}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.credit_limit')}</div>
-            <div>{customer.creditLimit ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.payment_terms_days')}</div>
-            <div>{customer.paymentTermsDays ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.available_credit')}</div>
-            <div>{statement.availableCredit ?? '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.last_invoice')}</div>
-            <div>{lastInvoice ? lastInvoice.invoiceNumber : '—'}</div>
-          </div>
-          <div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>{t('field.last_payment')}</div>
-            <div>{lastPayment ? `${lastPayment.paymentNumber} (${lastPayment.amount})` : '—'}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => navigate(`/customer-statement?customerId=${id}`)} data-testid="open-official-statement">
+              {ar ? 'كشف الحساب الرسمي' : 'Official statement'}
+            </button>
+            <details style={{ position: 'relative' }}>
+              <summary className="btn btn-secondary" style={{ listStyle: 'none', cursor: 'pointer' }}>
+                {ar ? 'إجراءات ▾' : 'Actions ▾'}
+              </summary>
+              <div className="card" style={{ position: 'absolute', insetInlineEnd: 0, zIndex: 20, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6, padding: 10 }}>
+                <button className="btn btn-secondary" onClick={() => setTab('invoices')}>{ar ? 'إنشاء فاتورة / تسجيل دفعة' : 'Create invoice / record payment'}</button>
+                <button className="btn btn-secondary" onClick={() => navigate('/returns')}>{t('nav.returns')}</button>
+                <button className="btn btn-secondary" onClick={() => navigate('/sales-orders')}>{t('nav.sales_orders')}</button>
+                <button className="btn btn-secondary" onClick={() => navigate('/ar-aging')}>{t('nav.ar_aging')}</button>
+              </div>
+            </details>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-        <button className="btn btn-secondary" onClick={() => navigate(`/customer-statement?customerId=${id}`)}>
-          {t('nav.customer_statement')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => setTab('invoices')}>
-          {t('panel.invoices')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate(`/customer-statement?customerId=${id}&entryType=deposit`)}>
-          {t('customer_ledger_entry_type.deposit')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate('/returns')}>
-          {t('nav.returns')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate(`/customer-statement?customerId=${id}&entryType=return_credit_note`)}>
-          {t('customer_ledger_entry_type.return_credit_note')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate(`/customer-statement?customerId=${id}&entryType=adjustment`)}>
-          {t('customer_ledger_entry_type.adjustment')}
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-        {(
-          [
-            ['balance', 'field.balance'],
-            ['totalSales', 'field.total_sales'],
-            ['totalPaid', 'field.total_paid'],
-            ['totalOutstanding', 'field.total_outstanding'],
-            ['overdueAmount', 'field.overdue_amount'],
-            ['totalReturns', 'field.total_returns'],
-          ] as const
-        ).map(([key, labelKey]) => (
-          <div key={key} className="card" style={{ minWidth: 150, textAlign: 'center' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>{statement[key]}</div>
-            <div style={{ color: '#6b7280' }}>{t(labelKey)}</div>
+      {summary && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            {(
+              [
+                ['balance', ar ? 'الرصيد الحالي' : 'Current balance', summary.balance, summary.definitions.balance],
+                ['creditLimit', ar ? 'حد الائتمان' : 'Credit limit', summary.creditLimit === null ? '—' : money(summary.creditLimit), null],
+                ['availableCredit', ar ? 'المتاح من الائتمان' : 'Available credit', summary.availableCredit === null ? '—' : money(summary.availableCredit), summary.definitions.availableCredit],
+                ['overdue', ar ? 'المتأخر' : 'Overdue', summary.overdue, summary.definitions.overdue],
+                ['unappliedCredit', ar ? 'دفعات مقدمة / رصيد دائن' : 'Advances / unapplied credit', summary.unappliedCredit, summary.definitions.unappliedCredit],
+                ['invoicedInPeriod', ar ? 'المفوتَر (آخر 12 شهرًا)' : 'Invoiced (last 12 months)', summary.invoicedInPeriod, summary.definitions.invoicedInPeriod],
+                ['collectedInPeriod', ar ? 'المحصَّل (آخر 12 شهرًا)' : 'Collected (last 12 months)', summary.collectedInPeriod, summary.definitions.collectedInPeriod],
+                ['returnsInPeriod', ar ? 'المرتجعات (آخر 12 شهرًا)' : 'Returns (last 12 months)', summary.returnsInPeriod, summary.definitions.returnsInPeriod],
+              ] as Array<[string, string, string, Bilingual | null]>
+            ).map(([key, label, value, def]) => (
+              <div key={key} className="card" style={{ minWidth: 150, textAlign: 'center' }} title={def ? def[lang] : undefined} data-testid={`kpi-${key}`}>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>{/^-?\d+(\.\d+)?$/.test(value) ? money(value) : value}</div>
+                <div style={{ color: '#6b7280', fontSize: 13 }}>{label}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+          <div className="card" style={{ marginBottom: 16 }} data-testid="aging-bands" title={summary.definitions.aging[lang]}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <strong>{ar ? 'أعمار الديون (من تاريخ الاستحقاق)' : 'Receivables aging (past due date)'}</strong>
+              {(['0-30', '31-60', '61-90', '90+'] as const).map((b) => (
+                <span key={b}>
+                  {b} {ar ? 'يوم' : 'days'}: <strong>{money(summary.aging[b])}</strong>
+                </span>
+              ))}
+              <span style={{ opacity: 0.7 }}>
+                ({ar ? 'منها غير مستحق بعد' : 'of which not yet due'} {money(summary.notYetDue)} · {ar ? 'إجمالي مفتوح' : 'total open'} {money(summary.totalOpen)})
+              </span>
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+              {ar ? 'آخر فاتورة' : 'Last invoice'}: {summary.lastInvoiceDate ? fmtDate(summary.lastInvoiceDate) : '—'} · {ar ? 'آخر دفعة' : 'Last payment'}: {summary.lastPaymentDate ? fmtDate(summary.lastPaymentDate) : '—'} · {ar ? 'أقرب استحقاق' : 'Next due'}: {summary.nextDueDate ?? '—'}
+            </div>
+          </div>
+        </>
+      )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <button className={tab === 'ledger' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('ledger')}>
-          {t('panel.customer_ledger')}
+          {ar ? 'آخر الحركات' : 'Latest movements'}
         </button>
         <button className={tab === 'invoices' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('invoices')}>
-          {t('panel.invoices')}
+          {ar ? 'الفواتير والمدفوعات' : 'Invoices & payments'}
         </button>
         <button className={tab === 'ar_aging' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('ar_aging')}>
           {t('panel.ar_aging')}
         </button>
+        <button className={tab === 'credit' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('credit')}>
+          {ar ? 'الائتمان والتحصيل' : 'Credit & collection'}
+        </button>
         <button className={tab === 'profile' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setTab('profile')}>
           {t('panel.customer_profile')}
         </button>
-        <button className="btn btn-secondary" onClick={() => navigate('/returns')}>
-          {t('nav.returns')}
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate('/sales-orders')}>
-          {t('nav.sales_orders')}
-        </button>
       </div>
 
+
       {tab === 'ledger' &&
-        (statement.entries.length === 0 ? (
+        (recent === null || recent.length === 0 ? (
           <div className="empty-state">{t('panel.no_ledger_entries_yet')}</div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t('field.date')}</th>
-                <th>{t('field.type')}</th>
-                <th>{t('field.reference')}</th>
-                <th>{t('field.description')}</th>
-                <th>{t('field.debit')}</th>
-                <th>{t('field.credit')}</th>
-                <th>{t('field.running_balance')}</th>
-                <th>{t('field.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {statement.entries.map((entry, idx) => (
-                <tr
-                  key={`${entry.reference}-${idx}`}
-                  style={{ cursor: entry.salesOrderId ? 'pointer' : 'default', opacity: entry.status === 'reversed' ? 0.5 : 1 }}
-                  onClick={() => entry.salesOrderId && navigate(`/sales-orders/${entry.salesOrderId}`)}
-                >
-                  <td>{fmtDateTime(entry.date)}</td>
-                  <td>{t(`customer_ledger_entry_type.${entry.type}`)}</td>
-                  <td>{entry.reference}</td>
-                  <td>{entry.description}</td>
-                  <td>{entry.debit !== '0.00' ? entry.debit : '—'}</td>
-                  <td>{entry.credit !== '0.00' ? entry.credit : '—'}</td>
-                  <td>{entry.runningBalance}</td>
-                  <td>{nameOf(STATUS_NAMES, entry.status, currentLang())}</td>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ opacity: 0.75 }}>{ar ? 'آخر 10 حركات — الكشف الرسمي بالفترة والرصيد الافتتاحي في شاشة كشف الحساب' : 'Latest 10 movements — the official period statement with opening balance is in the statement screen'}</span>
+              <Link to={`/customer-statement?customerId=${id}`}>{ar ? 'فتح كشف الحساب' : 'Open statement'}</Link>
+            </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{ar ? 'التاريخ' : 'Date'}</th>
+                  <th>{ar ? 'نوع الحركة' : 'Type'}</th>
+                  <th>{ar ? 'البيان' : 'Description'}</th>
+                  <th>{ar ? 'المستند' : 'Document'}</th>
+                  <th>{ar ? 'مدين' : 'Debit'}</th>
+                  <th>{ar ? 'دائن' : 'Credit'}</th>
+                  <th>{ar ? 'الرصيد' : 'Balance'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recent.map((r) => (
+                  <tr key={r.entryId} style={{ cursor: 'pointer', opacity: r.nettedOut ? 0.6 : 1 }} onClick={() => setOpenEntry(r.entryId)}>
+                    <td>{fmtDate(r.date)}</td>
+                    <td>{r.typeLabel[lang]}</td>
+                    <td>{r.description[lang]}{r.flags.length > 0 && <span style={{ color: '#b91c1c' }}> ⚠</span>}</td>
+                    <td onClick={(e) => e.stopPropagation()}>{r.documentNumber ? r.documentLink ? <Link to={r.documentLink}>{r.documentNumber}</Link> : r.documentNumber : '—'}</td>
+                    <td>{r.debit === '0.00' ? '' : money(r.debit)}</td>
+                    <td>{r.credit === '0.00' ? '' : money(r.credit)}</td>
+                    <td style={{ fontWeight: 600 }}>{money(r.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ))}
+
+      {tab === 'credit' && (
+        <div className="card" data-testid="credit-tab">
+          <h3 style={{ marginTop: 0 }}>{ar ? 'الائتمان والتحصيل' : 'Credit & collection'}</h3>
+          {summary ? (
+            <div className="detail-grid">
+              <div className="detail-field"><div className="label">{ar ? 'حد الائتمان' : 'Credit limit'}</div><div className="value">{summary.creditLimit === null ? (ar ? 'غير محدد' : 'Not set') : money(summary.creditLimit)}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'شروط السداد' : 'Payment terms'}</div><div className="value">{customer.paymentTermsDays != null ? `${customer.paymentTermsDays} ${ar ? 'يوم' : 'days'}` : ar ? 'غير محدد' : 'Not set'}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'الرصيد الحالي' : 'Current balance'}</div><div className="value">{money(summary.balance)}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'المتاح من الائتمان' : 'Available credit'}</div><div className="value">{summary.availableCredit === null ? '—' : money(summary.availableCredit)}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'المتأخر (إجمالي)' : 'Overdue (gross)'}</div><div className="value">{money(summary.overdue)}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'المتأخر بعد الرصيد الدائن غير المطبّق' : 'Overdue after unapplied credit'}</div><div className="value">{money(summary.overdueNetOfUnappliedCredit)}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'فواتير مفتوحة' : 'Open invoices'}</div><div className="value">{summary.openInvoices}</div></div>
+              <div className="detail-field"><div className="label">{ar ? 'أقرب استحقاق' : 'Next due date'}</div><div className="value">{summary.nextDueDate ?? '—'}</div></div>
+            </div>
+          ) : (
+            <div className="empty-state">{ar ? 'لا تتوفر مؤشرات الائتمان (الصلاحية مطلوبة).' : 'Credit indicators are not available (permission required).'}</div>
+          )}
+          <div style={{ marginTop: 12, fontSize: 13, opacity: 0.8 }}>{ar ? 'تعديل حد الائتمان وشروط السداد يتم من تبويب «الملف الشخصي» وفق صلاحياتك؛ هذه الشاشة للعرض فقط.' : 'Credit limit and payment terms are edited from the Profile tab according to your permissions; this tab is read-only.'}</div>
+          {arAging.length > 0 && (
+            <>
+              <h4>{ar ? 'الفواتير المستحقة' : 'Open invoices'}</h4>
+              <table className="data-table">
+                <thead>
+                  <tr><th>{t('field.invoice_number')}</th><th>{t('field.due_date')}</th><th>{ar ? 'المتبقي' : 'Remaining'}</th><th>{ar ? 'أيام التأخير' : 'Days late'}</th></tr>
+                </thead>
+                <tbody>
+                  {arAging.map((a) => (
+                    <tr key={a.invoiceId}><td><Link to={`/invoices/${a.invoiceId}`}>{a.invoiceNumber}</Link></td><td>{a.dueDate ? fmtDate(a.dueDate) : '—'}</td><td>{money(a.remaining)}</td><td>{a.daysOverdue}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
 
       {tab === 'invoices' && (
         <div>
-          <div className="card" style={{ marginBottom: 20 }}>
+          <details style={{ marginBottom: 20 }} data-testid="write-actions">
+            <summary className="btn btn-secondary" style={{ cursor: 'pointer' }}>
+              {ar ? 'إجراءات الكتابة: إنشاء فاتورة، تطبيق رصيد مرتجع، دفعة مقدمة/على الحساب' : 'Write actions: create invoice, apply return credit, advance / on-account payment'}
+            </summary>
+          <div className="card" style={{ marginBottom: 20, marginTop: 12 }}>
             <h3 style={{ marginTop: 0 }}>{t('action.create_invoice')}</h3>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
               <div className="form-field" style={{ marginBottom: 0 }}>
@@ -734,6 +813,8 @@ export function CustomerAccount() {
               ))
             )}
           </div>
+
+          </details>
 
           {invoices.length === 0 ? (
             <div className="empty-state">{t('panel.no_invoices_yet')}</div>
@@ -876,6 +957,7 @@ export function CustomerAccount() {
             </tbody>
           </table>
         ))}
+      {openEntry && <LedgerEntryDrawer entryId={openEntry} onClose={() => setOpenEntry(null)} onOpen={setOpenEntry} onChanged={() => loadAll().catch(() => undefined)} />}
     </div>
   );
 }
