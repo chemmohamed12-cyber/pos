@@ -96,8 +96,6 @@ interface RawEntry {
   paymentReversed: boolean | null;
 }
 
-const RETURN_REASON = /^(Sales|Shipment) return credit$/;
-
 @Injectable()
 export class CustomerStatementService {
   constructor(
@@ -360,6 +358,19 @@ export class CustomerStatementService {
     )) as Array<{ id: string; invoiceNumber: string; dueDate: string | null; remaining: string }>;
     const aging: AgingResult = ageInvoices(open, asOf);
 
+    // invoices whose applied credits exceed their value (customer paid / was credited more than the invoice): shown, never netted away
+    const over = (await runner.query(
+      `SELECT count(*)::int AS n, COALESCE(SUM(-(((inv."totalAmount" + inv."taxAmount") - COALESCE(app.total, 0)))), 0)::numeric(14,2)::text AS amount
+         FROM "sales_invoices" inv
+         JOIN "process_instances" pi ON pi."entityId"::text = inv."id"::text AND pi."definitionKey" = 'sales_invoice_lifecycle' AND pi."entityType" = 'sales_invoice'
+         LEFT JOIN (
+           SELECT "invoiceId", SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END) AS total
+             FROM "customer_ledger_entries" WHERE "invoiceId" IS NOT NULL AND "entryType" <> 'sales_invoice' GROUP BY "invoiceId"
+         ) app ON app."invoiceId" = inv."id"
+        WHERE inv."customerId" = $1 AND pi."currentState" NOT IN ('void', 'draft') AND ((inv."totalAmount" + inv."taxAmount") - COALESCE(app.total, 0)) < 0`,
+      [customerId],
+    )) as Array<{ n: number; amount: string }>;
+
     const unapplied = (await runner.query(
       `SELECT COALESCE(SUM(CASE WHEN "direction" = 'credit' THEN "amount" ELSE -"amount" END), 0)::numeric(14,2)::text AS v
          FROM "customer_ledger_entries" WHERE "customerId" = $1 AND "invoiceId" IS NULL`,
@@ -406,6 +417,8 @@ export class CustomerStatementService {
       overdueNetOfUnappliedCredit: fromCents(Math.max(0, overdueNet)),
       notYetDue: aging.notYetDue,
       unappliedCredit,
+      customerCreditBalance: toCents(balance) < 0 ? fromCents(-toCents(balance)) : '0.00',
+      overApplied: { invoices: over[0].n, amount: over[0].amount },
       aging: aging.bands,
       invoicedInPeriod: sums[0].invoiced,
       collectedInPeriod: sums[0].collected,
@@ -416,6 +429,7 @@ export class CustomerStatementService {
       alerts: {
         overCreditLimit: limit !== null && toCents(balance) > toCents(limit),
         hasOverdue: toCents(aging.overdue) > 0,
+        hasOverApplied: over[0].n > 0,
       },
       definitions: DEFINITIONS,
     };
@@ -433,6 +447,8 @@ const DEFINITIONS: Record<string, Bilingual> = {
   overdue: { ar: 'المتأخر = المتبقي على الفواتير التي تجاوز استحقاقها تاريخ الكشف (اليوم الأول للتأخير هو اليوم التالي للاستحقاق).', en: 'Overdue = remaining on invoices past their due date at the as-of date (the first overdue day is the day after the due date).' },
   overdueNetOfUnappliedCredit: { ar: 'المتأخر بعد خصم الرصيد الدائن غير المطبّق للعميل (يُعرض منفصلًا ولا يُخفي المتأخر الإجمالي).', en: 'Overdue after the customer’s unapplied credit (shown separately; the gross overdue is never hidden).' },
   availableCredit: { ar: 'المتاح من الائتمان = حد الائتمان − الرصيد الحالي، ويظهر فقط عند تحديد حد ائتمان.', en: 'Available credit = credit limit − current balance; shown only when a limit is set.' },
+  customerCreditBalance: { ar: 'رصيد دائن للعميل = قيمة الرصيد الحالي عندما يكون سالبًا (العميل دائن لدينا)، سواء كان مطبّقًا على فواتير أم لا.', en: 'Customer credit balance = the current balance when negative (we owe the customer), whether or not it is applied to invoices.' },
+  overApplied: { ar: 'فواتير مطبّق عليها أكثر من قيمتها (دفعات/عرابين تتجاوز الفاتورة) — تُعرض ولا تُخفى.', en: 'Invoices with more applied than their value (payments/deposits exceeding the invoice) — shown, never hidden.' },
   unappliedCredit: { ar: 'الرصيد الدائن غير المطبّق = دائن غير مرتبط بفاتورة (عربون/دفعة على الحساب) ناقص ما طُبّق منه.', en: 'Unapplied credit = credits not linked to an invoice (deposit / on-account payment) minus what was applied.' },
   aging: { ar: 'الأعمار: 0–30، 31–60، 61–90، 90+ يومًا من تاريخ الاستحقاق؛ يوم الاستحقاق نفسه = 0 يوم تأخير.', en: 'Aging: 0–30, 31–60, 61–90, 90+ days past the due date; the due day itself is 0 days late.' },
 };

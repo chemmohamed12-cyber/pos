@@ -130,6 +130,8 @@ interface AccountSummary {
   totalOpen: string;
   openInvoices: number;
   unappliedCredit: string;
+  customerCreditBalance: string;
+  overApplied: { invoices: number; amount: string };
   aging: Record<'0-30' | '31-60' | '61-90' | '90+', string>;
   invoicedInPeriod: string;
   collectedInPeriod: string;
@@ -137,7 +139,7 @@ interface AccountSummary {
   lastInvoiceDate: string | null;
   lastPaymentDate: string | null;
   nextDueDate: string | null;
-  alerts: { overCreditLimit: boolean; hasOverdue: boolean };
+  alerts: { overCreditLimit: boolean; hasOverdue: boolean; hasOverApplied: boolean };
   definitions: Record<string, Bilingual>;
 }
 interface RecentRow {
@@ -489,9 +491,10 @@ export function CustomerAccount() {
       {error && <div className="error-text">{error}</div>}
       {notice && <div style={{ color: 'var(--success, #2e7d32)', marginBottom: 12 }}>{notice}</div>}
 
-      {summary && (summary.alerts.overCreditLimit || summary.alerts.hasOverdue) && (
+      {summary && (summary.alerts.overCreditLimit || summary.alerts.hasOverdue || summary.alerts.hasOverApplied) && (
         <div className="error-text" style={{ marginBottom: 12 }} data-testid="account-alerts">
           {summary.alerts.overCreditLimit && <div>{ar ? `تنبيه: الرصيد (${money(summary.balance)}) تجاوز حد الائتمان (${money(summary.creditLimit ?? '0')}).` : `Alert: the balance (${money(summary.balance)}) exceeds the credit limit (${money(summary.creditLimit ?? '0')}).`}</div>}
+          {summary.alerts.hasOverApplied && <div>{ar ? `تنبيه: ${summary.overApplied.invoices} فاتورة مطبّق عليها أكثر من قيمتها بإجمالي ${money(summary.overApplied.amount)} — راجع الدفعات والعرابين.` : `Alert: ${summary.overApplied.invoices} invoice(s) have more applied than their value (${money(summary.overApplied.amount)}) — review payments and deposits.`}</div>}
           {summary.alerts.hasOverdue && <div>{ar ? `تنبيه: توجد مديونية متأخرة بقيمة ${money(summary.overdue)}.` : `Alert: overdue receivables of ${money(summary.overdue)}.`}</div>}
         </div>
       )}
@@ -545,7 +548,8 @@ export function CustomerAccount() {
                 ['creditLimit', ar ? 'حد الائتمان' : 'Credit limit', summary.creditLimit === null ? '—' : money(summary.creditLimit), null],
                 ['availableCredit', ar ? 'المتاح من الائتمان' : 'Available credit', summary.availableCredit === null ? '—' : money(summary.availableCredit), summary.definitions.availableCredit],
                 ['overdue', ar ? 'المتأخر' : 'Overdue', summary.overdue, summary.definitions.overdue],
-                ['unappliedCredit', ar ? 'دفعات مقدمة / رصيد دائن' : 'Advances / unapplied credit', summary.unappliedCredit, summary.definitions.unappliedCredit],
+                ['customerCreditBalance', ar ? 'رصيد دائن للعميل' : 'Customer credit balance', summary.customerCreditBalance, summary.definitions.customerCreditBalance],
+                ['unappliedCredit', ar ? 'دفعات مقدمة غير مطبّقة' : 'Unapplied advances', summary.unappliedCredit, summary.definitions.unappliedCredit],
                 ['invoicedInPeriod', ar ? 'المفوتَر (آخر 12 شهرًا)' : 'Invoiced (last 12 months)', summary.invoicedInPeriod, summary.definitions.invoicedInPeriod],
                 ['collectedInPeriod', ar ? 'المحصَّل (آخر 12 شهرًا)' : 'Collected (last 12 months)', summary.collectedInPeriod, summary.definitions.collectedInPeriod],
                 ['returnsInPeriod', ar ? 'المرتجعات (آخر 12 شهرًا)' : 'Returns (last 12 months)', summary.returnsInPeriod, summary.definitions.returnsInPeriod],

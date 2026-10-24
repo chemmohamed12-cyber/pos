@@ -1,0 +1,11 @@
+# Customer statement hotfix - regression set on the isolated cluster (REGRESSION_NS=biz_tNN_ node tools/testing/biz-run.js --regression tools/testing/regression-specs-cs-all.txt)
+src/domains/treasury/interface/treasury.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-posting-integrity.company-isolation.spec.ts
+src/domains/treasury/interface/treasury-posting-recovery.company-isolation.spec.ts
+src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts
+src/domains/customer-finance/interface/invoices.company-isolation.spec.ts
+src/domains/customer-finance/interface/payments.company-isolation.spec.ts
+src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts
+src/domains/customer-finance/interface/payment-reversal.company-isolation.spec.ts
+src/domains/customer-finance/interface/customer-statement.company-isolation.spec.ts

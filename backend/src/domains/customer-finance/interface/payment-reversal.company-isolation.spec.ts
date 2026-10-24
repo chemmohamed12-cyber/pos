@@ -365,6 +365,9 @@ describe('T2 — customer payment reversal through the owning document — real-
     expect(sum.unappliedCredit).toBe('25.00');
     expect(sum.overdueNetOfUnappliedCredit).toBe('825.00');
     expect(sum.openInvoices).toBe(4);
+    expect(sum.customerCreditBalance).toBe('75.00'); // 50 + 25 paid, no invoice debit in the ledger for these directly-inserted invoices
+    expect(sum.overApplied).toEqual({ invoices: 0, amount: '0.00' });
+    expect(sum.alerts.hasOverApplied).toBe(false);
     expect(sum.alerts.hasOverdue).toBe(true);
     expect(sum.creditLimit).toBe('500.00');
     expect(sum.nextDueDate).toBe('2026-11-03');

@@ -179,7 +179,10 @@ export function runningBalances(opening: string, rows: RunningInput[]): string[]
 export function periodTotals(rows: RunningInput[]): { debit: string; credit: string } {
   let d = 0;
   let c = 0;
-  for (const r of rows) (r.direction === 'debit' ? (d += toCents(r.amount)) : (c += toCents(r.amount)));
+  for (const r of rows) {
+    if (r.direction === 'debit') d += toCents(r.amount);
+    else c += toCents(r.amount);
+  }
   return { debit: fromCents(d), credit: fromCents(c) };
 }
 

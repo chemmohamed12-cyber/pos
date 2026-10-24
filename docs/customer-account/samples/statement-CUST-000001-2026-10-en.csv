@@ -1,0 +1,29 @@
+﻿Company,Alpha Trading Co
+Customer Account Statement,
+Statement reference,ST-CUST-000001-20261001-20261031-202610241545-95A08E6A
+Issue date,2026-10-24
+Customer,Alpha Customer 1 (CUST-000001)
+Tax registration no.,
+Address,
+Period,2026-10-01 → 2026-10-31
+Currency,EGP
+Filters,None (complete statement)
+Opening balance,0.00
+Total debit,22.00
+Total credit,34.00
+Closing balance,-12.00
+Excluding reversed rows and reversal entries,20.00 / 32.00
+,A reference generated for this copy of the statement — not a number from a stored register of issued documents.
+
+Date,Entry no.,Type,Description,Document no.,Due date,Debit,Credit,Running balance,Status
+Opening balance,,,,,,,,0.00,
+2026-10-20,CLE-2026-000001,Customer deposit,Customer deposit (cash) — invoice INV-2026-000001 / order SO-2026-000001,INV-2026-000001,,0.00,10.00,-10.00,Posted
+2026-10-22,CLE-2026-000002,Customer deposit,Customer deposit (wallet) — invoice INV-2026-000002 / order SO-2026-000002,INV-2026-000002,,0.00,2.00,-12.00,Posted
+2026-10-22,CLE-2026-000003,Customer payment,On-account payment (cash) — invoice INV-2026-000001 / receipt PAY-2026-000001 / order SO-2026-000001,PAY-2026-000001,,0.00,10.00,-22.00,Posted
+2026-10-22,CLE-2026-000004,Sales invoice,Sales invoice posted — invoice INV-2026-000001 / order SO-2026-000001,INV-2026-000001,,10.00,0.00,-12.00,Posted
+2026-10-22,CLE-2026-000005,Customer payment,On-account payment (cash) — invoice INV-2026-000002 / receipt PAY-2026-000002 / order SO-2026-000002,PAY-2026-000002,,0.00,2.00,-14.00,Posted
+2026-10-22,CLE-2026-000006,Sales invoice,Sales invoice posted — invoice INV-2026-000002 / order SO-2026-000002,INV-2026-000002,,10.00,0.00,-4.00,Posted
+2026-10-22,CLE-2026-000007,Customer payment,Payment against invoice (cash) — invoice INV-2026-000002 / receipt PAY-2026-000003 / order SO-2026-000002,PAY-2026-000003,,0.00,2.00,-6.00,Posted
+2026-10-22,CLE-2026-000008,Collection on delivery,Collection on delivery (cash) — remitted — invoice INV-2026-000002 / order SO-2026-000002 / waybill WB-2026-000002,INV-2026-000002,,0.00,8.00,-14.00,Posted
+2026-10-24,CLE-2026-000009,Payment reversal,Payment reversal: إكمال الجانب المستندي لعكس خزينة سابق — invoice INV-2026-000002 / receipt PAY-2026-000003 / order SO-2026-000002,PAY-2026-000003,,2.00,0.00,-12.00,Reversal
+Closing balance,,,,,,22.00,34.00,-12.00,

@@ -1,4 +1,3 @@
-/* eslint-disable */
 // Noto Naskh Arabic (Arabic subset) and Noto Sans (Latin subset) - SIL Open Font License 1.1, Copyright The Noto Project Authors (https://github.com/notofonts), woff,
 // embedded as base64 so the compiled output needs no asset copying. Used ONLY by the customer statement PDF (server-side, deterministic Arabic shaping).
 // The two families must keep DIFFERENT internal font names, otherwise PDF viewers reuse one subset for both.
