@@ -1,0 +1,1 @@
+src/domains/manufacturing/interface/manufacturing-outcomes.company-isolation.spec.ts

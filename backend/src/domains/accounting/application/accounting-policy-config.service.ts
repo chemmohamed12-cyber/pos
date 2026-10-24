@@ -27,6 +27,7 @@ export const ACCOUNTING_POLICY_KEYS: readonly PolicyKeyDef[] = [
   { key: 'accounting.inventory_adjustment_gain_account_code', group: 'inventory', kind: 'account', expectedTypes: ['revenue'] },
   { key: 'accounting.inventory_adjustment_loss_account_code', group: 'inventory', kind: 'account', expectedTypes: ['expense'] },
   { key: 'accounting.inventory_cogs_account_code', group: 'inventory', kind: 'account', expectedTypes: ['expense'] },
+  { key: 'accounting.manufacturing_scrap_loss_account_code', group: 'inventory', kind: 'account', expectedTypes: ['expense'] }, // Manufacturing Engine S1 (D-ME-1)
   { key: 'accounting.inventory_manual_receipt_reason_accounts', group: 'inventory', kind: 'reason_map', expectedTypes: ['equity', 'revenue', 'liability'] },
   { key: 'accounting.sales_returns_account_code', group: 'sales', kind: 'account', expectedTypes: ['revenue', 'expense'] },
   { key: 'accounting.purchase_price_variance_account_code', group: 'procurement', kind: 'account', expectedTypes: ['expense'] },

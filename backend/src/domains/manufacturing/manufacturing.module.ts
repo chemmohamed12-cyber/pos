@@ -6,6 +6,7 @@ import { WorkCenter } from './infrastructure/work-center.entity';
 import { Routing } from './infrastructure/routing.entity';
 import { RoutingOperation } from './infrastructure/routing-operation.entity';
 import { WorkOrderOperation } from './infrastructure/work-order-operation.entity';
+import { WorkOrderResult } from './infrastructure/work-order-result.entity';
 import { WorkCenterService } from './application/work-center.service';
 import { RoutingService } from './application/routing.service';
 import { ManufacturingBomController } from './interface/manufacturing-bom.controller';
@@ -38,7 +39,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation]),
+    TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult]),
     AuditModule,
     AuthenticationModule,
     AuthorizationModule,

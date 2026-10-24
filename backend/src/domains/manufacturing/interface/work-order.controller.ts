@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsInt, IsOptional, IsPositive, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsNumberString, IsOptional, IsPositive, IsString, IsUUID, MaxLength } from 'class-validator';
 import { WorkOrderService } from '../application/work-order.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
@@ -46,6 +46,65 @@ class OutputQuantityDto {
   requestId?: string;
 }
 
+
+class ScrapDto {
+  @IsInt()
+  @IsPositive()
+  quantity!: number;
+
+  @IsString()
+  @MaxLength(255)
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  requestId?: string;
+}
+
+class RecoveryDto {
+  @IsUUID()
+  productId!: string;
+
+  @IsInt()
+  @IsPositive()
+  quantity!: number;
+
+  @IsNumberString()
+  valueBase!: string;
+
+  @IsUUID()
+  sourceResultId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  requestId?: string;
+}
+
+class TrackedOutcomeDto {
+  @IsIn(['rework', 'rejected', 'held'])
+  outcomeClass!: 'rework' | 'rejected' | 'held';
+
+  @IsInt()
+  @IsPositive()
+  quantity!: number;
+
+  @IsString()
+  @MaxLength(255)
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  requestId?: string;
+}
+
+class ResolveOutcomeDto {
+  @IsIn(['good', 'scrap', 'rework'])
+  resolution!: 'good' | 'scrap' | 'rework';
+}
+
 /** ADR-061 §14 — Manufacturing/Work Order endpoints, feature-gated per §15 (`manufacturing.work_orders`, off by default). */
 @Controller('manufacturing/work-orders')
 @UseGuards(JwtAuthGuard, CompanyContextGuard, RequireModuleGuard)
@@ -69,7 +128,7 @@ export class WorkOrderController {
   async get(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
     if (!req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    const [workOrder, state, components, operations, wipValue, financialTrail, auditTrail] = await Promise.all([
+    const [workOrder, state, components, operations, wipValue, financialTrail, auditTrail, results] = await Promise.all([
       this.workOrders.getWorkOrderOrThrow(id, manager),
       this.workOrders.getWorkOrderState(id, manager),
       this.workOrders.getWorkOrderComponents(id, manager),
@@ -77,8 +136,9 @@ export class WorkOrderController {
       this.workOrders.computeWipValue(id, manager),
       this.workOrders.getFinancialTrail(id, manager),
       this.workOrders.getAuditTrail(id, manager),
+      this.workOrders.getResults(id, manager),
     ]);
-    return { ...workOrder, state, components, operations, wipValue: wipValue.toFixed(4), financialTrail, auditTrail };
+    return { ...workOrder, state, components, operations, wipValue: wipValue.toFixed(4), financialTrail, auditTrail, results };
   }
 
   /** ADR-061 Addendum 1 (A1) — execution tracking of the routing snapshot; no inventory/GL effect. */
@@ -147,6 +207,44 @@ export class WorkOrderController {
     await this.workOrders.finishedGoodsOutput(id, dto.quantity, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
     return { ok: true };
   }
+
+  /** Manufacturing Engine S1 (D-ME-1) — scrap is its own result: components consumed from WIP, value to the configured loss account, no stock created. */
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/scrap')
+  async scrap(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ScrapDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.recordScrap(id, dto.quantity, dto.reason, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/recovery')
+  async recovery(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecoveryDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.recordRecovery(id, dto.productId, dto.quantity, dto.valueBase, dto.sourceResultId, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/outcomes')
+  async trackedOutcome(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TrackedOutcomeDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.recordTrackedOutcome(id, dto.outcomeClass, dto.quantity, dto.reason, req.user.id, dto.requestId, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.outcome_record', 'editable')
+  @Post(':id/outcomes/:resultId/resolve')
+  async resolveOutcome(@Param('id', ParseUUIDPipe) id: string, @Param('resultId', ParseUUIDPipe) resultId: string, @Body() dto: ResolveOutcomeDto, @Req() req: CompanyScopedRequest) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.resolveTrackedOutcome(id, resultId, dto.resolution, req.user.id, req.companyContext.dataSource.manager);
+  }
+
 
   @UseGuards(RequireFeatureGuard, PermissionGuard)
   @RequireFeature('manufacturing.work_orders')

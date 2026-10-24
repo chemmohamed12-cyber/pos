@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { WorkOrderOutcomes, type WorkOrderResultRow } from './WorkOrderOutcomes';
 import { useParams, Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
@@ -63,6 +64,8 @@ interface WorkOrderDetail {
   finishedProductId: string;
   quantityPlanned: number;
   quantityProduced: number;
+  quantityScrapped: number;
+  results: WorkOrderResultRow[];
   warehouseId: string;
   wipWarehouseId: string | null;
   createdAt: string;
@@ -91,7 +94,7 @@ function newRequestId(): string {
 /** ADR-061 §18 — Work Order detail: BOM-snapshot components (issued/remaining), WIP balance, and every lifecycle action. */
 export function WorkOrderDetail() {
   const { id } = useParams<{ id: string }>();
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   const [wo, setWo] = useState<WorkOrderDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -261,7 +264,7 @@ export function WorkOrderDetail() {
   const canIssue = wo.state === 'released' || wo.state === 'in_progress';
   const canReturn = wo.state === 'in_progress' || wo.state === 'on_hold';
   const canOutput = wo.state === 'in_progress';
-  const remainingPlanned = wo.quantityPlanned - wo.quantityProduced;
+  const remainingPlanned = wo.quantityPlanned - wo.quantityProduced - (wo.quantityScrapped ?? 0);
 
   return (
     <div>
@@ -293,6 +296,10 @@ export function WorkOrderDetail() {
           <div>
             <label>{t('field.quantity_produced')}</label>
             <div>{wo.quantityProduced}</div>
+          </div>
+          <div>
+            <label>{lang === 'ar' ? 'الكمية الهالكة' : 'Quantity scrapped'}</label>
+            <div>{wo.quantityScrapped ?? 0}</div>
           </div>
           <div>
             <label>{t('field.status')}</label>
@@ -442,6 +449,8 @@ export function WorkOrderDetail() {
           </div>
         </div>
       )}
+
+      <WorkOrderOutcomes workOrderId={wo.id} state={wo.state} remainingPlanned={remainingPlanned} results={wo.results ?? []} products={products} onChanged={load} />
 
       <div className="card" style={{ marginTop: 20 }}>
         <h3 style={{ marginTop: 0 }}>{t('field.financial_events')}</h3>

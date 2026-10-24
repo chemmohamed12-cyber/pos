@@ -36,6 +36,7 @@ export const manufacturingManifest: ModuleManifest = {
     { node: 'manufacturing.work_order.material_issue', title_code: 'perm.manufacturing.work_order.material_issue', parent: 'manufacturing.work_order' },
     { node: 'manufacturing.work_order.material_return', title_code: 'perm.manufacturing.work_order.material_return', parent: 'manufacturing.work_order' },
     { node: 'manufacturing.work_order.finished_goods_receive', title_code: 'perm.manufacturing.work_order.finished_goods_receive', parent: 'manufacturing.work_order' },
+    { node: 'manufacturing.work_order.outcome_record', title_code: 'perm.manufacturing.work_order.outcome_record', parent: 'manufacturing.work_order' },
     { node: 'manufacturing.work_order.hold', title_code: 'perm.manufacturing.work_order.hold', parent: 'manufacturing.work_order' },
     { node: 'manufacturing.work_order.complete', title_code: 'perm.manufacturing.work_order.complete', parent: 'manufacturing.work_order' },
     { node: 'manufacturing.work_order.cancel', title_code: 'perm.manufacturing.work_order.cancel', parent: 'manufacturing.work_order' },
@@ -92,6 +93,8 @@ export const manufacturingManifest: ModuleManifest = {
       'manufacturing.work_order.material_issued',
       'manufacturing.work_order.material_returned',
       'manufacturing.work_order.finished_goods_received',
+      'manufacturing.work_order.scrap_recognized',
+      'manufacturing.work_order.recovery_received',
     ],
   },
 };

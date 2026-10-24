@@ -49,5 +49,8 @@ export type MovementType =
   | 'work_order_material_issue'
   | 'work_order_material_return'
   | 'work_order_finished_goods_output'
+  // Manufacturing Engine S1 (2026-10-24): scrap consumed from the order's WIP (no stock created) and salvage received back into the warehouse.
+  | 'work_order_scrap'
+  | 'work_order_recovery'
   // phase D-1 (2026-10-20): goods returned to a supplier by a posted Purchase Return. Deliberately NOT in `glKindFor`: the return publishes its own `procurement.purchase_return.posted` event.
   | 'purchase_return_out';

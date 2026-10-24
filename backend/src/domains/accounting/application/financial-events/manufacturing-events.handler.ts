@@ -99,3 +99,54 @@ export async function handleWorkOrderFinishedGoodsReceived(event: FinancialEvent
     },
   };
 }
+
+const SCRAP_LOSS_ACCOUNT_CONFIG_KEY = 'accounting.manufacturing_scrap_loss_account_code';
+
+/**
+ * Manufacturing Engine S1 (decision D-ME-1) — `manufacturing.work_order.scrap_recognized` → Dr Scrap loss (configured expense account) / Cr WIP, at the Work-Order-pooled value the
+ * application service already computed. Fails closed (rejected, re-drivable) while the account is not configured — never a hard-coded fallback.
+ */
+export async function handleWorkOrderScrapRecognized(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
+  const total = amt(event.payload.totalValueBase);
+  if (!total) return { kind: 'rejected', reason: 'manufacturing.work_order.scrap_recognized: missing/invalid totalValueBase' };
+  const wip = await ctx.resolveControlAccount('wip');
+  if (!wip) return { kind: 'rejected', reason: 'manufacturing.work_order.scrap_recognized: no active postable account has controlFunction "wip"' };
+  const loss = await ctx.resolveConfiguredPostableAccount(SCRAP_LOSS_ACCOUNT_CONFIG_KEY);
+  if (!loss.ok) return { kind: 'rejected', reason: `manufacturing.work_order.scrap_recognized: the scrap-loss account is ${loss.reason} — set ${SCRAP_LOSS_ACCOUNT_CONFIG_KEY} to a postable non-control expense account` };
+  return {
+    kind: 'draft',
+    draft: {
+      businessDate: event.businessDate,
+      description: `Work Order scrap — ${String(event.payload.workOrderId ?? '')}`,
+      transactionCurrencyCode: event.transactionCurrencyCode,
+      orgUnitId: event.orgUnitId,
+      lines: [
+        { accountId: loss.id, debit: total, description: 'Manufacturing scrap loss' },
+        { accountId: wip, credit: total, description: 'WIP (scrapped)' },
+      ],
+    },
+  };
+}
+
+/** `manufacturing.work_order.recovery_received` → Dr Inventory / Cr Scrap loss: salvaged material returns to stock and reverses the matching part of the loss (D-ME-1). */
+export async function handleWorkOrderRecoveryReceived(event: FinancialEvent, ctx: HandlerContext): Promise<HandlerResult> {
+  const total = amt(event.payload.totalValueBase);
+  if (!total) return { kind: 'rejected', reason: 'manufacturing.work_order.recovery_received: missing/invalid totalValueBase' };
+  const inventory = await ctx.resolveControlAccount('inventory');
+  if (!inventory) return { kind: 'rejected', reason: 'manufacturing.work_order.recovery_received: no active postable account has controlFunction "inventory"' };
+  const loss = await ctx.resolveConfiguredPostableAccount(SCRAP_LOSS_ACCOUNT_CONFIG_KEY);
+  if (!loss.ok) return { kind: 'rejected', reason: `manufacturing.work_order.recovery_received: the scrap-loss account is ${loss.reason} — set ${SCRAP_LOSS_ACCOUNT_CONFIG_KEY}` };
+  return {
+    kind: 'draft',
+    draft: {
+      businessDate: event.businessDate,
+      description: `Work Order material recovery — ${String(event.payload.workOrderId ?? '')}`,
+      transactionCurrencyCode: event.transactionCurrencyCode,
+      orgUnitId: event.orgUnitId,
+      lines: [
+        { accountId: inventory, debit: total, description: 'Inventory (recovered material)' },
+        { accountId: loss.id, credit: total, description: 'Manufacturing scrap loss (recovery)' },
+      ],
+    },
+  };
+}

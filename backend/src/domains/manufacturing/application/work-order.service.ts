@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { WorkOrder } from '../infrastructure/work-order.entity';
 import { WorkOrderComponent } from '../infrastructure/work-order-component.entity';
 import { WorkOrderOperation } from '../infrastructure/work-order-operation.entity';
+import { WorkOrderResult } from '../infrastructure/work-order-result.entity';
 import { RoutingService } from './routing.service';
 import { WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE } from '../domain/work-order-process';
 import { InventoryService } from '../../inventory-warehouse/application/inventory.service';
@@ -553,6 +554,7 @@ export class WorkOrderService {
       throw new ConflictException('outputQuantity must be a positive whole number.');
     }
     const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const outputEventId = requestId;
     const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'in_progress') {
       throw new ConflictException(`Work Order "${workOrderId}" cannot record a Finished Goods Output from state "${state}".`);
@@ -560,20 +562,264 @@ export class WorkOrderService {
     if (!wo.wipWarehouseId) throw new ConflictException(`Work Order "${workOrderId}" has no WIP sub-warehouse.`);
 
     // ADR-061 §7 — hard guard: no over-production beyond plan.
-    if (wo.quantityProduced + outputQuantity > wo.quantityPlanned) {
+    if (wo.quantityProduced + wo.quantityScrapped + outputQuantity > wo.quantityPlanned) {
       throw new ConflictException(
-        `Cannot output ${outputQuantity} — Work Order "${workOrderId}" has only ${wo.quantityPlanned - wo.quantityProduced} remaining of its ${wo.quantityPlanned}-unit plan.`,
+        `Cannot output ${outputQuantity} — Work Order "${workOrderId}" has only ${wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped} remaining of its ${wo.quantityPlanned}-unit plan.`,
       );
     }
 
     await (manager ?? this.dataSource).transaction(async (txManager) => {
+      const { valueOutput, unitCostOutput } = await this.consumePooledForOutput(
+        txManager,
+        wo,
+        outputQuantity,
+        requestId,
+        'fg_output',
+        'work_order_finished_goods_output',
+        actorUserId,
+        `${wo.warehouseId}:${wo.finishedProductId}`,
+      );
+      await this.inventory.recordMovement(wo.warehouseId, wo.finishedProductId, outputQuantity, 'work_order_finished_goods_output', 'work_order', wo.id, actorUserId, txManager);
+      await this.valuation.recordReceiptCost(
+        wo.finishedProductId,
+        wo.warehouseId,
+        outputQuantity,
+        unitCostOutput.toFixed(4),
+        `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}:receipt`,
+        txManager,
+      );
+
+      const woRepo = txManager.getRepository(WorkOrder);
+      await woRepo.update(wo.id, { quantityProduced: wo.quantityProduced + outputQuantity });
+
+      await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
+        idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}`,
+        workOrderId: wo.id,
+        finishedProductId: wo.finishedProductId,
+        quantity: outputQuantity,
+        unitCostBase: unitCostOutput.toFixed(4),
+        totalValueBase: valueOutput.toFixed(4),
+      });
+
+      await this.audit.record(
+        {
+          actorUserId,
+          organizationId: null,
+          action: 'manufacturing.work_order.finished_goods_received',
+          resource: 'work_order',
+          resourceId: wo.id,
+          result: 'success',
+          correlationId: null,
+          after: { outputQuantity, unitCostOutput: unitCostOutput.toFixed(4), valueOutput: valueOutput.toFixed(4) },
+        },
+        txManager,
+      );
+    });
+    await this.events.dispatchAfterCommit(manager);
+  }
+
+  // ---------------------------------------------------------------------
+  // Manufacturing Engine S1 — production results by outcome class (decisions D-ME-1 / D-ME-4)
+  // ---------------------------------------------------------------------
+
+  async getResults(workOrderId: string, manager?: EntityManager): Promise<WorkOrderResult[]> {
+    return (manager ?? this.dataSource).getRepository(WorkOrderResult).find({ where: { workOrderId }, order: { createdAt: 'ASC' } });
+  }
+
+  /** Quantities still open on the order: tracked units (rework / rejected / held) that have not been resolved yet. */
+  async getOpenTrackedQuantity(workOrderId: string, manager?: EntityManager): Promise<number> {
+    const rows: Array<{ n: string | null }> = await (manager ?? this.dataSource).query(
+      `SELECT COALESCE(SUM("quantity"), 0) AS n FROM "work_order_results" WHERE "workOrderId" = $1 AND "outcomeClass" IN ('rework','rejected','held') AND "resolvedAt" IS NULL`,
+      [workOrderId],
+    );
+    return Number(rows[0].n ?? 0);
+  }
+
+  /**
+   * D-ME-1 — scrap is a result, not a material return. Takes `quantity` finished-unit equivalents out of the Work Order's WIP at the SAME pooled cost a good output would
+   * have carried (so cost is never invented or lost), consumes their components physically, creates no stock, and posts the value to the configured scrap-loss account
+   * (Dr Scrap loss / Cr WIP). The plan is exhausted by produced + scrapped. Idempotent per `requestId`.
+   */
+  async recordScrap(workOrderId: string, quantity: number, reason: string, actorUserId: string | null, requestId: string = randomUUID(), manager?: EntityManager): Promise<WorkOrderResult> {
+    if (!Number.isInteger(quantity) || quantity <= 0) throw new ConflictException('Scrap quantity must be a positive whole number.');
+    const why = (reason ?? '').trim();
+    if (why.length < 3) throw new ConflictException('A reason is required to record scrap.');
+    const initial = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
+    if (state !== 'in_progress') throw new ConflictException(`Work Order "${workOrderId}" cannot record scrap from state "${state}".`);
+    if (!initial.wipWarehouseId) throw new ConflictException(`Work Order "${workOrderId}" has no WIP sub-warehouse.`);
+
+    const result = await (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`manufacturing:work_order:${workOrderId}:results`]);
+      const repo = tx.getRepository(WorkOrderResult);
+      const existing = await repo.findOne({ where: { workOrderId, outcomeClass: 'scrap', requestId } });
+      if (existing) return existing; // a retried request: no second effect
+      const wo = await tx.getRepository(WorkOrder).findOneOrFail({ where: { id: workOrderId } });
+      if (wo.quantityProduced + wo.quantityScrapped + quantity > wo.quantityPlanned) {
+        throw new ConflictException(`Cannot scrap ${quantity} — Work Order "${workOrderId}" has only ${wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped} remaining of its ${wo.quantityPlanned}-unit plan.`);
+      }
+      const { valueOutput } = await this.consumePooledForOutput(tx, wo, quantity, requestId, 'scrap', 'work_order_scrap', actorUserId);
+      await tx.getRepository(WorkOrder).update(wo.id, { quantityScrapped: wo.quantityScrapped + quantity });
+      const saved = await repo.save(
+        repo.create({ workOrderId: wo.id, operationId: null, outcomeClass: 'scrap', productId: wo.finishedProductId, quantity, valueBase: valueOutput.toFixed(4), requestId, reason: why, createdByUserId: actorUserId }),
+      );
+      if (valueOutput > 0) {
+        await this.events.publish(tx, 'manufacturing.work_order.scrap_recognized', {
+          idempotencyKey: `manufacturing:work_order:${wo.id}:scrap:${requestId}`,
+          workOrderId: wo.id,
+          finishedProductId: wo.finishedProductId,
+          quantity,
+          totalValueBase: valueOutput.toFixed(4),
+          reason: why,
+        });
+      }
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'manufacturing.work_order.scrap_recorded', resource: 'work_order', resourceId: wo.id, result: 'success', correlationId: saved.id, after: { quantity, valueBase: valueOutput.toFixed(4), reason: why } },
+        tx,
+      );
+      return saved;
+    });
+    await this.events.dispatchAfterCommit(manager);
+    return result;
+  }
+
+  /**
+   * D-ME-1 — salvage from scrap: the recovered material goes back into the Work Order's warehouse at a DECLARED value that can never exceed what the scrap it came from
+   * wrote off (cumulatively). Dr Inventory / Cr Scrap loss. A recovery is the only legal way for scrapped value to return to stock.
+   */
+  async recordRecovery(
+    workOrderId: string,
+    productId: string,
+    quantity: number,
+    valueBase: string,
+    sourceResultId: string,
+    actorUserId: string | null,
+    requestId: string = randomUUID(),
+    manager?: EntityManager,
+  ): Promise<WorkOrderResult> {
+    if (!Number.isInteger(quantity) || quantity <= 0) throw new ConflictException('Recovered quantity must be a positive whole number.');
+    if (!/^\d+(\.\d{1,4})?$/.test(valueBase) || Number(valueBase) <= 0) throw new ConflictException('The recovery value must be a positive amount (up to 4 decimals).');
+    const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    const state = await this.getWorkOrderState(workOrderId, manager);
+    if (state === 'draft' || state === 'cancelled') throw new ConflictException(`Work Order "${workOrderId}" cannot record a recovery from state "${state}".`);
+
+    const result = await (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`manufacturing:work_order:${workOrderId}:results`]);
+      const repo = tx.getRepository(WorkOrderResult);
+      const existing = await repo.findOne({ where: { workOrderId, outcomeClass: 'recovered', requestId } });
+      if (existing) return existing;
+      const source = await repo.findOne({ where: { id: sourceResultId, workOrderId, outcomeClass: 'scrap' } });
+      if (!source) throw new ConflictException(`Scrap result "${sourceResultId}" was not found on Work Order "${workOrderId}".`);
+      const prior: Array<{ n: string | null }> = await tx.query(
+        `SELECT COALESCE(SUM("valueBase"), 0) AS n FROM "work_order_results" WHERE "sourceResultId" = $1 AND "outcomeClass" = 'recovered'`,
+        [source.id],
+      );
+      // unit cost is stored at 4 decimals, so the journal and the valuation row both use qty × unit (never the raw declared figure)
+      const unit = (Number(valueBase) / quantity).toFixed(4);
+      const total = (Number(unit) * quantity).toFixed(4);
+      if (Number(prior[0].n ?? 0) + Number(total) > Number(source.valueBase) + 0.00005) {
+        throw new ConflictException(`Recovery value ${total} would exceed what the scrap wrote off (${source.valueBase}; already recovered ${Number(prior[0].n ?? 0).toFixed(4)}).`);
+      }
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${wo.warehouseId}:${productId}`]);
+      await this.inventory.recordMovement(wo.warehouseId, productId, quantity, 'work_order_recovery', 'work_order', wo.id, actorUserId, tx);
+      await this.valuation.recordReceiptCost(productId, wo.warehouseId, quantity, unit, `manufacturing:work_order:${wo.id}:recovery:${requestId}:receipt`, tx);
+      const saved = await repo.save(
+        repo.create({ workOrderId: wo.id, operationId: null, outcomeClass: 'recovered', productId, quantity, valueBase: total, requestId, reason: null, sourceResultId: source.id, createdByUserId: actorUserId }),
+      );
+      await this.events.publish(tx, 'manufacturing.work_order.recovery_received', {
+        idempotencyKey: `manufacturing:work_order:${wo.id}:recovery:${requestId}`,
+        workOrderId: wo.id,
+        productId,
+        quantity,
+        unitCostBase: unit,
+        totalValueBase: total,
+      });
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'manufacturing.work_order.recovery_recorded', resource: 'work_order', resourceId: wo.id, result: 'success', correlationId: saved.id, after: { productId, quantity, valueBase: total, sourceResultId } },
+        tx,
+      );
+      return saved;
+    });
+    await this.events.dispatchAfterCommit(manager);
+    return result;
+  }
+
+  /** rework / rejected / held — quantity-only tracking (no stock, no value). They must be resolved before the order can close. */
+  async recordTrackedOutcome(
+    workOrderId: string,
+    outcomeClass: 'rework' | 'rejected' | 'held',
+    quantity: number,
+    reason: string,
+    actorUserId: string | null,
+    requestId: string = randomUUID(),
+    manager?: EntityManager,
+  ): Promise<WorkOrderResult> {
+    if (!Number.isInteger(quantity) || quantity <= 0) throw new ConflictException('Quantity must be a positive whole number.');
+    const why = (reason ?? '').trim();
+    if (why.length < 3) throw new ConflictException('A reason is required.');
+    const state = await this.getWorkOrderState(workOrderId, manager);
+    if (state !== 'in_progress' && state !== 'on_hold') throw new ConflictException(`Work Order "${workOrderId}" cannot record a "${outcomeClass}" result from state "${state}".`);
+    return (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`manufacturing:work_order:${workOrderId}:results`]);
+      const repo = tx.getRepository(WorkOrderResult);
+      const existing = await repo.findOne({ where: { workOrderId, outcomeClass, requestId } });
+      if (existing) return existing;
+      const wo = await tx.getRepository(WorkOrder).findOneOrFail({ where: { id: workOrderId } });
+      const open = await this.getOpenTrackedQuantity(workOrderId, tx);
+      if (open + quantity > wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped) {
+        throw new ConflictException(`Cannot track ${quantity} as "${outcomeClass}" — it would exceed the quantity still to be produced (${wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped}, of which ${open} is already tracked).`);
+      }
+      const saved = await repo.save(repo.create({ workOrderId, operationId: null, outcomeClass, productId: wo.finishedProductId, quantity, valueBase: '0', requestId, reason: why, createdByUserId: actorUserId }));
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: `manufacturing.work_order.${outcomeClass}_recorded`, resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: saved.id, after: { quantity, reason: why } },
+        tx,
+      );
+      return saved;
+    });
+  }
+
+  /** Closes a tracked row with its disposition. The disposition itself is then carried out with the normal output / scrap actions; this only lifts the closing block. */
+  async resolveTrackedOutcome(workOrderId: string, resultId: string, resolution: 'good' | 'scrap' | 'rework', actorUserId: string | null, manager?: EntityManager): Promise<WorkOrderResult> {
+    return (manager ?? this.dataSource).transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`manufacturing:work_order:${workOrderId}:results`]);
+      const repo = tx.getRepository(WorkOrderResult);
+      const row = await repo.findOne({ where: { id: resultId, workOrderId } });
+      if (!row || !['rework', 'rejected', 'held'].includes(row.outcomeClass)) throw new NotFoundException(`Tracked result "${resultId}" not found on Work Order "${workOrderId}".`);
+      if (row.resolvedAt) throw new ConflictException(`Result "${resultId}" is already resolved (${row.resolution}).`);
+      row.resolvedAt = new Date();
+      row.resolution = resolution;
+      row.resolvedByUserId = actorUserId;
+      const saved = await repo.save(row);
+      await this.audit.record(
+        { actorUserId, organizationId: null, action: 'manufacturing.work_order.outcome_resolved', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: saved.id, after: { resolution, quantity: row.quantity } },
+        tx,
+      );
+      return saved;
+    });
+  }
+
+  /**
+   * ADR-061 §7's Work-Order-pooled consumption, shared by every result that takes finished-unit equivalents out of the Work Order's WIP (a good output and, since S1, a
+   * scrap): physical availability guard for every component first, pooled value `WIP ÷ remaining plan × quantity` (the last unit takes the whole remaining WIP),
+   * pro-rata attribution across components, WIP movements. Returns the value and unit cost; the CALLER decides where that value goes (finished stock or loss).
+   */
+  private async consumePooledForOutput(
+    txManager: EntityManager,
+    wo: WorkOrder,
+    outputQuantity: number,
+    requestId: string,
+    keyTag: string,
+    movementType: 'work_order_finished_goods_output' | 'work_order_scrap',
+    actorUserId: string | null,
+    extraLockKey?: string,
+  ): Promise<{ valueOutput: number; unitCostOutput: number }> {
       const componentRepo = txManager.getRepository(WorkOrderComponent);
       const components = await componentRepo.find({ where: { workOrderId: wo.id } });
-      if (components.length === 0) throw new ConflictException(`Work Order "${workOrderId}" has no components — cannot produce.`);
+      if (components.length === 0) throw new ConflictException(`Work Order "${wo.id}" has no components — cannot produce.`);
 
       const lockKeys = new Set<string>();
       for (const c of components) lockKeys.add(`${wo.wipWarehouseId}:${c.componentProductId}`);
-      lockKeys.add(`${wo.warehouseId}:${wo.finishedProductId}`);
+      if (extraLockKey) lockKeys.add(extraLockKey);
       for (const key of Array.from(lockKeys).sort()) await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
 
       // ADR-061 §6/§7 — WIP(WO).value_before, read as F08's own authoritative `totalValueBase` for
@@ -618,7 +864,7 @@ export class WorkOrderService {
       // identical, but avoids a floating-point round-trip that could otherwise make the applied
       // total a fraction of a cent larger than what F08 actually holds, tripping the
       // `value_exceeds_on_hand` guard on the exact case that most needs to land at precisely zero.
-      const remainingPlannedQtyBefore = wo.quantityPlanned - wo.quantityProduced;
+      const remainingPlannedQtyBefore = wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped;
       const isFinalOutputOfRemainingPlan = outputQuantity === remainingPlannedQtyBefore;
       const valueOutput = isFinalOutputOfRemainingPlan ? wipValueBefore : (wipValueBefore / remainingPlannedQtyBefore) * outputQuantity;
       // Recomputed from the FINAL valueOutput (not the other way around) so the per-unit rate fed
@@ -653,7 +899,7 @@ export class WorkOrderService {
           wo.wipWarehouseId!,
           p.qtyConsumed,
           appliedValueBase,
-          `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}:${p.componentProductId}`,
+          `manufacturing:work_order:${wo.id}:${keyTag}:${outputEventId}:${p.componentProductId}`,
           txManager,
         );
         if (!consumeResult || 'rejected' in consumeResult) {
@@ -663,7 +909,7 @@ export class WorkOrderService {
           wo.wipWarehouseId!,
           p.componentProductId,
           -p.qtyConsumed,
-          'work_order_finished_goods_output',
+          movementType,
           'work_order',
           wo.id,
           actorUserId,
@@ -671,44 +917,8 @@ export class WorkOrderService {
         );
       }
 
-      await this.inventory.recordMovement(wo.warehouseId, wo.finishedProductId, outputQuantity, 'work_order_finished_goods_output', 'work_order', wo.id, actorUserId, txManager);
-      await this.valuation.recordReceiptCost(
-        wo.finishedProductId,
-        wo.warehouseId,
-        outputQuantity,
-        unitCostOutput.toFixed(4),
-        `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}:receipt`,
-        txManager,
-      );
 
-      const woRepo = txManager.getRepository(WorkOrder);
-      await woRepo.update(wo.id, { quantityProduced: wo.quantityProduced + outputQuantity });
-
-      await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
-        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the WIP / inventory entry to the work order's branch (null = company level, as before)
-        idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}`,
-        workOrderId: wo.id,
-        finishedProductId: wo.finishedProductId,
-        quantity: outputQuantity,
-        unitCostBase: unitCostOutput.toFixed(4),
-        totalValueBase: valueOutput.toFixed(4),
-      });
-
-      await this.audit.record(
-        {
-          actorUserId,
-          organizationId: null,
-          action: 'manufacturing.work_order.finished_goods_received',
-          resource: 'work_order',
-          resourceId: wo.id,
-          result: 'success',
-          correlationId: null,
-          after: { outputQuantity, unitCostOutput: unitCostOutput.toFixed(4), valueOutput: valueOutput.toFixed(4) },
-        },
-        txManager,
-      );
-    });
-    await this.events.dispatchAfterCommit(manager);
+      return { valueOutput, unitCostOutput };
   }
 
   /**
@@ -822,6 +1032,12 @@ export class WorkOrderService {
       throw new ConflictException(
         `Cannot complete Work Order "${workOrderId}" — its WIP balance is ${wipValue.toFixed(4)}, not zero. Material-Return any remaining unconsumed component value first.`,
       );
+    }
+
+    // S1 (D-ME-4): rework / rejected / held units are open decisions — each must be resolved before the order closes.
+    const openTracked = await this.getOpenTrackedQuantity(workOrderId, manager);
+    if (openTracked > 0) {
+      throw new ConflictException(`Cannot complete Work Order "${workOrderId}" — ${openTracked} unit(s) are still tracked as rework / rejected / held. Resolve them first.`);
     }
 
     // ADR-061 Addendum 1 (A1) — opt-in by data: a Work Order that snapshotted a routing may complete only

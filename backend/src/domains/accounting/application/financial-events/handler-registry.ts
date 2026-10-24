@@ -131,6 +131,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   'manufacturing.work_order.material_issued',
   'manufacturing.work_order.material_returned',
   'manufacturing.work_order.finished_goods_received',
+  'manufacturing.work_order.scrap_recognized',
+  'manufacturing.work_order.recovery_received',
   'treasury.cash.recorded',
   'treasury.transfer.completed',
   // F07 (ADR-040) — real handler, fail-closed (`no_valuation_source`) until F08

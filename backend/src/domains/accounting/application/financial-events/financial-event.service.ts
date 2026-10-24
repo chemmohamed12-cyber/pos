@@ -66,6 +66,8 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   'manufacturing.work_order.material_issued': 'manufacturing',
   'manufacturing.work_order.material_returned': 'manufacturing',
   'manufacturing.work_order.finished_goods_received': 'manufacturing',
+  'manufacturing.work_order.scrap_recognized': 'manufacturing',
+  'manufacturing.work_order.recovery_received': 'manufacturing',
   'customer.refund.adjusted': 'deposit-control',
   // F04 — internal (F04 both emits and consumes; not an outbox subscription)
   'accounting.ar.adjustment.approved': 'accounting',

@@ -5,7 +5,7 @@ import { handleSupplierInvoicePosted, handleSupplierInvoiceVoided, handleSupplie
 import { handlePurchaseReturnPosted, handleSupplierCreditNoteReturnSettled } from './purchase-return.handler';
 import { handleSupplierCreditNoteTax } from './supplier-credit-note-tax.handler';
 import { handleGoodsReceiptPosted } from './goods-receipt.handler';
-import { handleWorkOrderMaterialIssued, handleWorkOrderMaterialReturned, handleWorkOrderFinishedGoodsReceived } from './manufacturing-events.handler';
+import { handleWorkOrderMaterialIssued, handleWorkOrderMaterialReturned, handleWorkOrderFinishedGoodsReceived, handleWorkOrderScrapRecognized, handleWorkOrderRecoveryReceived } from './manufacturing-events.handler';
 import { handlePayrollRunPosted } from './payroll-run-posted.handler';
 
 /**
@@ -397,6 +397,8 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   'manufacturing.work_order.material_issued': handleWorkOrderMaterialIssued,
   'manufacturing.work_order.material_returned': handleWorkOrderMaterialReturned,
   'manufacturing.work_order.finished_goods_received': handleWorkOrderFinishedGoodsReceived,
+  'manufacturing.work_order.scrap_recognized': handleWorkOrderScrapRecognized,
+  'manufacturing.work_order.recovery_received': handleWorkOrderRecoveryReceived,
   'treasury.cash.recorded': handleCashRecorded,
   'treasury.transfer.completed': handleTransferCompleted,
   // ADR-070 — Payroll's own GL entry point, the only one the Payroll/Commission/Attendance chain

@@ -25,6 +25,10 @@ export class WorkOrder {
   @Column({ type: 'int', default: 0 })
   quantityProduced!: number;
 
+  /** Manufacturing Engine S1 — finished-unit equivalents written off as scrap (decision D-ME-1); the plan is exhausted by produced + scrapped. */
+  @Column({ type: 'int', default: 0 })
+  quantityScrapped!: number;
+
   /** The real (non-WIP) execution warehouse (§3). */
   @Index()
   @Column('uuid')
