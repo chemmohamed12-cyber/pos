@@ -896,7 +896,7 @@ export class PayrollService implements OnModuleInit {
       const fresh = await tx.getRepository(PayrollRun).findOneOrFail({ where: { id: run.id } });
       if (fresh.status !== 'reviewed' || fresh.approvalRequestId !== approvalRequestId) return;
       const [decision]: Array<{ approverUserId: string; note: string | null }> = await tx.query(
-        `SELECT "approverUserId", note FROM approval_decisions WHERE "approvalRequestId" = $1 AND decision = 'rejected' ORDER BY "createdAt" DESC LIMIT 1`,
+        `SELECT "approverUserId", note FROM approval_decisions WHERE "approvalRequestId" = $1 AND decision = 'rejected' ORDER BY "decidedAt" DESC LIMIT 1`,
         [approvalRequestId],
       );
       await this.processEngine.transition(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, run.id, 'reject', SYSTEM_ACTOR_ID, tx);
