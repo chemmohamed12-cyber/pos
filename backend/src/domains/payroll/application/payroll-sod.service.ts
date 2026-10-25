@@ -1,17 +1,13 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PayrollRunStageActor, PayrollStage } from '../infrastructure/payroll-run-stage-actor.entity';
 import { PayrollSetting } from '../infrastructure/payroll-setting.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
-import { DaiiException } from '../../../foundation/error-contract/daii-exception';
 
-/** 403 that keeps its own `code` through the error envelope (the screen localizes it) and the structured body the specs and API clients read. */
-export class SodViolationException extends DaiiException {
+/** A 403 (still a `ForbiddenException`) that keeps its own `code` through the error envelope (`localizable`, honoured by the exception filter) so the screen can localize it. */
+export class SodViolationException extends ForbiddenException {
   constructor(message: string, readonly stage: PayrollStage, readonly conflictsWith: PayrollStage) {
-    super('SOD_VIOLATION', message, HttpStatus.FORBIDDEN, { stage, conflictsWith });
-  }
-  getResponse(): object {
-    return { statusCode: 403, code: 'SOD_VIOLATION', message: this.message, stage: this.stage, conflictsWith: this.conflictsWith };
+    super({ statusCode: 403, code: 'SOD_VIOLATION', message, stage, conflictsWith, localizable: true, params: { stage, conflictsWith } });
   }
 }
 
