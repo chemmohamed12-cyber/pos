@@ -25,6 +25,7 @@ Method: real UI in the built-in browser unless marked **API**. Independent DB ch
 | 17 | Close period (UI) | PASS | «مغلقة»; calculating on a closed period → 409 |
 | 18 | English / LTR on run detail, compensation, periods, runs, commission policies | PASS | no Arabic leakage, no raw codes |
 | 19 | Commission policy form | PASS | `net_sales` / `customer_group` not offered, notice shown |
+| 21 | SoD profile settings screen: strict → persisted → standard | PASS | new screen, `payroll.settings.manage` |
 | 20 | Narrow viewport | PARTIAL | payroll content does not overflow; the app shell keeps a fixed 240px sidebar so `<main>` is ~135px wide at phone width (global, pre-existing) |
 
 Independent DB reconciliation after the journeys:

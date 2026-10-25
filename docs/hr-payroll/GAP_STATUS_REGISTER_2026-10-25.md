@@ -45,7 +45,8 @@ Evidence keys. **S1** `payroll-gap-closure.company-isolation.spec` (10/10) · **
 | R-SEC-01 | Company isolation of every new table/route | mandate §11 | specs | yes | yes | S1, S3, S4 (A/B leak checks), RG1 | Mandate | no |
 | R-SEC-02 | Manifest nodes = routes; unused removed | A-10 | `payroll.manifest.ts`, `payroll.module.ts` | yes | yes | **no static test** | Mandate | no |
 | R-UI | Screens in AR/EN, RTL/LTR, responsive | mandate §10 | `pages/payroll/*`, `CommissionPolicies.tsx`, terminology seed | yes | yes (commits `da962a5`, `4ec632b`) | BR 1–19 desktop AR + EN; tsc -b + oxlint clean | Mandate | mobile: shell limitation (global) |
-| R-UI/gap | Commission adjustment screen, strict-profile switch, failed-payout re-issue in browser, HR picker | — | — | yes | partly | **NOT VERIFIED in browser** | — | no |
+| R-PAY-05/UI | SoD profile settings screen (`/payroll/settings`) | A-6 | `PayrollSettings.tsx`, cover shortcut | yes | yes (this commit) | BR: standard→strict→standard persisted, localized | Mandate | no |
+| R-UI/gap | Commission adjustment screen, failed-payout re-issue in browser, HR picker | — | — | yes | partly | **NOT VERIFIED in browser** | — | no |
 | R-FIN | Numerical acceptance (mandate §8) | mandate §8 | S1–S3 | yes | yes | S1–S3 + DB ledger/treasury check after browser run | Mandate | no |
 
 Proration (R-PAY-08): the supplementary run in the browser paid the **whole-period** difference (+1,000.00) for a rise effective on 15 October. Proration by days is a payroll rule that no ADR defines; it is left as an owner decision and the current behaviour is documented, not assumed correct.

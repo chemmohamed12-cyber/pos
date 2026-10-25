@@ -63,6 +63,7 @@ import { PayrollPeriods } from './pages/payroll/PayrollPeriods';
 import { PayrollCompensation } from './pages/payroll/PayrollCompensation';
 import { PayrollRuns } from './pages/payroll/PayrollRuns';
 import { PayrollRunDetail } from './pages/payroll/PayrollRunDetail';
+import { PayrollSettings } from './pages/payroll/PayrollSettings';
 import { PayrollCover } from './pages/covers/PayrollCover';
 import { Targets } from './pages/targets/Targets';
 import { TargetsCover } from './pages/covers/TargetsCover';
@@ -303,6 +304,7 @@ function AppRoutes() {
         <Route path="payroll/compensation" element={<PayrollCompensation />} />
         <Route path="payroll/runs" element={<PayrollRuns />} />
         <Route path="payroll/runs/:id" element={<PayrollRunDetail />} />
+        <Route path="payroll/settings" element={<PayrollSettings />} />
         <Route path="targets" element={<TargetsCover />} />
         <Route path="targets/targets" element={<Targets />} />
         <Route path="commission" element={<CommissionCover />} />

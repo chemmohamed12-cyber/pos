@@ -39,6 +39,7 @@ export function PayrollCover() {
         { to: '/payroll/periods', labelCode: 'nav.payroll_periods' },
         { to: '/payroll/compensation', labelCode: 'nav.payroll_compensation' },
         { to: '/payroll/runs', labelCode: 'nav.payroll_runs' },
+        ...(can('payroll.settings.view') ? [{ to: '/payroll/settings', labelCode: 'nav.payroll_settings' }] : []),
       ]}
       kpis={
         kpis
