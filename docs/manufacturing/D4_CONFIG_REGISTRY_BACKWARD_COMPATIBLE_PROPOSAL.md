@@ -14,6 +14,32 @@ Consequence on a database shared by backends of different versions: a build that
 
 Why it is dangerous beyond manufacturing: **any** configuration value of **any** team whose key is newer than the oldest backend that touches the shared database can be silently archived.
 
+### Evidence re-verified on 2026-10-25 (read-only query of `audit_records`, action `configuration.registry.synced`, 148 rows since 2026-10-04)
+Every sync with `removed > 0` is a **64-key build booting after a 68/69/71-key build**, and it is always followed within minutes-to-hours by a larger build re-adding the same keys:
+
+| removal (UTC) | `total` after | keys removed |
+|---|---|---|
+| 2026-10-21 07:16 | 64 | 4 purchase-cost keys |
+| 2026-10-21 16:10 | 64 | those 4 + `accounting.treasury_receipt_reason_accounts` + 2 more treasury keys (7) |
+| 2026-10-24 18:57 | 64 | 4 purchase-cost keys |
+| 2026-10-24 20:37 | 64 | 4 purchase-cost keys + **`accounting.manufacturing_scrap_loss_account_code`** |
+| 2026-10-24 22:53 | 64 | the same 5 |
+| 2026-10-25 10:27 | 64 | the same 5 (a 64-key build was running on the shared database this morning) |
+
+Two archived `config_values` rows for the scrap-loss key exist today (set 2026-10-24 21:16Z and 23:55Z by the shared demo admin account); both are archived and **were not restored**. Since 2026-10-25 10:52Z (this build) no sync has removed anything. Other teams' keys (purchase cost, treasury reasons) were removed by the same mechanism — the defect is not specific to manufacturing.
+
+## 1b. Related finding — nine keys reported as `changed` at EVERY boot (investigated 2026-10-25, read-only)
+
+Every backend boot writes a `configuration.registry.synced` audit row with `changed: 9` even when nothing changed (`added: 0`, `removed: 0`, `total: 69`). Cause, reproduced with the compiled seeder's own `composeSources()/toRow()/rowEquals()` against the live `config_keys` rows:
+
+* `rowEquals` compares `allowed` with `JSON.stringify(a.allowed) === JSON.stringify(b.allowed)`. PostgreSQL `jsonb` returns object keys in its own normalised order (`{"max":60,"min":3}`), while the code declares them as `{ min, max }`. The two strings never match for the **nine keys that declare a `{min,max}` range**: `core.security.rate_limit.auth_per_minute`, `core.security.session_idle_minutes`, `core.config.cache_reload_seconds`, `core.approval.request_ttl_hours`, `core.approval.expire_sweep_interval_min`, `accounting.allow_backdated_manual_journal_days`, `inventory.reservation_hold_minutes`, `logistics.remittance_grace_days`, `logistics.sales_return_eligibility_window_days`.
+* It is **not** caused by two backends running concurrently: the entries line up with every restart of one backend, and `total` has been 69 with `removed: []` since this build started (the earlier 64 → 69 step, `added: 5`, is the older build being replaced by this one).
+* (`core.config.org_scope_enabled`'s `flagRemoveBy` also differs when read with a raw driver; through the ORM both sides are the same `date` string, so it is not among the nine in the audit rows.)
+
+**Effect:** each boot rewrites nine `config_keys` rows with identical meaning and appends one audit row (hash-chain growth + noise). **No configuration value is touched** (only `config_keys` rows are updated, never `config_values`). **Risk:** the constant noise makes a *real* registry change harder to spot in the audit trail — the same row would also carry a genuine `removed` list, which is the T-M-01 signal.
+
+**Not changed here.** Proposed (for the independent D4 package): compare `allowed` with an order-insensitive canonical form, add a test that two consecutive boots of the same build write no audit row (already in §4, test 2).
+
 ## 2. Operational safeguard (in force now, no code)
 
 * Only one backend version (a build whose registry is a superset of every key in use) may run against a shared database. Never run an older and a newer build concurrently or alternately on the same database.
