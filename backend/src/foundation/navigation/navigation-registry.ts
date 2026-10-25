@@ -50,6 +50,8 @@ export interface NavItem {
   permissionNode?: string;
   /** Legacy per-item role gate — the ACTUAL enforcement mechanism every linked route still uses today (P4 Tranche-2 has not guard-swapped these domains). */
   roles?: string[];
+  /** UX redesign (D5, additive): terminology code of a sub-heading the sidebar shows above this item inside its group. Presentation only - it gates nothing. */
+  section?: string;
   /** F5 — a WORKFLOW RULE (capability, `authorization/workflow-rules.ts`) that replaces `roles` for the migrated items; decided under the active `AUTHZ_WORKFLOW_MODE`. The platform tools (`/admin`, `/integrations`, `/release-center`) keep `roles: ['admin']` — see the F5 report (AZ-01 residual). */
   workflowRule?: string;
 }
@@ -437,12 +439,13 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
     code: 'nav_group.manufacturing',
     coverTo: '/manufacturing',
     items: [
-      { to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', module: 'manufacturing', feature: 'manufacturing.work_orders', permissionNode: 'manufacturing.work_order' },
-      { to: '/manufacturing/boms', code: 'nav.manufacturing_boms', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
-      { to: '/manufacturing/routings', code: 'nav.manufacturing_routings', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
-      { to: '/manufacturing/processes', code: 'nav.manufacturing_processes', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
-      { to: '/manufacturing/work-centers', code: 'nav.manufacturing_work_centers', module: 'manufacturing', permissionNode: 'manufacturing.work_center' },
-      { to: '/manufacturing/assembly', code: 'nav.manufacturing_assembly', module: 'manufacturing', permissionNode: 'inventory.assembly' },
+      // UX redesign (stage 2): the same routes and gates, grouped by what the user is doing - run production / prepare it. Legacy routings and work centers stay reachable, labelled as the basic path.
+      { to: '/manufacturing/assembly', code: 'nav.manufacturing_quick_assembly', section: 'nav_section.mfg_execution', module: 'manufacturing', permissionNode: 'inventory.assembly' },
+      { to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', section: 'nav_section.mfg_execution', module: 'manufacturing', feature: 'manufacturing.work_orders', permissionNode: 'manufacturing.work_order' },
+      { to: '/manufacturing/boms', code: 'nav.manufacturing_boms', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
+      { to: '/manufacturing/processes', code: 'nav.manufacturing_processes', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
+      { to: '/manufacturing/routings', code: 'nav.manufacturing_routings_basic', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
+      { to: '/manufacturing/work-centers', code: 'nav.manufacturing_work_centers', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.work_center' },
     ],
   },
   {

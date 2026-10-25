@@ -38,6 +38,8 @@ import { CommerceModule } from '../commerce/commerce.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { InventoryValuationModule } from '../inventory-valuation/inventory-valuation.module';
 import { CompanyModule } from '../../foundation/company/company.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
+import { ErrorContractModule } from '../../foundation/error-contract/error-contract.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 
 /**
@@ -52,6 +54,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
   imports: [
     TypeOrmModule.forFeature([WorkOrder, WorkOrderComponent, WorkCenter, Routing, RoutingOperation, WorkOrderOperation, WorkOrderResult, ProductUnitConversion, OperationType, ProcessVersion, ProcessOperation, ProcessEdge, ProcessInput, ProcessOutput, OperationRun, OperationFlow]),
     AuditModule,
+    ScopeModule, // UX stage 2 - AccessScopeService + WarehouseScopeGuard for the quick-assembly routes
+    ErrorContractModule, // IdempotencyService for the quick-assembly confirm
     AuthenticationModule,
     AuthorizationModule,
     PermissionModule,

@@ -24,6 +24,8 @@ import { WorkOrderController } from './work-order.controller';
 import { ManufacturingBomController } from './manufacturing-bom.controller';
 import { RoutingController } from './routing.controller';
 import { WorkCenterController } from './work-center.controller';
+import { QuickAssemblyController } from './quick-assembly.controller';
+import { WAREHOUSE_SCOPE_KEY } from '../../../foundation/scope/warehouse-scope.decorator';
 
 /**
  * ADR-061 Addendum 1 (M6/M7, 2026-10-06) — Manufacturing uses the platform's ONE entitlement and permission
@@ -74,6 +76,28 @@ describe('Manufacturing — static route coverage (no unguarded or unregistered 
 
   it('declares no costing/payroll/overhead surface (ADR-060 D2/D3)', () => {
     for (const n of MANIFEST_NODES) expect(n).not.toMatch(/labor|labour|overhead|standard_cost|variance|payroll/);
+  });
+});
+
+describe('Manufacturing — Quick Assembly routes (UX stage 2, D8): same permission as the assembly, warehouse-scoped, idempotent confirm', () => {
+  const routes = [
+    ['preview', 0],
+    ['assemble', 1],
+  ] as const;
+
+  it('the class is behind JWT + company + module(manufacturing) + warehouse scope guards', () => {
+    expect(Reflect.getMetadata(REQUIRE_MODULE_METADATA_KEY, QuickAssemblyController)).toBe('manufacturing');
+    const guards = ((Reflect.getMetadata('__guards__', QuickAssemblyController) ?? []) as Array<{ name: string }>).map((g) => g.name);
+    expect(guards).toEqual(expect.arrayContaining(['JwtAuthGuard', 'CompanyContextGuard', 'RequireModuleGuard', 'WarehouseScopeGuard']));
+  });
+
+  it.each(routes)('%s needs inventory.assembly.create (editable) - never inventory stock visibility - behind PermissionGuard and a warehouse scope source', (name, verb) => {
+    const handler = QuickAssemblyController.prototype[name];
+    expect(Reflect.getMetadata('method', handler)).toBe(verb);
+    expect(Reflect.getMetadata(PERMISSION_METADATA_KEY, handler)).toMatchObject({ nodeKey: 'inventory.assembly.create', access: 'editable' });
+    expect(((Reflect.getMetadata('__guards__', handler) ?? []) as Array<{ name: string }>).map((g) => g.name)).toContain('PermissionGuard');
+    const sources = Reflect.getMetadata(WAREHOUSE_SCOPE_KEY, handler) as Array<{ query?: string; body?: string }>;
+    expect(sources).toEqual([verb === 0 ? { query: 'warehouseId' } : { body: 'warehouseId' }]);
   });
 });
 

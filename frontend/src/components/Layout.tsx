@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -12,6 +12,8 @@ import { loadingLabel, roleLabel } from '../lib/displayNames';
 interface NavItem {
   to: string;
   code: string;
+  /** Optional sub-heading (terminology code) shown above the first item of each run of items sharing it - presentation only. */
+  section?: string;
 }
 interface NavGroup {
   code: string; // section header terminology code, or '' for the standalone top-level item
@@ -167,10 +169,13 @@ export function Layout() {
                 </div>
                 {openGroup === group.code && (
                   <div className="nav-section-items">
-                    {group.items.map((item) => (
-                      <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-                        {t(item.code)}
-                      </NavLink>
+                    {group.items.map((item, idx) => (
+                      <Fragment key={item.to}>
+                        {item.section && item.section !== group.items[idx - 1]?.section && <div className="nav-subsection">{t(item.section)}</div>}
+                        <NavLink to={item.to} className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                          {t(item.code)}
+                        </NavLink>
+                      </Fragment>
                     ))}
                   </div>
                 )}
