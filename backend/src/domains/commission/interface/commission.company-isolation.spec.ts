@@ -77,7 +77,7 @@ describe('CommissionService Area 21 retrofit — real-Postgres Company isolation
     const mB = await mgr(h.companyBId);
     empA = (await hr.createEmployee({ fullName: 'Comm Emp A' }, makerA, mA)).id;
     const empB = (await hr.createEmployee({ fullName: 'Comm Emp B' }, makerA, mB)).id;
-    const input = { scope: 'sales_rep' as const, scopeRefId: empA, basis: 'net_sales' as const, rateModel: 'flat' as const, flatRate: '0.05' };
+    const input = { scope: 'sales_rep' as const, scopeRefId: empA, basis: 'gross_sales' as const, rateModel: 'flat' as const, flatRate: '0.05' };
     await expect(commission.createPolicy(input, makerA, mB)).rejects.toBeInstanceOf(NotFoundException);
     await commission.createPolicy(input, makerA, mA);
     await commission.createPolicy({ ...input, scopeRefId: empB, flatRate: '0.09' }, makerA, mB);
@@ -92,7 +92,7 @@ describe('CommissionService Area 21 retrofit — real-Postgres Company isolation
     resultA = (
       await mA.query(
         `INSERT INTO commission_results ("employeeId","customerId","sourceTransactionRefs","resolvedPolicyId","policyScope","calculationBasis","rate","calculationInputs","calculatedAmount","calculationTimestamp","triggerEventKey")
-         VALUES ($1, gen_random_uuid(), '{}', $2, 'sales_rep', 'net_sales', 0.05, '{}', 50, '2026-09-10T10:00:00Z', 'invoice:iso-1') RETURNING id`,
+         VALUES ($1, gen_random_uuid(), '{}', $2, 'sales_rep', 'gross_sales', 0.05, '{}', 50, '2026-09-10T10:00:00Z', 'invoice:iso-1') RETURNING id`,
         [empA, policy.id],
       )
     )[0].id;

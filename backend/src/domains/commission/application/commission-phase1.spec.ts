@@ -178,7 +178,7 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
       {
         scope: 'sales_rep',
         scopeRefId: rep.employeeId,
-        basis: 'net_sales',
+        basis: 'gross_sales', // net_sales is disabled (ADR-071 Addendum A-11)
         rateModel: 'target_tiered',
         tiers: [
           { tierOrder: 1, fromPercent: '0', toPercent: '100', rate: '0.02' },
@@ -191,10 +191,10 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
     // netAmount 15000 against a 10000 target = 150% achievement:
     // band 1 (0-100%) = 15000 * 1.00 * 0.02 = 300.00
     // band 2 (100-150%) = 15000 * 0.50 * 0.05 = 375.00 => 675.00 total
-    await publishInvoicePosted(customerId, '15000.00', '15500.00');
+    await publishInvoicePosted(customerId, '15500.00', '15000.00'); // (net, gross) — the policy basis is gross_sales = 15000
 
     const [result] = await commission.listResults(rep.employeeId);
-    expect(result.calculationBasis).toBe('net_sales');
+    expect(result.calculationBasis).toBe('gross_sales');
     expect(result.targetPeriodId).toBe(target.id);
     expect(Number(result.calculatedAmount)).toBeCloseTo(675, 2);
     const applicableTier = result.applicableTier as { achievementPercent: number; appliedTiers: unknown[] };
@@ -241,7 +241,8 @@ describe('CommissionService & TargetService (ADR-071, Commission & Target Phase 
 
     // A customer_group-scoped policy exists in the table, at a deliberately distinct rate — proves
     // it is never even queried, not merely "queried and lost."
-    await commission.createPolicy({ scope: 'customer_group', scopeRefId: randomUUID(), basis: 'gross_sales', rateModel: 'flat', flatRate: '0.99' }, ADMIN_A);
+    // customer_group is disabled (ADR-071 Addendum A-11): creation is refused, so resolution can only fall through to the Sales Rep
+    await expect(commission.createPolicy({ scope: 'customer_group', scopeRefId: randomUUID(), basis: 'gross_sales', rateModel: 'flat', flatRate: '0.99' }, ADMIN_A)).rejects.toThrow(/customer_group.*disabled/i);
     await commission.createPolicy({ scope: 'sales_rep', scopeRefId: rep.employeeId, basis: 'gross_sales', rateModel: 'flat', flatRate: '0.03' }, ADMIN_A);
 
     await publishInvoicePosted(customerId, '1000.00', '1000.00');
