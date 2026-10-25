@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780" direction="rtl" font-family="Segoe UI, Tahoma, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#475569"/></marker></defs>
+<rect width="1400" height="780" fill="#ffffff"/>
+<text x="700.0" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">WF1 — نظرة عامة على التصنيع (Manufacturing Overview)</text>
+<rect x="30" y="60" width="1340" height="60" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1.4"/>
+<text x="1350" y="98" text-anchor="start" font-size="20" fill="#0f172a" font-weight="700">التصنيع  ›  نظرة عامة</text>
+<text x="1350" y="150" text-anchor="start" font-size="14" fill="#475569" font-weight="400">اختر المسار المناسب لعملك — لا تحتاج لفهم الرسم البياني لتجميع منتج بسيط</text>
+<rect x="720" y="170" width="650" height="200" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1350" y="205" text-anchor="start" font-size="22" fill="#1d4ed8" font-weight="700">التجميع السريع</text>
+<text x="1350" y="235" text-anchor="start" font-size="14" fill="#334155" font-weight="400">منتج + كمية + تأكيد. يعتمد على قائمة مواد (BOM) نشطة.</text>
+<text x="1350" y="258" text-anchor="start" font-size="13" fill="#64748b" font-weight="400">مناسب: تجميع بسيط، تعبئة، خطوة واحدة.</text>
+<text x="1350" y="281" text-anchor="start" font-size="13" fill="#64748b" font-weight="400">ينشئ أمر تصنيع حقيقيًا بأثر مخزني ومحاسبي كامل.</text>
+<rect x="1130" y="318" width="220" height="36" rx="7" fill="#2563eb" stroke="#2563eb" stroke-width="1.4"/>
+<text x="1240.0" y="341.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">ابدأ تجميعًا</text>
+<rect x="900" y="318" width="210" height="36" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+<text x="1005.0" y="341.0" text-anchor="middle" font-size="14" fill="#0f172a" font-weight="700">منتجات جاهزة: 3</text>
+<rect x="30" y="170" width="670" height="200" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+<text x="680" y="205" text-anchor="start" font-size="22" fill="#15803d" font-weight="700">التصنيع متعدد المراحل</text>
+<text x="680" y="235" text-anchor="start" font-size="14" fill="#334155" font-weight="400">مراحل مرتبطة: تتابع، فروع متوازية، وسيط، فحص جودة، هالك، ناتج متعدد.</text>
+<text x="680" y="258" text-anchor="start" font-size="13" fill="#64748b" font-weight="400">مناسب: تصنيع على أكثر من خطوة أو أكثر من ناتج.</text>
+<text x="680" y="281" text-anchor="start" font-size="13" fill="#64748b" font-weight="400">يحتاج تعريف عملية نشط للمنتج.</text>
+<rect x="460" y="318" width="210" height="36" rx="7" fill="#2563eb" stroke="#2563eb" stroke-width="1.4"/>
+<text x="565.0" y="341.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">أمر تصنيع جديد</text>
+<rect x="240" y="318" width="200" height="36" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+<text x="340.0" y="341.0" text-anchor="middle" font-size="14" fill="#0f172a" font-weight="700">إعداد التصنيع</text>
+<text x="1350" y="410" text-anchor="start" font-size="18" fill="#0f172a" font-weight="700">يحتاج إجراءً الآن</text>
+<rect x="1040" y="430" width="310" height="90" rx="10" fill="#dcfce7" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1335" y="465" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">أوامر جاهزة لخطوة تالية</text>
+<text x="1335" y="500" text-anchor="start" font-size="26" fill="#0f172a" font-weight="700">‪2‬</text>
+<text x="1060" y="500" text-anchor="start" font-size="13" fill="#2563eb" font-weight="700">عرض ‹</text>
+<rect x="710" y="430" width="310" height="90" rx="10" fill="#fef3c7" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1005" y="465" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">عمليات معلّقة بانتظار سابقتها</text>
+<text x="1005" y="500" text-anchor="start" font-size="26" fill="#0f172a" font-weight="700">‪1‬</text>
+<text x="730" y="500" text-anchor="start" font-size="13" fill="#2563eb" font-weight="700">عرض ‹</text>
+<rect x="380" y="430" width="310" height="90" rx="10" fill="#fee2e2" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="675" y="465" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">أحداث مالية مرفوضة (تصنيع)</text>
+<text x="675" y="500" text-anchor="start" font-size="26" fill="#0f172a" font-weight="700">‪1‬</text>
+<text x="400" y="500" text-anchor="start" font-size="13" fill="#2563eb" font-weight="700">عرض ‹</text>
+<rect x="50" y="430" width="310" height="90" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="345" y="465" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">وحدات معلّقة / مرفوضة بلا حسم</text>
+<text x="345" y="500" text-anchor="start" font-size="26" fill="#0f172a" font-weight="700">‪0‬</text>
+<text x="70" y="500" text-anchor="start" font-size="13" fill="#2563eb" font-weight="700">عرض ‹</text>
+<text x="1350" y="560" text-anchor="start" font-size="18" fill="#0f172a" font-weight="700">آخر ما اكتمل</text>
+<rect x="30" y="575" width="1340" height="150" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1340" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">رقم الأمر</text>
+<text x="1125" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">المنتج</text>
+<text x="910" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">المسار</text>
+<text x="695" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">المنتَج / المخطط</text>
+<text x="480" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الهالك</text>
+<text x="265" y="605" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الحالة</text>
+<text x="1340" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪WO-2026-000001‬</text>
+<text x="1125" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">لمبة اختبار</text>
+<text x="910" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">متعدد المراحل</text>
+<text x="695" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪9 / 10‬</text>
+<text x="480" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪1‬</text>
+<text x="265" y="640" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">مكتمل</text>
+<text x="1340" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪WO-2026-000002‬</text>
+<text x="1125" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">لمبة اختبار</text>
+<text x="910" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">تجميع سريع</text>
+<text x="695" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪2 / 2‬</text>
+<text x="480" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">‪0‬</text>
+<text x="265" y="676" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">مكتمل</text>
+<text x="700" y="760" text-anchor="middle" font-size="13" fill="#475569" font-weight="400">كل رقم هنا يقود إلى قائمة مصفّاة؛ لا لوحة مؤشرات تزيينية. تُعرض فقط الأرقام المتاحة من الواجهات الحالية.</text>
+</svg>

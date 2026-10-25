@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780" direction="rtl" font-family="Segoe UI, Tahoma, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#475569"/></marker></defs>
+<rect width="1400" height="780" fill="#ffffff"/>
+<text x="700.0" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">WF5 — التكلفة والمراجعة (Cost, Reconciliation & Exceptions)</text>
+<rect x="1035" y="65" width="315" height="100" rx="12" fill="#e0f2fe" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1335" y="100" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">قيمة المواد المصروفة إلى WIP</text>
+<text x="1335" y="145" text-anchor="start" font-size="28" fill="#0f172a" font-weight="700">‪130.00‬</text>
+<rect x="700" y="65" width="315" height="100" rx="12" fill="#dcfce7" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1000" y="100" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">ناتج جيد</text>
+<text x="1000" y="145" text-anchor="start" font-size="28" fill="#0f172a" font-weight="700">‪117.00‬</text>
+<rect x="365" y="65" width="315" height="100" rx="12" fill="#fee2e2" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="665" y="100" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">هالك / نتائج أخرى</text>
+<text x="665" y="145" text-anchor="start" font-size="28" fill="#0f172a" font-weight="700">‪13.00‬</text>
+<rect x="30" y="65" width="315" height="100" rx="12" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="330" y="100" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">WIP المتبقي</text>
+<text x="330" y="145" text-anchor="start" font-size="28" fill="#0f172a" font-weight="700">‪0.00‬</text>
+<rect x="30" y="190" width="1340" height="120" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+<text x="1350" y="222" text-anchor="start" font-size="17" fill="#15803d" font-weight="700">مطابقة الدفاتر</text>
+<text x="1350" y="252" text-anchor="start" font-size="14" fill="#334155" font-weight="400">✓ WIP في التقييم = WIP في الدفاتر (0.00)     ✓ مجموع القيود = 130.00     ✓ لا أحداث معلّقة</text>
+<text x="1350" y="282" text-anchor="start" font-size="12" fill="#64748b" font-weight="400">إن وُجد اختلاف يظهر هنا بالأرقام وبالمصدر، لا رسالة نجاح عامة.</text>
+<text x="1350" y="345" text-anchor="start" font-size="18" fill="#0f172a" font-weight="700">استثناءات تحتاج معالجة</text>
+<rect x="30" y="360" width="1340" height="230" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1340" y="392" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الأمر</text>
+<text x="1075" y="392" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الحدث</text>
+<text x="810" y="392" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">السبب</text>
+<text x="545" y="392" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الأثر</text>
+<text x="280" y="392" text-anchor="start" font-size="13" fill="#64748b" font-weight="700">الإجراء</text>
+<text x="1340" y="432" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">WO-…01</text>
+<text x="1075" y="432" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">تسجيل هالك</text>
+<text x="810" y="432" text-anchor="start" font-size="13" fill="#b91c1c" font-weight="700">حساب الهالك غير معرّف</text>
+<text x="545" y="432" text-anchor="start" font-size="13" fill="#0f172a" font-weight="400">الحركة تمت، القيد لم يُرحَّل (13.00 فرق)</text>
+<rect x="150" y="412" width="150" height="34" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+<text x="225.0" y="434.0" text-anchor="middle" font-size="14" fill="#0f172a" font-weight="700">إعداد الحساب</text>
+<rect x="40" y="412" width="100" height="34" rx="7" fill="#2563eb" stroke="#2563eb" stroke-width="1.4"/>
+<text x="90.0" y="434.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">إعادة معالجة</text>
+<text x="1350" y="470" text-anchor="start" font-size="12" fill="#64748b" font-weight="400">ملاحظة: «إعادة معالجة» تُفعَّل بعد ضبط الإعداد. الاثنان يظهران بحسب الصلاحية.</text>
+<text x="1350" y="640" text-anchor="start" font-size="13" fill="#475569" font-weight="400">تُعرض فقط البيانات المتاحة في الخلفية اليوم؛ لا تقارير مخترعة. ما ينقص يُسجَّل كفجوة منتج.</text>
+</svg>

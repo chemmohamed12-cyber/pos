@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900" direction="rtl" font-family="Segoe UI, Tahoma, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#475569"/></marker></defs>
+<rect width="1500" height="900" fill="#ffffff"/>
+<text x="750.0" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">WF3 — محرر تعريف العملية (Process Definition Editor) — ثلاث مناطق</text>
+<rect x="30" y="55" width="1440" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="1450" y="85" text-anchor="start" font-size="20" fill="#0f172a" font-weight="700">عملية تصنيع اللمبة</text>
+<text x="1450" y="112" text-anchor="start" font-size="13" fill="#64748b" font-weight="400">المنتج النهائي: WT-LAMP · الإصدار v2</text>
+<rect x="1090" y="72" width="90" height="24" rx="12" fill="#fef3c7" stroke="#fef3c7" stroke-width="1.4"/>
+<text x="1135.0" y="89" text-anchor="middle" font-size="12" fill="#0f172a" font-weight="700">مسودة</text>
+<rect x="920" y="72" width="150" height="24" rx="12" fill="#dcfce7" stroke="#dcfce7" stroke-width="1.4"/>
+<text x="995.0" y="89" text-anchor="middle" font-size="12" fill="#0f172a" font-weight="700">محفوظ 10:42 ✓</text>
+<rect x="740" y="72" width="160" height="24" rx="12" fill="#fee2e2" stroke="#fee2e2" stroke-width="1.4"/>
+<text x="820.0" y="89" text-anchor="middle" font-size="12" fill="#0f172a" font-weight="700">2 أخطاء · 1 تنبيه</text>
+<rect x="560" y="78" width="150" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+<text x="635.0" y="103.0" text-anchor="middle" font-size="14" fill="#0f172a" font-weight="700">حفظ المسودة</text>
+<rect x="400" y="78" width="150" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+<text x="475.0" y="103.0" text-anchor="middle" font-size="14" fill="#0f172a" font-weight="700">التحقق من المسار</text>
+<rect x="230" y="78" width="160" height="40" rx="7" fill="#2563eb" stroke="#2563eb" stroke-width="1.4"/>
+<text x="310.0" y="103.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">تفعيل المسار</text>
+<text x="1450" y="160" text-anchor="start" font-size="15" fill="#334155" font-weight="700">أ رأس العملية (فوق) · ب مساحة العمل (الرسم)</text>
+<rect x="430" y="175" width="1040" height="480" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+<defs/>
+<rect x="1200" y="215" width="250" height="116" rx="10" fill="#eef2ff" stroke="#2563eb" stroke-width="3"/>
+<text x="1438" y="241" text-anchor="start" font-size="15" fill="#0f172a" font-weight="700">1 · تصنيع وحدة الإضاءة</text>
+<text x="1438" y="267" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مدخلات: شريحة ×4</text>
+<text x="1438" y="289" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مخرجات: وحدة (وسيط)</text>
+<rect x="1200" y="385" width="250" height="116" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="1438" y="411" text-anchor="start" font-size="15" fill="#0f172a" font-weight="700">2 · تصنيع الغلاف</text>
+<text x="1438" y="437" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مدخلات: خام غلاف ×1</text>
+<text x="1438" y="459" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مخرجات: غلاف (وسيط)</text>
+<rect x="870" y="300" width="250" height="116" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="1108" y="326" text-anchor="start" font-size="15" fill="#0f172a" font-weight="700">3 · تجميع اللمبة</text>
+<text x="1108" y="352" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مدخلات: وحدة + غلاف</text>
+<text x="1108" y="374" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مخرجات: لمبة (نهائي)</text>
+<rect x="882" y="386" width="100" height="24" rx="12" fill="#e0f2fe" stroke="#e0f2fe" stroke-width="1.4"/>
+<text x="932.0" y="403" text-anchor="middle" font-size="12" fill="#075985" font-weight="700">ينتظر 1 و 2</text>
+<rect x="540" y="300" width="250" height="116" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="778" y="326" text-anchor="start" font-size="15" fill="#0f172a" font-weight="700">4 · فحص الجودة</text>
+<text x="778" y="352" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مدخلات: —</text>
+<text x="778" y="374" text-anchor="start" font-size="12" fill="#334155" font-weight="400">مخرجات: —</text>
+<rect x="552" y="386" width="100" height="24" rx="12" fill="#e0f2fe" stroke="#e0f2fe" stroke-width="1.4"/>
+<text x="602.0" y="403" text-anchor="middle" font-size="12" fill="#075985" font-weight="700">اختيارية · حتى 2</text>
+<line x1="1200" y1="273" x2="1120" y2="340" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="1200" y1="443" x2="1120" y2="380" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="870" y1="358" x2="790" y2="358" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<text x="1450" y="690" text-anchor="start" font-size="15" fill="#334155" font-weight="700">ج — تفاصيل العملية المحددة</text>
+<rect x="30" y="175" width="380" height="480" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<text x="395" y="205" text-anchor="start" font-size="14" fill="#0f172a" font-weight="700">العملية المحددة: 1 · تصنيع وحدة الإضاءة</text>
+<text x="395" y="245" text-anchor="start" font-size="12" fill="#334155" font-weight="400">١ الهوية: الاسم، الرمز، الوصف</text>
+<text x="395" y="283" text-anchor="start" font-size="12" fill="#334155" font-weight="400">٢ المواد: جدول (المنتج | الكمية لكل وحدة | الوحدة)</text>
+<text x="395" y="321" text-anchor="start" font-size="12" fill="#334155" font-weight="400">٣ المخرجات: جدول (المنتج | الفئة | الكمية | وسيط/نهائي)</text>
+<text x="395" y="359" text-anchor="start" font-size="12" fill="#334155" font-weight="400">٤ تبدأ بعد اكتمال: [اختر عمليات]</text>
+<text x="395" y="397" text-anchor="start" font-size="12" fill="#334155" font-weight="400">٥ السلوك: اختيارية ☐ · تكرار حتى [ ] مرات</text>
+<text x="395" y="435" text-anchor="start" font-size="12" fill="#334155" font-weight="400">▸ متقدم: وزن توزيع التكلفة…</text>
+<rect x="40" y="600" width="160" height="38" rx="7" fill="#2563eb" stroke="#2563eb" stroke-width="1.4"/>
+<text x="120.0" y="624.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">إضافة عملية</text>
+<rect x="215" y="600" width="170" height="38" rx="7" fill="#dc2626" stroke="#dc2626" stroke-width="1.4"/>
+<text x="300.0" y="624.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">حذف العملية</text>
+<rect x="30" y="700" width="1440" height="170" rx="12" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
+<text x="1450" y="730" text-anchor="start" font-size="15" fill="#9a3412" font-weight="700">التحقق (مثال)</text>
+<text x="1450" y="760" text-anchor="start" font-size="13" fill="#7c2d12" font-weight="400">خطأ: العملية «3» تستهلك «وحدة» لا ينتجها أي عمل سابق ← أضف مخرج «وحدة» (وسيط) إلى العملية 1.</text>
+<text x="1450" y="790" text-anchor="start" font-size="13" fill="#7c2d12" font-weight="400">خطأ: لا مخرج نهائي للمنتج «WT-LAMP» ← حدّد مخرجًا نهائيًا في العملية 3.</text>
+<text x="1450" y="820" text-anchor="start" font-size="13" fill="#7c2d12" font-weight="400">تنبيه: لا مركز عمل للعملية 4 (اختياري).</text>
+</svg>
