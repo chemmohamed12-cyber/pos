@@ -57,6 +57,7 @@ export function CommissionResults() {
     'action.create_adjustment',
     'panel.no_results_yet',
     'panel.no_adjustments_yet',
+    'field.commission_result',
     'value.adjustment_kind.adjustment',
     'value.adjustment_kind.correction',
     'value.adjustment_kind.recalculation',
@@ -156,7 +157,7 @@ export function CommissionResults() {
         <h3>{t('action.create_adjustment')}</h3>
         <form onSubmit={onCreateAdjustment} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 260 }}>
-            <label>{currentLang() === 'ar' ? 'نتيجة العمولة' : 'Commission Result'}</label>
+            <label>{t('field.commission_result')}</label>
             <select value={originalCommissionResultId} onChange={(e) => setOriginalCommissionResultId(e.target.value)} required>
               <option value="">—</option>
               {(results ?? []).map((r) => (

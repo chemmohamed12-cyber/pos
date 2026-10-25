@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
+import { ErrorText, FailureReason, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PANEL_TERMS, employeeLabel, useMoney, type EmployeeRef } from './payrollUi';
@@ -366,7 +366,9 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
                       <td>
                         <StatusBadge code={`value.payout_status.${i.status}`} />
                       </td>
-                      <td>{i.failureReason ?? '—'}</td>
+                      <td>
+                        <FailureReason reason={i.failureReason} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

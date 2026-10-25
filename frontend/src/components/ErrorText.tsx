@@ -22,3 +22,20 @@ export function ErrorText({ error }: { error: UiError }) {
   const text = label && label !== key ? label : error.message;
   return <>{String(text).replace(/\{(\w+)\}/g, (m, name) => (error.params && name in error.params ? String(error.params[name]) : m))}</>;
 }
+
+/** Failure reasons stored as the English text of the refusal that caused them; known ones are shown through their registered label with the figures parsed out of the text. */
+const KNOWN_REASONS: Array<{ pattern: RegExp; key: string; names: string[] }> = [
+  { pattern: /Insufficient treasury balance: requested (\d+(?:\.\d+)?), available (\d+(?:\.\d+)?), short by (\d+(?:\.\d+)?)/, key: 'error.payout_insufficient_balance', names: ['requested', 'available', 'short'] },
+];
+
+export function FailureReason({ reason }: { reason: string | null }) {
+  const { t, preload } = useLanguage();
+  preload(KNOWN_REASONS.map((k) => k.key));
+  if (!reason) return <>—</>;
+  for (const k of KNOWN_REASONS) {
+    const m = reason.match(k.pattern);
+    const label = t(k.key);
+    if (m && label !== k.key) return <>{label.replace(/\{(\w+)\}/g, (x, name) => (k.names.includes(name) ? m[k.names.indexOf(name) + 1] : x))}</>;
+  }
+  return <>{reason}</>;
+}

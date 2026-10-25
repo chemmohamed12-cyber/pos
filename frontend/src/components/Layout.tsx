@@ -69,6 +69,7 @@ export function Layout() {
   const { user, logout, companyContext, canPlatform, authz } = useAuth();
   const { lang, setLang, t, preload } = useLanguage();
   const [openGroup, setOpenGroup] = useState<string | null>(loadOpenGroup);
+  const [navOpen, setNavOpen] = useState(false); // phone widths: the sidebar is an off-canvas drawer
   const { groups: visibleGroups, error: navError, retry: retryNav } = useNavigation();
 
   useEffect(() => {
@@ -99,7 +100,11 @@ export function Layout() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <button type="button" className="nav-toggle" aria-label={lang === 'ar' ? 'القائمة' : 'Menu'} aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}>
+        ☰
+      </button>
+      {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} />}
+      <aside className={navOpen ? 'sidebar open' : 'sidebar'} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setNavOpen(false); }}>
         <div className="brand">Daii</div>
         {(canPlatform('platform.company.view') || canPlatform('platform.support.view')) && (
           // XNEXUS Control Plane — Installation-level, gated by the platform
