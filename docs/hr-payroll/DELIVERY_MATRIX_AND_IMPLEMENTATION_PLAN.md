@@ -1,5 +1,7 @@
 # HR · Attendance · Payroll · Commission — Delivery Matrix, Baseline and Implementation Plan
 
+> **Status note (2026-10-25):** the «Status» column of §3 below is the Phase 0 snapshot and is superseded. Current statuses, kept separately as PROPOSED / IMPLEMENTED / VERIFIED / APPROVED / BLOCKED, are in `GAP_STATUS_REGISTER_2026-10-25.md`; the financial points awaiting decisions are in `FINANCIAL_DECISIONS_MEMO_2026-10-25.md`.
+
 **Mandate:** CTO "Master Execution & Delivery Directive" (C16 = S2). **Production: HOLD.** This is the living ledger; the *Status* columns are updated as evidence arrives (last update: see §9).
 **Status vocabulary:** NOT STARTED · IN PROGRESS · PASS (executed on the current candidate, evidence linked) · FAIL · BLOCKED · NOT RUN · HISTORICAL PASS.
 
