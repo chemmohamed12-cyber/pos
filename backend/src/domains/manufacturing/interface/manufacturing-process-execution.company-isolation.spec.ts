@@ -174,7 +174,11 @@ describe('Manufacturing Engine S4 - process execution (graph, runs, per-operatio
 
   it('S4-9 the unchanged order lifecycle closes it: output takes the whole pooled value, WIP and GL return to zero, the lamp is in stock', async () => {
     const m = await k.mgr();
-    await k.wo.finishedGoodsOutput(orderId, 10, k.actor, 'out-all', m);
+    // CTO D1: the basic single-output receipt is refused on a process-bound order and points at the multi-output receipt; nothing is posted by the refusal
+    const movements0 = (await k.q(`SELECT count(*)::int AS n FROM "stock_movements"`))[0].n;
+    await expect(k.wo.finishedGoodsOutput(orderId, 10, k.actor, 'out-basic', m)).rejects.toThrow(/bound to a process definition.*multi-output receipt/);
+    expect((await k.q(`SELECT count(*)::int AS n FROM "stock_movements"`))[0].n).toBe(movements0);
+    await k.wo.receiveProcessOutputs(orderId, 10, k.actor, 'out-all', m);
     await k.flush();
     await k.wo.complete(orderId, k.actor, m);
     await k.flush();
@@ -203,6 +207,43 @@ describe('Manufacturing Engine S4 - process execution (graph, runs, per-operatio
     await k.flush();
     await k.wo.complete(b.id, k.actor, m);
     expect(await k.wo.getWorkOrderState(b.id, m)).toBe('completed');
+  });
+
+  it('S4-12 an OPTIONAL operation in a chain is transparent but never lets the next one jump the line: A -> optional B -> C keeps C behind A (view and start gate agree)', async () => {
+    const m = await k.mgr();
+    p.chain = await k.product('S4-CHAIN', 'Chain item');
+    const v = await k.processes.createDraft(
+      p.chain,
+      {
+        name: 'Chain with an optional middle',
+        operations: [
+          { code: 'ONE', name: 'First', operationTypeCode: 'transform', sequenceNo: 10 },
+          { code: 'TWO', name: 'Optional middle', operationTypeCode: 'transform', sequenceNo: 20, optional: true },
+          { code: 'THREE', name: 'Last', operationTypeCode: 'transform', sequenceNo: 30 },
+        ],
+        edges: [{ from: 'ONE', to: 'TWO' }, { from: 'TWO', to: 'THREE' }],
+        inputs: [{ operationCode: 'ONE', componentProductId: p.basicC, quantityPerUnit: 1 }],
+        outputs: [{ operationCode: 'THREE', productId: p.chain, quantityPerUnit: 1, role: 'good' }],
+      },
+      k.actor,
+      m,
+    );
+    await k.processes.activate(v.version.id, k.actor, m);
+    const o = await k.wo.createProcessWorkOrder(p.chain, 2, k.warehouseId, null, k.actor, m);
+    await k.wo.release(o.id, k.actor, m);
+    await k.wo.materialIssue(o.id, p.basicC, 2, k.actor, 'chain-iss', m);
+    const status = async (code: string) => (await k.exec.getExecution(o.id, m)).operations.find((x) => x.code === code)!;
+    // the view says THREE waits for ONE (not "ready" because TWO is optional), and the start gate refuses with the same blocker
+    expect(await status('THREE')).toMatchObject({ status: 'pending', blockedBy: ['ONE'] });
+    await expect(k.exec.startOperation(o.id, 'THREE', k.actor, 'th-early', m)).rejects.toThrow(/waiting for: ONE/);
+    const r1 = await k.exec.startOperation(o.id, 'ONE', k.actor, 'one-1', m);
+    await k.exec.recordConsumption(o.id, r1.id, p.basicC, 2, k.actor, 'one-c', m);
+    await k.exec.completeRun(o.id, r1.id, k.actor, m);
+    // ONE is done: THREE is ready WITHOUT running the optional TWO; TWO itself is ready to run or skip
+    expect(await status('THREE')).toMatchObject({ status: 'ready', blockedBy: [] });
+    expect(await status('TWO')).toMatchObject({ status: 'ready' });
+    const r3 = await k.exec.startOperation(o.id, 'THREE', k.actor, 'th-1', m);
+    expect(r3.status).toBe('running');
   });
 
   it('S4-11 Company B (the witness) holds no process execution data', async () => {

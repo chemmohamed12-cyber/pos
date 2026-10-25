@@ -124,7 +124,7 @@ describe('Manufacturing Engine - industrial cases by configuration - real-Postgr
       await expect(k.exec.startOperation(o.id, 'MACH', k.actor, 'third', m)).rejects.toThrow(/permitted run/);
       await k.wo.recordRecovery(o.id, p.chips, 6, '12.00', scrapRow, k.actor, 'rec-1', m); // recoverable swarf worth 12 out of the 40 written off
       await expect(k.wo.recordRecovery(o.id, p.chips, 1, '30.00', scrapRow, k.actor, 'rec-2', m)).rejects.toThrow(/exceed/); // never more than the scrap wrote off
-      await k.wo.finishedGoodsOutput(o.id, 8, k.actor, 'fg', m);
+      await k.wo.receiveProcessOutputs(o.id, 8, k.actor, 'fg', m);
       await k.wo.complete(o.id, k.actor, m);
     });
     expect(d['1150']).toBeCloseTo(-200, 3); // the 200 issued before the window left WIP: zero again
@@ -181,7 +181,7 @@ describe('Manufacturing Engine - industrial cases by configuration - real-Postgr
     await runOp(o.id, 'INSP', async (r) => {
       held = (await k.exec.recordOutcomeAt(o.id, r, 'held', 2, 'awaiting lab', k.actor, 'h', m)).id;
     });
-    await k.wo.finishedGoodsOutput(o.id, 10, k.actor, 'fg', m);
+    await k.wo.receiveProcessOutputs(o.id, 10, k.actor, 'fg', m);
     await expect(k.wo.complete(o.id, k.actor, m)).rejects.toThrow(/still tracked/);
     await k.wo.resolveTrackedOutcome(o.id, held, 'good', k.actor, m);
     await k.wo.complete(o.id, k.actor, m);

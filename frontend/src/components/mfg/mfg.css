@@ -101,3 +101,13 @@
 .mfg-subrow.bom { grid-template-columns: minmax(180px, 2fr) minmax(110px, 1fr) minmax(130px, 1fr) minmax(160px, 1.4fr) auto; }
 .mfg-equiv { display: flex; flex-direction: column; gap: 4px; padding-block-start: 2px; min-inline-size: 0; }
 @media (max-width: 900px) { .mfg-subrow.bom { grid-template-columns: minmax(0, 1fr); } }
+
+/* Work orders (stage 4) */
+.mfg-tabs { display: flex; gap: 6px; margin-block: 8px 14px; flex-wrap: wrap; }
+.mfg-tab { border: 1px solid #cfd4dc; background: #f3f4f6; padding: 8px 16px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; color: #374151; }
+.mfg-tab.active, .mfg-tab[aria-selected='true'] { background: #dbe7ff; border-color: #2f5fd7; color: #1e3a8a; }
+.mfg-tab:focus-visible { outline: 2px solid #2f5fd7; outline-offset: 2px; }
+.mfg-dl.detail { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 24px; }
+.mfg-dl.detail dt { grid-column: auto; }
+.mfg-dl.detail { display: grid; grid-auto-flow: row; }
+.mfg-run { margin-block-start: 14px; padding: 12px; border: 1px solid #d7dae0; border-radius: 8px; background: #fafbfc; }

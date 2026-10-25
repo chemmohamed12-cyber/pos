@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { BlockedReason, FormField } from '../../components/mfg';
 
 interface ActiveVersion {
   id: string;
@@ -22,14 +23,13 @@ interface Warehouse {
 }
 
 /** Manufacturing Engine S4 - create a Work Order that runs a product's ACTIVE process version (one explicit choice per alternate group). */
-export function NewProcessOrder() {
-  const { lang } = useLanguage();
-  const ar = lang === 'ar';
+export function NewProcessOrder({ canReadProcesses }: { canReadProcesses: boolean }) {
+  const { t } = useLanguage();
   const nav = useNavigate();
-  const [versions, setVersions] = useState<ActiveVersion[]>([]);
+  const [versions, setVersions] = useState<ActiveVersion[] | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [versionId, setVersionId] = useState('');
-  const [groups, setGroups] = useState<Array<{ key: string; label: string; options: Array<{ id: string; sku: string | null }> }>>([]);
+  const [groups, setGroups] = useState<Array<{ key: string; op: string; group: string; options: Array<{ id: string; sku: string | null }> }>>([]);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [qty, setQty] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -39,14 +39,15 @@ export function NewProcessOrder() {
   useEffect(() => {
     void (async () => {
       try {
-        const [vs, wh] = await Promise.all([api.get<ActiveVersion[]>('/manufacturing/processes'), api.get<Warehouse[]>('/inventory/warehouses')]);
+        const [vs, wh] = await Promise.all([canReadProcesses ? api.get<ActiveVersion[]>('/manufacturing/processes') : Promise.resolve([]), api.get<Warehouse[]>('/inventory/warehouses')]);
         setVersions(vs.filter((v) => v.status === 'active'));
         setWarehouses(wh.filter((w) => w.kind !== 'operational'));
-      } catch {
-        /* the card simply stays empty when the process list is not readable */
+      } catch (err) {
+        setVersions([]);
+        setError(err instanceof ApiError ? err.message : t('mfg2.common.load_failed'));
       }
     })();
-  }, []);
+  }, [canReadProcesses, t]);
 
   async function pick(id: string) {
     setVersionId(id);
@@ -55,70 +56,117 @@ export function NewProcessOrder() {
     if (!id) return;
     try {
       const d = await api.get<VersionDetail>(`/manufacturing/processes/${id}`);
-      const by = new Map<string, Array<{ id: string; sku: string | null }>>();
-      for (const i of d.inputs) if (i.alternateGroup) (by.get(`${i.operationCode}|${i.alternateGroup}`) ?? by.set(`${i.operationCode}|${i.alternateGroup}`, []).get(`${i.operationCode}|${i.alternateGroup}`)!).push({ id: i.componentProductId, sku: i.componentSku });
-      setGroups([...by.entries()].map(([key, options]) => ({ key, label: key.replace('|', ' / '), options })));
+      const by = new Map<string, { op: string; group: string; options: Array<{ id: string; sku: string | null }> }>();
+      for (const i of d.inputs) {
+        if (!i.alternateGroup) continue;
+        const key = `${i.operationCode}|${i.alternateGroup}`;
+        const g = by.get(key) ?? { op: i.operationCode, group: i.alternateGroup, options: [] };
+        g.options.push({ id: i.componentProductId, sku: i.componentSku });
+        by.set(key, g);
+      }
+      setGroups([...by.entries()].map(([key, g]) => ({ key, ...g })));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed.');
+      setError(err instanceof ApiError ? err.message : t('mfg2.common.load_failed'));
     }
   }
 
-  const v = versions.find((x) => x.id === versionId);
-  const ready = !!v && Number(qty) > 0 && !!warehouseId && groups.every((g) => choices[g.key]);
+  const v = versions?.find((x) => x.id === versionId);
+  const qtyNum = Number(qty);
+  const qtyError = qty.trim() !== '' && (!Number.isInteger(qtyNum) || qtyNum < 1) ? t('mfg2.qa.qty_invalid') : null;
+  const missing = groups.filter((g) => !choices[g.key]);
+  const ready = !!v && qtyNum > 0 && !qtyError && !!warehouseId && missing.length === 0;
 
   async function create() {
     if (!v) return;
     setBusy(true);
     setError(null);
     try {
-      const wo = await api.post<{ id: string }>('/manufacturing/process-orders', { finishedProductId: v.productId, quantityPlanned: Number(qty), warehouseId, alternateChoices: choices });
+      const wo = await api.post<{ id: string }>('/manufacturing/process-orders', { finishedProductId: v.productId, quantityPlanned: qtyNum, warehouseId, alternateChoices: choices });
       nav(`/manufacturing/work-orders/${wo.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed.');
+      setError(err instanceof ApiError ? err.message : t('mfg2.common.action_failed'));
     } finally {
       setBusy(false);
     }
   }
 
-  if (versions.length === 0) return null;
+  if (versions === null) return <div className="mfg-note">{t('mfg2.common.loading')}</div>;
+  if (versions.length === 0) {
+    return (
+      <BlockedReason to={canReadProcesses ? '/manufacturing/processes' : undefined} linkText={canReadProcesses ? t('nav.manufacturing_processes') : undefined}>
+        {t('mfg2.wo.no_active_process')}
+      </BlockedReason>
+    );
+  }
   return (
-    <div className="card" style={{ marginBottom: 20 }} data-testid="new-process-order">
-      <h3 style={{ marginTop: 0 }}>{ar ? 'أمر تشغيل بعملية (إصدار عملية نشط)' : 'Process work order (active process version)'}</h3>
-      {error && <div className="error-text">{error}</div>}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <select value={versionId} onChange={(e) => void pick(e.target.value)} data-testid="npo-version">
-          <option value="">{ar ? 'اختر العملية' : 'Select process'}</option>
-          {versions.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.productSku} — {x.productName} (v{x.versionNo})
-            </option>
-          ))}
-        </select>
-        <input type="number" min={1} placeholder={ar ? 'الكمية المخططة' : 'Planned quantity'} value={qty} onChange={(e) => setQty(e.target.value)} style={{ width: 140 }} data-testid="npo-qty" />
-        <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="npo-wh">
-          <option value="">{ar ? 'المخزن' : 'Warehouse'}</option>
-          {warehouses.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.code} — {w.name}
-            </option>
-          ))}
-        </select>
-        {groups.map((g) => (
-          <label key={g.key} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {ar ? 'بديل' : 'Alternative'} {g.label}
-            <select value={choices[g.key] ?? ''} onChange={(e) => setChoices((c) => ({ ...c, [g.key]: e.target.value }))} data-testid={`npo-choice-${g.key}`}>
-              <option value="">—</option>
-              {g.options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.sku}
+    <div data-testid="new-process-order">
+      <p className="mfg-note" style={{ marginBlockStart: 0 }}>
+        {t('mfg2.wo.ms.help')}
+      </p>
+      {error && <BlockedReason danger>{error}</BlockedReason>}
+      <div className="mfg-grid cols-3">
+        <FormField label={t('mfg2.wo.ms.process')} hint={t('mfg2.wo.ms.process_hint')} required>
+          {(p) => (
+            <select {...p} value={versionId} onChange={(e) => void pick(e.target.value)} data-testid="npo-version">
+              <option value="">{t('mfg2.common.choose')}</option>
+              {versions.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.productSku} — {x.productName} (v{x.versionNo})
                 </option>
               ))}
             </select>
-          </label>
-        ))}
-        <button className="btn btn-primary" type="button" disabled={!ready || busy} onClick={create} data-testid="npo-create">
-          {ar ? 'إنشاء أمر العملية' : 'Create process order'}
+          )}
+        </FormField>
+        <FormField label={t('field.quantity_planned')} hint={t('mfg2.qa.qty_hint')} error={qtyError} required>
+          {(p) => <input {...p} type="number" min={1} step={1} value={qty} onChange={(e) => setQty(e.target.value)} data-testid="npo-qty" />}
+        </FormField>
+        <FormField label={t('field.warehouse')} hint={t('mfg2.qa.warehouse_hint')} required>
+          {(p) => (
+            <select {...p} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="npo-wh">
+              <option value="">{t('mfg2.common.choose')}</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.code} — {w.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
+      </div>
+      {groups.length > 0 && (
+        <fieldset className="mfg-fieldset">
+          <legend>{t('mfg2.wo.ms.alternatives')}</legend>
+          <p className="mfg-note" style={{ marginBlockStart: 0 }}>
+            {t('mfg2.wo.ms.alternatives_help')}
+          </p>
+          <div className="mfg-grid cols-3">
+            {groups.map((g) => (
+              <FormField key={g.key} label={`${g.op} / ${g.group}`} required>
+                {(p) => (
+                  <select {...p} value={choices[g.key] ?? ''} onChange={(e) => setChoices((c) => ({ ...c, [g.key]: e.target.value }))} data-testid={`npo-choice-${g.key}`}>
+                    <option value="">{t('mfg2.common.choose')}</option>
+                    {g.options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.sku}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div className="mfg-actions">
+        <button className="btn btn-primary" type="button" disabled={!ready || busy} aria-busy={busy} onClick={create} data-testid="npo-create">
+          {t('mfg2.wo.ms.create')}
         </button>
+        {!ready && <span className="mfg-note">{!v ? t('mfg2.wo.ms.need_process') : missing.length > 0 ? t('mfg2.wo.ms.need_choices') : t('mfg2.wo.need_fields')}</span>}
+        {canReadProcesses && v && (
+          <Link to="/manufacturing/processes" className="mfg-note">
+            {t('nav.manufacturing_processes')}
+          </Link>
+        )}
       </div>
     </div>
   );

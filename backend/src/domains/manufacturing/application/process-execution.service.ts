@@ -1,3 +1,4 @@
+import { unmetPredecessors } from './process-readiness';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
@@ -70,10 +71,7 @@ export class ProcessExecutionService {
     for (const e of def.edges) (preds.get(e.to) ?? preds.set(e.to, []).get(e.to)!).push(e.from);
     const byOp = new Map(def.operations.map((o) => [o.code, o]));
     const runsOf = (code: string) => runs.filter((r) => r.operationCode === code);
-    const doneOrOptional = (code: string) => {
-      const o = byOp.get(code)!;
-      return runsOf(code).some((r) => r.status === 'completed') || (o.optional && !runsOf(code).some((r) => r.status === 'running'));
-    };
+    const optionalOf = new Map(def.operations.map((o) => [o.code, o.optional]));
     const sum = (rows: OperationFlow[]) => {
       const agg = new Map<string, { quantity: number; value: number }>();
       for (const f of rows) {
@@ -86,7 +84,7 @@ export class ProcessExecutionService {
     };
     const operations: OperationLedgerRow[] = def.operations.map((o) => {
       const rs = runsOf(o.code);
-      const blockedBy = (preds.get(o.code) ?? []).filter((p) => !doneOrOptional(p));
+      const blockedBy = unmetPredecessors(o.code, preds, optionalOf, runs);
       const opFlows = flows.filter((f) => f.operationId === o.id);
       const valueIn = opFlows.filter((f) => f.direction === 'in').reduce((s, f) => s + Number(f.valueBase), 0);
       const valueOut = opFlows.filter((f) => f.direction === 'out').reduce((s, f) => s + Number(f.valueBase), 0);
@@ -159,13 +157,9 @@ export class ProcessExecutionService {
       if (runs.length >= op.maxRuns) throw new ConflictException(`Operation "${operationCode}" has used its ${op.maxRuns} permitted run(s).`);
       const allRuns = await tx.getRepository(OperationRun).find({ where: { workOrderId } });
       const byId = new Map(def.operations.map((o) => [o.id, o]));
-      const predEdges = (await tx.getRepository(ProcessEdge).find({ where: { versionId: def.version.id, toOperationId: op.id } })).map((e) => byId.get(e.fromOperationId)!);
-      const blocking = predEdges.filter((p) => {
-        const pr = allRuns.filter((r) => r.operationId === p.id);
-        if (pr.some((r) => r.status === 'running')) return true; // never start behind a predecessor that is still working
-        if (pr.some((r) => r.status === 'completed')) return false;
-        return !p.optional; // a mandatory predecessor with no completed run blocks; an optional one that was skipped / never run does not
-      });
+      const predMap = new Map<string, string[]>();
+      for (const e of def.edges) (predMap.get(e.to) ?? predMap.set(e.to, []).get(e.to)!).push(e.from);
+      const blocking = unmetPredecessors(operationCode, predMap, new Map(def.operations.map((o) => [o.code, o.optional])), allRuns).map((code) => ({ code }));
       if (blocking.length > 0) throw new ConflictException(`Operation "${operationCode}" cannot start - waiting for: ${blocking.map((b) => b.code).join(', ')}.`);
       const run = await tx.getRepository(OperationRun).save(
         tx.getRepository(OperationRun).create({ workOrderId, operationId: op.id, operationCode, runNo: runs.length + 1, status: 'running', startedByUserId: actorUserId, requestId }),

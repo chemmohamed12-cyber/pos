@@ -581,6 +581,13 @@ export class WorkOrderService {
       throw new ConflictException('outputQuantity must be a positive whole number.');
     }
     const wo = await this.getWorkOrderOrThrow(workOrderId, manager);
+    // CTO D1 (UX redesign stage 4): a process-bound order has ONE receipt path - the multi-output receipt, which honours the version's final outputs and cost allocation. The
+    // single-output path would receive only the primary product and silently skip co-/by-products, so it is refused here (basic orders are unchanged).
+    if (wo.processVersionId) {
+      throw new ConflictException(
+        `Work Order "${wo.workOrderNumber}" is bound to a process definition - receive its outputs with the multi-output receipt (POST manufacturing/process-orders/${wo.id}/output). The basic finished-goods output is only for basic orders.`,
+      );
+    }
     const outputEventId = requestId;
     const state = await this.getWorkOrderState(workOrderId, manager);
     if (state !== 'in_progress') {
