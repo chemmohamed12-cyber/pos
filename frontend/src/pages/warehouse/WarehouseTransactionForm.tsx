@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import { ProductCombobox } from '../../components/ProductCombobox';
 import { ErrorState } from '../../components/ErrorState';
 import { loadingLabel } from '../../lib/displayNames';
@@ -44,6 +45,7 @@ const OUTBOUND_TYPES: TxnType[] = ['issue', 'transfer'];
 export function WarehouseTransactionForm({ type }: { type: TxnType }) {
   const navigate = useNavigate();
   const { t, preload } = useLanguage();
+  const { can } = useAuth();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
@@ -292,7 +294,12 @@ export function WarehouseTransactionForm({ type }: { type: TxnType }) {
                   </option>
                 ))}
               </select>
-              {reasonCodes.length === 0 && <div style={{ color: '#a3262d', fontSize: '0.78rem', marginTop: 2 }}>{t('panel.no_manual_receipt_reasons')}</div>}
+              {reasonCodes.length === 0 && (
+                <div style={{ color: '#a3262d', fontSize: '0.78rem', marginTop: 2 }} data-testid="no-receipt-reasons">
+                  {t('panel.no_manual_receipt_reasons')}{' '}
+                  {can('accounting.account.edit', 'editable') && <Link to="/accounting/policy">{t('mfg2.oo.scrap.fix_link')}</Link>}
+                </div>
+              )}
             </div>
           )}
           <div className="form-field" style={{ marginBottom: 0 }}>

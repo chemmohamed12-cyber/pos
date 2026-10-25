@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../../../lib/api';
 import { useLanguage } from '../../../context/LanguageContext';
 import { BlockedReason, EmptyState, FormField, StatusChip } from '../../../components/mfg';
 import { ProcessGraph } from './ProcessGraph';
+import { QuantityWithUnit, type ProductUnits } from './QuantityWithUnit';
 import { check, fill, layout, type Body, type Finding, type Inp, type Op, type Out } from './model';
 
 export interface Product {
@@ -155,6 +157,19 @@ export function ProcessBodyEditor({ body, setBody, products, types, productId, f
   const [showGraph, setShowGraph] = useState(body.operations.length <= GRAPH_DEFAULT_LIMIT);
   const [open, setOpen] = useState<Set<string>>(() => new Set(body.operations.length <= 6 ? body.operations.map((o) => o.code) : []));
   const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+  // T-W-06: pack units of every product used by an input / output, read lazily from the existing endpoint (no unit data is stored by the definition)
+  const [unitsOf, setUnitsOf] = useState<Record<string, ProductUnits>>({});
+  const usedProducts = useMemo(() => [...new Set([...body.inputs.map((i) => i.componentProductId), ...body.outputs.map((o) => o.productId)].filter(Boolean))], [body.inputs, body.outputs]);
+  useEffect(() => {
+    for (const id of usedProducts) {
+      if (unitsOf[id]) continue;
+      setUnitsOf((prev) => (prev[id] ? prev : { ...prev, [id]: { baseUnit: '', packs: {} } })); // mark as requested
+      api
+        .get<{ baseUnit: string; conversions: Array<{ unitCode: string; factor: number }> }>(`/manufacturing/unit-conversions/${id}`)
+        .then((v) => setUnitsOf((prev) => ({ ...prev, [id]: { baseUnit: v.baseUnit, packs: Object.fromEntries(v.conversions.map((c) => [c.unitCode, c.factor])) } })))
+        .catch(() => undefined); // not readable by this user -> the plain whole-number input stays
+    }
+  }, [usedProducts]); // eslint-disable-line react-hooks/exhaustive-deps
   const prod = (id: string) => products.find((p) => p.id === id);
   const productLabel = (id: string) => (prod(id) ? `${prod(id)!.sku} — ${prod(id)!.name}` : t('mfg2.pe.unset'));
   const typeLabel = (c: string) => {
@@ -342,7 +357,7 @@ export function ProcessBodyEditor({ body, setBody, products, types, productId, f
                           {(p) => productSelect(p, x.componentProductId, (v) => patchInput(i, { componentProductId: v }))}
                         </FormField>
                         <FormField label={t('mfg2.pe.inputs.qty')} hint={t('mfg2.pe.qty_hint')} required>
-                          {(p) => <input {...p} type="number" min={1} step={1} value={x.quantityPerUnit} onChange={(e) => patchInput(i, { quantityPerUnit: Number(e.target.value) || 0 })} />}
+                          {(p) => <QuantityWithUnit field={p} valueBase={x.quantityPerUnit} units={unitsOf[x.componentProductId]} onChange={(n) => patchInput(i, { quantityPerUnit: n })} />}
                         </FormField>
                         <FormField label={t('mfg2.pe.inputs.alt')} hint={t('mfg2.pe.inputs.alt_hint')}>
                           {(p) => <input {...p} value={x.alternateGroup} onChange={(e) => patchInput(i, { alternateGroup: e.target.value })} />}
@@ -365,7 +380,7 @@ export function ProcessBodyEditor({ body, setBody, products, types, productId, f
                           {(p) => productSelect(p, x.productId, (v) => patchOutput(i, { productId: v }))}
                         </FormField>
                         <FormField label={t('mfg2.pe.outputs.qty')} hint={t('mfg2.pe.qty_hint')} required>
-                          {(p) => <input {...p} type="number" min={1} step={1} value={x.quantityPerUnit} onChange={(e) => patchOutput(i, { quantityPerUnit: Number(e.target.value) || 0 })} />}
+                          {(p) => <QuantityWithUnit field={p} valueBase={x.quantityPerUnit} units={unitsOf[x.productId]} onChange={(n) => patchOutput(i, { quantityPerUnit: n })} />}
                         </FormField>
                         <FormField label={t('mfg2.pe.out.role')}>
                           {(p) => (

@@ -74,10 +74,22 @@ export interface InventoryPostingPolicy {
    */
   assertManufacturingScrapPostable?(kind: 'scrap' | 'recovery', manager?: EntityManager): Promise<void>;
   /**
+   * T-M-02 (follow-up package) - OPTIONAL read-only status of every accounting setting Manufacturing depends on (WIP and inventory control accounts, the scrap-loss account, the manual-receipt
+   * reasons). Exposes only ready / not ready and the actionable reason - never account balances or configuration values.
+   */
+  manufacturingSetupStatus?(manager?: EntityManager): Promise<ManufacturingSetupCheck[]>;
+  /**
    * C2 (ADR-INV-10) - OPTIONAL read-only financial status of the events that reference an operational record (document, movement): what the response of an
    * in-request dispatch reports, so a document never claims "posted to GL" while its posting is pending or rejected.
    */
   financialStatusByReference?(referenceType: string, referenceId: string, manager?: EntityManager): Promise<FinancialPostingSummary>;
+}
+
+/** One accounting prerequisite of Manufacturing: `code` is stable (the screen maps it to a label), `reason` is the actionable explanation when not ready. */
+export interface ManufacturingSetupCheck {
+  code: 'wip_account' | 'inventory_account' | 'scrap_loss_account' | 'receipt_reasons';
+  ready: boolean;
+  reason: string | null;
 }
 
 /** `none` = no financial event exists for the reference (e.g. a transfer posts no journal under Model A). */

@@ -74,6 +74,13 @@ export class WorkOrderService {
     }
   }
 
+  /** T-M-02 - the accounting prerequisites of Manufacturing and whether each is ready (read-only; reasons are actionable, no values are exposed). Empty when accounting is not installed. */
+  async setupStatus(manager?: EntityManager): Promise<Array<{ code: string; ready: boolean; reason: string | null }>> {
+    const status = this.postingPolicy?.get()?.manufacturingSetupStatus;
+    if (!status) return [];
+    return this.postingPolicy!.get()!.manufacturingSetupStatus!(manager ?? this.dataSource.manager);
+  }
+
   async listWorkOrders(manager?: EntityManager): Promise<WorkOrder[]> {
     return (manager ?? this.dataSource).getRepository(WorkOrder).find({ order: { createdAt: 'DESC' } });
   }

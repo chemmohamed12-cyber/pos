@@ -111,3 +111,9 @@
 .mfg-dl.detail dt { grid-column: auto; }
 .mfg-dl.detail { display: grid; grid-auto-flow: row; }
 .mfg-run { margin-block-start: 14px; padding: 12px; border: 1px solid #d7dae0; border-radius: 8px; background: #fafbfc; }
+
+/* quantity with unit (T-W-06) */
+.mfg-qty { display: flex; flex-direction: column; gap: 4px; min-inline-size: 0; }
+.mfg-qty-row { display: flex; gap: 6px; }
+.mfg-qty-row input { flex: 1 1 90px; min-inline-size: 0; }
+.mfg-qty-row select { flex: 0 1 150px; padding: 8px 6px; border: 1px solid #d7dae0; border-radius: 6px; background: #fff; }

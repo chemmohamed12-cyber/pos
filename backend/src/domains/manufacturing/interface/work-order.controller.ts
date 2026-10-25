@@ -121,6 +121,16 @@ export class WorkOrderController {
     return this.workOrders.listWorkOrdersWithSummary(req.companyContext.dataSource.manager);
   }
 
+  /** T-M-02 - the accounting prerequisites of Manufacturing (ready / not ready + actionable reason), read-only; declared BEFORE `:id`. */
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.view', 'read-only')
+  @Get('setup-status')
+  async setupStatus(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.setupStatus(req.companyContext.dataSource.manager);
+  }
+
   /** D6 - may scrap / recovery be recorded now? (accounting pre-flight, read-only) - declared BEFORE `:id` so the path is not taken as an id. */
   @UseGuards(RequireFeatureGuard, PermissionGuard)
   @RequireFeature('manufacturing.work_orders')

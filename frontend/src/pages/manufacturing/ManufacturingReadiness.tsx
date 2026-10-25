@@ -22,6 +22,14 @@ interface ProcRow {
   versionNo: number;
 }
 
+interface SetupCheck {
+  code: string;
+  ready: boolean;
+  reason: string | null;
+}
+/** Where each prerequisite is fixed (the link is shown only to users who may edit accounting). */
+const FIX_TO: Record<string, string> = { wip_account: '/accounting/chart-of-accounts', inventory_account: '/accounting/chart-of-accounts', scrap_loss_account: '/accounting/policy', receipt_reasons: '/accounting/policy' };
+
 type Path = 'qa' | 'ms';
 interface Row {
   p: Product;
@@ -44,6 +52,7 @@ export function ManufacturingReadiness() {
   const [boms, setBoms] = useState<BomRow[]>([]);
   const [procs, setProcs] = useState<ProcRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [setup, setSetup] = useState<SetupCheck[] | null>(null);
   const [search, setSearch] = useState('');
   const [only, setOnly] = useState<'configured' | 'all'>('configured');
 
@@ -54,6 +63,11 @@ export function ManufacturingReadiness() {
         setProducts(prods);
         setBoms(b);
         setProcs(pr);
+        try {
+          setSetup(await api.get<SetupCheck[]>('/manufacturing/work-orders/setup-status'));
+        } catch {
+          setSetup(null); // the user may not read orders: the section simply is not shown
+        }
       } catch (err) {
         setError(err instanceof ApiError ? err.message : t('mfg2.common.load_failed'));
       }
@@ -106,6 +120,34 @@ export function ManufacturingReadiness() {
         {t('mfg2.rd.intro')}
       </p>
       {error && <BlockedReason danger>{error}</BlockedReason>}
+      {setup && setup.length > 0 && (
+        <section className="card" style={{ marginBlockEnd: 16 }} aria-labelledby="su-title" data-testid="setup-health">
+          <h2 id="su-title" style={{ marginBlockStart: 0, fontSize: '1.15rem' }}>
+            {t('mfg2.su.title')}
+          </h2>
+          <p className="mfg-note">{t('mfg2.su.help')}</p>
+          <DataTable
+            caption={t('mfg2.su.title')}
+            rows={setup}
+            rowKey={(c) => c.code}
+            warnRow={(c) => !c.ready}
+            columns={[
+              { key: 'n', header: t('mfg2.su.col.setting'), render: (c) => t(`mfg2.su.${c.code}`) },
+              { key: 's', header: t('mfg2.col.status'), render: (c) => <StatusChip tone={c.ready ? 'success' : 'danger'}>{c.ready ? t('mfg2.su.ok') : t('mfg2.su.missing')}</StatusChip> },
+              {
+                key: 'r',
+                header: t('mfg2.su.col.detail'),
+                render: (c) => (
+                  <span>
+                    {c.ready ? t('mfg2.su.ok_detail') : c.reason}{' '}
+                    {!c.ready && can('accounting.account.edit', 'editable') && <Link to={FIX_TO[c.code] ?? '/accounting/policy'}>{t('mfg2.oo.scrap.fix_link')}</Link>}
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </section>
+      )}
       {products && (
         <div className="mfg-grid cols-2" style={{ marginBlockEnd: 16 }}>
           <div className="mfg-kpi">

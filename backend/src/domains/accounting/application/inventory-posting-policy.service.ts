@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
-import { FinancialPostingSummary, InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
+import { ManufacturingSetupCheck, FinancialPostingSummary, InventoryPostingPolicy, InventoryPostingPolicyRegistry, SaleReturnPostableInput, SupplierInvoicePostableInput } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { GLAccount } from '../infrastructure/gl-account.entity';
 import { FiscalPeriodService } from './fiscal-period.service';
 import { PostingStatusService } from './posting-status.service';
@@ -69,6 +69,33 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
     const problem = this.accountProblem(acc);
     if (problem) throw new ConflictException(`${what}: the configured scrap-loss account ${code} (${MANUFACTURING_SCRAP_LOSS_ACCOUNT_KEY}) ${problem}. Fix it in Accounting policy, then retry - nothing was recorded.`);
     if (acc!.accountType !== 'expense') throw new ConflictException(`${what}: the configured scrap-loss account ${code} is "${acc!.accountType}", not an expense account. Fix it in Accounting policy, then retry - nothing was recorded.`);
+  }
+
+  /** T-M-02 - the accounting prerequisites of Manufacturing, each with an actionable reason. Reuses the same account rules the posting gates apply. */
+  async manufacturingSetupStatus(manager?: EntityManager): Promise<ManufacturingSetupCheck[]> {
+    if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to read the manufacturing setup status');
+    const accounts = manager.getRepository(GLAccount);
+    const control = async (fn: 'wip' | 'inventory'): Promise<ManufacturingSetupCheck> => {
+      const ok = await accounts.findOne({ where: { controlFunction: fn, isActive: true, isPostable: true } });
+      return { code: fn === 'wip' ? 'wip_account' : 'inventory_account', ready: !!ok, reason: ok ? null : `No active postable account has the "${fn}" control function. Define it in the chart of accounts.` };
+    };
+    const scrap = async (): Promise<ManufacturingSetupCheck> => {
+      try {
+        await this.assertManufacturingScrapPostable('scrap', manager);
+        await this.assertManufacturingScrapPostable('recovery', manager);
+        return { code: 'scrap_loss_account', ready: true, reason: null };
+      } catch (err) {
+        if (err instanceof ConflictException) return { code: 'scrap_loss_account', ready: false, reason: err.message };
+        throw err;
+      }
+    };
+    const reasons = this.listManualReceiptReasons();
+    return [
+      await control('wip'),
+      await control('inventory'),
+      await scrap(),
+      { code: 'receipt_reasons', ready: reasons.length > 0, reason: reasons.length > 0 ? null : 'No manual-receipt reason code has a configured offset account (accounting.inventory_manual_receipt_reason_accounts). Stock cannot be received manually until one is mapped.' },
+    ];
   }
 
   /** C2 - the explicit business date must fall in an open fiscal period; same gate the journal posting itself applies later (org-unit-less, like the inventory events). */
