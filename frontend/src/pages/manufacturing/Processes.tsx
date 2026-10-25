@@ -1,20 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { loadingLabel } from '../../lib/displayNames';
+import { BlockedReason, DataTable, EmptyState, FormField, StatusChip, type Tone } from '../../components/mfg';
+import { ProcessGraph } from './process/ProcessGraph';
+import { FindingsPanel, OperationSummary, ProcessBodyEditor, StructureList, type OpType, type Product } from './process/ProcessEditor';
+import { check, layout, type Body, type Edge, type Inp, type Op, type Out } from './process/model';
 
-interface Product {
-  id: string;
-  sku: string;
-  name: string;
-}
-interface OpType {
-  code: string;
-  nameAr: string;
-  nameEn: string;
-  kind: string;
-  active: boolean;
-}
 interface VersionRow {
   id: string;
   productId: string;
@@ -25,67 +17,50 @@ interface VersionRow {
   productName: string | null;
   operationCount: number;
 }
-interface Op {
-  code: string;
-  name: string;
-  operationTypeCode: string;
-  sequenceNo: number;
-  optional: boolean;
-  maxRuns: number;
-}
-interface Edge {
-  from: string;
-  to: string;
-}
-interface Inp {
-  operationCode: string;
-  componentProductId: string;
-  quantityPerUnit: number;
-  alternateGroup: string;
-}
-interface Out {
-  operationCode: string;
-  productId: string;
-  quantityPerUnit: number;
-  role: 'good' | 'co_product' | 'by_product';
-  intermediate: boolean;
-  allocationWeight: number;
-}
-interface Body {
-  name: string;
-  note: string;
-  operations: Op[];
-  edges: Edge[];
-  inputs: Inp[];
-  outputs: Out[];
-}
 interface VersionView {
   version: { id: string; productId: string; versionNo: number; status: 'draft' | 'active' | 'retired'; name: string; note: string | null };
   operations: Array<Op & { workCenterId: string | null }>;
   edges: Edge[];
   inputs: Array<{ operationCode: string; componentProductId: string; quantityPerUnit: number; alternateGroup: string | null }>;
-  outputs: Array<Out>;
+  outputs: Out[];
 }
+type EditState = { versionId: string | null; productId: string; status: 'draft' | 'active' | 'retired'; versionNo: number | null; body: Body; saved: string; mode: 'edit' | 'review' };
 
 const emptyBody = (): Body => ({ name: '', note: '', operations: [], edges: [], inputs: [], outputs: [] });
-const STATUS_AR: Record<string, string> = { draft: 'مسودة', active: 'نشطة', retired: 'متقاعدة' };
-const ROLE_AR: Record<string, string> = { good: 'منتج رئيسي', co_product: 'ناتج مشترك', by_product: 'ناتج ثانوي' };
+const TONE: Record<string, Tone> = { draft: 'warning', active: 'success', retired: 'neutral' };
+
+const toBody = (v: VersionView): Body => ({
+  name: v.version.name,
+  note: v.version.note ?? '',
+  operations: v.operations.map((o) => ({ code: o.code, name: o.name, operationTypeCode: o.operationTypeCode, sequenceNo: o.sequenceNo, optional: o.optional, maxRuns: o.maxRuns, workCenterId: o.workCenterId })),
+  edges: v.edges.map((e) => ({ from: e.from, to: e.to })),
+  inputs: v.inputs.map((i) => ({ operationCode: i.operationCode, componentProductId: i.componentProductId, quantityPerUnit: i.quantityPerUnit, alternateGroup: i.alternateGroup ?? '' })) as Inp[],
+  outputs: v.outputs.map((o) => ({ operationCode: o.operationCode, productId: o.productId, quantityPerUnit: o.quantityPerUnit, role: o.role, intermediate: o.intermediate, allocationWeight: o.allocationWeight })),
+});
+const payload = (b: Body) => ({ name: b.name, note: b.note || null, operations: b.operations, edges: b.edges, inputs: b.inputs.map((i) => ({ ...i, alternateGroup: i.alternateGroup.trim() || null })), outputs: b.outputs });
 
 /**
- * Manufacturing Engine S3 - process definitions: versioned operation graph (types, predecessors, optional / repeatable), inputs with alternates and outputs
- * (good / co-product / by-product, intermediate or final). A draft is edited as a whole; activating it makes it the product's one active version.
+ * Manufacturing Engine process definitions (UX redesign stage 3): versioned operation graph. A DRAFT is edited as operation cards (identity + predecessors + inputs + outputs together) with a live
+ * structure summary and graph; saving then REVIEWS the persisted definition and only that review step can activate it. Active / retired versions open read-only. The server stays the authority.
  */
 export function Processes() {
-  const { lang } = useLanguage();
+  const { t, lang, preload } = useLanguage();
+  const { can } = useAuth();
   const ar = lang === 'ar';
-  const tx = (a: string, e: string) => (ar ? a : e);
+  const canEdit = can('manufacturing.routing.edit', 'editable');
   const [rows, setRows] = useState<VersionRow[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [types, setTypes] = useState<OpType[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [edit, setEdit] = useState<{ versionId: string | null; productId: string; status: string; versionNo: number | null; body: Body } | null>(null);
+  const [edit, setEdit] = useState<EditState | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const [newProductId, setNewProductId] = useState('');
+
+  useEffect(() => {
+    void preload(['mfg2.pe.confirm_discard', 'mfg2.pe.confirm_delete']); // read at click time inside window.confirm
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     try {
@@ -94,333 +69,284 @@ export function Processes() {
       setProducts(prods);
       setTypes(ts);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load.');
+      setError(err instanceof ApiError ? err.message : t('mfg2.common.load_failed'));
     }
-  }, []);
+  }, [t]);
   useEffect(() => {
     void load();
   }, [load]);
 
-  async function openVersion(id: string) {
+  const pname = (id: string) => products.find((p) => p.id === id);
+  const productLabel = useCallback((id: string) => (products.find((p) => p.id === id) ? `${products.find((p) => p.id === id)!.sku} — ${products.find((p) => p.id === id)!.name}` : t('mfg2.pe.unset')), [products, t]);
+  const typeLabel = (c: string) => {
+    const x = types.find((tp) => tp.code === c);
+    return x ? (ar ? x.nameAr : x.nameEn) : c;
+  };
+  const statusLabel = (s: string) => t(`mfg2.pe.status.${s}`);
+  const dirty = !!edit && edit.mode === 'edit' && JSON.stringify(edit.body) !== edit.saved;
+
+  async function open(id: string, mode?: 'edit' | 'review') {
     setError(null);
+    setNotice(null);
     try {
       const v = await api.get<VersionView>(`/manufacturing/processes/${id}`);
-      setEdit({
-        versionId: id,
-        productId: v.version.productId,
-        status: v.version.status,
-        versionNo: v.version.versionNo,
-        body: {
-          name: v.version.name,
-          note: v.version.note ?? '',
-          operations: v.operations.map((o) => ({ code: o.code, name: o.name, operationTypeCode: o.operationTypeCode, sequenceNo: o.sequenceNo, optional: o.optional, maxRuns: o.maxRuns })),
-          edges: v.edges,
-          inputs: v.inputs.map((i) => ({ ...i, alternateGroup: i.alternateGroup ?? '' })),
-          outputs: v.outputs.map((o) => ({ operationCode: o.operationCode, productId: o.productId, quantityPerUnit: o.quantityPerUnit, role: o.role, intermediate: o.intermediate, allocationWeight: o.allocationWeight })),
-        },
-      });
+      const body = toBody(v);
+      setEdit({ versionId: id, productId: v.version.productId, status: v.version.status, versionNo: v.version.versionNo, body, saved: JSON.stringify(body), mode: mode ?? (v.version.status === 'draft' ? 'edit' : 'review') });
+      setFocus(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed.');
+      setError(err instanceof ApiError ? err.message : t('mfg2.common.action_failed'));
     }
   }
 
-  async function act(fn: () => Promise<unknown>, after?: () => void) {
+  async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await fn();
-      after?.();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed.');
+      setError(err instanceof ApiError ? err.message : t('mfg2.common.action_failed'));
     } finally {
       setBusy(false);
     }
   }
 
-  const payload = (b: Body) => ({
-    name: b.name,
-    note: b.note || null,
-    operations: b.operations,
-    edges: b.edges,
-    inputs: b.inputs.map((i) => ({ ...i, alternateGroup: i.alternateGroup.trim() || null })),
-    outputs: b.outputs,
-  });
+  /** Saves the draft; returns the persisted view so the caller can show what was REALLY stored. */
+  async function persist(e: EditState): Promise<VersionView> {
+    if (e.versionId) return api.post<VersionView>(`/manufacturing/processes/${e.versionId}/save`, payload(e.body));
+    return api.post<VersionView>(`/manufacturing/processes/products/${e.productId}/versions`, payload(e.body));
+  }
+  const afterSave = (v: VersionView, mode: 'edit' | 'review') => {
+    const body = toBody(v);
+    setEdit({ versionId: v.version.id, productId: v.version.productId, status: v.version.status, versionNo: v.version.versionNo, body, saved: JSON.stringify(body), mode });
+  };
 
-  async function save() {
+  async function saveDraft(thenReview: boolean) {
     if (!edit) return;
-    await act(async () => {
-      if (edit.versionId) {
-        await api.post(`/manufacturing/processes/${edit.versionId}/save`, payload(edit.body));
-      } else {
-        const v = await api.post<VersionView>(`/manufacturing/processes/products/${edit.productId}/versions`, payload(edit.body));
-        setEdit((e) => (e ? { ...e, versionId: v.version.id, versionNo: v.version.versionNo } : e));
-      }
+    await run(async () => {
+      const v = await persist(edit);
+      afterSave(v, thenReview ? 'review' : 'edit');
+      setNotice(thenReview ? 'mfg2.pe.notice.saved_review' : 'mfg2.pe.notice.saved');
     });
   }
+  async function activate() {
+    if (!edit?.versionId) return;
+    await run(async () => {
+      await api.post(`/manufacturing/processes/${edit.versionId}/activate`, {});
+      await open(edit.versionId!, 'review');
+      setNotice('mfg2.pe.notice.activated');
+    });
+  }
+  function close() {
+    if (dirty && !window.confirm(t('mfg2.pe.confirm_discard'))) return;
+    setEdit(null);
+    setFocus(null);
+  }
 
-  const pname = (id: string) => products.find((p) => p.id === id);
-  const label = (id: string) => (pname(id) ? `${pname(id)!.sku} — ${pname(id)!.name}` : id.slice(0, 8));
-  const isDraft = !!edit && edit.status === 'draft';
+  const reviewFindings = useMemo(() => (edit && edit.mode === 'review' ? check(edit.body, edit.productId, productLabel) : []), [edit, productLabel]);
+  const reviewErrors = reviewFindings.filter((x) => x.severity === 'error').length;
   const setBody = (fn: (b: Body) => Body) => setEdit((e) => (e ? { ...e, body: fn(e.body) } : e));
-  const codes = edit?.body.operations.map((o) => o.code).filter(Boolean) ?? [];
-
-  const cellInput = (value: string | number, onChange: (v: string) => void, props: Record<string, unknown> = {}) => (
-    <input value={value} onChange={(e) => onChange(e.target.value)} disabled={!isDraft} style={{ width: '100%' }} {...props} />
-  );
-  const opSelect = (value: string, onChange: (v: string) => void) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={!isDraft}>
-      <option value="">—</option>
-      {codes.map((c) => (
-        <option key={c} value={c}>
-          {c}
-        </option>
-      ))}
-    </select>
-  );
-  const prodSelect = (value: string, onChange: (v: string) => void) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={!isDraft} style={{ maxWidth: 220 }}>
-      <option value="">—</option>
-      {products.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.sku} — {p.name}
-        </option>
-      ))}
-    </select>
-  );
-  const delBtn = (onClick: () => void) =>
-    isDraft ? (
-      <button className="btn btn-secondary" type="button" onClick={onClick}>
-        ×
-      </button>
-    ) : null;
-  const addBtn = (text: string, onClick: () => void) =>
-    isDraft ? (
-      <button className="btn btn-secondary" type="button" onClick={onClick} style={{ marginTop: 6 }}>
-        + {text}
-      </button>
-    ) : null;
 
   return (
     <div data-testid="processes-page">
-      <h2>{tx('تعريفات العمليات (الإصدارات)', 'Process definitions (versions)')}</h2>
-      {error && <div className="error-text">{error}</div>}
+      <div className="page-header">
+        <h1>{t('nav.manufacturing_processes')}</h1>
+      </div>
+      <p className="mfg-note" style={{ marginBlockStart: 0, fontSize: '0.95rem' }}>
+        {t('mfg2.pe.intro')}
+      </p>
+      {error && <BlockedReason danger>{error}</BlockedReason>}
+      {notice && (
+        <div className="mfg-blocked" role="status" style={{ background: '#e7f6ec', borderColor: '#7bc596', color: '#1c7a3e', marginBlock: 8 }} data-testid="pe-notice">
+          {t(notice)}
+        </div>
+      )}
 
       {!edit && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <select value={newProductId} onChange={(e) => setNewProductId(e.target.value)} data-testid="proc-new-product">
-              <option value="">{tx('اختر الصنف المنتَج', 'Select the product it makes')}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.sku} — {p.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={!newProductId}
-              data-testid="proc-new"
-              onClick={() => {
-                setEdit({ versionId: null, productId: newProductId, status: 'draft', versionNo: null, body: { ...emptyBody(), name: `${pname(newProductId)?.name ?? ''}` } });
-                setNewProductId('');
-              }}
-            >
-              {tx('عملية جديدة', 'New process')}
-            </button>
-          </div>
+          {canEdit && (
+            <div className="card" style={{ marginBlockEnd: 16 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ minInlineSize: 280, flex: '1 1 280px' }}>
+                  <FormField label={t('mfg2.pe.new.product')} hint={t('mfg2.pe.new.hint')}>
+                    {(p) => (
+                      <select {...p} value={newProductId} onChange={(e) => setNewProductId(e.target.value)} data-testid="proc-new-product">
+                        <option value="">{t('mfg2.common.choose')}</option>
+                        {products.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.sku} — {x.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </FormField>
+                </div>
+                <div style={{ marginBlockEnd: 14 }}>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!newProductId}
+                    data-testid="proc-new"
+                    onClick={() => {
+                      const body = { ...emptyBody(), name: pname(newProductId)?.name ?? '' };
+                      setEdit({ versionId: null, productId: newProductId, status: 'draft', versionNo: null, body, saved: '', mode: 'edit' });
+                      setNewProductId('');
+                      setNotice(null);
+                    }}
+                  >
+                    {t('mfg2.pe.new.cta')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {rows === null ? (
-            <div className="empty-state">{loadingLabel()}</div>
-          ) : rows.length === 0 ? (
-            <div className="empty-state">{tx('لا توجد تعريفات عمليات بعد.', 'No process definitions yet.')}</div>
+            <div className="mfg-note">{t('mfg2.common.loading')}</div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{tx('الصنف', 'Product')}</th>
-                  <th>{tx('الإصدار', 'Version')}</th>
-                  <th>{tx('الاسم', 'Name')}</th>
-                  <th>{tx('العمليات', 'Operations')}</th>
-                  <th>{tx('الحالة', 'Status')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} data-testid={`proc-row-${r.status}`}>
-                    <td>
-                      {r.productSku} — {r.productName}
-                    </td>
-                    <td>v{r.versionNo}</td>
-                    <td>{r.name}</td>
-                    <td>{r.operationCount}</td>
-                    <td>{ar ? STATUS_AR[r.status] : r.status}</td>
-                    <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button className="btn btn-secondary" type="button" onClick={() => openVersion(r.id)}>
-                        {r.status === 'draft' ? tx('تعديل', 'Edit') : tx('عرض', 'View')}
+            <DataTable
+              caption={t('mfg2.pe.list.title')}
+              rows={rows}
+              rowKey={(r) => r.id}
+              empty={<EmptyState title={t('mfg2.pe.list.empty_title')} description={t('mfg2.pe.list.empty_desc')} />}
+              columns={[
+                { key: 'p', header: t('mfg2.col.product'), render: (r) => `${r.productSku ?? ''} — ${r.productName ?? ''}` },
+                { key: 'v', header: t('mfg2.pe.col.version'), render: (r) => `v${r.versionNo}` },
+                { key: 'n', header: t('mfg2.pe.col.name'), render: (r) => r.name },
+                { key: 'o', header: t('mfg2.pe.col.operations'), align: 'end', render: (r) => r.operationCount },
+                { key: 's', header: t('mfg2.col.status'), render: (r) => <StatusChip tone={TONE[r.status]}>{statusLabel(r.status)}</StatusChip> },
+                {
+                  key: 'a',
+                  header: t('mfg2.pe.col.actions'),
+                  render: (r) => (
+                    <span className="mfg-row-actions">
+                      <button className="btn btn-secondary" type="button" onClick={() => open(r.id, r.status === 'draft' && canEdit ? 'edit' : 'review')} data-testid={`proc-open-${r.status}`}>
+                        {r.status === 'draft' && canEdit ? t('mfg2.pe.act.edit') : t('mfg2.pe.act.view')}
                       </button>
-                      <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => act(() => api.post(`/manufacturing/processes/${r.id}/clone`, {}))}>
-                        {tx('نسخ كإصدار جديد', 'Clone')}
-                      </button>
-                      {r.status === 'draft' && (
-                        <>
-                          <button className="btn btn-primary" type="button" disabled={busy} onClick={() => act(() => api.post(`/manufacturing/processes/${r.id}/activate`, {}))}>
-                            {tx('تفعيل', 'Activate')}
-                          </button>
-                          <button className="btn btn-danger" type="button" disabled={busy} onClick={() => act(() => api.delete(`/manufacturing/processes/${r.id}`))}>
-                            {tx('حذف', 'Delete')}
-                          </button>
-                        </>
+                      {canEdit && r.status === 'draft' && (
+                        <button className="btn btn-primary" type="button" disabled={busy} onClick={() => open(r.id, 'review')} data-testid="proc-review">
+                          {t('mfg2.pe.act.review')}
+                        </button>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {canEdit && (
+                        <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => run(async () => void (await api.post(`/manufacturing/processes/${r.id}/clone`, {})))}>
+                          {t('mfg2.pe.act.clone')}
+                        </button>
+                      )}
+                      {canEdit && r.status === 'draft' && (
+                        <button
+                          className="btn btn-danger"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            if (window.confirm(t('mfg2.pe.confirm_delete'))) void run(async () => void (await api.delete(`/manufacturing/processes/${r.id}`)));
+                          }}
+                        >
+                          {t('mfg2.pe.act.delete')}
+                        </button>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           )}
         </>
       )}
 
       {edit && (
-        <div className="card" data-testid="proc-editor">
-          <h3 style={{ marginTop: 0 }}>
-            {label(edit.productId)} {edit.versionNo ? `— v${edit.versionNo}` : ''} <span className="muted">({ar ? STATUS_AR[edit.status] : edit.status})</span>
-          </h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            <input value={edit.body.name} onChange={(e) => setBody((b) => ({ ...b, name: e.target.value }))} disabled={!isDraft} placeholder={tx('اسم العملية', 'Process name')} style={{ minWidth: 260 }} data-testid="proc-name" />
-            <input value={edit.body.note} onChange={(e) => setBody((b) => ({ ...b, note: e.target.value }))} disabled={!isDraft} placeholder={tx('ملاحظة', 'Note')} style={{ minWidth: 260 }} />
+        <div data-testid="proc-editor">
+          <div className="card" style={{ marginBlockEnd: 16 }}>
+            <div className="mfg-row-between">
+              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>
+                {productLabel(edit.productId)} {edit.versionNo ? `— v${edit.versionNo}` : `— ${t('mfg2.pe.new_version')}`}
+              </h2>
+              <span>
+                <StatusChip tone={TONE[edit.status]}>{statusLabel(edit.status)}</StatusChip> <StatusChip tone="info">{edit.mode === 'edit' ? t('mfg2.pe.mode.edit') : t('mfg2.pe.mode.review')}</StatusChip>
+                {dirty && <StatusChip tone="warning">{t('mfg2.pe.unsaved')}</StatusChip>}
+              </span>
+            </div>
+            {edit.mode === 'edit' ? (
+              <div className="mfg-grid cols-2" style={{ marginBlockStart: 12 }}>
+                <FormField label={t('mfg2.pe.name')} required>
+                  {(p) => <input {...p} value={edit.body.name} onChange={(e) => setBody((b) => ({ ...b, name: e.target.value }))} data-testid="proc-name" />}
+                </FormField>
+                <FormField label={t('mfg2.pe.note')}>{(p) => <input {...p} value={edit.body.note} onChange={(e) => setBody((b) => ({ ...b, note: e.target.value }))} />}</FormField>
+              </div>
+            ) : (
+              <p style={{ marginBlockEnd: 0 }}>
+                <strong>{edit.body.name}</strong>
+                {edit.body.note && <span className="mfg-note"> — {edit.body.note}</span>}
+              </p>
+            )}
           </div>
 
-          <h4>{tx('العمليات (عقد المخطط)', 'Operations (graph nodes)')}</h4>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{tx('الرمز', 'Code')}</th>
-                <th>{tx('الاسم', 'Name')}</th>
-                <th>{tx('النوع', 'Type')}</th>
-                <th>{tx('ترتيب', 'Seq')}</th>
-                <th>{tx('اختيارية', 'Optional')}</th>
-                <th>{tx('أقصى مرات', 'Max runs')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {edit.body.operations.map((o, i) => (
-                <tr key={i}>
-                  <td>{cellInput(o.code, (v) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, code: v } : x)) })), { 'data-testid': `op-code-${i}` })}</td>
-                  <td>{cellInput(o.name, (v) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, name: v } : x)) })))}</td>
-                  <td>
-                    <select value={o.operationTypeCode} disabled={!isDraft} onChange={(e) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, operationTypeCode: e.target.value } : x)) }))}>
-                      {types
-                        .filter((t) => t.active || t.code === o.operationTypeCode)
-                        .map((t) => (
-                          <option key={t.code} value={t.code}>
-                            {ar ? t.nameAr : t.nameEn}
-                          </option>
-                        ))}
-                    </select>
-                  </td>
-                  <td style={{ width: 70 }}>{cellInput(o.sequenceNo, (v) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, sequenceNo: Number(v) || 0 } : x)) })), { type: 'number' })}</td>
-                  <td>
-                    <input type="checkbox" checked={o.optional} disabled={!isDraft} onChange={(e) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, optional: e.target.checked } : x)) }))} />
-                  </td>
-                  <td style={{ width: 70 }}>{cellInput(o.maxRuns, (v) => setBody((b) => ({ ...b, operations: b.operations.map((x, j) => (j === i ? { ...x, maxRuns: Number(v) || 1 } : x)) })), { type: 'number', min: 1 })}</td>
-                  <td>{delBtn(() => setBody((b) => ({ ...b, operations: b.operations.filter((_, j) => j !== i) })))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {addBtn(tx('عملية', 'Operation'), () => setBody((b) => ({ ...b, operations: [...b.operations, { code: '', name: '', operationTypeCode: types.find((t) => t.active)?.code ?? 'transform', sequenceNo: (b.operations.length + 1) * 10, optional: false, maxRuns: 1 }] })))}
+          {edit.mode === 'edit' && edit.status === 'draft' && (
+            <>
+              <ProcessBodyEditor body={edit.body} setBody={setBody} products={products} types={types} productId={edit.productId} focus={focus} setFocus={setFocus} />
+              <div className="mfg-actions" style={{ position: 'sticky', insetBlockEnd: 0, background: '#fff', paddingBlock: 10, borderBlockStart: '1px solid #e2e5eb' }}>
+                <button className="btn btn-secondary" type="button" disabled={busy || !edit.body.name.trim()} onClick={() => saveDraft(false)} data-testid="proc-save">
+                  {t('mfg2.pe.save')}
+                </button>
+                <button className="btn btn-primary" type="button" disabled={busy || !edit.body.name.trim()} onClick={() => saveDraft(true)} data-testid="proc-save-review">
+                  {t('mfg2.pe.save_review')}
+                </button>
+                <button className="btn btn-secondary" type="button" onClick={close}>
+                  {t('mfg2.pe.close')}
+                </button>
+              </div>
+            </>
+          )}
 
-          <h4>{tx('الترتيب (من ← إلى). فرعان متوازيان = عمليتان بنفس السابقة؛ الدمج = عملية لها أكثر من سابقة', 'Order (from → to). Parallel branches = two operations after the same one; a join = an operation with several predecessors')}</h4>
-          <table className="data-table">
-            <tbody>
-              {edit.body.edges.map((e, i) => (
-                <tr key={i}>
-                  <td>{opSelect(e.from, (v) => setBody((b) => ({ ...b, edges: b.edges.map((x, j) => (j === i ? { ...x, from: v } : x)) })))}</td>
-                  <td>→</td>
-                  <td>{opSelect(e.to, (v) => setBody((b) => ({ ...b, edges: b.edges.map((x, j) => (j === i ? { ...x, to: v } : x)) })))}</td>
-                  <td>{delBtn(() => setBody((b) => ({ ...b, edges: b.edges.filter((_, j) => j !== i) })))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {addBtn(tx('ربط', 'Link'), () => setBody((b) => ({ ...b, edges: [...b.edges, { from: '', to: '' }] })))}
-
-          <h4>{tx('المواد المستهلكة لكل عملية (مجموعة البدائل: نفس الاسم = اختيار واحد منها)', 'Inputs per operation (same alternate group = pick one)')}</h4>
-          <table className="data-table">
-            <tbody>
-              {edit.body.inputs.map((x, i) => (
-                <tr key={i}>
-                  <td>{opSelect(x.operationCode, (v) => setBody((b) => ({ ...b, inputs: b.inputs.map((y, j) => (j === i ? { ...y, operationCode: v } : y)) })))}</td>
-                  <td>{prodSelect(x.componentProductId, (v) => setBody((b) => ({ ...b, inputs: b.inputs.map((y, j) => (j === i ? { ...y, componentProductId: v } : y)) })))}</td>
-                  <td style={{ width: 90 }}>{cellInput(x.quantityPerUnit, (v) => setBody((b) => ({ ...b, inputs: b.inputs.map((y, j) => (j === i ? { ...y, quantityPerUnit: Number(v) || 0 } : y)) })), { type: 'number', min: 1 })}</td>
-                  <td style={{ width: 120 }}>{cellInput(x.alternateGroup, (v) => setBody((b) => ({ ...b, inputs: b.inputs.map((y, j) => (j === i ? { ...y, alternateGroup: v } : y)) })), { placeholder: tx('مجموعة بدائل', 'alt. group') })}</td>
-                  <td>{delBtn(() => setBody((b) => ({ ...b, inputs: b.inputs.filter((_, j) => j !== i) })))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {addBtn(tx('مادة', 'Input'), () => setBody((b) => ({ ...b, inputs: [...b.inputs, { operationCode: '', componentProductId: '', quantityPerUnit: 1, alternateGroup: '' }] })))}
-
-          <h4>{tx('المخرجات لكل عملية (وسيط = يُستهلك في عملية لاحقة؛ الوزن = حصته من التكلفة المجمّعة)', 'Outputs per operation (intermediate = consumed by a later operation; weight = share of the pooled cost)')}</h4>
-          <table className="data-table">
-            <tbody>
-              {edit.body.outputs.map((x, i) => (
-                <tr key={i}>
-                  <td>{opSelect(x.operationCode, (v) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, operationCode: v } : y)) })))}</td>
-                  <td>{prodSelect(x.productId, (v) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, productId: v } : y)) })))}</td>
-                  <td style={{ width: 90 }}>{cellInput(x.quantityPerUnit, (v) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, quantityPerUnit: Number(v) || 0 } : y)) })), { type: 'number', min: 1 })}</td>
-                  <td>
-                    <select value={x.role} disabled={!isDraft} onChange={(e) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, role: e.target.value as Out['role'] } : y)) }))}>
-                      {(['good', 'co_product', 'by_product'] as const).map((r) => (
-                        <option key={r} value={r}>
-                          {ar ? ROLE_AR[r] : r}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <label>
-                      <input type="checkbox" checked={x.intermediate} disabled={!isDraft} onChange={(e) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, intermediate: e.target.checked } : y)) }))} /> {tx('وسيط', 'intermediate')}
-                    </label>
-                  </td>
-                  <td style={{ width: 80 }}>{cellInput(x.allocationWeight, (v) => setBody((b) => ({ ...b, outputs: b.outputs.map((y, j) => (j === i ? { ...y, allocationWeight: Number(v) || 0 } : y)) })), { type: 'number', min: 0, title: tx('الوزن', 'weight') })}</td>
-                  <td>{delBtn(() => setBody((b) => ({ ...b, outputs: b.outputs.filter((_, j) => j !== i) })))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {addBtn(tx('مخرج', 'Output'), () => setBody((b) => ({ ...b, outputs: [...b.outputs, { operationCode: '', productId: '', quantityPerUnit: 1, role: 'good', intermediate: false, allocationWeight: 1 }] })))}
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            {isDraft && (
-              <button className="btn btn-primary" type="button" disabled={busy} onClick={save} data-testid="proc-save">
-                {tx('حفظ المسودة', 'Save draft')}
-              </button>
-            )}
-            {isDraft && edit.versionId && (
-              <button
-                className="btn btn-secondary"
-                type="button"
-                disabled={busy}
-                data-testid="proc-activate"
-                onClick={() =>
-                  act(async () => {
-                    await api.post(`/manufacturing/processes/${edit.versionId}/save`, payload(edit.body));
-                    await api.post(`/manufacturing/processes/${edit.versionId}/activate`, {});
-                    setEdit(null);
-                  })
-                }
-              >
-                {tx('حفظ وتفعيل', 'Save & activate')}
-              </button>
-            )}
-            <button className="btn btn-secondary" type="button" onClick={() => setEdit(null)}>
-              {tx('إغلاق', 'Close')}
-            </button>
-          </div>
+          {edit.mode === 'review' && (
+            <div data-testid="proc-review-panel">
+              <section className="card" aria-labelledby="pe-rev-title">
+                <h3 id="pe-rev-title" style={{ marginBlockStart: 0 }}>
+                  {t('mfg2.pe.review.title')}
+                </h3>
+                <p className="mfg-note">{edit.status === 'draft' ? t('mfg2.pe.review.help_draft') : t('mfg2.pe.review.help_readonly')}</p>
+                <FindingsPanel findings={reviewFindings} />
+              </section>
+              <section className="card" style={{ marginBlockStart: 16 }}>
+                <h3 style={{ marginBlockStart: 0 }}>{t('mfg2.pe.flow.title')}</h3>
+                <StructureList body={edit.body} label={(c) => `${c} — ${edit.body.operations.find((o) => o.code === c)?.name ?? ''}`} />
+                {layout(edit.body.operations, edit.body.edges).levels.length > 0 && <ProcessGraph ops={edit.body.operations} edges={edit.body.edges} selected={focus} onSelect={setFocus} typeLabel={typeLabel} />}
+              </section>
+              <section style={{ marginBlockStart: 16 }} aria-labelledby="pe-rev-ops">
+                <h3 id="pe-rev-ops">{t('mfg2.pe.ops.title')}</h3>
+                {[...edit.body.operations]
+                  .sort((a, b) => a.sequenceNo - b.sequenceNo)
+                  .map((o) => (
+                    <OperationSummary key={o.code} body={edit.body} o={o} productLabel={productLabel} typeLabel={typeLabel} />
+                  ))}
+              </section>
+              <div className="mfg-actions">
+                {edit.status === 'draft' && canEdit && (
+                  <>
+                    <button className="btn btn-primary" type="button" disabled={busy || reviewErrors > 0} onClick={activate} data-testid="proc-activate">
+                      {t('mfg2.pe.activate')}
+                    </button>
+                    <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => setEdit((e) => (e ? { ...e, mode: 'edit' } : e))}>
+                      {t('mfg2.pe.back_edit')}
+                    </button>
+                  </>
+                )}
+                {edit.status !== 'draft' && canEdit && edit.versionId && (
+                  <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => run(async () => { const v = await api.post<VersionView>(`/manufacturing/processes/${edit.versionId}/clone`, {}); afterSave(v, 'edit'); setNotice('mfg2.pe.notice.cloned'); })}>
+                    {t('mfg2.pe.act.clone')}
+                  </button>
+                )}
+                <button className="btn btn-secondary" type="button" onClick={close}>
+                  {t('mfg2.pe.close')}
+                </button>
+              </div>
+              {edit.status === 'draft' && reviewErrors > 0 && (
+                <div style={{ marginBlockStart: 8 }}>
+                  <BlockedReason>{t('mfg2.pe.chk.cannot_activate')}</BlockedReason>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

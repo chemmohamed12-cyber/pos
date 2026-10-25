@@ -442,6 +442,7 @@ export const NAVIGATION_REGISTRY: NavGroup[] = [
       // UX redesign (stage 2): the same routes and gates, grouped by what the user is doing - run production / prepare it. Legacy routings and work centers stay reachable, labelled as the basic path.
       { to: '/manufacturing/assembly', code: 'nav.manufacturing_quick_assembly', section: 'nav_section.mfg_execution', module: 'manufacturing', permissionNode: 'inventory.assembly' },
       { to: '/manufacturing/work-orders', code: 'nav.manufacturing_work_orders', section: 'nav_section.mfg_execution', module: 'manufacturing', feature: 'manufacturing.work_orders', permissionNode: 'manufacturing.work_order' },
+      { to: '/manufacturing/readiness', code: 'nav.manufacturing_readiness', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
       { to: '/manufacturing/boms', code: 'nav.manufacturing_boms', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.bom' },
       { to: '/manufacturing/processes', code: 'nav.manufacturing_processes', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.routing' },
       { to: '/manufacturing/routings', code: 'nav.manufacturing_routings_basic', section: 'nav_section.mfg_setup', module: 'manufacturing', permissionNode: 'manufacturing.routing' },

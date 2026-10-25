@@ -50,6 +50,7 @@ import { Processes } from './pages/manufacturing/Processes';
 import { Routings } from './pages/manufacturing/Routings';
 import { WorkCenters } from './pages/manufacturing/WorkCenters';
 import { Assembly } from './pages/manufacturing/Assembly';
+import { ManufacturingReadiness } from './pages/manufacturing/ManufacturingReadiness';
 import { ManufacturingCover } from './pages/covers/ManufacturingCover';
 import { AttendanceConnectors } from './pages/attendance/AttendanceConnectors';
 import { AttendanceImport } from './pages/attendance/AttendanceImport';
@@ -288,6 +289,7 @@ function AppRoutes() {
         <Route path="manufacturing/processes" element={<Processes />} />
         <Route path="manufacturing/work-centers" element={<WorkCenters />} />
         <Route path="manufacturing/assembly" element={<Assembly />} />
+        <Route path="manufacturing/readiness" element={<ManufacturingReadiness />} />
         <Route path="attendance" element={<AttendanceCover />} />
         <Route path="attendance/connectors" element={<AttendanceConnectors />} />
         <Route path="attendance/import" element={<AttendanceImport />} />
