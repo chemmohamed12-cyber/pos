@@ -11,8 +11,6 @@ import { buildPayrollFixture, PayrollFixture } from '../../../foundation/testing
 describe('Payroll financial integrity — accrual, payouts, reconciliation (real PG, real ledger and treasury)', () => {
   jest.setTimeout(580_000);
   let f: PayrollFixture;
-  let e1 = '';
-  let e2 = '';
   const u = () => f.users.A;
 
   const journalOf = async (sourceType: string, sourceId: string) => {
@@ -36,8 +34,8 @@ describe('Payroll financial integrity — accrual, payouts, reconciliation (real
 
   beforeAll(async () => {
     f = await buildPayrollFixture('payroll_fin');
-    e1 = await f.employee('A', 'Fin One', '1000.00');
-    e2 = await f.employee('A', 'Fin Two', '800.00');
+    await f.employee('A', 'Fin One', '1000.00');
+    await f.employee('A', 'Fin Two', '800.00');
   });
 
   afterAll(async () => {
