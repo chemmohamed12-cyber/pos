@@ -7,7 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ErrorState } from '../../components/ErrorState';
 import { BlockedReason, DataTable, EmptyState, FormField, StatusChip } from '../../components/mfg';
 import { EVENT_AND_ACTION_NAMES, STATUS_NAMES, currentLang, nameOf } from '../../lib/displayNames';
-import { fmtDateTime } from '../../lib/formatDateTime';
+import { fmtDate, fmtDateTime } from '../../lib/formatDateTime';
 import { ProcessExecutionPanel, type Execution } from './ProcessExecutionPanel';
 import { WorkOrderOutcomes, type WorkOrderResultRow } from './WorkOrderOutcomes';
 import { nextStep } from './workOrderNext';
@@ -438,7 +438,7 @@ export function WorkOrderDetail() {
                   <Fragment key={ev.id}>
                     {ev.lines.length === 0 ? (
                       <tr className={ev.status.toUpperCase() === 'REJECTED' ? 'mfg-row-warn' : undefined}>
-                        <td>{ev.businessDate}</td>
+                        <td>{fmtDate(ev.businessDate)}</td>
                         <td>
                           <StatusBadge code={`value.financial_event_status.${ev.status.toLowerCase()}`} />
                         </td>
@@ -450,7 +450,7 @@ export function WorkOrderDetail() {
                         <tr key={`${ev.id}:${i}`}>
                           {i === 0 && (
                             <>
-                              <td rowSpan={ev.lines.length}>{ev.businessDate}</td>
+                              <td rowSpan={ev.lines.length}>{fmtDate(ev.businessDate)}</td>
                               <td rowSpan={ev.lines.length}>
                                 <StatusBadge code={`value.financial_event_status.${ev.status.toLowerCase()}`} />
                               </td>
