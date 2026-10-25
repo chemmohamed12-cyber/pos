@@ -9,6 +9,8 @@ import { ErrorState } from '../../components/ErrorState';
 import { currentLang, loadingLabel } from '../../lib/displayNames';
 import { translateRejectionReason } from '../../lib/financialReason';
 import { PANEL_TERMS, RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel, useMoney } from './PayrollRunPanels';
+import { RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel } from './PayrollRunPanels';
+import { PANEL_TERMS, useMoney } from './payrollUi';
 
 interface Employee {
   id: string;

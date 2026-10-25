@@ -1,0 +1,118 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+/**
+ * Payroll gap closure (2026-10-25) — Arabic / English labels for the new Run Detail panels (exceptions, inputs, actors, payouts, reconciliation), the revision /
+ * kind / superseded states and the compensation, period and commission-policy changes. Only NEW codes; existing codes are never overwritten (`DO NOTHING`).
+ */
+export class SeedPayrollGapClosureTerminology1790100100000 implements MigrationInterface {
+  name = 'SeedPayrollGapClosureTerminology1790100100000';
+
+  private readonly rows: Array<[string, string, string]> = [
+    ['action.acknowledge_exceptions', 'تأكيد الاستثناءات المحددة', 'Acknowledge selected exceptions'],
+    ['action.calculate_supplementary', 'احتساب دورة مكمِّلة', 'Calculate supplementary run'],
+    ['action.cancel_payout_batch', 'إلغاء دفعة الصرف', 'Cancel payout batch'],
+    ['action.close_period', 'إقفال الفترة', 'Close period'],
+    ['action.create_payout_batch', 'إنشاء دفعة صرف', 'Create payout batch'],
+    ['action.execute_payout_batch', 'تنفيذ دفعة الصرف', 'Execute payout batch'],
+    ['action.recalculate_run', 'إعادة الاحتساب', 'Recalculate'],
+    ['field.adjustments_amount', 'التسويات', 'Adjustments'],
+    ['field.at', 'التوقيت', 'At'],
+    ['field.attendance_status', 'حالة الحضور', 'Attendance status'],
+    ['field.carried_forward', 'مُرحَّل من فترة سابقة', 'Carried forward'],
+    ['field.decision_reference', 'مرجع القرار الموثق', 'Decision reference'],
+    ['field.effective_from', 'ساري من', 'Effective from'],
+    ['field.effective_to', 'ساري حتى', 'Effective to'],
+    ['field.exception_class', 'تصنيف الاستثناء', 'Exception class'],
+    ['field.exception_code', 'الاستثناء', 'Exception'],
+    ['field.failed', 'فشل', 'Failed'],
+    ['field.failure_reason', 'سبب الفشل', 'Failure reason'],
+    ['field.input_kind', 'نوع المدخل', 'Input kind'],
+    ['field.ledger_payable', 'رواتب مستحقة (دائن − مدين)', 'Wages payable (credit − debit)'],
+    ['field.outstanding', 'المتبقي للصرف', 'Outstanding'],
+    ['field.paid', 'المصروف', 'Paid'],
+    ['field.payout_batch', 'دفعة الصرف', 'Payout batch'],
+    ['field.payroll_period', 'فترة الرواتب', 'Payroll period'],
+    ['field.pending', 'معلّق', 'Pending'],
+    ['field.performed_by', 'المنفِّذ', 'Performed by'],
+    ['field.revision', 'المراجعة', 'Revision'],
+    ['field.run_kind', 'نوع الدورة', 'Run kind'],
+    ['field.stage', 'المرحلة', 'Stage'],
+    ['field.total_expense', 'المصروف (الدورة / القيد)', 'Expense (run / ledger)'],
+    ['field.treasury_cash_out', 'خروج نقدي من الخزينة', 'Treasury cash out'],
+    ['msg.action_failed', 'تعذّر تنفيذ العملية.', 'The action could not be completed.'],
+    ['msg.consistent', 'متطابق', 'Consistent'],
+    ['msg.inconsistent', 'توجد فروق', 'Differences found'],
+    ['msg.load_failed', 'تعذّر تحميل البيانات.', 'Could not load the data.'],
+    ['msg.loading', 'جارٍ التحميل…', 'Loading…'],
+    ['panel.commission_disabled_kinds_notice', 'أساس «صافي المبيعات» ونطاق «مجموعة العملاء» معطّلان إلى حين اعتماد تعريفهما ومصدر بياناتهما.', 'The "net sales" basis and the "customer group" scope are disabled until their definition and data source are approved.'],
+    ['panel.payroll_actors', 'من نفّذ كل مرحلة', 'Who performed each stage'],
+    ['panel.payroll_exceptions', 'استثناءات الدورة', 'Run exceptions'],
+    ['panel.payroll_exceptions_hint', 'كل حالة تغيّر من يُصرف له أو على أي أساس تظهر هنا ولا تُتجاهل بصمت. الاستثناءات من فئة «يتطلب توثيقاً» تُؤكَّد بمرجع قرار؛ الفئة «يمنع الاعتماد» تُعالج من المصدر ثم تُعاد الدورة.', 'Every condition that changes who is paid, or on what basis, is listed here and never skipped silently. "Needs documentation" items are acknowledged with a decision reference; "blocks approval" items are fixed at the source and the run is recalculated.'],
+    ['panel.payroll_inputs', 'عمولات وتسويات محجوزة لهذه الدورة', 'Commission and adjustments held by this run'],
+    ['panel.payroll_no_exceptions', 'لا توجد استثناءات', 'No exceptions'],
+    ['panel.payroll_no_inputs', 'لا توجد عمولات أو تسويات في هذه الدورة', 'No commission or adjustments in this run'],
+    ['panel.payroll_no_payouts', 'لا توجد دفعات صرف بعد', 'No payout batches yet'],
+    ['panel.payroll_payouts', 'دفعات الصرف', 'Payouts'],
+    ['panel.payroll_payouts_hint', 'الدفعة الفاشلة تبقى في السجل ولا تُرحَّل؛ المتبقي يُعاد إصداره كبند جديد.', 'A failed payment stays in the history and posts nothing; the remainder is re-issued as a new item.'],
+    ['panel.payroll_reconciliation', 'مطابقة الدورة', 'Run reconciliation'],
+    ['panel.payroll_rejection_notice', 'أُعيدت الدورة بعد الرفض', 'The run was returned after a rejection'],
+    ['panel.payroll_superseded_notice', 'حلّت محلها مراجعة أحدث من هذه الدورة؛ تبقى للسجل فقط.', 'A newer revision replaced this run; it is kept for history only.'],
+    ['panel.reconciliation_gap', 'فجوة مطابقة: الدورة مرحَّلة ولم يُؤكَّد قيدها', 'Reconciliation gap: the run is posted but its ledger entry is not confirmed'],
+    ['value.exception_class.A_DOC', 'يتطلب توثيقاً', 'Needs documentation'],
+    ['value.exception_class.B_APPROVE', 'يمنع الاعتماد', 'Blocks approval'],
+    ['value.exception_class.INFO', 'معلومة', 'Information'],
+    ['value.exception_status.acknowledged', 'مؤكَّد', 'Acknowledged'],
+    ['value.exception_status.open', 'مفتوح', 'Open'],
+    ['value.exception_status.resolved', 'مُعالَج', 'Resolved'],
+    ['value.input_kind.commission_adjustment', 'تسوية عمولة', 'Commission adjustment'],
+    ['value.input_kind.commission_result', 'عمولة معتمدة', 'Approved commission'],
+    ['value.input_kind.payroll_adjustment', 'تسوية رواتب', 'Payroll adjustment'],
+    ['value.input_state.consumed', 'مستهلك', 'Consumed'],
+    ['value.input_state.released', 'مُحرَّر', 'Released'],
+    ['value.input_state.reserved', 'محجوز', 'Reserved'],
+    ['value.payout_batch_status.cancelled', 'ملغاة', 'Cancelled'],
+    ['value.payout_batch_status.completed', 'مكتملة', 'Completed'],
+    ['value.payout_batch_status.draft', 'مسودة', 'Draft'],
+    ['value.payout_batch_status.executing', 'قيد التنفيذ', 'Executing'],
+    ['value.payout_batch_status.failed', 'فشلت', 'Failed'],
+    ['value.payout_batch_status.partially_completed', 'مكتملة جزئياً', 'Partially completed'],
+    ['value.payout_status.failed', 'فشل', 'Failed'],
+    ['value.payout_status.paid', 'مصروف', 'Paid'],
+    ['value.payout_status.pending', 'معلّق', 'Pending'],
+    ['value.payroll_exception.ADJUSTMENTS_APPLIED', 'تسويات مُطبَّقة في الدورة', 'Adjustments applied in this run'],
+    ['value.payroll_exception.COMMISSION_CARRIED_FORWARD', 'عمولة مُرحَّلة من فترة سابقة', 'Commission carried forward from an earlier period'],
+    ['value.payroll_exception.COMPENSATION_CHANGE_IN_PERIOD', 'تغيّر الأجر داخل الفترة (لا يوجد توزيع نسبي)', 'Compensation changes inside the period (no proration rule)'],
+    ['value.payroll_exception.EMPLOYEE_ON_LEAVE_STATUS', 'الموظف بحالة «إجازة» ولم يُحتسب', 'Employee on leave status — not calculated'],
+    ['value.payroll_exception.EMPTY_RUN', 'دورة بلا بنود', 'Run has no lines'],
+    ['value.payroll_exception.EXPENSE_ACCOUNT_MISSING', 'حساب مصروف الرواتب غير متاح للترحيل', 'Payroll expense account is not available for posting'],
+    ['value.payroll_exception.INPUT_TAKEN_BY_ANOTHER_RUN', 'مدخل محجوز لدورة أخرى', 'Input already held by another run'],
+    ['value.payroll_exception.NEGATIVE_NET_PAY', 'صافي الأجر سالب', 'Net pay is negative'],
+    ['value.payroll_exception.NO_ATTENDANCE_COVERAGE', 'لا يوجد حضور معتمد للفترة', 'No approved attendance for the period'],
+    ['value.payroll_exception.NO_COMPENSATION', 'لا يوجد أجر ساري — لم يُحتسب', 'No effective compensation — not calculated'],
+    ['value.payroll_exception.TERMINATED_IN_PERIOD', 'انتهت خدمته خلال الفترة — لم يُحتسب', 'Service ended in the period — not calculated'],
+    ['value.payroll_exception.UNCLASSIFIED_ABSENCE_DAYS', 'أيام غياب غير مصنّفة (لا خصم)', 'Unclassified absence days (no deduction)'],
+    ['value.payroll_exception.WAGES_PAYABLE_ACCOUNT_MISSING', 'حساب الرواتب المستحقة غير متاح للترحيل', 'Wages payable account is not available for posting'],
+    ['value.payroll_run_kind.regular', 'أساسية', 'Regular'],
+    ['value.payroll_run_kind.supplementary', 'مكمِّلة', 'Supplementary'],
+    ['value.payroll_run_status.superseded', 'حلّت محلها مراجعة أحدث', 'Superseded'],
+    ['value.stage.acknowledge_exception', 'تأكيد استثناء', 'Exception acknowledged'],
+    ['value.stage.approve', 'اعتماد', 'Approval'],
+    ['value.stage.close_period', 'إقفال الفترة', 'Period closed'],
+    ['value.stage.disburse', 'صرف', 'Disbursement'],
+    ['value.stage.prepare', 'احتساب', 'Calculation'],
+    ['value.stage.reconcile', 'مطابقة', 'Reconciliation'],
+    ['value.stage.review', 'مراجعة', 'Review'],
+    ['value.stage.submit', 'تقديم للاعتماد', 'Submission'],
+  ];
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    for (const [code, ar, en] of this.rows) {
+      const category = code.startsWith('action.') ? 'action' : code.startsWith('panel.') ? 'panel' : 'field';
+      await queryRunner.query(`INSERT INTO "terminology_entries" ("code", "category", "ar", "en") VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING`, [code, category, ar, en]);
+    }
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DELETE FROM "terminology_entries" WHERE code = ANY($1)`, [this.rows.map(([code]) => code)]);
+  }
+}

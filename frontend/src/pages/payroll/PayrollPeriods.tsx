@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { loadingLabel } from '../../lib/displayNames';
+import { useAuth } from '../../context/AuthContext';
 
 interface PayrollPeriod {
   id: string;
@@ -17,6 +18,7 @@ interface PayrollPeriod {
 export function PayrollPeriods() {
   const { t, preload } = useLanguage();
   const navigate = useNavigate();
+  const { can } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriod[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -31,6 +33,12 @@ export function PayrollPeriods() {
     'field.actions',
     'action.create_period',
     'action.view_details',
+    'action.close_period',
+    'field.start_date',
+    'field.end_date',
+    'msg.loading',
+    'msg.load_failed',
+    'msg.action_failed',
     'panel.no_periods_yet',
     'value.payroll_period_status.open',
     'value.payroll_period_status.closed',
@@ -40,13 +48,23 @@ export function PayrollPeriods() {
     try {
       setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load payroll periods.');
+      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
     }
   }
 
   useEffect(() => {
     loadPeriods();
   }, []);
+
+  async function onClose(id: string) {
+    setError(null);
+    try {
+      await api.post(`/payroll/periods/${id}/close`);
+      await loadPeriods();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+    }
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -59,7 +77,7 @@ export function PayrollPeriods() {
       setEndDate('');
       await loadPeriods();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create period.');
+      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
     } finally {
       setCreating(false);
     }
@@ -81,11 +99,11 @@ export function PayrollPeriods() {
             <input value={code} onChange={(e) => setCode(e.target.value)} required />
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>Start</label>
+            <label>{t('field.start_date')}</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label>End</label>
+            <label>{t('field.end_date')}</label>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
           </div>
           <button className="btn btn-primary" type="submit" disabled={creating}>
@@ -95,7 +113,7 @@ export function PayrollPeriods() {
       </div>
 
       {periods === null ? (
-        <div className="empty-state">{loadingLabel()}</div>
+        <div className="empty-state">{t('msg.loading')}</div>
       ) : periods.length === 0 ? (
         <div className="empty-state">{t('panel.no_periods_yet')}</div>
       ) : (
@@ -103,8 +121,8 @@ export function PayrollPeriods() {
           <thead>
             <tr>
               <th>{t('field.period_code')}</th>
-              <th>Start</th>
-              <th>End</th>
+              <th>{t('field.start_date')}</th>
+              <th>{t('field.end_date')}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.actions')}</th>
             </tr>
@@ -122,6 +140,11 @@ export function PayrollPeriods() {
                   <button className="btn btn-secondary" onClick={() => navigate('/payroll/runs')}>
                     {t('nav.payroll_runs')}
                   </button>
+                  {p.status === 'open' && can('payroll.period.close') && (
+                    <button className="btn btn-secondary" style={{ marginInlineStart: 8 }} onClick={() => onClose(p.id)}>
+                      {t('action.close_period')}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -71,7 +71,7 @@ export function CommissionPolicies() {
     'action.add_tier',
     'action.view_tiers',
     'panel.no_policies_yet',
-    'panel.customer_group_inert_notice',
+    'panel.commission_disabled_kinds_notice',
     'value.commission_scope.sales_rep',
     'value.commission_scope.customer',
     'value.commission_scope.customer_group',
@@ -183,7 +183,7 @@ export function CommissionPolicies() {
       {error && <div className="error-text">{error}</div>}
 
       <div className="card" style={{ marginBottom: 20, background: 'var(--panel-info-bg, #eef4ff)' }}>
-        <p style={{ margin: 0 }}>{t('panel.customer_group_inert_notice')}</p>
+        <p style={{ margin: 0 }}>{t('panel.commission_disabled_kinds_notice')}</p>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -201,7 +201,6 @@ export function CommissionPolicies() {
               >
                 <option value="sales_rep">{t('value.commission_scope.sales_rep')}</option>
                 <option value="customer">{t('value.commission_scope.customer')}</option>
-                <option value="customer_group">{t('value.commission_scope.customer_group')}</option>
               </select>
             </div>
 
@@ -231,18 +230,11 @@ export function CommissionPolicies() {
                 </select>
               </div>
             )}
-            {scope === 'customer_group' && (
-              <div className="form-field" style={{ marginBottom: 0, minWidth: 220 }}>
-                <label>{currentLang() === 'ar' ? 'معرّف مجموعة العملاء' : 'Customer Group ID'}</label>
-                <input value={scopeRefId} onChange={(e) => setScopeRefId(e.target.value)} required />
-              </div>
-            )}
 
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>{t('field.basis')}</label>
               <select value={basis} onChange={(e) => setBasis(e.target.value as typeof basis)}>
                 <option value="gross_sales">{t('value.commission_basis.gross_sales')}</option>
-                <option value="net_sales">{t('value.commission_basis.net_sales')}</option>
                 <option value="collected_amount">{t('value.commission_basis.collected_amount')}</option>
               </select>
             </div>

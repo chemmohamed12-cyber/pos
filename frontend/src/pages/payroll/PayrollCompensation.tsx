@@ -21,6 +21,7 @@ interface PayrollCompensationRow {
   effectiveFrom: string;
   effectiveTo: string | null;
   status: 'active' | 'superseded';
+  reason: string | null;
 }
 
 /** ADR-070 §B — componentized Earnings, never a single figure. Effective-dated: creating a new compensation record automatically closes the employee's prior active one (server-side), never rewriting history. */
@@ -33,6 +34,8 @@ export function PayrollCompensation() {
   const [employeeId, setEmployeeId] = useState('');
   const [earnings, setEarnings] = useState<EarningLineDraft[]>([{ componentCode: 'basic', amount: '' }]);
   const [saving, setSaving] = useState(false);
+  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [reason, setReason] = useState('');
 
   preload([
     'nav.payroll_compensation',
@@ -43,6 +46,12 @@ export function PayrollCompensation() {
     'action.create_compensation',
     'action.add_earning_line',
     'panel.no_compensations_yet',
+    'field.effective_from',
+    'field.effective_to',
+    'field.reason',
+    'msg.loading',
+    'msg.load_failed',
+    'msg.action_failed',
     'value.payroll_period_status.open',
   ]);
 
@@ -51,14 +60,14 @@ export function PayrollCompensation() {
       setEmployees(await api.get<Employee[]>('/hr/employees'));
     } catch (err) {
       // Foundation fix: no error handling — employee selects/labels silently stayed empty.
-      setError(err instanceof ApiError ? err.message : 'Failed to load employees.');
+      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
     }
   }
   async function loadCompensations() {
     try {
       setCompensations(await api.get<PayrollCompensationRow[]>('/payroll/compensations'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load compensation records.');
+      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
     }
   }
 
@@ -89,13 +98,16 @@ export function PayrollCompensation() {
     try {
       await api.post('/payroll/compensations', {
         employeeId,
+        effectiveFrom,
+        reason,
         earnings: earnings.filter((l) => l.componentCode && l.amount).map((l) => ({ componentCode: l.componentCode, amount: l.amount })),
       });
       setEmployeeId('');
+      setReason('');
       setEarnings([{ componentCode: 'basic', amount: '' }]);
       await loadCompensations();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save compensation.');
+      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
     } finally {
       setSaving(false);
     }
@@ -126,6 +138,17 @@ export function PayrollCompensation() {
             </select>
           </div>
 
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ minWidth: 180 }}>
+              <label>{t('field.effective_from')}</label>
+              <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} required />
+            </div>
+            <div className="form-field" style={{ minWidth: 260, flex: 1 }}>
+              <label>{t('field.reason')}</label>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} minLength={3} maxLength={500} required />
+            </div>
+          </div>
+
           {earnings.map((line, i) => (
             <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 8 }}>
               <div className="form-field" style={{ marginBottom: 0 }}>
@@ -147,7 +170,7 @@ export function PayrollCompensation() {
             <button type="button" className="btn btn-secondary" onClick={addLine}>
               {t('action.add_earning_line')}
             </button>
-            <button className="btn btn-primary" type="submit" disabled={saving || !employeeId}>
+            <button className="btn btn-primary" type="submit" disabled={saving || !employeeId || reason.trim().length < 3}>
               {t('action.create_compensation')}
             </button>
           </div>
@@ -155,7 +178,7 @@ export function PayrollCompensation() {
       </div>
 
       {compensations === null ? (
-        <div className="empty-state">{loadingLabel()}</div>
+        <div className="empty-state">{t('msg.loading')}</div>
       ) : compensations.length === 0 ? (
         <div className="empty-state">{t('panel.no_compensations_yet')}</div>
       ) : (
@@ -163,8 +186,9 @@ export function PayrollCompensation() {
           <thead>
             <tr>
               <th>{t('field.employee')}</th>
-              <th>{currentLang() === 'ar' ? 'ساري من' : 'Effective From'}</th>
-              <th>{currentLang() === 'ar' ? 'ساري حتى' : 'Effective To'}</th>
+              <th>{t('field.effective_from')}</th>
+              <th>{t('field.effective_to')}</th>
+              <th>{t('field.reason')}</th>
               <th>{t('field.status')}</th>
             </tr>
           </thead>
@@ -172,9 +196,10 @@ export function PayrollCompensation() {
             {compensations.map((c) => (
               <tr key={c.id}>
                 <td>{employeeLabel(c.employeeId)}</td>
-                <td>{fmtDate(c.effectiveFrom)}</td>
-                <td>{c.effectiveTo ? fmtDate(c.effectiveTo) : '—'}</td>
-                <td>{nameOf(STATUS_NAMES, c.status, currentLang())}</td>
+                <td>{new Date(c.effectiveFrom).toLocaleDateString()}</td>
+                <td>{c.effectiveTo ? new Date(c.effectiveTo).toLocaleDateString() : '—'}</td>
+                <td>{c.reason ?? '—'}</td>
+                <td>{c.status}</td>
               </tr>
             ))}
           </tbody>

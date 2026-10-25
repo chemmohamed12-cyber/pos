@@ -15,7 +15,9 @@ interface PayrollRun {
   id: string;
   code: string;
   payrollPeriodId: string;
-  status: 'draft' | 'calculated' | 'reviewed' | 'approved' | 'posted';
+  status: 'draft' | 'calculated' | 'reviewed' | 'approved' | 'posted' | 'superseded';
+  revision: number;
+  kind: 'regular' | 'supplementary';
   postedAt: string | null;
   disbursedAt: string | null;
 }
@@ -45,6 +47,14 @@ export function PayrollRuns() {
     'value.payroll_run_status.reviewed',
     'value.payroll_run_status.approved',
     'value.payroll_run_status.posted',
+    'value.payroll_run_status.superseded',
+    'value.payroll_run_kind.regular',
+    'value.payroll_run_kind.supplementary',
+    'field.revision',
+    'field.payroll_period',
+    'msg.loading',
+    'msg.load_failed',
+    'msg.action_failed',
     'value.disbursement_status.pending',
     'value.disbursement_status.disbursed',
   ]);
@@ -54,14 +64,14 @@ export function PayrollRuns() {
       setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
     } catch (err) {
       // Foundation fix: no error handling — the period selector silently stayed empty.
-      setError(err instanceof ApiError ? err.message : 'Failed to load payroll periods.');
+      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
     }
   }
   async function loadRuns() {
     try {
       setRuns(await api.get<PayrollRun[]>('/payroll/runs'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load payroll runs.');
+      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
     }
   }
 
@@ -81,7 +91,7 @@ export function PayrollRuns() {
       await loadRuns();
       navigate(`/payroll/runs/${run.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to calculate payroll run.');
+      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
     } finally {
       setCalculating(false);
     }
@@ -99,7 +109,7 @@ export function PayrollRuns() {
         <h3>{t('action.calculate_run')}</h3>
         <form onSubmit={onCalculate} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 200 }}>
-            <label>{currentLang() === 'ar' ? 'فترة الرواتب' : 'Payroll Period'}</label>
+            <label>{t('field.payroll_period')}</label>
             <select value={payrollPeriodId} onChange={(e) => setPayrollPeriodId(e.target.value)} required>
               <option value="">—</option>
               {periods.map((p) => (
@@ -116,7 +126,7 @@ export function PayrollRuns() {
       </div>
 
       {runs === null ? (
-        <div className="empty-state">{loadingLabel()}</div>
+        <div className="empty-state">{t('msg.loading')}</div>
       ) : runs.length === 0 ? (
         <div className="empty-state">{t('panel.no_runs_yet')}</div>
       ) : (
@@ -124,7 +134,8 @@ export function PayrollRuns() {
           <thead>
             <tr>
               <th>{t('field.run_code')}</th>
-              <th>Period</th>
+              <th>{t('field.payroll_period')}</th>
+              <th>{t('field.revision')}</th>
               <th>{t('field.status')}</th>
               <th>{t('field.disbursement_status')}</th>
               <th>{t('field.actions')}</th>
@@ -135,6 +146,9 @@ export function PayrollRuns() {
               <tr key={r.id}>
                 <td>{r.code}</td>
                 <td>{periodCode(r.payrollPeriodId)}</td>
+                <td>
+                  {r.revision} <StatusBadge code={`value.payroll_run_kind.${r.kind}`} />
+                </td>
                 <td>
                   <StatusBadge code={`value.payroll_run_status.${r.status}`} />
                 </td>
