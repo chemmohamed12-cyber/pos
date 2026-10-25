@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="720" viewBox="0 0 1500 720" direction="rtl" font-family="Segoe UI, Tahoma, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#475569"/></marker></defs>
+<rect width="1500" height="720" fill="#ffffff"/>
+<text x="750.0" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">خريطة الشاشات ومسار المستخدم</text>
+<rect x="30" y="60" width="1440" height="150" rx="14" fill="#e0f2fe" opacity="0.55"/>
+<text x="1454" y="86" text-anchor="start" font-size="16" font-weight="700" fill="#1e293b">تجهيز الأساسيات (مرة واحدة)</text>
+<rect x="1190" y="100" width="250" height="96" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="1315.0" y="132.66666666666666" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">المنتجات</text>
+<text x="1315.0" y="152.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/products‬</text>
+<text x="1315.0" y="172.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪sales.catalog.create / edit‬</text>
+<rect x="900" y="100" width="250" height="96" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.6"/>
+<text x="1025.0" y="132.66666666666666" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">السياسات المحاسبية</text>
+<text x="1025.0" y="152.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/accounting/policy‬</text>
+<text x="1025.0" y="172.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪accounting.account.view / edit‬</text>
+<rect x="610" y="100" width="250" height="96" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="735.0" y="132.66666666666666" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">مركز الحركات — استلام</text>
+<text x="735.0" y="152.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/movement-center/new/receipt‬</text>
+<text x="735.0" y="172.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪inventory.transaction.create‬</text>
+<rect x="320" y="100" width="250" height="96" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="445.0" y="132.66666666666666" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">قوائم المواد + الوحدات</text>
+<text x="445.0" y="152.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/boms‬</text>
+<text x="445.0" y="172.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪manufacturing.bom.*‬</text>
+<rect x="50" y="100" width="240" height="96" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+<text x="170.0" y="132.66666666666666" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">تعريفات العمليات</text>
+<text x="170.0" y="152.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/processes‬</text>
+<text x="170.0" y="172.66666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪manufacturing.routing.*‬</text>
+<rect x="30" y="235" width="1440" height="150" rx="14" fill="#dcfce7" opacity="0.55"/>
+<text x="1454" y="261" text-anchor="start" font-size="16" font-weight="700" fill="#1e293b">الإنتاج اليومي</text>
+<rect x="1190" y="290" width="250" height="96" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="1315.0" y="322.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">أوامر الإنتاج (قائمة + إنشاء)</text>
+<text x="1315.0" y="342.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/work-orders‬</text>
+<text x="1315.0" y="362.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪manufacturing.work_order.view / create‬</text>
+<rect x="900" y="290" width="250" height="96" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="1025.0" y="322.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">تفاصيل أمر الإنتاج</text>
+<text x="1025.0" y="342.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/work-orders/:id‬</text>
+<text x="1025.0" y="362.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪release · material_issue · complete‬</text>
+<rect x="610" y="290" width="250" height="96" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="735.0" y="322.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">لوحة تنفيذ العملية</text>
+<text x="735.0" y="342.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">داخل تفاصيل الأمر</text>
+<text x="735.0" y="362.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪operation_execute · outcome_record‬</text>
+<rect x="320" y="290" width="250" height="96" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="445.0" y="322.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">التجميع السريع</text>
+<text x="445.0" y="342.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/assembly‬</text>
+<text x="445.0" y="362.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪inventory.assembly.create‬</text>
+<rect x="50" y="290" width="240" height="96" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="170.0" y="322.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">غرفة القيادة</text>
+<text x="170.0" y="342.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing‬</text>
+<text x="170.0" y="362.6666666666667" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪manufacturing.* (view)‬</text>
+<rect x="30" y="410" width="1440" height="190" rx="14" fill="#fee2e2" opacity="0.55"/>
+<text x="1454" y="436" text-anchor="start" font-size="16" font-weight="700" fill="#1e293b">المراجعة والتتبع</text>
+<rect x="1190" y="460" width="250" height="96" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="1.6"/>
+<text x="1315.0" y="492.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">الأحداث المالية + إعادة المعالجة</text>
+<text x="1315.0" y="512.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/accounting/financial-events‬</text>
+<text x="1315.0" y="532.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪accounting.* (view / redrive)‬</text>
+<rect x="900" y="460" width="250" height="96" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="1.6"/>
+<text x="1025.0" y="492.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">تفاصيل الصنف (أرصدة وحركات)</text>
+<text x="1025.0" y="512.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/inventory/items/:id‬</text>
+<text x="1025.0" y="532.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪inventory.* (view)‬</text>
+<rect x="610" y="460" width="250" height="96" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.6"/>
+<text x="735.0" y="492.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">مسارات التشغيل (Routings)</text>
+<text x="735.0" y="512.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/routings‬</text>
+<text x="735.0" y="532.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">manufacturing.routing.* — للمسار الأساسي</text>
+<rect x="320" y="460" width="250" height="96" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.6"/>
+<text x="445.0" y="492.6666666666667" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">مراكز العمل</text>
+<text x="445.0" y="512.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪/manufacturing/work-centers‬</text>
+<text x="445.0" y="532.6666666666666" text-anchor="middle" font-size="12" font-weight="400" fill="#0f172a">‪manufacturing.work_center.*‬</text>
+<text x="750" y="645" text-anchor="middle" font-size="16" fill="#1e293b" font-weight="700">الترتيب الموصى به: المنتجات ← الإعدادات المحاسبية ← الاستلام ← الوحدات ← BOM (أو تعريف عملية) ← أمر إنتاج ← تنفيذ ← استلام ← إقفال</text>
+<text x="750" y="680" text-anchor="middle" font-size="14" fill="#475569" font-weight="400">القراءة من الأعلى إلى الأسفل: تجهيز ثم تنفيذ ثم مراجعة. الشاشات الرمادية للمسار الأساسي القديم (غير لازمة للمسار العام).</text>
+</svg>
