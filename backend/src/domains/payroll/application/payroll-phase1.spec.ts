@@ -83,7 +83,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('1. calculate() computes Gross Pay from componentized Earnings (never a single figure) for an eligible employee', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayEmp'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '5000.00' }, { componentCode: 'housing', amount: '1000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '5000.00' }, { componentCode: 'housing', amount: '1000.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('1');
 
     const run = await payroll.calculate(period.id, ADMIN_A);
@@ -98,7 +98,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('2. Day-type determination: present -> working/none; on_leave -> approved_leave/none; absent -> unclassified/none (fail-safe, never a deduction) — ADR-070 §9/§C', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayDayType'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '3000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '3000.00' }], reason: 'test fixture' }, ADMIN_A);
 
     const presentDate = '2027-02-02';
     const leaveDate = '2027-02-03';
@@ -136,7 +136,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('3. Contractor exclusion (ADR-067 §I): a contractor never receives a PayrollRunLine', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayContractor'), employmentType: 'contractor' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '9999.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '9999.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('3');
 
     const run = await payroll.calculate(period.id, ADMIN_A);
@@ -154,7 +154,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('5. Full lifecycle: calculate -> review -> submit -> FA-01 SoD -> automatic posted, then a balanced GL journal via the real Financial Event pipeline, then the reconciliation gap clears', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayLifecycle'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '4000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '4000.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('5');
 
     const run = await payroll.calculate(period.id, ADMIN_A);
@@ -202,7 +202,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
     // active), this test instead proves the DECOUPLING directly: PayrollRun reaches 'posted'
     // synchronously, before/regardless of whether the FinancialEvent has resolved POSTED yet.
     const emp = await hr.createEmployee({ fullName: shortName('PayDecouple'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '2500.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '2500.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('6');
 
     const run = await payroll.calculate(period.id, ADMIN_A);
@@ -221,7 +221,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('7. Correction/immutability (ADR-070 §18): createAdjustment never mutates the original PayrollRunLine', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayAdjust'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '1000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '1000.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('7');
     const run = await payroll.calculate(period.id, ADMIN_A);
     const { lines } = await payroll.getRun(run.id);
@@ -238,14 +238,14 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('8. Effective-dated compensation: a later compensation change never rewrites a prior period\'s already-calculated line', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayEffDate'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '2000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '2000.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('8');
     const run = await payroll.calculate(period.id, ADMIN_A);
     const { lines } = await payroll.getRun(run.id);
     const originalGross = lines.find((l) => l.employeeId === emp.id)!.grossPay;
 
     // Compensation changes AFTER this run was already calculated.
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '9000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '9000.00' }], effectiveFrom: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), reason: 'test fixture' }, ADMIN_A);
 
     const { lines: linesAfter } = await payroll.getRun(run.id);
     expect(linesAfter.find((l) => l.employeeId === emp.id)!.grossPay).toBe(originalGross); // untouched
@@ -253,7 +253,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('9. Disbursement (ADR-070 §9/§13): succeeds only once FinancialEvent.status = POSTED, moves Treasury funds, reduces Wages Payable balance, and is idempotent against a second call', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayDisburse'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '3000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '3000.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('9');
     // calculate() is company-wide (ADR-070's own Phase 1 scope) — this dev DB accumulates every
     // employee/compensation this whole suite has ever created across every run, so this run's
@@ -292,7 +292,7 @@ describe('PayrollService (ADR-070, Payroll Phase 1)', () => {
 
   it('10. Disbursement gate: refused while FinancialEvent has not resolved POSTED — never based on PayrollRun.posted alone (ADR-070 §9)', async () => {
     const emp = await hr.createEmployee({ fullName: shortName('PayGate'), employmentType: 'full_time' }, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '1800.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: '1800.00' }], reason: 'test fixture' }, ADMIN_A);
     const period = await makePeriod('10');
     const treasuryAccountId = await makeFundedTreasuryAccount('100000000.00');
 

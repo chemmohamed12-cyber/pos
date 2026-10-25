@@ -88,6 +88,9 @@ describe('Integrated Attendance -> Payroll -> Commission -> GL E2E (ADR-072, spe
    * unlike `payroll-phase1.spec.ts`'s own fixed 2027 dates (which never
    * needed to intersect a real timestamp).
    */
+  // GAP-CLOSURE NOTE (2026-10-25): payroll periods may no longer overlap (DB trigger `payroll_periods_check_overlap`). This ambient-database spec creates several
+  // windows around 'today' and therefore needs re-fitting (one distinct window per test) when the ambient test database is authorised; it was NOT RUN in the gap-closure
+  // work (ambient DB blocked by the DB guard). Its company-mode replacement is `payroll-gap-closure.company-isolation.spec.ts`.
   async function makePeriod(): Promise<{ id: string; startDate: string; endDate: string }> {
     const startDate = addDays(-3);
     const endDate = addDays(5);
@@ -138,7 +141,7 @@ describe('Integrated Attendance -> Payroll -> Commission -> GL E2E (ADR-072, spe
   it('Chain A + Chain B converge in one PayrollRun: Approved Commission Result and Attendance-derived day classifications both land correctly; PayrollRun.posted is never treated as GL proof; exactly one balanced journal posts; Commission/Attendance post zero GL entries of their own; disbursement succeeds only after FinancialEvent.status=POSTED', async () => {
     // --- Chain B fixture: Attendance ---
     const rep = await makeEmployeeLinkedToUser();
-    await payroll.createCompensation({ employeeId: rep.employeeId, earnings: [{ componentCode: 'basic', amount: '4000.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: rep.employeeId, earnings: [{ componentCode: 'basic', amount: '4000.00' }], reason: 'test fixture' }, ADMIN_A);
 
     const presentDate = addDays(0);
     const leaveDate = addDays(1);
@@ -244,7 +247,7 @@ describe('Integrated Attendance -> Payroll -> Commission -> GL E2E (ADR-072, spe
 
   it('Failure/recovery across the full chain: PayrollRun still reaches posted when wages_payable is deactivated (a Commission-bearing run this time); the reconciliation gap is flagged; disburse() is refused; reactivating + redrive self-heals (ADR-072 §18 items 1)', async () => {
     const rep = await makeEmployeeLinkedToUser();
-    await payroll.createCompensation({ employeeId: rep.employeeId, earnings: [{ componentCode: 'basic', amount: '1500.00' }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: rep.employeeId, earnings: [{ componentCode: 'basic', amount: '1500.00' }], reason: 'test fixture' }, ADMIN_A);
     const customerId = await makeAssignedCustomer(rep.userId);
     await commission.createPolicy({ scope: 'customer', scopeRefId: customerId, basis: 'gross_sales', rateModel: 'flat', flatRate: '0.05' }, ADMIN_A);
     await publishInvoicePosted(customerId, '1000.00', '1000.00');

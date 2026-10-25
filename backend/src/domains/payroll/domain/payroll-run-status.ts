@@ -10,7 +10,7 @@
  * (`ADR-070 §6`'s reconciliation invariant; only `FinancialEvent.status =
  * 'POSTED'` is that evidence).
  */
-export type PayrollRunStatus = 'draft' | 'calculated' | 'reviewed' | 'approved' | 'posted';
+export type PayrollRunStatus = 'draft' | 'calculated' | 'reviewed' | 'approved' | 'posted' | 'superseded';
 
 export const PAYROLL_RUN_PROCESS_KEY = 'payroll_run';
 

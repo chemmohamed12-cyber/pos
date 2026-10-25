@@ -60,6 +60,9 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
     await moduleRef.close();
   });
 
+  // GAP-CLOSURE NOTE (2026-10-25): payroll periods may no longer overlap (DB trigger `payroll_periods_check_overlap`). This ambient-database spec creates several
+  // windows around 'today' and therefore needs re-fitting (one distinct window per test) when the ambient test database is authorised; it was NOT RUN in the gap-closure
+  // work (ambient DB blocked by the DB guard). Its company-mode replacement is `payroll-gap-closure.company-isolation.spec.ts`.
   async function makePeriod(): Promise<string> {
     const period = await payroll.createPeriod({ code: shortName('PAY01'), startDate: addDays(-3), endDate: addDays(5) }, ADMIN_A);
     return period.id;
@@ -78,7 +81,7 @@ describe('WP-PAY-01 — runtime characterization of the payroll -> GL path (PA-3
     const user = await users.create({ fullName: `PAY01 Rep ${suffix}`, email: `pay01.${suffix}@test.daii.local` });
     const emp = await hr.createEmployee({ fullName: shortName('PAY01Emp'), employmentType: 'full_time' }, ADMIN_A);
     await hr.linkUser(emp.id, user.id, ADMIN_A);
-    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: basic }] }, ADMIN_A);
+    await payroll.createCompensation({ employeeId: emp.id, earnings: [{ componentCode: 'basic', amount: basic }], reason: 'test fixture' }, ADMIN_A);
     return { employeeId: emp.id, userId: user.id };
   }
 

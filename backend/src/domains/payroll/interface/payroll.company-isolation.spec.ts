@@ -5,6 +5,9 @@ import { HrService } from '../../hr/application/hr.service';
 import { TargetService } from '../../targets/application/target.service';
 import { AttendanceService } from '../../attendance/application/attendance.service';
 import { CommissionService } from '../../commission/application/commission.service';
+import { PayrollSodService } from '../application/payroll-sod.service';
+import { PayrollExceptionService } from '../application/payroll-exception.service';
+import { PayrollPayoutService } from '../application/payroll-payout.service';
 import { PayrollRun } from '../infrastructure/payroll-run.entity';
 import { LimitService } from '../../../foundation/limit-engine/limit.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
@@ -57,7 +60,10 @@ describe('PayrollService Area 21 retrofit — real-Postgres Company isolation', 
     const targets = new TargetService(ambient, audit, events, approvals, process, hr);
     const attendance = new AttendanceService(ambient, audit, events, approvals, new ExcelService(), hr);
     const commission = new CommissionService(ambient, audit, events, approvals, process, hr, targets);
-    payroll = new PayrollService(ambient, audit, events, approvals, process, numbering, hr, attendance, commission, {} as never);
+    const sod = new PayrollSodService(ambient, audit);
+    const exceptions = new PayrollExceptionService(ambient, audit, sod);
+    const payouts = new PayrollPayoutService(ambient, audit, events, numbering, sod, {} as never);
+    payroll = new PayrollService(ambient, audit, events, approvals, process, numbering, hr, attendance, commission, sod, exceptions, payouts);
     await hr.onModuleInit();
     await targets.onModuleInit();
     await attendance.onModuleInit();
@@ -89,9 +95,9 @@ describe('PayrollService Area 21 retrofit — real-Postgres Company isolation', 
     const empB = (await hr.createEmployee({ fullName: 'Pay Emp B' }, makerA, mB)).id;
     periodA = (await payroll.createPeriod({ code: '2026-09', startDate: '2026-09-01', endDate: '2026-09-30' }, makerA, mA)).id;
     await payroll.createPeriod({ code: '2026-09-B', startDate: '2026-09-01', endDate: '2026-09-30' }, makerA, mB);
-    await expect(payroll.createCompensation({ employeeId: empA, earnings: [{ componentCode: 'BASE', amount: '1000' }] }, makerA, mB)).rejects.toBeInstanceOf(NotFoundException);
-    await payroll.createCompensation({ employeeId: empA, earnings: [{ componentCode: 'BASE', amount: '1000' }] }, makerA, mA);
-    await payroll.createCompensation({ employeeId: empB, earnings: [{ componentCode: 'BASE', amount: '777' }] }, makerA, mB);
+    await expect(payroll.createCompensation({ employeeId: empA, earnings: [{ componentCode: 'BASE', amount: '1000' }], reason: 'test fixture' }, makerA, mB)).rejects.toBeInstanceOf(NotFoundException);
+    await payroll.createCompensation({ employeeId: empA, earnings: [{ componentCode: 'BASE', amount: '1000' }], effectiveFrom: '2026-01-01', reason: 'test fixture' }, makerA, mA);
+    await payroll.createCompensation({ employeeId: empB, earnings: [{ componentCode: 'BASE', amount: '777' }], effectiveFrom: '2026-01-01', reason: 'test fixture' }, makerA, mB);
     expect((await payroll.listPeriods(mA)).map((p) => p.code)).toEqual(['2026-09']);
     expect((await payroll.listPeriods(mB)).map((p) => p.code)).toEqual(['2026-09-B']);
     expect((await payroll.listCompensations(undefined, mA)).length).toBe(1);
@@ -101,6 +107,8 @@ describe('PayrollService Area 21 retrofit — real-Postgres Company isolation', 
   it('calculate computes a run from the Company\'s own employees and compensation, numbered in that Company', async () => {
     const mA = await mgr(h.companyAId);
     const mB = await mgr(h.companyBId);
+    // the chart the run will post into (the run now refuses approval while the accounts it posts to do not exist)
+    await mA.query(`INSERT INTO accounting_gl_accounts ("code","name","nameAr","accountType","normalBalance","isContra","parentAccountId","isPostable","controlFunction","currencyMode","allowManualJournal","isActive") VALUES ('2150','Wages Payable','wages payable','liability','credit',false,NULL,true,'wages_payable','functional_only',false,true), ('5201','Salaries and Wages Expense','wages expense','expense','debit',false,NULL,true,NULL,'functional_only',true,true)`);
     await expect(payroll.calculate(periodA, makerA, mB)).rejects.toBeInstanceOf(NotFoundException); // A's period is unknown to B
     const run = await payroll.calculate(periodA, makerA, mA);
     runA = run.id;
@@ -119,6 +127,9 @@ describe('PayrollService Area 21 retrofit — real-Postgres Company isolation', 
     const mA = await mgr(h.companyAId);
     const mB = await mgr(h.companyBId);
     await payroll.review(runA, makerA, mA);
+    // the run has no approved attendance for the employee: a documented decision must acknowledge that before it can be submitted
+    await expect(payroll.submitForApproval(runA, makerA, mA)).rejects.toThrow(/unresolved exception/i);
+    await payroll.acknowledgeExceptions(runA, { code: 'NO_ATTENDANCE_COVERAGE' }, 'DEC-FIXTURE-1', approverA, mA);
     const submitted = await payroll.submitForApproval(runA, makerA, mA);
     await expect(payroll.decide(submitted.approvalRequestId!, approverA, 'approved', null, mB)).rejects.toBeInstanceOf(NotFoundException);
     await payroll.decide(submitted.approvalRequestId!, approverA, 'approved', null, mA);

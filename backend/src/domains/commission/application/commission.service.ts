@@ -13,6 +13,7 @@ import { ProcessEngineService } from '../../../foundation/process-engine/process
 import { ProcessDefinition } from '../../../foundation/process-engine/process-definition';
 import { HrService } from '../../hr/application/hr.service';
 import { TargetService } from '../../targets/application/target.service';
+import { dec, isFiniteDecimalString } from '../../../foundation/money/decimal-money';
 
 const APPROVAL_TYPE = 'commission.batch_approval';
 const APPROVER_NODE = 'commission.batch.approve';
@@ -135,6 +136,9 @@ export class CommissionService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   async createPolicy(input: CreatePolicyInput, actorUserId: string, manager?: EntityManager): Promise<CommissionPolicy> {
+    // ADR-071 Addendum A-11 — disabled until their basis / data source is explicit and verified (no ratified definition of net sales; no structured Customer Group in CRM).
+    if (input.basis === 'net_sales') throw new ConflictException('basis "net_sales" is disabled: the composition of net sales (returns, discounts, tax) is not ratified yet (ADR-071 Addendum A-11).');
+    if (input.scope === 'customer_group') throw new ConflictException('scope "customer_group" is disabled: CRM has no structured Customer Group source yet (ADR-071 Addendum A-11).');
     if (input.rateModel === 'flat' && !input.flatRate) throw new ConflictException('flatRate is required when rateModel is "flat".');
     if (input.rateModel === 'target_tiered' && (!input.tiers || input.tiers.length === 0)) {
       throw new ConflictException('At least one tier is required when rateModel is "target_tiered".');
@@ -274,6 +278,8 @@ export class CommissionService implements OnModuleInit {
     customerId: string;
     basisAmountByType: Partial<Record<CommissionBasis, number>>;
     eventDate: Date;
+    /** Addendum A-1 — the BUSINESS date of the source event (YYYY-MM-DD): what the commission is attributed to, whenever it is processed or approved. */
+    attributionDate?: string | null;
   }, manager?: EntityManager): Promise<CommissionResult | null> {
     const triggerEventKey = `${params.triggerKind}:${params.sourceEntityId}`;
     const existing = await this.repos(manager).results.findOne({ where: { triggerEventKey } });
@@ -288,6 +294,14 @@ export class CommissionService implements OnModuleInit {
 
     const policy = await this.resolvePolicy(params.customerId, salesRepEmployeeId, params.eventDate, manager);
     if (!policy) return null; // no policy resolves — surfaced, not silently skipped or zeroed (ADR-071 §9 step 4)
+    if (policy.basis === 'net_sales' || policy.scope === 'customer_group') {
+      // A-11: a legacy row of a disabled kind must not produce money. Recorded, not silent.
+      await this.audit.record({
+        actorUserId: SYSTEM_ACTOR_ID, organizationId: null, action: 'commission.result.skipped_disabled_policy', resource: 'commission_policy', resourceId: policy.id,
+        result: 'denied', correlationId: null, after: { triggerEventKey, basis: policy.basis, scope: policy.scope },
+      }, manager);
+      return null;
+    }
 
     const eligibleAmount = params.basisAmountByType[policy.basis];
     if (eligibleAmount === undefined) return null; // this event doesn't carry the basis this policy needs
@@ -327,7 +341,13 @@ export class CommissionService implements OnModuleInit {
         targetSnapshot,
         applicableTier,
         rate,
-        calculationInputs: { eligibleAmount, basis: policy.basis },
+        // A-1: the attribution date is stored INSIDE the existing calculation snapshot (ADR-068 §F closes the column list). Fallback = the UTC processing date, flagged by rule version.
+        calculationInputs: {
+          eligibleAmount,
+          basis: policy.basis,
+          attributionDate: params.attributionDate ?? new Date().toISOString().slice(0, 10),
+          attributionRule: params.attributionDate ? 'event-business-date-v1' : 'processing-date-fallback-v1',
+        },
         calculatedAmount: calculatedAmount.toFixed(2),
         calculationTimestamp: new Date(),
         batchId: null,
@@ -359,7 +379,15 @@ export class CommissionService implements OnModuleInit {
       customerId,
       basisAmountByType: { gross_sales: grossAmount, net_sales: netAmount },
       eventDate: new Date(),
+      attributionDate: this.attributionDateFrom(payload.businessDate),
     }, manager);
+  }
+
+  /** `YYYY-MM-DD` from an event's `businessDate` (a date or an ISO timestamp); `null` when absent or malformed (never guessed). */
+  private attributionDateFrom(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const head = value.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(head) ? head : null;
   }
 
   private async onCollectionRemitted(payload: Record<string, unknown>, manager?: EntityManager): Promise<void> {
@@ -384,6 +412,7 @@ export class CommissionService implements OnModuleInit {
       customerId: row.customerId,
       basisAmountByType: { collected_amount: amount },
       eventDate: new Date(),
+      attributionDate: this.attributionDateFrom(payload.businessDate),
     }, manager);
   }
 
@@ -467,6 +496,45 @@ export class CommissionService implements OnModuleInit {
   }
 
   /**
+   * Addendum A-1/A-2/A-3 — what Payroll may consume for a run whose period ends at `periodEnd`: APPROVED results (their batch is `approved`) attributed on or
+   * before `periodEnd`, and the adjustments of approved results. Availability is by approval; eligibility is by attribution date; nothing here knows whether a
+   * run already took them — Payroll's `payroll_input_consumptions` (unique live source) decides that. Read-only.
+   */
+  async listConsumableForPayroll(
+    periodEnd: string,
+    manager?: EntityManager,
+  ): Promise<{
+    results: Array<{ id: string; employeeId: string; amount: string; attributionDate: string; policyId: string }>;
+    adjustments: Array<{ id: string; employeeId: string; amount: string; originalResultId: string; kind: string; attributionDate: string }>;
+  }> {
+    const attributionSql = `COALESCE(r."calculationInputs"->>'attributionDate', to_char(r."calculationTimestamp" AT TIME ZONE 'UTC', 'YYYY-MM-DD'))`;
+    const results: Array<{ id: string; employeeId: string; amount: string; attributionDate: string; policyId: string }> = await this.repos(manager).results
+      .createQueryBuilder('r')
+      .innerJoin(CommissionApprovalBatch, 'b', 'b.id = r."batchId"')
+      .select('r.id', 'id')
+      .addSelect('r."employeeId"', 'employeeId')
+      .addSelect('r."calculatedAmount"', 'amount')
+      .addSelect(attributionSql, 'attributionDate')
+      .addSelect('r."resolvedPolicyId"', 'policyId')
+      .where("b.status = 'approved'")
+      .andWhere(`${attributionSql} <= :periodEnd`, { periodEnd })
+      .getRawMany();
+    const adjustments: Array<{ id: string; employeeId: string; amount: string; originalResultId: string; kind: string; attributionDate: string }> = await this.repos(manager).adjustments
+      .createQueryBuilder('a')
+      .innerJoin(CommissionResult, 'r', 'r.id = a."originalCommissionResultId"')
+      .innerJoin(CommissionApprovalBatch, 'b', 'b.id = r."batchId"')
+      .select('a.id', 'id')
+      .addSelect('r."employeeId"', 'employeeId')
+      .addSelect('a."amountDelta"', 'amount')
+      .addSelect('a."originalCommissionResultId"', 'originalResultId')
+      .addSelect('a.kind', 'kind')
+      .addSelect(attributionSql, 'attributionDate')
+      .where("b.status = 'approved'")
+      .getRawMany();
+    return { results, adjustments };
+  }
+
+  /**
    * Independent re-verification finding (2026-09-21): comparing a
    * `timestamptz` column against a naive `'YYYY-MM-DD'`/`'YYYY-MM-DD
    * 23:59:59'` string lets Postgres cast it using the SESSION's
@@ -541,6 +609,11 @@ export class CommissionService implements OnModuleInit {
   async createAdjustment(input: CreateAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<CommissionAdjustment> {
     const result = await this.repos(manager).results.findOne({ where: { id: input.originalCommissionResultId } });
     if (!result) throw new NotFoundException(`CommissionResult "${input.originalCommissionResultId}" not found.`);
+    // Addendum A-3: an adjustment is a signed, non-zero decimal amount — never an arbitrary string.
+    if (!isFiniteDecimalString(input.amountDelta) || dec(input.amountDelta).isZero()) {
+      throw new ConflictException('amountDelta must be a non-zero decimal number.');
+    }
+    if (!input.reason || input.reason.trim().length === 0) throw new ConflictException('An adjustment needs a reason.');
 
     const saved = await this.repos(manager).adjustments.save(
       this.repos(manager).adjustments.create({

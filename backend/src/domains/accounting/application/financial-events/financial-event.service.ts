@@ -77,6 +77,8 @@ const DOMAIN_OF_TOPIC: Record<string, string> = {
   'accounting.cash.adjustment.approved': 'accounting',
   // ADR-070 — Payroll's own GL entry point
   'payroll.run.posted': 'payroll',
+  // ADR-070 Addendum A-7 — one payroll payment
+  'payroll.payout.settled': 'payroll',
 };
 
 export interface IngestResult {

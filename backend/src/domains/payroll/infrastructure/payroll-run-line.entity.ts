@@ -41,6 +41,10 @@ export class PayrollRunLine {
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   overtimeAmount!: string | null;
 
+  /** Σ signed adjustment inputs consumed by this line (Addendum A-3); netPay = grossPay + commissionAmount + adjustmentsAmount − totalDeductions. */
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  adjustmentsAmount!: string;
+
   @Column({ type: 'timestamptz' })
   calculationTimestamp!: Date;
 }

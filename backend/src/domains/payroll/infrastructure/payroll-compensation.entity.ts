@@ -28,6 +28,10 @@ export class PayrollCompensation {
   @Column('uuid')
   createdByUserId!: string;
 
+  /** Why the compensation changed (required for every change made after the gap-closure release; null on legacy rows). */
+  @Column({ type: 'text', nullable: true })
+  reason!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

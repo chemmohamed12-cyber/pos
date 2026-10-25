@@ -8,7 +8,16 @@ import { PayrollRunLine } from './infrastructure/payroll-run-line.entity';
 import { PayrollAttendanceDayClassification } from './infrastructure/payroll-attendance-day-classification.entity';
 import { PayrollDeductionLine } from './infrastructure/payroll-deduction-line.entity';
 import { PayrollAdjustment } from './infrastructure/payroll-adjustment.entity';
+import { PayrollException } from './infrastructure/payroll-exception.entity';
+import { PayrollInputConsumption } from './infrastructure/payroll-input-consumption.entity';
+import { PayrollPayoutBatch } from './infrastructure/payroll-payout-batch.entity';
+import { PayrollPayoutItem } from './infrastructure/payroll-payout-item.entity';
+import { PayrollRunStageActor } from './infrastructure/payroll-run-stage-actor.entity';
+import { PayrollSetting } from './infrastructure/payroll-setting.entity';
 import { PayrollService } from './application/payroll.service';
+import { PayrollSodService } from './application/payroll-sod.service';
+import { PayrollExceptionService } from './application/payroll-exception.service';
+import { PayrollPayoutService } from './application/payroll-payout.service';
 import { PayrollController } from './interface/payroll.controller';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { EventsModule } from '../../foundation/events/events.module';
@@ -46,6 +55,12 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
       PayrollAttendanceDayClassification,
       PayrollDeductionLine,
       PayrollAdjustment,
+      PayrollException,
+      PayrollInputConsumption,
+      PayrollPayoutBatch,
+      PayrollPayoutItem,
+      PayrollRunStageActor,
+      PayrollSetting,
     ]),
     AuthenticationModule,
     EventsModule,
@@ -60,7 +75,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CommissionModule,
   ],
   controllers: [PayrollController],
-  providers: [PayrollService],
+  providers: [PayrollService, PayrollSodService, PayrollExceptionService, PayrollPayoutService],
   exports: [PayrollService],
 })
 export class PayrollModule {}

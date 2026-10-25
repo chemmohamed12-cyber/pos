@@ -52,6 +52,45 @@ export class PayrollRun {
   @Column({ type: 'timestamptz', nullable: true })
   disbursedAt!: Date | null;
 
+  /** Addendum A-4 — 1 for the original run; a recalculation after submission, or a supplementary run after posting, takes the next number. */
+  @Column({ type: 'int', default: 1 })
+  revision!: number;
+
+  /** `regular` = the period's run; `supplementary` = delta-only run for an already-posted period (never rewrites the posted one). */
+  @Column({ type: 'varchar', length: 16, default: 'regular' })
+  kind!: 'regular' | 'supplementary';
+
+  @Column('uuid', { nullable: true })
+  supersedesRunId!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  rejectedAt!: Date | null;
+
+  @Column('uuid', { nullable: true })
+  rejectedByUserId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  rejectionReason!: string | null;
+
+  /** Hash of the inputs (compensations, approved attendance batches, commission/adjustment sources) the calculation used — re-checked at submit and at approval. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  inputsFingerprint!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  totalGross!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  totalCommission!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  totalAdjustments!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  totalDeductions!: string | null;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  totalNet!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

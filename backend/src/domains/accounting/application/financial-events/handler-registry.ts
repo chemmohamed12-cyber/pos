@@ -150,6 +150,8 @@ export const SUBSCRIBED_TOPICS: readonly string[] = [
   'customer.refund.adjusted',
   // ADR-070 — Payroll's own GL entry point (real handler, see finance-handlers.ts)
   'payroll.run.posted',
+  // ADR-070 Addendum A-7 — one payroll payment: Dr Wages Payable / Cr the paying Treasury account's mapped GL account
+  'payroll.payout.settled',
 ] as const;
 
 @Injectable()

@@ -7,6 +7,7 @@ import { handleSupplierCreditNoteTax } from './supplier-credit-note-tax.handler'
 import { handleGoodsReceiptPosted } from './goods-receipt.handler';
 import { handleWorkOrderMaterialIssued, handleWorkOrderMaterialReturned, handleWorkOrderFinishedGoodsReceived, handleWorkOrderScrapRecognized, handleWorkOrderRecoveryReceived } from './manufacturing-events.handler';
 import { handlePayrollRunPosted } from './payroll-run-posted.handler';
+import { handlePayrollPayoutSettled } from './payroll-payout-settled.handler';
 
 /**
  * F03 — V1 Financial Event handlers for the `finance` / `treasury` topics
@@ -404,6 +405,7 @@ export const V1_FINANCE_HANDLERS: Record<string, (e: FinancialEvent, c: HandlerC
   // ADR-070 — Payroll's own GL entry point, the only one the Payroll/Commission/Attendance chain
   // ever produces (ADR-072 §16).
   'payroll.run.posted': handlePayrollRunPosted,
+  'payroll.payout.settled': handlePayrollPayoutSettled,
   // F09 (ADR-042 D1-D3) — 'deposit.verified' and 'collection.remitted' are both PURE (read
   // ctx.findAccountByCode/resolveControlAccount only, mutate nothing) — the same shape as
   // handleCashRecorded/handlePaymentRecorded above, so the stateless map is the right home for

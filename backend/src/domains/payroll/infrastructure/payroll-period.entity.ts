@@ -25,4 +25,10 @@ export class PayrollPeriod {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  closedAt!: Date | null;
+
+  @Column('uuid', { nullable: true })
+  closedByUserId!: string | null;
 }
