@@ -46,7 +46,10 @@ Evidence keys. **S1** `payroll-gap-closure.company-isolation.spec` (10/10) · **
 | R-SEC-02 | Manifest nodes = routes; unused removed | A-10 | `payroll.manifest.ts`, `payroll.module.ts` | yes | yes | **no static test** | Mandate | no |
 | R-UI | Screens in AR/EN, RTL/LTR, responsive | mandate §10 | `pages/payroll/*`, `CommissionPolicies.tsx`, terminology seed | yes | yes (commits `da962a5`, `4ec632b`) | BR 1–19 desktop AR + EN; tsc -b + oxlint clean | Mandate | mobile: shell limitation (global) |
 | R-PAY-05/UI | SoD profile settings screen (`/payroll/settings`) | A-6 | `PayrollSettings.tsx`, cover shortcut | yes | yes (this commit) | BR: standard→strict→standard persisted, localized | Mandate | no |
-| R-UI/gap | Commission adjustment screen, failed-payout re-issue in browser | — | — | yes | partly | **NOT VERIFIED in browser** | — | no |
+| R-UI/err | Localized refusals (stable code + parameters, 48 ar/en labels), actor names, payout failure label | A-10 / mandate §10 | `payroll-refusal.ts`, `all-exceptions.filter.ts` (opt-in), `ErrorText.tsx` | yes | yes (`0f387a5`, `f35412c`) | BR 23–25 | Mandate | no |
+| R-UI/mobile | Responsive shell (off-canvas sidebar) | mandate §10 | `Layout.tsx/css` | yes | yes (`f35412c`) | BR 20 (375px, AR + EN) | Mandate | no |
+| R-SEC-03 | Permission denial and view-only role | A-10 | `PermissionGuard` | yes | yes | BR 26 | Mandate | no |
+| R-UI/gap | Commission adjustment creation in the browser | — | — | yes | partly | **NOT VERIFIED in browser** (no commission results in the environment; S2 covers the service) | — | no |
 | R-FIN | Numerical acceptance (mandate §8) | mandate §8 | S1–S3 | yes | yes | S1–S3 + DB ledger/treasury check after browser run | Mandate | no |
 
 Proration (R-PAY-08): the supplementary run in the browser paid the **whole-period** difference (+1,000.00) for a rise effective on 15 October. Proration by days is a payroll rule that no ADR defines; it is left as an owner decision and the current behaviour is documented, not assumed correct.

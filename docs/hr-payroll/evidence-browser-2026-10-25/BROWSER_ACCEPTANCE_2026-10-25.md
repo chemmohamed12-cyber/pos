@@ -27,7 +27,12 @@ Method: real UI in the built-in browser unless marked **API**. Independent DB ch
 | 19 | Commission policy form | PASS | `net_sales` / `customer_group` not offered, notice shown |
 | 21 | SoD profile settings screen: strict → persisted → standard | PASS | new screen, `payroll.settings.manage` |
 | 22 | HR link-user picker (G-09) | PASS | now lists only the Company's active members (`/hr/link-candidates`); before it called the platform-only `/admin/users` |
-| 20 | Narrow viewport | PARTIAL | payroll content does not overflow; the app shell keeps a fixed 240px sidebar so `<main>` is ~135px wide at phone width (global, pre-existing) |
+| 20 | Phone width 375px, AR/RTL and EN/LTR | PASS | after `f35412c`: sidebar is an off-canvas drawer (opens from the right in RTL, from the left in LTR), `<main>` is the full 375px, page scrollWidth = 375 (no horizontal scroll), the drawer closes on navigation. Before: `<main>` was ~135px (global shell limitation, fixed) |
+| 23 | Localized refusals | PASS | period overlap (AR with parameter «2026-10», and EN), calculate on closed period (AR), SoD (AR), view-only role: «غير متاح — إما أنه غير موجود أو لا تملك صلاحية عرضه.»; no English server text left on those paths |
+| 24 | Stage actor names | PASS | table shows BV Admin / BV Approver … instead of id prefixes |
+| 25 | Failed payout and re-issue | PASS | run 3: bank had 9,000.00 of 21,000.00 → batch «مكتملة جزئياً», Ahmed paid, Mona «فشل» with localized reason (needed 12,000.00, available 0.00, short 12,000.00); after funding, a new batch paid the remaining 12,000.00; reconciliation consistent, outstanding 0.00, failed item kept as history |
+| 26 | Permissions (view-only role `payroll.run.view` + `payroll.period.view`) | PASS | API: GET runs/periods 200; create period, PUT SoD profile, payout, review, calculate, compensations → 404 (non-disclosing); UI: run page shows no action buttons, settings page shows the localized «not available» message. Removing a single child node from a role that holds the module node `payroll` does **not** revoke it (inheritance by design) |
+| 27 | Commission result adjustment screen | PARTIAL | screen loads in AR/EN with no raw keys (one hard-coded English label fixed); creating an adjustment needs an approved commission result, which needs sales events not present in this environment → **NOT VERIFIED in browser** (S2 spec covers the service) |
 
 Independent DB reconciliation after the journeys:
 - GL: 5201 Dr 21,000.00; 2150 Cr 21,000.00 / Dr 21,000.00; 1102 Cr 21,000.00.
@@ -38,4 +43,4 @@ Defects found by this pass and fixed in the same change: raw exception code as c
 
 Environment finding: the Terminology service reads the **platform** database. Payroll terminology (including the pre-existing Phase 1 codes) is only present when the `payroll` tag migrations have run on the platform database; without that the screens show raw codes. The BV bootstrap did not run them; `bv-migrate-all` against the platform DB fixed it. A real deployment must apply the Terminology seeds to the platform database.
 
-Not verified in the browser: Commission adjustment screen, failed-payout re-issue, mobile layout of the shell.
+Not verified in the browser: creating a commission adjustment (no commission results in the environment), mobile layout of the shell.
