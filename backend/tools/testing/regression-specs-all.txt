@@ -140,3 +140,6 @@ src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts
 src/domains/procurement/interface/supplier-payment-branch.company-isolation.spec.ts
 src/domains/accounting/interface/work-order-branch.company-isolation.spec.ts
 src/domains/accounting/application/financial-events/org-company-level-decisions.guard.spec.ts
+src/domains/payroll/interface/payroll-gap-closure.company-isolation.spec.ts
+src/domains/payroll/interface/payroll-commission-consumption.company-isolation.spec.ts
+src/domains/payroll/interface/payroll-financial-e2e.company-isolation.spec.ts
