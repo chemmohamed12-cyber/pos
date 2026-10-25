@@ -26,6 +26,7 @@ Method: real UI in the built-in browser unless marked **API**. Independent DB ch
 | 18 | English / LTR on run detail, compensation, periods, runs, commission policies | PASS | no Arabic leakage, no raw codes |
 | 19 | Commission policy form | PASS | `net_sales` / `customer_group` not offered, notice shown |
 | 21 | SoD profile settings screen: strict → persisted → standard | PASS | new screen, `payroll.settings.manage` |
+| 22 | HR link-user picker (G-09) | PASS | now lists only the Company's active members (`/hr/link-candidates`); before it called the platform-only `/admin/users` |
 | 20 | Narrow viewport | PARTIAL | payroll content does not overflow; the app shell keeps a fixed 240px sidebar so `<main>` is ~135px wide at phone width (global, pre-existing) |
 
 Independent DB reconciliation after the journeys:
@@ -37,4 +38,4 @@ Defects found by this pass and fixed in the same change: raw exception code as c
 
 Environment finding: the Terminology service reads the **platform** database. Payroll terminology (including the pre-existing Phase 1 codes) is only present when the `payroll` tag migrations have run on the platform database; without that the screens show raw codes. The BV bootstrap did not run them; `bv-migrate-all` against the platform DB fixed it. A real deployment must apply the Terminology seeds to the platform database.
 
-Not verified in the browser: HR link-candidate picker (G-09), Commission adjustment screen, strict SoD profile switch screen, failed-payout re-issue, mobile layout of the shell.
+Not verified in the browser: Commission adjustment screen, failed-payout re-issue, mobile layout of the shell.

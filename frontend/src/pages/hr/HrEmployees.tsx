@@ -99,7 +99,7 @@ export function HrEmployees() {
 
   async function loadUsers() {
     try {
-      setUsers(await api.get<AdminUser[]>('/admin/users'));
+      setUsers(await api.get<AdminUser[]>('/hr/link-candidates'));
     } catch {
       // link-user picker degrades to empty — not fatal for the rest of the page
     }

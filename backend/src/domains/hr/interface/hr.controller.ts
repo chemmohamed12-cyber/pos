@@ -223,6 +223,14 @@ export class HrController {
     return this.hr.terminate(id, req.user.id, dto.reason, dto.terminationDate, req.companyContext!.dataSource.manager);
   }
 
+  /** G-09 — the Company-scoped picker source for `link-user` (replaces the screen's use of the platform-only `/admin/users`). */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr.employee.link_user', 'editable')
+  @Get('link-candidates')
+  async linkCandidates(@Req() req: CompanyScopedRequest) {
+    return this.hr.listLinkCandidates(req.companyContext!.companyId, req.companyContext!.dataSource.manager);
+  }
+
   /** ADR-059 D2 — manual Admin action, its own dedicated node. */
   @UseGuards(PermissionGuard)
   @RequirePermission('hr.employee.link_user', 'editable')

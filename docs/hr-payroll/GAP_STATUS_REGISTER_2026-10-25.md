@@ -9,14 +9,14 @@ Definitions
 - **APPROVED** — the owner/CTO approved the **rule** (not the code). «Mandate» = adopted by the CTO decision of 2026-10-25 as the working contract (C16 = S2, addenda A-1…A-11); the formal ADR-070/071/072 approval stays **PENDING**.
 - **BLOCKED** — cannot proceed without a named decision or environment.
 
-Evidence keys. **S1** `payroll-gap-closure.company-isolation.spec` (10/10) · **S2** `payroll-commission-consumption.company-isolation.spec` (6/6) · **S3** `payroll-financial-e2e.company-isolation.spec` (7/7) · **S4** `hr.company-isolation.spec` (7/7) · **BR** `evidence-browser-2026-10-25/BROWSER_ACCEPTANCE_2026-10-25.md` journey number · **RG1** full regression on `4eb2801` (113/115, `evidence-regression-2026-10-25/full-regression-4eb2801.log`) · **RG2** full regression on `4ec632b` (see §3). Commits: backend core `1790100000000` migration + services in the branch history up to `4eb2801`; UI `da962a5`; browser fixes `4ec632b`.
+Evidence keys. **S1** `payroll-gap-closure.company-isolation.spec` (10/10) · **S2** `payroll-commission-consumption.company-isolation.spec` (6/6) · **S3** `payroll-financial-e2e.company-isolation.spec` (7/7) · **S4** `hr.company-isolation.spec` (8/8 incl. G-09) · **BR** `evidence-browser-2026-10-25/BROWSER_ACCEPTANCE_2026-10-25.md` journey number · **RG1** full regression on `4eb2801` (113/115, `evidence-regression-2026-10-25/full-regression-4eb2801.log`) · **RG2** full regression on `4ec632b` (see §3). Commits: backend core `1790100000000` migration + services in the branch history up to `4eb2801`; UI `da962a5`; browser fixes `4ec632b`.
 
 ## 1. Register
 
 | ID | Gap | Decision / authority | Main files | PROPOSED | IMPLEMENTED | VERIFIED | APPROVED | BLOCKED |
 |---|---|---|---|---|---|---|---|---|
 | R-HR-1 | Employee↔User link only to an active member of the same Company | ADR-059 D2, B-1 | `hr.service.ts`, `hr.controller.ts` | yes | yes (B-1) | S4 7/7, RG1 | Mandate | no |
-| R-HR-1/UI | Link-candidate picker (G-09) | mandate §10 | `HrEmployees.tsx` | yes | **no** | no | Mandate | no — not started |
+| R-HR-1/UI | Link-candidate picker (G-09): the screen used the platform-only `/admin/users`; now Company-scoped `GET /hr/link-candidates` (active members of this Company, not yet linked) | mandate §10 | `hr.service.listLinkCandidates`, `hr.controller`, `HrEmployees.tsx` | yes | yes (this commit) | S4 8/8 (new G-09 test), BR: picker lists the Company's active members | Mandate | no |
 | R-PAY-01 | One active regular run per period, no `populationScope` | A-5 | migration `1790100000000`, `payroll.service.ts` | yes | yes | S1 (R-PAY-08 case), BR 4/14 | Mandate | no |
 | R-PAY-02 | Effective-dated compensation + reason | ADR-067 §B | `payroll.service.ts`, `PayrollCompensation.tsx` | yes | yes | S1, BR 3 | Mandate | no |
 | R-PAY-03 | Exact decimal money | PA-36 | `foundation/money/decimal-money.ts` | yes | yes | S1 (cent test), S3 totals | Mandate | no |
@@ -46,7 +46,7 @@ Evidence keys. **S1** `payroll-gap-closure.company-isolation.spec` (10/10) · **
 | R-SEC-02 | Manifest nodes = routes; unused removed | A-10 | `payroll.manifest.ts`, `payroll.module.ts` | yes | yes | **no static test** | Mandate | no |
 | R-UI | Screens in AR/EN, RTL/LTR, responsive | mandate §10 | `pages/payroll/*`, `CommissionPolicies.tsx`, terminology seed | yes | yes (commits `da962a5`, `4ec632b`) | BR 1–19 desktop AR + EN; tsc -b + oxlint clean | Mandate | mobile: shell limitation (global) |
 | R-PAY-05/UI | SoD profile settings screen (`/payroll/settings`) | A-6 | `PayrollSettings.tsx`, cover shortcut | yes | yes (this commit) | BR: standard→strict→standard persisted, localized | Mandate | no |
-| R-UI/gap | Commission adjustment screen, failed-payout re-issue in browser, HR picker | — | — | yes | partly | **NOT VERIFIED in browser** | — | no |
+| R-UI/gap | Commission adjustment screen, failed-payout re-issue in browser | — | — | yes | partly | **NOT VERIFIED in browser** | — | no |
 | R-FIN | Numerical acceptance (mandate §8) | mandate §8 | S1–S3 | yes | yes | S1–S3 + DB ledger/treasury check after browser run | Mandate | no |
 
 Proration (R-PAY-08): the supplementary run in the browser paid the **whole-period** difference (+1,000.00) for a rise effective on 15 October. Proration by days is a payroll rule that no ADR defines; it is left as an owner decision and the current behaviour is documented, not assumed correct.

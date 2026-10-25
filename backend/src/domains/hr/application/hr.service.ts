@@ -410,6 +410,16 @@ export class HrService implements OnModuleInit {
     return membership.id;
   }
 
+  /** G-09 — who a Company's HR officer can link: ACTIVE members of THIS Company (Platform membership) not yet linked to an employee here. Never the platform's whole user list. */
+  async listLinkCandidates(companyId: string, manager: EntityManager): Promise<Array<{ id: string; email: string; fullName: string }>> {
+    if (!this.memberships) throw new InternalServerErrorException('Company membership cannot be read for this operation.');
+    const active = (await this.memberships.findByCompany(companyId)).filter((m) => m.status === 'active');
+    if (active.length === 0) return [];
+    const linked = new Set((await manager.getRepository(Employee).find({ select: { userId: true } })).map((e) => e.userId).filter((u): u is string => !!u));
+    const users = await this.users.findByIds(active.map((m) => m.userId).filter((id) => !linked.has(id)));
+    return users.map((u) => ({ id: u.id, email: u.email, fullName: u.fullName })).sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
   /** ADR-059 D2 — manual only. Never called by any automatic path (no auto-provisioning anywhere in this service). */
   async linkUser(employeeId: string, userId: string, actorUserId: string, manager?: EntityManager, companyId?: string): Promise<Employee> {
     const employee = await this.getEmployee(employeeId, manager);

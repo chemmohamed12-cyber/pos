@@ -175,6 +175,30 @@ describe('HrService Area 21 retrofit — real-Postgres Company isolation', () =>
     expect(await dsB.getRepository(Employee).count({ where: { userId: person.id } })).toBe(0);
   });
 
+  it("G-09 — link candidates are the ACTIVE members of THIS Company not yet linked here: never another Company's members, never non-active, never an already-linked user", async () => {
+    const mA = await mgr(h.companyAId);
+    const mB = await mgr(h.companyBId);
+    const make = (n: string) => h.users.create({ fullName: n, email: `${n.replace(/ /g, '-').toLowerCase()}-${randomUUID()}@test.local` });
+    const inA = await make('Cand In A');
+    const inB = await make('Cand In B');
+    const suspended = await make('Cand Suspended');
+    await h.memberships.create({ userId: inA.id, companyId: h.companyAId, roleKey: 'admin' });
+    await h.memberships.create({ userId: inB.id, companyId: h.companyBId, roleKey: 'admin' });
+    await h.memberships.create({ userId: suspended.id, companyId: h.companyAId, roleKey: 'admin', status: 'suspended' });
+    const idsA = async () => (await hr.listLinkCandidates(h.companyAId, mA)).map((c) => c.id);
+    expect(await idsA()).toContain(inA.id);
+    expect(await idsA()).not.toContain(inB.id); // another Company's member
+    expect(await idsA()).not.toContain(suspended.id); // not active
+    const emp = await hr.createEmployee({ fullName: 'G09 Target' }, makerA, mA);
+    await hr.linkUser(emp.id, inA.id, makerA, mA, h.companyAId);
+    expect(await idsA()).not.toContain(inA.id); // already linked here
+    const idsB = (await hr.listLinkCandidates(h.companyBId, mB)).map((c) => c.id);
+    expect(idsB).toContain(inB.id);
+    expect(idsB).not.toContain(inA.id);
+    const row = (await hr.listLinkCandidates(h.companyBId, mB)).find((c) => c.id === inB.id)!;
+    expect(Object.keys(row).sort()).toEqual(['email', 'fullName', 'id']); // no status/hash/role leak
+  });
+
   it('Test F — nothing leaked into the other Company\'s tables', async () => {
     const dsB = await h.connections.getDataSource(h.companyBId);
     expect((await dsB.getRepository(Employee).find()).map((e) => e.fullName)).toEqual(['Bob B']);
