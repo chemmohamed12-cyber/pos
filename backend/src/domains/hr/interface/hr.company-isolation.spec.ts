@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { HrService } from '../application/hr.service';
 import { Employee } from '../infrastructure/employee.entity';
 import { LeaveRequest } from '../infrastructure/leave-request.entity';
@@ -41,7 +41,7 @@ describe('HrService Area 21 retrofit — real-Postgres Company isolation', () =>
     const limits = new LimitService(ambient, { sync: async () => undefined } as never, audit);
     const permissions = new PermissionService(inert, new AuthorizationService(inert, inert));
     const approvals = new ApprovalEngineService(ambient, new ProcessEngineService(ambient), audit, events, permissions, { get: () => 24 } as never);
-    hr = new HrService(ambient, limits, events, audit, new OrganizationService(ambient), numbering, approvals, h.users);
+    hr = new HrService(ambient, limits, events, audit, new OrganizationService(ambient), numbering, approvals, h.users, h.memberships);
     await hr.onModuleInit(); // registers numbering types + approval type/rule declaration + the company-scope subscriber
 
     makerA = (await h.createUserWithAdminRoleIn('HR Maker A', h.companyAId)).id;
@@ -91,9 +91,16 @@ describe('HrService Area 21 retrofit — real-Postgres Company isolation', () =>
     expect((await hr.getEmployee(empB.id, mB)).status).toBe('active'); // B untouched
     await hr.setStatus(empA.id, 'active', makerA, null, mA);
     const shared = await h.users.create({ fullName: 'Shared Person', email: `shared-${randomUUID()}@test.local` });
-    await hr.linkUser(empA.id, shared.id, makerA, mA);
-    await hr.linkUser(empB.id, shared.id, makerA, mB); // same User, different Company → allowed
-    await expect(hr.linkUser(empA.id, shared.id, makerA, mA)).rejects.toBeInstanceOf(ConflictException);
+    // B-1: a link requires an ACTIVE membership in the Company being linked in.
+    await expect(hr.linkUser(empA.id, shared.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(ConflictException); // no membership anywhere
+    expect((await hr.getEmployee(empA.id, mA)).userId).toBeNull();
+    await h.memberships.create({ userId: shared.id, companyId: h.companyAId, roleKey: 'admin' }); // member of A only
+    await expect(hr.linkUser(empB.id, shared.id, makerA, mB, h.companyBId)).rejects.toBeInstanceOf(ConflictException); // cross-Company: A's member cannot be linked in B
+    expect((await hr.getEmployee(empB.id, mB)).userId).toBeNull();
+    await hr.linkUser(empA.id, shared.id, makerA, mA, h.companyAId); // positive
+    await h.memberships.create({ userId: shared.id, companyId: h.companyBId, roleKey: 'admin' });
+    await hr.linkUser(empB.id, shared.id, makerA, mB, h.companyBId); // same User, different Company, member of both → allowed
+    await expect(hr.linkUser(empA.id, shared.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(ConflictException);
     expect((await hr.getEmployeeByUserId(shared.id, mA))?.id).toBe(empA.id);
     expect((await hr.getEmployeeByUserId(shared.id, mB))?.id).toBe(empB.id);
     const boss = await hr.createEmployee({ fullName: 'Boss A' }, makerA, mA);
@@ -135,6 +142,37 @@ describe('HrService Area 21 retrofit — real-Postgres Company isolation', () =>
     await hr.cancelLeaveRequest(leave.id, makerA, mA);
     const req = await hr.listLeaveRequestsWithApprovalState(undefined, mA);
     expect(req.find((r) => r.id === leave.id)?.approvalState).toBe('withdrawn');
+  });
+
+  it('B-1 — the link needs an ACTIVE membership of THIS Company: suspended/removed/invited are refused; without Company context it fails closed; nothing is written on refusal', async () => {
+    const mA = await mgr(h.companyAId);
+    const emp = await hr.createEmployee({ fullName: 'B1 Link Target' }, makerA, mA);
+    const linkAudits = async () => Number((await mA.query(`SELECT count(*)::int n FROM audit_records WHERE action = 'hr.employee.user_linked' AND "resourceId" = $1`, [emp.id]))[0].n);
+    const person = await h.users.create({ fullName: 'B1 Person', email: `b1-${randomUUID()}@test.local` });
+    await h.memberships.create({ userId: person.id, companyId: h.companyAId, roleKey: 'admin', status: 'invited' });
+    await expect(hr.linkUser(emp.id, person.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(ConflictException); // invited
+    await h.memberships.setStatus(person.id, h.companyAId, 'suspended');
+    await expect(hr.linkUser(emp.id, person.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(ConflictException); // suspended
+    await h.memberships.setStatus(person.id, h.companyAId, 'removed');
+    await expect(hr.linkUser(emp.id, person.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(ConflictException); // removed
+    // fail closed: Company manager but no company id, and no membership source configured
+    await h.memberships.setStatus(person.id, h.companyAId, 'active');
+    await expect(hr.linkUser(emp.id, person.id, makerA, mA)).rejects.toBeInstanceOf(InternalServerErrorException);
+    const noSource = new HrService(ambient, undefined as never, events, new AuditService(ambient), new OrganizationService(ambient), new NumberingService(ambient), undefined as never, h.users);
+    await expect(noSource.linkUser(emp.id, person.id, makerA, mA, h.companyAId)).rejects.toBeInstanceOf(InternalServerErrorException);
+    // every refusal wrote nothing
+    expect((await hr.getEmployee(emp.id, mA)).userId).toBeNull();
+    expect(await linkAudits()).toBe(0);
+    // an active member links, and the audit record carries the membership id
+    const membership = await h.memberships.findByUserAndCompany(person.id, h.companyAId);
+    const linked = await hr.linkUser(emp.id, person.id, makerA, mA, h.companyAId);
+    expect(linked.userId).toBe(person.id);
+    expect(await linkAudits()).toBe(1);
+    const audit = (await mA.query(`SELECT "after" FROM audit_records WHERE action = 'hr.employee.user_linked' AND "resourceId" = $1`, [emp.id]))[0];
+    expect(JSON.stringify(audit.after)).toContain(membership!.id);
+    // the other Company's employees are untouched
+    const dsB = await h.connections.getDataSource(h.companyBId);
+    expect(await dsB.getRepository(Employee).count({ where: { userId: person.id } })).toBe(0);
   });
 
   it('Test F — nothing leaked into the other Company\'s tables', async () => {

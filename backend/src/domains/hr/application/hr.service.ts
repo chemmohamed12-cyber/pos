@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { DataSource, EntityManager, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Employee } from '../infrastructure/employee.entity';
 import { EmployeeStatusHistory } from '../infrastructure/employee-status-history.entity';
@@ -13,6 +13,7 @@ import { OrgUnit } from '../../../foundation/organization/org-unit.entity';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { ApprovalEngineService } from '../../../foundation/approval-engine/approval-engine.service';
 import { UsersService } from '../../../foundation/identity/users.service';
+import { MembershipService } from '../../../foundation/company/membership.service';
 
 export interface CreateDepartmentInput {
   name: string;
@@ -81,6 +82,8 @@ export class HrService implements OnModuleInit {
     private readonly numbering: NumberingService,
     private readonly approvals: ApprovalEngineService,
     private readonly users: UsersService,
+    /** B-1 — the Platform `Membership` source of truth. Optional only so pre-existing manual constructions keep compiling; a Company-scoped link without it fails closed (see `assertActiveCompanyMember`). */
+    @Optional() private readonly memberships?: MembershipService,
   ) {}
 
   private em(manager?: EntityManager): EntityManager {
@@ -388,13 +391,33 @@ export class HrService implements OnModuleInit {
     return this.em(manager).getRepository(EmployeeStatusHistory).find({ where: { employeeId }, order: { changedAt: 'DESC' } });
   }
 
+  /**
+   * B-1 — same-Company membership, enforced on the server. A User is Platform identity, so "exists" is not enough: only a User with an ACTIVE
+   * `Membership` in THIS Company (not invited / suspended / removed / expired) may be linked to one of its Employees.
+   * Company mode (a Company `manager` was passed) REQUIRES `companyId` and fails closed without it or without the membership source;
+   * the ambient/Platform mode (no `manager`) has no Company, hence no membership to check (unchanged behaviour).
+   * Returns the membership id for the audit record (null in ambient mode).
+   */
+  private async assertActiveCompanyMember(userId: string, manager?: EntityManager, companyId?: string): Promise<string | null> {
+    if (!manager) return null;
+    if (!companyId || !this.memberships) {
+      throw new InternalServerErrorException('Company membership cannot be verified for this operation (no Company context) — the link was refused.');
+    }
+    const membership = await this.memberships.findActiveByUserAndCompany(userId, companyId);
+    if (!membership) {
+      throw new ConflictException(`User "${userId}" is not an active member of this Company and cannot be linked to an employee.`);
+    }
+    return membership.id;
+  }
+
   /** ADR-059 D2 — manual only. Never called by any automatic path (no auto-provisioning anywhere in this service). */
-  async linkUser(employeeId: string, userId: string, actorUserId: string, manager?: EntityManager): Promise<Employee> {
+  async linkUser(employeeId: string, userId: string, actorUserId: string, manager?: EntityManager, companyId?: string): Promise<Employee> {
     const employee = await this.getEmployee(employeeId, manager);
     if (employee.userId) {
       throw new ConflictException(`Employee "${employeeId}" is already linked to a user account.`);
     }
     await this.users.findById(userId); // throws NotFoundException if the target user does not exist (a User is Platform identity — ambient on purpose)
+    const membershipId = await this.assertActiveCompanyMember(userId, manager, companyId);
     const repo = this.em(manager).getRepository(Employee);
     const alreadyLinked = await repo.findOne({ where: { userId } });
     if (alreadyLinked) {
@@ -411,7 +434,7 @@ export class HrService implements OnModuleInit {
         resourceId: employeeId,
         result: 'success',
         correlationId: null,
-        after: { userId },
+        after: membershipId ? { userId, membershipId } : { userId },
       },
       manager,
     );

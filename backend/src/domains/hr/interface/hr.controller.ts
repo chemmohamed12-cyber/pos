@@ -228,7 +228,7 @@ export class HrController {
   @RequirePermission('hr.employee.link_user', 'editable')
   @Post('employees/:id/link-user')
   async linkUser(@Param('id', ParseUUIDPipe) id: string, @Body() dto: LinkUserDto, @Req() req: CompanyScopedRequest) {
-    return this.hr.linkUser(id, dto.userId, req.user.id, req.companyContext!.dataSource.manager);
+    return this.hr.linkUser(id, dto.userId, req.user.id, req.companyContext!.dataSource.manager, req.companyContext!.companyId);
   }
 
   @UseGuards(PermissionGuard)
