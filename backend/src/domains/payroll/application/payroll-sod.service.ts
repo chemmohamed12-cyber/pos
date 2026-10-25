@@ -1,8 +1,19 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PayrollRunStageActor, PayrollStage } from '../infrastructure/payroll-run-stage-actor.entity';
 import { PayrollSetting } from '../infrastructure/payroll-setting.entity';
 import { AuditService } from '../../../foundation/audit/audit.service';
+import { DaiiException } from '../../../foundation/error-contract/daii-exception';
+
+/** 403 that keeps its own `code` through the error envelope (the screen localizes it) and the structured body the specs and API clients read. */
+export class SodViolationException extends DaiiException {
+  constructor(message: string, readonly stage: PayrollStage, readonly conflictsWith: PayrollStage) {
+    super('SOD_VIOLATION', message, HttpStatus.FORBIDDEN, { stage, conflictsWith });
+  }
+  getResponse(): object {
+    return { statusCode: 403, code: 'SOD_VIOLATION', message: this.message, stage: this.stage, conflictsWith: this.conflictsWith };
+  }
+}
 
 export type SodProfile = 'standard' | 'strict';
 export const SOD_PROFILE_KEY = 'sod_profile';
@@ -77,7 +88,7 @@ export class PayrollSodService {
   }
 
   /**
-   * Throws `ForbiddenException` (403, `code: 'SOD_VIOLATION'`) when `userId` performing `stage` on `runId` breaks a rule of the Company's profile.
+   * Throws `SodViolationException` (403, `code: 'SOD_VIOLATION'`) when `userId` performing `stage` on `runId` breaks a rule of the Company's profile.
    * The refusal is audited with result `denied` on the CALLER's manager (outside any transaction the refusal may roll back).
    */
   async assert(runId: string, stage: PayrollStage, userId: string, manager?: EntityManager): Promise<void> {
@@ -95,7 +106,7 @@ export class PayrollSodService {
               manager,
             )
             .catch(() => undefined);
-          throw new ForbiddenException({ statusCode: 403, code: 'SOD_VIOLATION', message, stage, conflictsWith: other });
+          throw new SodViolationException(message, stage, other);
         }
       }
     }

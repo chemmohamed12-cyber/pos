@@ -27,18 +27,24 @@ interface ApprovalRequest {
  */
 export function ApprovalsPanel({ requestTypeCodes, decidePath, onDecided }: { requestTypeCodes: string[]; decidePath: (id: string) => string; onDecided?: () => void }) {
   const { t, preload } = useLanguage();
-  preload(['field.approval_request_id', 'field.approval_decision', 'action.decide_approval', 'field.reason']);
+  preload(['error.sod_violation', 'field.approval_request_id', 'field.approval_decision', 'action.decide_approval', 'field.reason']);
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** A server error with a registered `error.<code>` label shows the localized label; otherwise the server's message. */
+  const errorText = (err: ApiError) => {
+    const key = `error.${err.code.toLowerCase()}`;
+    const label = t(key);
+    return label !== key ? label : err.message;
+  };
 
   async function load() {
     try {
       const lists = await Promise.all(requestTypeCodes.map((code) => api.get<ApprovalRequest[]>(`/approvals/requests?requestTypeCode=${encodeURIComponent(code)}`)));
       setRequests(lists.flat().filter((r) => r.decidedAt === null));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load approval requests.');
+      setError(err instanceof ApiError ? errorText(err) : 'Failed to load approval requests.');
     }
   }
 
@@ -55,7 +61,7 @@ export function ApprovalsPanel({ requestTypeCodes, decidePath, onDecided }: { re
       await load();
       onDecided?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to decide request.');
+      setError(err instanceof ApiError ? errorText(err) : 'Failed to decide request.');
     } finally {
       setBusyId(null);
     }

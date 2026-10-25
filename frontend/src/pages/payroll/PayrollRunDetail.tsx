@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -10,7 +10,7 @@ import { currentLang, loadingLabel } from '../../lib/displayNames';
 import { translateRejectionReason } from '../../lib/financialReason';
 import { PANEL_TERMS, RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel, useMoney } from './PayrollRunPanels';
 import { RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel } from './PayrollRunPanels';
-import { PANEL_TERMS, useMoney } from './payrollUi';
+import { PANEL_TERMS, apiErrorText, useMoney } from './payrollUi';
 
 interface Employee {
   id: string;
@@ -18,6 +18,7 @@ interface Employee {
   fullName: string;
 }
 interface PayrollRun {
+  approvalRequestId?: string | null;
   id: string;
   code: string;
   payrollPeriodId: string;
@@ -156,7 +157,7 @@ export function PayrollRunDetail() {
       setRun(data.run);
       setLines(data.lines);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
   async function loadFinancialEvent() {
@@ -178,7 +179,7 @@ export function PayrollRunDetail() {
     try {
       setEmployees(await api.get<Employee[]>('/hr/employees'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
 
@@ -208,7 +209,7 @@ export function PayrollRunDetail() {
       after?.(result);
       reloadAll();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(apiErrorText(err, t, 'msg.action_failed'));
       reloadAll();
     } finally {
       setBusy(false);
@@ -224,7 +225,7 @@ export function PayrollRunDetail() {
     try {
       setClassifications(await api.get<DayClassification[]>(`/payroll/run-lines/${lineId}/day-classifications`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
 
@@ -235,7 +236,7 @@ export function PayrollRunDetail() {
   const isGap = gaps.some((g) => g.payrollRunId === run.id);
   const editableState = run.status === 'calculated' || run.status === 'reviewed';
   const canReview = run.status === 'calculated';
-  const canSubmit = run.status === 'reviewed';
+  const canSubmit = run.status === 'reviewed' && !run.approvalRequestId; // a submitted run stays 'reviewed' until the approval decides it
   const canRecalculate = run.status === 'calculated' || run.status === 'reviewed' || run.status === 'draft';
   const isPosted = run.status === 'posted';
   const ledgerPosted = financialEvent?.status.toUpperCase() === 'POSTED';

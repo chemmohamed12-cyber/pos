@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
-import { PANEL_TERMS, employeeLabel, useMoney, type EmployeeRef } from './payrollUi';
+import { PANEL_TERMS, apiErrorText, employeeLabel, useMoney, type EmployeeRef } from './payrollUi';
 
 interface PayrollException {
   id: string;
@@ -28,7 +28,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
     try {
       setRows(await api.get<PayrollException[]>(`/payroll/runs/${runId}/exceptions`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {
@@ -55,7 +55,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(apiErrorText(err, t, 'msg.action_failed'));
     } finally {
       setBusy(false);
     }
@@ -89,7 +89,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
                   {editable && (
                     <td>
                       {r.impactClass === 'A_DOC' && r.status === 'open' && (
-                        <input type="checkbox" aria-label={r.code} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
+                        <input type="checkbox" aria-label={t(`value.payroll_exception.${r.code}`)} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                       )}
                     </td>
                   )}
@@ -262,7 +262,7 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
     try {
       setBatches(await api.get<PayoutBatch[]>(`/payroll/runs/${runId}/payouts`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {
@@ -281,7 +281,7 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(apiErrorText(err, t, 'msg.action_failed'));
       await load();
     } finally {
       setBusy(false);
@@ -392,7 +392,7 @@ export function RunReconciliationPanel({ runId, refreshKey }: { runId: string; r
     try {
       setRec(await api.get<Reconciliation>(`/payroll/runs/${runId}/reconciliation`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(apiErrorText(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 import { fmtDate } from '../../lib/formatDateTime';
+import { StatusBadge } from '../../components/StatusBadge';
 
 interface Employee {
   id: string;
@@ -199,7 +200,9 @@ export function PayrollCompensation() {
                 <td>{new Date(c.effectiveFrom).toLocaleDateString()}</td>
                 <td>{c.effectiveTo ? new Date(c.effectiveTo).toLocaleDateString() : '—'}</td>
                 <td>{c.reason ?? '—'}</td>
-                <td>{c.status}</td>
+                <td>
+                  <StatusBadge code={`value.compensation_status.${c.status}`} />
+                </td>
               </tr>
             ))}
           </tbody>
