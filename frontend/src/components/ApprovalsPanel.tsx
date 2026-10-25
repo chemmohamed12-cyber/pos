@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
+import { ErrorText, toUiError, type UiError } from './ErrorText';
 import { useLanguage } from '../context/LanguageContext';
 
 interface ApprovalRequest {
@@ -31,20 +32,14 @@ export function ApprovalsPanel({ requestTypeCodes, decidePath, onDecided }: { re
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  /** A server error with a registered `error.<code>` label shows the localized label; otherwise the server's message. */
-  const errorText = (err: ApiError) => {
-    const key = `error.${err.code.toLowerCase()}`;
-    const label = t(key);
-    return label !== key ? label : err.message;
-  };
+  const [error, setError] = useState<UiError | null>(null);
 
   async function load() {
     try {
       const lists = await Promise.all(requestTypeCodes.map((code) => api.get<ApprovalRequest[]>(`/approvals/requests?requestTypeCode=${encodeURIComponent(code)}`)));
       setRequests(lists.flat().filter((r) => r.decidedAt === null));
     } catch (err) {
-      setError(err instanceof ApiError ? errorText(err) : 'Failed to load approval requests.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     }
   }
 
@@ -61,7 +56,7 @@ export function ApprovalsPanel({ requestTypeCodes, decidePath, onDecided }: { re
       await load();
       onDecided?.();
     } catch (err) {
-      setError(err instanceof ApiError ? errorText(err) : 'Failed to decide request.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setBusyId(null);
     }
@@ -72,7 +67,11 @@ export function ApprovalsPanel({ requestTypeCodes, decidePath, onDecided }: { re
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <h3 style={{ marginTop: 0 }}>{t('value.approval_status.pending')}</h3>
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
       <table className="data-table">
         <thead>
           <tr>

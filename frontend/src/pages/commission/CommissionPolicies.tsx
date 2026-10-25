@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
@@ -45,7 +46,7 @@ export function CommissionPolicies() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [policies, setPolicies] = useState<CommissionPolicy[] | null>(null);
   const [tiersByPolicy, setTiersByPolicy] = useState<Record<string, CommissionTier[]>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
 
   const [scope, setScope] = useState<'sales_rep' | 'customer' | 'customer_group'>('sales_rep');
   const [scopeRefId, setScopeRefId] = useState('');
@@ -87,7 +88,7 @@ export function CommissionPolicies() {
       setEmployees(await api.get<Employee[]>('/hr/employees'));
     } catch (err) {
       // Foundation fix: no error handling — employee selects/labels silently stayed empty.
-      setError(err instanceof ApiError ? err.message : 'Failed to load employees.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     }
   }
   async function loadCustomers() {
@@ -101,7 +102,7 @@ export function CommissionPolicies() {
     try {
       setPolicies(await api.get<CommissionPolicy[]>('/commission/policies'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load commission policies.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     }
   }
 
@@ -151,7 +152,7 @@ export function CommissionPolicies() {
       setTiers([{ tierOrder: 1, fromPercent: '0', toPercent: '', rate: '' }]);
       await loadPolicies();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create commission policy.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setBusy(false);
     }
@@ -170,7 +171,7 @@ export function CommissionPolicies() {
       const rows = await api.get<CommissionTier[]>(`/commission/policies/${policyId}/tiers`);
       setTiersByPolicy((prev) => ({ ...prev, [policyId]: rows }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load tiers.');
+      setError(toUiError(err, t, 'msg.action_failed'));
     }
   }
 
@@ -180,7 +181,11 @@ export function CommissionPolicies() {
         <h1>{t('nav.commission_policies')}</h1>
       </div>
 
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20, background: 'var(--panel-info-bg, #eef4ff)' }}>
         <p style={{ margin: 0 }}>{t('panel.commission_disabled_kinds_notice')}</p>

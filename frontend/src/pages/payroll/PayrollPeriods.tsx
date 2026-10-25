@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { loadingLabel } from '../../lib/displayNames';
@@ -20,7 +21,7 @@ export function PayrollPeriods() {
   const navigate = useNavigate();
   const { can } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriod[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [code, setCode] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -48,7 +49,7 @@ export function PayrollPeriods() {
     try {
       setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
 
@@ -62,7 +63,7 @@ export function PayrollPeriods() {
       await api.post(`/payroll/periods/${id}/close`);
       await loadPeriods();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
     }
   }
 
@@ -77,7 +78,7 @@ export function PayrollPeriods() {
       setEndDate('');
       await loadPeriods();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setCreating(false);
     }
@@ -89,7 +90,11 @@ export function PayrollPeriods() {
         <h1>{t('nav.payroll_periods')}</h1>
       </div>
 
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3>{t('action.create_period')}</h3>

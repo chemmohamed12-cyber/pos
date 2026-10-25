@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -10,7 +11,7 @@ import { currentLang, loadingLabel } from '../../lib/displayNames';
 import { translateRejectionReason } from '../../lib/financialReason';
 import { PANEL_TERMS, RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel, useMoney } from './PayrollRunPanels';
 import { RunActorsPanel, RunExceptionsPanel, RunInputsPanel, RunPayoutsPanel, RunReconciliationPanel } from './PayrollRunPanels';
-import { PANEL_TERMS, apiErrorText, useMoney } from './payrollUi';
+import { PANEL_TERMS, useMoney } from './payrollUi';
 
 interface Employee {
   id: string;
@@ -84,7 +85,7 @@ export function PayrollRunDetail() {
   const [gaps, setGaps] = useState<ReconciliationGap[]>([]);
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [classifications, setClassifications] = useState<DayClassification[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -157,7 +158,7 @@ export function PayrollRunDetail() {
       setRun(data.run);
       setLines(data.lines);
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   async function loadFinancialEvent() {
@@ -179,7 +180,7 @@ export function PayrollRunDetail() {
     try {
       setEmployees(await api.get<Employee[]>('/hr/employees'));
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
 
@@ -209,7 +210,7 @@ export function PayrollRunDetail() {
       after?.(result);
       reloadAll();
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
       reloadAll();
     } finally {
       setBusy(false);
@@ -225,11 +226,11 @@ export function PayrollRunDetail() {
     try {
       setClassifications(await api.get<DayClassification[]>(`/payroll/run-lines/${lineId}/day-classifications`));
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
 
-  if (!run && error) return <ErrorState error={new Error(error)} onRetry={reloadAll} />;
+  if (!run && error) return <ErrorState error={new Error(error.message)} onRetry={reloadAll} />;
   if (!run) return <div className="empty-state">{t('msg.loading')}</div>;
 
   const financialEventStatusCode = financialEvent ? financialEvent.status.toLowerCase() : 'none';
@@ -251,7 +252,7 @@ export function PayrollRunDetail() {
 
       {error && (
         <div className="error-text" role="alert" data-testid="payroll-error">
-          {error}
+          <ErrorText error={error} />
         </div>
       )}
 

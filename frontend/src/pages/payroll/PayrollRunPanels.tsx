@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
-import { PANEL_TERMS, apiErrorText, employeeLabel, useMoney, type EmployeeRef } from './payrollUi';
+import { PANEL_TERMS, employeeLabel, useMoney, type EmployeeRef } from './payrollUi';
 
 interface PayrollException {
   id: string;
@@ -20,7 +21,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
   const [rows, setRows] = useState<PayrollException[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [decisionRef, setDecisionRef] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [busy, setBusy] = useState(false);
   preload([...PANEL_TERMS, ...(rows ?? []).map((r) => `value.payroll_exception.${r.code}`)]);
 
@@ -28,7 +29,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
     try {
       setRows(await api.get<PayrollException[]>(`/payroll/runs/${runId}/exceptions`));
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {
@@ -55,7 +56,7 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
       await load();
       onChanged();
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setBusy(false);
     }
@@ -65,7 +66,11 @@ export function RunExceptionsPanel({ runId, employees, editable, refreshKey, onC
     <div className="card" style={{ marginBottom: 20 }} data-testid="payroll-exceptions-panel">
       <h3>{t('panel.payroll_exceptions')}</h3>
       <p style={{ opacity: 0.75, marginTop: 0 }}>{t('panel.payroll_exceptions_hint')}</p>
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
       {rows === null ? (
         <div className="empty-state">…</div>
       ) : rows.length === 0 ? (
@@ -186,6 +191,7 @@ interface StageActor {
   id: string;
   stage: string;
   userId: string;
+  userName?: string | null;
   at: string;
 }
 
@@ -213,7 +219,7 @@ export function RunActorsPanel({ runId, refreshKey }: { runId: string; refreshKe
             {rows.map((r) => (
               <tr key={r.id}>
                 <td>{t(`value.stage.${r.stage}`)}</td>
-                <td title={r.userId}>{r.userId.slice(0, 8)}</td>
+                <td title={r.userId}>{r.userName ?? r.userId.slice(0, 8)}</td>
                 <td>{new Date(r.at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}</td>
               </tr>
             ))}
@@ -254,7 +260,7 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
   const [accounts, setAccounts] = useState<TreasuryAccountRow[]>([]);
   const [accountId, setAccountId] = useState('');
   const [method, setMethod] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [busy, setBusy] = useState(false);
   preload(PANEL_TERMS);
 
@@ -262,7 +268,7 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
     try {
       setBatches(await api.get<PayoutBatch[]>(`/payroll/runs/${runId}/payouts`));
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {
@@ -281,7 +287,7 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
       await load();
       onChanged();
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
       await load();
     } finally {
       setBusy(false);
@@ -292,7 +298,11 @@ export function RunPayoutsPanel({ runId, employees, canDisburse, refreshKey, onC
     <div className="card" style={{ marginBottom: 20 }} data-testid="payroll-payouts-panel">
       <h3>{t('panel.payroll_payouts')}</h3>
       <p style={{ opacity: 0.75, marginTop: 0 }}>{t('panel.payroll_payouts_hint')}</p>
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
       {canDisburse && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
           <div className="form-field" style={{ marginBottom: 0, minWidth: 240 }}>
@@ -385,14 +395,14 @@ export function RunReconciliationPanel({ runId, refreshKey }: { runId: string; r
   const { t, preload } = useLanguage();
   const money = useMoney();
   const [rec, setRec] = useState<Reconciliation | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   preload(PANEL_TERMS);
   async function load() {
     setError(null);
     try {
       setRec(await api.get<Reconciliation>(`/payroll/runs/${runId}/reconciliation`));
     } catch (err) {
-      setError(apiErrorText(err, t, 'msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   useEffect(() => {
@@ -407,7 +417,11 @@ export function RunReconciliationPanel({ runId, refreshKey }: { runId: string; r
           {t('action.refresh')}
         </button>
       </div>
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
       {rec && (
         <>
           <div style={{ margin: '8px 0' }}>

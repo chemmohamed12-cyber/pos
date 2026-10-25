@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { conflict, notFound } from './payroll-refusal';
 import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { PayrollPeriod } from '../infrastructure/payroll-period.entity';
 import { PayrollCompensation } from '../infrastructure/payroll-compensation.entity';
@@ -183,20 +184,20 @@ export class PayrollService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   async createPeriod(input: CreatePeriodInput, actorUserId: string, manager?: EntityManager): Promise<PayrollPeriod> {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(input.endDate)) throw new ConflictException('startDate and endDate must be YYYY-MM-DD dates.');
-    if (input.startDate > input.endDate) throw new ConflictException('startDate must be on or before endDate.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(input.endDate)) throw conflict('PAYROLL_DATE_FORMAT', 'startDate and endDate must be YYYY-MM-DD dates.');
+    if (input.startDate > input.endDate) throw conflict('PAYROLL_PERIOD_DATE_ORDER', 'startDate must be on or before endDate.');
     const overlap: Array<{ code: string }> = await this.em(manager).query(
       `SELECT code FROM payroll_periods WHERE daterange("startDate", "endDate", '[]') && daterange($1::date, $2::date, '[]') LIMIT 1`,
       [input.startDate, input.endDate],
     );
-    if (overlap.length > 0) throw new ConflictException(`The period overlaps the existing payroll period "${overlap[0].code}".`);
+    if (overlap.length > 0) throw conflict('PAYROLL_PERIOD_OVERLAP', `The period overlaps the existing payroll period "${overlap[0].code}".`, { code: overlap[0].code });
     let saved: PayrollPeriod;
     try {
       saved = await this.repos(manager).periods.save(this.repos(manager).periods.create({ code: input.code, startDate: input.startDate, endDate: input.endDate, status: 'open' }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/overlaps an existing payroll period/i.test(msg)) throw new ConflictException('The period overlaps an existing payroll period.');
-      if (/UQ_payroll_periods_code|duplicate key/i.test(msg)) throw new ConflictException(`A payroll period with code "${input.code}" already exists.`);
+      if (/overlaps an existing payroll period/i.test(msg)) throw conflict('PAYROLL_PERIOD_OVERLAP_GENERIC', 'The period overlaps an existing payroll period.');
+      if (/UQ_payroll_periods_code|duplicate key/i.test(msg)) throw conflict('PAYROLL_PERIOD_CODE_EXISTS', `A payroll period with code "${input.code}" already exists.`, { code: input.code });
       throw err;
     }
     await this.audit.record({
@@ -224,13 +225,13 @@ export class PayrollService implements OnModuleInit {
     return runInTransaction(this.dataSource, manager, async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:period:${periodId}`]);
       const period = await tx.getRepository(PayrollPeriod).findOne({ where: { id: periodId } });
-      if (!period) throw new NotFoundException(`Payroll period "${periodId}" not found.`);
-      if (period.status === 'closed') throw new ConflictException(`Payroll period "${period.code}" is already closed.`);
+      if (!period) throw notFound('PAYROLL_PERIOD_NOT_FOUND', `Payroll period "${periodId}" not found.`);
+      if (period.status === 'closed') throw conflict('PAYROLL_PERIOD_ALREADY_CLOSED', `Payroll period "${period.code}" is already closed.`, { code: period.code });
       const runs = await tx.getRepository(PayrollRun).find({ where: { payrollPeriodId: periodId } });
       const regular = runs.find((r) => r.kind === 'regular' && r.status !== 'superseded');
-      if (!regular || regular.status !== 'posted') throw new ConflictException(`Payroll period "${period.code}" cannot be closed: its regular run is ${regular ? `"${regular.status}"` : 'missing'}, not "posted".`);
+      if (!regular || regular.status !== 'posted') throw conflict('PAYROLL_PERIOD_CLOSE_NO_POSTED_REGULAR', `Payroll period "${period.code}" cannot be closed: its regular run is ${regular ? `"${regular.status}"` : 'missing'}, not "posted".`, { code: period.code });
       const openSupp = runs.find((r) => r.kind === 'supplementary' && r.status !== 'posted' && r.status !== 'superseded');
-      if (openSupp) throw new ConflictException(`Payroll period "${period.code}" cannot be closed: supplementary run "${openSupp.code}" is still "${openSupp.status}".`);
+      if (openSupp) throw conflict('PAYROLL_PERIOD_CLOSE_OPEN_SUPPLEMENTARY', `Payroll period "${period.code}" cannot be closed: supplementary run "${openSupp.code}" is still "${openSupp.status}".`, { code: period.code, run: openSupp.code });
       period.status = 'closed';
       period.closedAt = new Date();
       period.closedByUserId = actorUserId;
@@ -247,19 +248,19 @@ export class PayrollService implements OnModuleInit {
 
   async createCompensation(input: CreateCompensationInput, actorUserId: string, manager?: EntityManager): Promise<PayrollCompensation> {
     await this.hr.getEmployee(input.employeeId, manager); // throws NotFoundException if the employee does not exist
-    if (!input.reason || input.reason.trim().length < 3) throw new ConflictException('A reason is required for every compensation change.');
-    if (!Array.isArray(input.earnings) || input.earnings.length === 0) throw new ConflictException('At least one earning line is required.');
+    if (!input.reason || input.reason.trim().length < 3) throw conflict('PAYROLL_COMP_REASON_REQUIRED', 'A reason is required for every compensation change.');
+    if (!Array.isArray(input.earnings) || input.earnings.length === 0) throw conflict('PAYROLL_COMP_EARNING_REQUIRED', 'At least one earning line is required.');
     const seen = new Set<string>();
     for (const line of input.earnings) {
       const code = (line.componentCode ?? '').trim();
-      if (code.length === 0 || code.length > 32) throw new ConflictException('Each earning line needs a component code (1-32 characters).');
-      if (seen.has(code)) throw new ConflictException(`Earning component "${code}" appears more than once.`);
+      if (code.length === 0 || code.length > 32) throw conflict('PAYROLL_COMP_COMPONENT_CODE', 'Each earning line needs a component code (1-32 characters).');
+      if (seen.has(code)) throw conflict('PAYROLL_COMP_COMPONENT_DUPLICATE', `Earning component "${code}" appears more than once.`, { code });
       seen.add(code);
-      if (!isFiniteDecimalString(line.amount) || !dec(line.amount).gt(0)) throw new ConflictException(`Earning line "${code}" must have a positive decimal amount.`);
-      if (dec(line.amount).decimalPlaces() > 2) throw new ConflictException(`Earning line "${code}" has more than two decimal places.`);
+      if (!isFiniteDecimalString(line.amount) || !dec(line.amount).gt(0)) throw conflict('PAYROLL_COMP_AMOUNT_POSITIVE', `Earning line "${code}" must have a positive decimal amount.`, { code });
+      if (dec(line.amount).decimalPlaces() > 2) throw conflict('PAYROLL_COMP_AMOUNT_DECIMALS', `Earning line "${code}" has more than two decimal places.`, { code });
     }
     const effectiveDate = input.effectiveFrom ?? new Date().toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) throw new ConflictException('effectiveFrom must be a YYYY-MM-DD date.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) throw conflict('PAYROLL_DATE_FORMAT', 'effectiveFrom must be a YYYY-MM-DD date.');
     const effectiveFrom = new Date(`${effectiveDate}T00:00:00.000Z`);
 
     return runInTransaction(this.dataSource, manager, async (tx) => {
@@ -267,7 +268,7 @@ export class PayrollService implements OnModuleInit {
       const repo = tx.getRepository(PayrollCompensation);
       const current = await repo.findOne({ where: { employeeId: input.employeeId, effectiveTo: IsNull() } });
       if (current && effectiveFrom.getTime() <= current.effectiveFrom.getTime()) {
-        throw new ConflictException(`The new compensation must take effect after the current one started (${current.effectiveFrom.toISOString().slice(0, 10)}); history is never rewritten.`);
+        throw conflict('PAYROLL_COMP_NOT_AFTER_CURRENT', `The new compensation must take effect after the current one started (${current.effectiveFrom.toISOString().slice(0, 10)}); history is never rewritten.`, { since: current.effectiveFrom.toISOString().slice(0, 10) });
       }
       if (current) {
         current.effectiveTo = effectiveFrom;
@@ -443,8 +444,8 @@ export class PayrollService implements OnModuleInit {
     return runInTransaction(this.dataSource, manager, async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:period:${payrollPeriodId}`]);
       const period = await tx.getRepository(PayrollPeriod).findOne({ where: { id: payrollPeriodId } });
-      if (!period) throw new NotFoundException(`Payroll period "${payrollPeriodId}" not found.`);
-      if (kind === 'regular' && period.status === 'closed') throw new ConflictException(`Payroll period "${period.code}" is closed — use a supplementary run for a post-close correction.`);
+      if (!period) throw notFound('PAYROLL_PERIOD_NOT_FOUND', `Payroll period "${payrollPeriodId}" not found.`);
+      if (kind === 'regular' && period.status === 'closed') throw conflict('PAYROLL_PERIOD_CLOSED_USE_SUPPLEMENTARY', `Payroll period "${period.code}" is closed — use a supplementary run for a post-close correction.`, { code: period.code });
 
       const runRepo = tx.getRepository(PayrollRun);
       const runs = await runRepo.find({ where: { payrollPeriodId }, order: { revision: 'DESC' } });
@@ -454,7 +455,7 @@ export class PayrollService implements OnModuleInit {
 
       if (kind === 'regular') {
         const active = runs.find((r) => r.kind === 'regular' && r.status !== 'superseded');
-        if (active && active.status === 'posted') throw new ConflictException(`Payroll period "${period.code}" already has a posted run — recalculation requires a supplementary run (POST /payroll/runs/supplementary).`);
+        if (active && active.status === 'posted') throw conflict('PAYROLL_PERIOD_HAS_POSTED_RUN', `Payroll period "${period.code}" already has a posted run — recalculation requires a supplementary run (POST /payroll/runs/supplementary).`, { code: period.code });
         if (active) {
           const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, active.id, tx);
           if (state === 'draft' || state === 'calculated') run = active;
@@ -469,7 +470,7 @@ export class PayrollService implements OnModuleInit {
         }
       } else {
         const posted = runs.filter((r) => r.status === 'posted');
-        if (!posted.some((r) => r.kind === 'regular')) throw new ConflictException(`Payroll period "${period.code}" has no posted regular run — a supplementary run corrects a posted period only.`);
+        if (!posted.some((r) => r.kind === 'regular')) throw conflict('PAYROLL_NO_POSTED_REGULAR', `Payroll period "${period.code}" has no posted regular run — a supplementary run corrects a posted period only.`, { code: period.code });
         const open = runs.find((r) => r.kind === 'supplementary' && r.status !== 'posted' && r.status !== 'superseded');
         if (open) {
           const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, open.id, tx);
@@ -657,7 +658,7 @@ export class PayrollService implements OnModuleInit {
 
   async review(runId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
     const run0 = await this.repos(manager).runs.findOne({ where: { id: runId } });
-    if (!run0) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
+    if (!run0) throw notFound('PAYROLL_RUN_NOT_FOUND', `PayrollRun "${runId}" not found.`);
     await this.sod.assert(runId, 'review', actorUserId, manager);
     return runInTransaction(this.dataSource, manager, async (tx) => {
       const run = await tx.getRepository(PayrollRun).findOneOrFail({ where: { id: runId } });
@@ -681,6 +682,8 @@ export class PayrollService implements OnModuleInit {
       throw new ConflictException({
         statusCode: 409,
         code: 'PAYROLL_EXCEPTIONS_OPEN',
+        localizable: true,
+        params: { count: blockers.length },
         message: `The run has ${blockers.length} unresolved exception(s) (${[...byCode.entries()].map(([c, n]) => `${c} ×${n}`).join(', ')}). Fix the cause and recalculate, or acknowledge the documented ones.`,
       });
     }
@@ -689,21 +692,21 @@ export class PayrollService implements OnModuleInit {
       [run.id],
     );
     if (!dec(sums.net).eq(dec(run.totalNet)) || !dec(sums.gross).eq(dec(run.totalGross)) || !dec(sums.commission).eq(dec(run.totalCommission)) || !dec(sums.adjustments).eq(dec(run.totalAdjustments))) {
-      throw new ConflictException({ statusCode: 409, code: 'PAYROLL_TOTALS_MISMATCH', message: 'The stored run totals no longer equal the sum of its lines — recalculate the run.' });
+      throw new ConflictException({ statusCode: 409, code: 'PAYROLL_TOTALS_MISMATCH', localizable: true, params: {}, message: 'The stored run totals no longer equal the sum of its lines — recalculate the run.' });
     }
     const period = await tx.getRepository(PayrollPeriod).findOneOrFail({ where: { id: run.payrollPeriodId } });
     const g = await this.gatherInputs(tx, period, run.id);
     if (this.fingerprintInputs(period, run.kind, g) !== run.inputsFingerprint) {
-      throw new ConflictException({ statusCode: 409, code: 'PAYROLL_INPUTS_CHANGED', message: 'The facts this run was calculated from (employees, compensation, approved attendance, approved commission, adjustments, accounting readiness) changed after the calculation — recalculate the run.' });
+      throw new ConflictException({ statusCode: 409, code: 'PAYROLL_INPUTS_CHANGED', localizable: true, params: {}, message: 'The facts this run was calculated from (employees, compensation, approved attendance, approved commission, adjustments, accounting readiness) changed after the calculation — recalculate the run.' });
     }
   }
 
   /** FA-01 submission — the one human control point (ADR-070 §5/§10). `approved -> posted` is automatic afterward, not a second submission. */
   async submitForApproval(runId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollRun> {
     const run = await this.repos(manager).runs.findOne({ where: { id: runId } });
-    if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
+    if (!run) throw notFound('PAYROLL_RUN_NOT_FOUND', `PayrollRun "${runId}" not found.`);
     const state = await this.processEngine.getState(PAYROLL_RUN_PROCESS, RUN_ENTITY_TYPE, runId, manager);
-    if (state !== 'reviewed') throw new ConflictException(`PayrollRun must be "reviewed" before FA-01 submission (current: "${state}").`);
+    if (state !== 'reviewed') throw conflict('PAYROLL_RUN_NOT_REVIEWED', `PayrollRun must be "reviewed" before FA-01 submission (current: "${state}").`, { state });
     await this.sod.assert(runId, 'submit', actorUserId, manager);
 
     const readyCheck = await runInTransaction(this.dataSource, manager, async (tx) => {
@@ -760,6 +763,15 @@ export class PayrollService implements OnModuleInit {
     return this.em(manager).getRepository(PayrollRunStageActor).find({ where: { payrollRunId: runId }, order: { at: 'ASC' } });
   }
 
+  /** Stage actors with the acting person's display name (Platform identity, read only for the users that acted on THIS run). */
+  async listStageActorsNamed(runId: string, manager?: EntityManager): Promise<Array<PayrollRunStageActor & { userName: string | null }>> {
+    const actors = await this.listStageActors(runId, manager);
+    const ids = [...new Set(actors.map((a) => a.userId).filter((u) => u !== SYSTEM_ACTOR_ID))];
+    const names = new Map<string, string>();
+    if (ids.length > 0) for (const u of (await this.dataSource.query(`SELECT id, "fullName" FROM users WHERE id = ANY($1::uuid[])`, [ids])) as Array<{ id: string; fullName: string }>) names.set(u.id, u.fullName);
+    return actors.map((a) => Object.assign(a, { userName: names.get(a.userId) ?? null }));
+  }
+
   async listInputConsumptions(runId: string, manager?: EntityManager): Promise<PayrollInputConsumption[]> {
     return this.em(manager).getRepository(PayrollInputConsumption).find({ where: { payrollRunId: runId }, order: { createdAt: 'ASC' } });
   }
@@ -770,7 +782,7 @@ export class PayrollService implements OnModuleInit {
 
   async getRun(id: string, manager?: EntityManager): Promise<{ run: PayrollRun; lines: PayrollRunLine[] }> {
     const run = await this.repos(manager).runs.findOne({ where: { id } });
-    if (!run) throw new NotFoundException(`PayrollRun "${id}" not found.`);
+    if (!run) throw notFound('PAYROLL_RUN_NOT_FOUND', `PayrollRun "${id}" not found.`);
     const lines = await this.repos(manager).runLines.find({ where: { payrollRunId: id } });
     return { run, lines };
   }
@@ -939,7 +951,7 @@ export class PayrollService implements OnModuleInit {
   }
 
   async setSodProfile(profile: 'standard' | 'strict', actorUserId: string, manager?: EntityManager) {
-    if (profile !== 'standard' && profile !== 'strict') throw new ConflictException('Profile must be "standard" or "strict".');
+    if (profile !== 'standard' && profile !== 'strict') throw conflict('PAYROLL_SOD_PROFILE_INVALID', 'Profile must be "standard" or "strict".');
     return this.sod.setProfile(profile, actorUserId, manager);
   }
 
@@ -949,12 +961,12 @@ export class PayrollService implements OnModuleInit {
 
   async createAdjustment(input: CreateAdjustmentInput, actorUserId: string, manager?: EntityManager): Promise<PayrollAdjustment> {
     const line = await this.repos(manager).runLines.findOne({ where: { id: input.originalPayrollRunLineId } });
-    if (!line) throw new NotFoundException(`PayrollRunLine "${input.originalPayrollRunLineId}" not found.`);
+    if (!line) throw notFound('PAYROLL_LINE_NOT_FOUND', `PayrollRunLine "${input.originalPayrollRunLineId}" not found.`);
     const run = await this.repos(manager).runs.findOneOrFail({ where: { id: line.payrollRunId } });
-    if (run.status !== 'posted') throw new ConflictException(`An adjustment corrects a POSTED run; run "${run.code}" is "${run.status}" — recalculate it instead.`);
-    if (!isFiniteDecimalString(input.amountDelta) || dec(input.amountDelta).isZero()) throw new ConflictException('amountDelta must be a non-zero decimal number.');
-    if (dec(input.amountDelta).decimalPlaces() > 2) throw new ConflictException('amountDelta has more than two decimal places.');
-    if (!input.reason || input.reason.trim().length === 0) throw new ConflictException('An adjustment needs a reason.');
+    if (run.status !== 'posted') throw conflict('PAYROLL_ADJ_RUN_NOT_POSTED', `An adjustment corrects a POSTED run; run "${run.code}" is "${run.status}" — recalculate it instead.`, { code: run.code, status: run.status });
+    if (!isFiniteDecimalString(input.amountDelta) || dec(input.amountDelta).isZero()) throw conflict('PAYROLL_ADJ_AMOUNT_NONZERO', 'amountDelta must be a non-zero decimal number.');
+    if (dec(input.amountDelta).decimalPlaces() > 2) throw conflict('PAYROLL_ADJ_AMOUNT_DECIMALS', 'amountDelta has more than two decimal places.');
+    if (!input.reason || input.reason.trim().length === 0) throw conflict('PAYROLL_ADJ_REASON_REQUIRED', 'An adjustment needs a reason.');
 
     const saved = await this.repos(manager).adjustments.save(
       this.repos(manager).adjustments.create({

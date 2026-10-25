@@ -244,7 +244,7 @@ export class PayrollController {
   @RequirePermission('payroll.run.view', 'read-only')
   @Get('runs/:id/actors')
   async listActors(@Param('id', ParseUUIDPipe) id: string, @Req() req: CompanyScopedRequest) {
-    return this.payroll.listStageActors(id, req.companyContext!.dataSource.manager);
+    return this.payroll.listStageActorsNamed(id, req.companyContext!.dataSource.manager);
   }
 
   @UseGuards(PermissionGuard)

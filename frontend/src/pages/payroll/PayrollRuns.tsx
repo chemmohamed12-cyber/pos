@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { currentLang, loadingLabel } from '../../lib/displayNames';
@@ -28,7 +29,7 @@ export function PayrollRuns() {
   const navigate = useNavigate();
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
   const [runs, setRuns] = useState<PayrollRun[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [payrollPeriodId, setPayrollPeriodId] = useState('');
   const [calculating, setCalculating] = useState(false);
 
@@ -64,14 +65,14 @@ export function PayrollRuns() {
       setPeriods(await api.get<PayrollPeriod[]>('/payroll/periods'));
     } catch (err) {
       // Foundation fix: no error handling — the period selector silently stayed empty.
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   async function loadRuns() {
     try {
       setRuns(await api.get<PayrollRun[]>('/payroll/runs'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
 
@@ -91,7 +92,7 @@ export function PayrollRuns() {
       await loadRuns();
       navigate(`/payroll/runs/${run.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setCalculating(false);
     }
@@ -103,7 +104,11 @@ export function PayrollRuns() {
         <h1>{t('nav.payroll_runs')}</h1>
       </div>
 
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3>{t('action.calculate_run')}</h3>

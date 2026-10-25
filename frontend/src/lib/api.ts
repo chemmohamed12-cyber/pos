@@ -6,10 +6,13 @@ const API_BASE = '/api';
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
+  /** Parameters a localizable refusal carries (substituted into its registered label). */
+  details?: Record<string, unknown>;
+  constructor(status: number, code: string, message: string, details?: Record<string, unknown>) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -119,7 +122,7 @@ export async function apiFetch<T>(method: string, path: string, body?: unknown, 
     !opts?.skipUnauthorizedHandler && path !== '/auth/login' && path !== '/auth/refresh',
   );
 
-  let json: { success: boolean; data?: T; error?: { code: string; message: string } };
+  let json: { success: boolean; data?: T; error?: { code: string; message: string; details?: Record<string, unknown> } };
   try {
     json = await res.json();
   } catch {
@@ -134,7 +137,7 @@ export async function apiFetch<T>(method: string, path: string, body?: unknown, 
   if (res.status === 401 && onUnauthorized && !opts?.skipUnauthorizedHandler) onUnauthorized();
 
   if (!json.success) {
-    throw new ApiError(res.status, json.error?.code ?? 'UNKNOWN', json.error?.message ?? 'Request failed.');
+    throw new ApiError(res.status, json.error?.code ?? 'UNKNOWN', json.error?.message ?? 'Request failed.', json.error?.details);
   }
   return json.data as T;
 }

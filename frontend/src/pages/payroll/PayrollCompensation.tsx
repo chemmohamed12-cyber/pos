@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
+import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
 import { fmtDate } from '../../lib/formatDateTime';
@@ -30,7 +31,7 @@ export function PayrollCompensation() {
   const { t, preload } = useLanguage();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [compensations, setCompensations] = useState<PayrollCompensationRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
 
   const [employeeId, setEmployeeId] = useState('');
   const [earnings, setEarnings] = useState<EarningLineDraft[]>([{ componentCode: 'basic', amount: '' }]);
@@ -61,14 +62,14 @@ export function PayrollCompensation() {
       setEmployees(await api.get<Employee[]>('/hr/employees'));
     } catch (err) {
       // Foundation fix: no error handling — employee selects/labels silently stayed empty.
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
   async function loadCompensations() {
     try {
       setCompensations(await api.get<PayrollCompensationRow[]>('/payroll/compensations'));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.load_failed'));
+      setError(toUiError(err, t, 'msg.load_failed'));
     }
   }
 
@@ -108,7 +109,7 @@ export function PayrollCompensation() {
       setEarnings([{ componentCode: 'basic', amount: '' }]);
       await loadCompensations();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('msg.action_failed'));
+      setError(toUiError(err, t, 'msg.action_failed'));
     } finally {
       setSaving(false);
     }
@@ -120,7 +121,11 @@ export function PayrollCompensation() {
         <h1>{t('nav.payroll_compensation')}</h1>
       </div>
 
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="error-text">
+          <ErrorText error={error} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3>{t('action.create_compensation')}</h3>

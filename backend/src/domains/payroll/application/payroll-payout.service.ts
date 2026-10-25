@@ -1,4 +1,5 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { conflict, notFound } from './payroll-refusal';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { PayrollRun } from '../infrastructure/payroll-run.entity';
@@ -72,7 +73,7 @@ export class PayrollPayoutService {
 
   private async getRunOrThrow(runId: string, manager?: EntityManager): Promise<PayrollRun> {
     const run = await this.em(manager).getRepository(PayrollRun).findOne({ where: { id: runId } });
-    if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
+    if (!run) throw notFound('PAYROLL_RUN_NOT_FOUND', `PayrollRun "${runId}" not found.`);
     return run;
   }
 
@@ -83,9 +84,21 @@ export class PayrollPayoutService {
       [runId],
     );
     if (!event || event.status.toUpperCase() !== 'POSTED') {
-      throw new ConflictException(
+      throw conflict(
+        'PAYROLL_PAYOUT_EVENT_NOT_POSTED',
         `PayrollRun "${runId}" cannot be disbursed — its Financial Event has not resolved POSTED (current: "${event?.status ?? 'none — not yet dispatched'}"). ADR-070 §9: disbursement never proceeds on PayrollRun.posted alone.`,
+        { status: String(event?.status ?? 'none') },
       );
+    }
+  }
+
+  /** Treasury's own refusal for an unmapped paying account, re-thrown with a stable code the screen can localize. */
+  private async requireMapped(accountId: string, manager?: EntityManager) {
+    try {
+      return await this.treasury.requireGlMappedAccount(accountId, manager);
+    } catch (e) {
+      if (e instanceof HttpException && /not GL-mapped/i.test(e.message)) throw conflict('PAYROLL_PAYOUT_ACCOUNT_UNMAPPED', e.message);
+      throw e;
     }
   }
 
@@ -114,16 +127,16 @@ export class PayrollPayoutService {
     opts: { method?: string | null; lineIds?: string[] } = {},
   ): Promise<{ batch: PayrollPayoutBatch; items: PayrollPayoutItem[] }> {
     const run = await this.getRunOrThrow(runId, manager);
-    if (run.status !== 'posted') throw new ConflictException(`PayrollRun "${runId}" must be "posted" before disbursement (current: "${run.status}").`);
+    if (run.status !== 'posted') throw conflict('PAYROLL_PAYOUT_RUN_NOT_POSTED', `PayrollRun "${runId}" must be "posted" before disbursement (current: "${run.status}").`, { status: run.status });
     await this.assertLedgerPosted(runId, manager);
-    await this.treasury.requireGlMappedAccount(treasuryAccountId, manager); // before any write: an unmapped account produces zero side effects
+    await this.requireMapped(treasuryAccountId, manager); // before any write: an unmapped account produces zero side effects
     await this.ensureNumbering(manager);
 
     return runInTransaction(this.dataSource, manager, async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:payout:run:${runId}`]);
       const todo = await this.outstandingByLine(runId, tx, opts.lineIds);
       if (todo.length === 0) {
-        throw new ConflictException(run.disbursedAt ? `PayrollRun "${runId}" has already been disbursed.` : `PayrollRun "${runId}" has nothing outstanding to pay (pending payouts already cover every line).`);
+        throw conflict(run.disbursedAt ? 'PAYROLL_PAYOUT_ALREADY_DISBURSED' : 'PAYROLL_PAYOUT_NOTHING_OUTSTANDING', run.disbursedAt ? `PayrollRun "${runId}" has already been disbursed.` : `PayrollRun "${runId}" has nothing outstanding to pay (pending payouts already cover every line).`);
       }
       const code = await this.numbering.getNextNumber(PAYOUT_DOC_TYPE, tx);
       const batchRepo = tx.getRepository(PayrollPayoutBatch);
@@ -162,7 +175,7 @@ export class PayrollPayoutService {
     try {
       return await runInTransaction(this.dataSource, manager, async (tx) => {
         const item0 = await tx.getRepository(PayrollPayoutItem).findOne({ where: { id: itemId } });
-        if (!item0) throw new NotFoundException(`Payout item "${itemId}" not found.`);
+        if (!item0) throw notFound('PAYROLL_PAYOUT_ITEM_NOT_FOUND', `Payout item "${itemId}" not found.`);
         await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`payroll:payout:run:${item0.payrollRunId}`]);
         const repo = tx.getRepository(PayrollPayoutItem);
         const item = await repo.findOneOrFail({ where: { id: itemId } });
@@ -221,15 +234,15 @@ export class PayrollPayoutService {
 
   async executeBatch(batchId: string, actorUserId: string, manager?: EntityManager): Promise<{ batch: PayrollPayoutBatch; items: PayrollPayoutItem[]; run: PayrollRun }> {
     const batch0 = await this.em(manager).getRepository(PayrollPayoutBatch).findOne({ where: { id: batchId } });
-    if (!batch0) throw new NotFoundException(`Payout batch "${batchId}" not found.`);
-    if (batch0.status === 'cancelled') throw new ConflictException(`Payout batch "${batch0.code}" is cancelled.`);
+    if (!batch0) throw notFound('PAYROLL_PAYOUT_BATCH_NOT_FOUND', `Payout batch "${batchId}" not found.`);
+    if (batch0.status === 'cancelled') throw conflict('PAYROLL_PAYOUT_BATCH_CANCELLED', `Payout batch "${batch0.code}" is cancelled.`, { code: batch0.code });
     const pending = await this.em(manager).getRepository(PayrollPayoutItem).find({ where: { payoutBatchId: batchId, status: 'pending' }, order: { seq: 'ASC', createdAt: 'ASC' } });
-    if (pending.length === 0) throw new ConflictException(`Payout batch "${batch0.code}" has no pending items.`);
+    if (pending.length === 0) throw conflict('PAYROLL_PAYOUT_BATCH_NO_PENDING', `Payout batch "${batch0.code}" has no pending items.`, { code: batch0.code });
     await this.sod.assert(batch0.payrollRunId, 'disburse', actorUserId, manager);
     const run0 = await this.getRunOrThrow(batch0.payrollRunId, manager);
-    if (run0.status !== 'posted') throw new ConflictException(`PayrollRun "${run0.id}" must be "posted" before disbursement.`);
+    if (run0.status !== 'posted') throw conflict('PAYROLL_PAYOUT_RUN_NOT_POSTED', `PayrollRun "${run0.id}" must be "posted" before disbursement.`, { status: run0.status });
     await this.assertLedgerPosted(run0.id, manager);
-    const { glAccountCode } = await this.treasury.requireGlMappedAccount(batch0.treasuryAccountId, manager);
+    const { glAccountCode } = await this.requireMapped(batch0.treasuryAccountId, manager);
 
     for (const item of pending) {
       await this.settleItem(item.id, glAccountCode, batch0.treasuryAccountId, actorUserId, manager);
@@ -277,8 +290,8 @@ export class PayrollPayoutService {
   async cancelBatch(batchId: string, actorUserId: string, manager?: EntityManager): Promise<PayrollPayoutBatch> {
     return runInTransaction(this.dataSource, manager, async (tx) => {
       const batch = await tx.getRepository(PayrollPayoutBatch).findOne({ where: { id: batchId } });
-      if (!batch) throw new NotFoundException(`Payout batch "${batchId}" not found.`);
-      if (batch.status !== 'draft') throw new ConflictException(`Only a draft batch can be cancelled (current: "${batch.status}").`);
+      if (!batch) throw notFound('PAYROLL_PAYOUT_BATCH_NOT_FOUND', `Payout batch "${batchId}" not found.`);
+      if (batch.status !== 'draft') throw conflict('PAYROLL_PAYOUT_BATCH_NOT_DRAFT', `Only a draft batch can be cancelled (current: "${batch.status}").`, { status: batch.status });
       batch.status = 'cancelled';
       const saved = await tx.getRepository(PayrollPayoutBatch).save(batch);
       await tx.getRepository(PayrollPayoutItem).delete({ payoutBatchId: batchId, status: 'pending' });

@@ -1,4 +1,3 @@
-import { ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
 
 /** Display-only money formatting (the server owns every amount; these are exact 2-decimal strings). */
@@ -9,14 +8,6 @@ export function useMoney() {
     const n = Number(v);
     return Number.isFinite(n) ? n.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v);
   };
-}
-
-/** A server error with a registered `error.<code>` label shows that label (the envelope message is English); any other keeps the server's message. `error.sod_violation` is in PANEL_TERMS so it is cached when this runs. */
-export function apiErrorText(err: unknown, t: (code: string) => string, fallbackCode: string): string {
-  if (!(err instanceof ApiError)) return t(fallbackCode);
-  const key = `error.${err.code.toLowerCase()}`;
-  const label = t(key);
-  return label !== key ? label : err.message;
 }
 
 export const PANEL_TERMS = [

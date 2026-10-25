@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { conflict, notFound } from './payroll-refusal';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PayrollException, PayrollExceptionClass } from '../infrastructure/payroll-exception.entity';
 import { PayrollRun } from '../infrastructure/payroll-run.entity';
@@ -95,11 +96,11 @@ export class PayrollExceptionService {
     manager?: EntityManager,
   ): Promise<PayrollException[]> {
     const ref = (decisionRef ?? '').trim();
-    if (ref.length < 3) throw new ConflictException('A decision reference is required to acknowledge an exception.');
+    if (ref.length < 3) throw conflict('PAYROLL_DECISION_REF_REQUIRED', 'A decision reference is required to acknowledge an exception.');
     const run = await this.em(manager).getRepository(PayrollRun).findOne({ where: { id: runId } });
-    if (!run) throw new NotFoundException(`PayrollRun "${runId}" not found.`);
+    if (!run) throw notFound('PAYROLL_RUN_NOT_FOUND', `PayrollRun "${runId}" not found.`);
     if (run.status !== 'calculated' && run.status !== 'reviewed') {
-      throw new ConflictException(`Exceptions can be acknowledged only while the run is "calculated" or "reviewed" (current: "${run.status}").`);
+      throw conflict('PAYROLL_EXC_RUN_STATE', `Exceptions can be acknowledged only while the run is "calculated" or "reviewed" (current: "${run.status}").`, { status: run.status });
     }
     await this.sod.assert(runId, 'acknowledge_exception', userId, manager);
 
@@ -109,10 +110,10 @@ export class PayrollExceptionService {
       let rows: PayrollException[];
       if (selector.exceptionIds && selector.exceptionIds.length > 0) rows = await repo.find({ where: { payrollRunId: runId, id: In(selector.exceptionIds) } });
       else if (selector.code) rows = await repo.find({ where: { payrollRunId: runId, code: selector.code, status: 'open' } });
-      else throw new ConflictException('Provide exceptionIds or a code to acknowledge.');
-      if (rows.length === 0) throw new NotFoundException('No matching open exception on this run.');
+      else throw conflict('PAYROLL_EXC_SELECTION_REQUIRED', 'Provide exceptionIds or a code to acknowledge.');
+      if (rows.length === 0) throw notFound('PAYROLL_EXC_NONE_OPEN', 'No matching open exception on this run.');
       for (const row of rows) {
-        if (row.impactClass !== 'A_DOC') throw new ConflictException(`Exception "${row.code}" is "${row.impactClass}" and cannot be acknowledged — fix the cause and recalculate.`);
+        if (row.impactClass !== 'A_DOC') throw conflict('PAYROLL_EXC_NOT_ACKNOWLEDGEABLE', `Exception "${row.code}" is "${row.impactClass}" and cannot be acknowledged — fix the cause and recalculate.`, { code: row.code, class: row.impactClass });
         if (row.status === 'acknowledged') continue;
         row.status = 'acknowledged';
         row.decisionRef = ref;

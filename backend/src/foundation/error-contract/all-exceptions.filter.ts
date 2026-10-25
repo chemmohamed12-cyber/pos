@@ -40,6 +40,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const body = exception.getResponse();
       const message =
         typeof body === 'string' ? body : ((body as { message?: string | string[] }).message ?? exception.message);
+      // A domain refusal that opts in (`localizable: true`) keeps its own stable code and parameters so the client can show the registered label.
+      const coded = typeof body === 'object' && body !== null ? (body as { localizable?: boolean; code?: unknown; params?: Record<string, unknown> }) : null;
+      if (coded?.localizable === true && typeof coded.code === 'string') {
+        response.status(status).json({ success: false, error: { code: coded.code, message, details: coded.params }, meta: { correlationId } });
+        return;
+      }
       response.status(status).json({
         success: false,
         error: { code: httpStatusToCode(status), message, details: undefined },
