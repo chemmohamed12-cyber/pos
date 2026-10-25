@@ -19,6 +19,7 @@ import { NumberingService } from '../../../foundation/numbering/numbering.servic
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { ProcessEngineService } from '../../../foundation/process-engine/process-engine.service';
 import { ConfigurationEngineService } from '../../../foundation/configuration-engine/configuration-engine.service';
+import { InventoryPostingPolicyService } from '../../accounting/application/inventory-posting-policy.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 
@@ -88,11 +89,13 @@ describe('Manufacturing Engine S1 — outcomes (scrap, recovery, tracked) — re
     new FinancialEventService(h.controlPlane, currencies, journals, audit, events, registry, cfg).onModuleInit();
     new InventoryCostingHandlerService(registry, valuation).onModuleInit();
     const policy = new InventoryPostingPolicyRegistry();
-    policy.bind({ assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }), listManualReceiptReasons: () => [], assertSaleReturnPostable: async () => undefined, assertSupplierInvoicePostable: async () => undefined });
+    // D6: the REAL accounting pre-flight for scrap / recovery (reads the same mutable `config` as the event handler), the other gates stay stubs
+    const realPolicy = new InventoryPostingPolicyService(cfg, new InventoryPostingPolicyRegistry());
+    policy.bind({ assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }), listManualReceiptReasons: () => [], assertSaleReturnPostable: async () => undefined, assertSupplierInvoicePostable: async () => undefined, assertManufacturingScrapPostable: (kind, m) => realPolicy.assertManufacturingScrapPostable(kind, m) });
     const products = new ProductsService(h.controlPlane, audit, events);
     inventory = new InventoryService(h.controlPlane, audit, products as never, inert, numbering, events, valuation as never, policy);
     bom = new BomService(h.controlPlane, audit, products);
-    wo = new WorkOrderService(h.controlPlane, inventory, numbering, processEngine, audit, events, bom, valuation as never, new RoutingService(h.controlPlane, audit, products));
+    wo = new WorkOrderService(h.controlPlane, inventory, numbering, processEngine, audit, events, bom, valuation as never, new RoutingService(h.controlPlane, audit, products), undefined, policy);
 
     await seed('A');
     await seed('B');
@@ -248,22 +251,30 @@ describe('Manufacturing Engine S1 — outcomes (scrap, recovery, tracked) — re
     expect(await glBalance('5301')).toBeCloseTo(0, 4);
   });
 
-  it('S1-9 while the scrap-loss account is NOT configured the scrap event is REJECTED (fail closed, nothing posted), and the physical/valuation effect still happened', async () => {
+  it('S1-9 (D6) while the scrap-loss account is NOT configured scrap is REFUSED BEFORE anything is written: no result, no stock/WIP movement, no event, plan untouched - and it works once configured', async () => {
     const saved = config['accounting.manufacturing_scrap_loss_account_code'];
     delete config['accounting.manufacturing_scrap_loss_account_code'];
     const o2 = await newOrder(4);
-    const r = await wo.recordScrap(o2.id, 1, 'config test', actor, 'scrap-cfg', await mgr());
-    await flush();
-    const ev = await qa<{ id: string; status: string; rejectionReason: string | null; journalEntryId: string | null }>(
-      `SELECT id, status, "rejectionReason", "journalEntryId" FROM "accounting_financial_events" WHERE "idempotencyKey" = $1`,
-      [`manufacturing:work_order:${o2.id}:scrap:scrap-cfg`],
-    );
-    expect(ev).toHaveLength(1);
-    expect(ev[0].status).toBe('REJECTED');
-    expect(ev[0].rejectionReason).toMatch(/scrap-loss account/);
-    expect(ev[0].journalEntryId).toBeNull();
-    expect(r.outcomeClass).toBe('scrap');
+    const count = async (sql: string, p: unknown[] = []) => Number((await qa<{ n: string }>(sql, p))[0].n);
+    const before = {
+      results: await count(`SELECT count(*) AS n FROM "work_order_results" WHERE "workOrderId" = $1`, [o2.id]),
+      moves: await count(`SELECT count(*) AS n FROM "stock_movements"`),
+      events: await count(`SELECT count(*) AS n FROM "accounting_financial_events"`),
+    };
+    await expect(wo.recordScrap(o2.id, 1, 'config test', actor, 'scrap-cfg', await mgr())).rejects.toThrow(/scrap-loss account is not configured.*nothing was recorded/);
+    expect(await count(`SELECT count(*) AS n FROM "work_order_results" WHERE "workOrderId" = $1`, [o2.id])).toBe(before.results);
+    expect(await count(`SELECT count(*) AS n FROM "stock_movements"`)).toBe(before.moves);
+    expect(await count(`SELECT count(*) AS n FROM "accounting_financial_events"`)).toBe(before.events);
+    expect((await wo.getWorkOrderOrThrow(o2.id, await mgr())).quantityScrapped).toBe(0);
+    // an account that is not an expense account is refused with its own reason
+    config['accounting.manufacturing_scrap_loss_account_code'] = '1120';
+    await expect(wo.recordScrap(o2.id, 1, 'config test', actor, 'scrap-cfg', await mgr())).rejects.toThrow(/control account|not an expense/);
     config['accounting.manufacturing_scrap_loss_account_code'] = saved;
+    const r = await wo.recordScrap(o2.id, 1, 'config test', actor, 'scrap-cfg', await mgr()); // same requestId: the refused attempts left nothing behind
+    await flush();
+    expect(r.outcomeClass).toBe('scrap');
+    const ev = await qa<{ status: string }>(`SELECT status FROM "accounting_financial_events" WHERE "idempotencyKey" = $1`, [`manufacturing:work_order:${o2.id}:scrap:scrap-cfg`]);
+    expect(ev.map((e) => e.status)).toEqual(['POSTED']);
   });
 
   it('S1-10 Company B (the witness) was never touched', async () => {

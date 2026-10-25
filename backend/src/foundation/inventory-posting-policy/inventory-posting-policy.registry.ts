@@ -68,6 +68,12 @@ export interface InventoryPostingPolicy {
    */
   assertOpeningBatchPostable?(kind: 'opening' | 'reversal' | 'correction', manager?: EntityManager): Promise<void>;
   /**
+   * UX redesign stage 5 (CTO D6) - OPTIONAL pre-mutation gate of manufacturing scrap / recovery: the accounts the event's journal will need must resolve BEFORE any WIP / stock /
+   * valuation / result write. `scrap`: the `wip` control account and the configured scrap-loss account (an active, postable, non-control EXPENSE account). `recovery`: the `inventory`
+   * control account and the same scrap-loss account. Throws (409) with an actionable message; never falls back to another account. Unbound / absent => no GL => no gate.
+   */
+  assertManufacturingScrapPostable?(kind: 'scrap' | 'recovery', manager?: EntityManager): Promise<void>;
+  /**
    * C2 (ADR-INV-10) - OPTIONAL read-only financial status of the events that reference an operational record (document, movement): what the response of an
    * in-request dispatch reports, so a document never claims "posted to GL" while its posting is pending or rejected.
    */

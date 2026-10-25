@@ -47,11 +47,12 @@ const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? c
  * operation permit them, SEPARATE material and output selectors for a run, outcomes, the derived per-operation ledger and the ONE receipt path for this kind of order - the multi-output receipt.
  * The execution data is owned by the order screen (it also feeds the "next step" card); every change reloads it through `onChanged`.
  */
-export function ProcessExecutionPanel({ workOrderId, state, planned, remainingPlanned, ex, onChanged }: { workOrderId: string; state: string; planned: number; remainingPlanned: number; ex: Execution; onChanged: () => void }) {
+export function ProcessExecutionPanel({ workOrderId, state, planned, remainingPlanned, ex, scrap, onChanged }: { workOrderId: string; state: string; planned: number; remainingPlanned: number; ex: Execution; scrap: { ready: boolean; reason: string | null }; onChanged: () => void }) {
   const { t } = useLanguage();
   const { can } = useAuth();
   const canRun = can('manufacturing.work_order.operation_execute', 'editable');
   const canReceive = can('manufacturing.work_order.finished_goods_receive', 'editable');
+  const canFixPolicy = can('accounting.account.edit', 'editable');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null); // run id whose forms are open
@@ -208,8 +209,15 @@ export function ProcessExecutionPanel({ workOrderId, state, planned, remainingPl
                 <legend>{t('mfg2.px.losses')}</legend>
                 <FormField label={t('mfg2.col.quantity')}>{(p) => <input {...p} type="number" min={1} step={1} value={loss.quantity} onChange={(e) => setLoss({ ...loss, quantity: e.target.value })} data-testid="run-loss-qty" />}</FormField>
                 <FormField label={t('mfg2.px.reason')} hint={t('mfg2.px.reason_hint')}>{(p) => <input {...p} value={loss.reason} onChange={(e) => setLoss({ ...loss, reason: e.target.value })} data-testid="run-reason" />}</FormField>
+                {!scrap.ready && (
+                  <div style={{ marginBlockEnd: 8 }} data-testid="run-scrap-blocked">
+                    <BlockedReason danger to="/accounting/policy" linkText={canFixPolicy ? t('mfg2.oo.scrap.fix_link') : undefined}>
+                      {scrap.reason}
+                    </BlockedReason>
+                  </div>
+                )}
                 <div className="mfg-row-actions">
-                  <button className="btn btn-danger" type="button" disabled={busy || !lossOk} onClick={() => post('scrap', { quantity: Number(loss.quantity), reason: loss.reason.trim() })} data-testid="run-scrap">
+                  <button className="btn btn-danger" type="button" disabled={busy || !lossOk || !scrap.ready} onClick={() => post('scrap', { quantity: Number(loss.quantity), reason: loss.reason.trim() })} data-testid="run-scrap">
                     {t('mfg2.px.scrap_here')}
                   </button>
                   {(['held', 'rework', 'rejected'] as const).map((c) => (

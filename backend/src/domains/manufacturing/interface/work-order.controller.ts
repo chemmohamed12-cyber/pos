@@ -121,6 +121,16 @@ export class WorkOrderController {
     return this.workOrders.listWorkOrdersWithSummary(req.companyContext.dataSource.manager);
   }
 
+  /** D6 - may scrap / recovery be recorded now? (accounting pre-flight, read-only) - declared BEFORE `:id` so the path is not taken as an id. */
+  @UseGuards(RequireFeatureGuard, PermissionGuard)
+  @RequireFeature('manufacturing.work_orders')
+  @RequirePermission('manufacturing.work_order.view', 'read-only')
+  @Get('scrap-readiness')
+  async scrapReadiness(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.workOrders.scrapReadiness(req.companyContext.dataSource.manager);
+  }
+
   @UseGuards(RequireFeatureGuard, PermissionGuard)
   @RequireFeature('manufacturing.work_orders')
   @RequirePermission('manufacturing.work_order.view', 'read-only')

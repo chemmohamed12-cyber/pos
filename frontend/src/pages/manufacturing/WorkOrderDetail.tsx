@@ -11,6 +11,7 @@ import { fmtDateTime } from '../../lib/formatDateTime';
 import { ProcessExecutionPanel, type Execution } from './ProcessExecutionPanel';
 import { WorkOrderOutcomes, type WorkOrderResultRow } from './WorkOrderOutcomes';
 import { nextStep } from './workOrderNext';
+import { OrderReconciliation } from './OrderReconciliation';
 
 interface Warehouse {
   id: string;
@@ -112,6 +113,8 @@ export function WorkOrderDetail() {
   const [returnQty, setReturnQty] = useState<Record<string, string>>({});
   const [outputQty, setOutputQty] = useState('');
   const [loadError, setLoadError] = useState<unknown>(null);
+  // D6: can scrap / recovery be recorded right now? (the accounting pre-flight, asked read-only so the forms can say why not BEFORE they are filled)
+  const [scrap, setScrap] = useState<{ ready: boolean; reason: string | null }>({ ready: true, reason: null });
 
   useEffect(() => {
     void preload(['mfg2.wo.confirm_cancel']);
@@ -125,6 +128,11 @@ export function WorkOrderDetail() {
       setWo(detail);
       setProducts(prod);
       setWarehouses(wh);
+      try {
+        setScrap(await api.get<{ ready: boolean; reason: string | null }>('/manufacturing/work-orders/scrap-readiness'));
+      } catch {
+        setScrap({ ready: true, reason: null }); // unknown => do not block; the server still enforces on the action
+      }
       if (detail.processVersionId) {
         try {
           setEx(await api.get<Execution>(`/manufacturing/process-orders/${id}`));
@@ -397,10 +405,12 @@ export function WorkOrderDetail() {
         </section>
       )}
 
-      {processBound && ex && <ProcessExecutionPanel workOrderId={wo.id} state={wo.state} planned={wo.quantityPlanned} remainingPlanned={remaining} ex={ex} onChanged={load} />}
+      {processBound && ex && <ProcessExecutionPanel workOrderId={wo.id} state={wo.state} planned={wo.quantityPlanned} remainingPlanned={remaining} ex={ex} scrap={scrap} onChanged={load} />}
       {processBound && !ex && <BlockedReason>{t('mfg2.wo.process_unavailable')}</BlockedReason>}
 
-      <WorkOrderOutcomes workOrderId={wo.id} state={wo.state} remainingPlanned={remaining} results={wo.results ?? []} products={products} onChanged={load} />
+      <WorkOrderOutcomes workOrderId={wo.id} state={wo.state} remainingPlanned={remaining} results={wo.results ?? []} products={products} scrap={scrap} onChanged={load} />
+
+      <OrderReconciliation events={wo.financialTrail} wipValue={Number(wo.wipValue)} planned={wo.quantityPlanned} produced={wo.quantityProduced} scrapped={scrapped} />
 
       <section className="card" style={{ marginBlockStart: 20 }} aria-labelledby="wo-events-title">
         <h2 id="wo-events-title" style={{ marginBlockStart: 0, fontSize: '1.15rem' }}>

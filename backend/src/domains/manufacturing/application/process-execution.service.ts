@@ -24,6 +24,8 @@ export interface OperationLedgerRow {
   yielded: Array<{ productId: string; sku: string | null; quantity: number; valueBase: string }>;
   /** Material value consumed by this operation and not (yet) carried out by its outputs - what is "inside" the operation right now. */
   wipValueBase: string;
+  /** Value of the scrap recorded against this operation (it left the operation's WIP at the pooled cost - D7). */
+  scrappedValueBase: string;
   /** Scrap / rework / rejected / held recorded against this operation (quantity only - no cost element). */
   outcomes: Array<{ outcomeClass: string; quantity: number }>;
   /** What the definition plans for this order: inputs under its alternate choices and outputs, in whole base units for the full plan. */
@@ -37,7 +39,7 @@ export interface ProcessExecutionView {
   runs: OperationRun[];
   /** Intermediate items yielded and not yet consumed by a later operation, with the value they carry. */
   intermediateOnHand: Array<{ productId: string; sku: string | null; quantity: number; valueBase: string }>;
-  totals: { rawConsumedValueBase: string; operationWipValueBase: string; intermediateOnHandValueBase: string };
+  totals: { rawConsumedValueBase: string; operationWipValueBase: string; intermediateOnHandValueBase: string; scrappedValueBase: string };
 }
 
 /**
@@ -63,7 +65,7 @@ export class ProcessExecutionService {
     const def = await this.definitions.get(wo.processVersionId, manager);
     const runs = await m.getRepository(OperationRun).find({ where: { workOrderId }, order: { startedAt: 'ASC' } });
     const flows = await m.getRepository(OperationFlow).find({ where: { workOrderId } });
-    const results = await m.query(`SELECT "operationId", "outcomeClass", SUM("quantity")::int AS quantity FROM "work_order_results" WHERE "workOrderId" = $1 AND "operationId" IS NOT NULL GROUP BY 1, 2`, [workOrderId]) as Array<{ operationId: string; outcomeClass: string; quantity: number }>;
+    const results = await m.query(`SELECT "operationId", "outcomeClass", SUM("quantity")::int AS quantity, SUM("valueBase")::text AS value FROM "work_order_results" WHERE "workOrderId" = $1 AND "operationId" IS NOT NULL GROUP BY 1, 2`, [workOrderId]) as Array<{ operationId: string; outcomeClass: string; quantity: number; value: string }>;
     const skuOf = new Map<string, string | null>();
     const ids = [...new Set(flows.map((f) => f.productId))];
     if (ids.length) for (const p of (await m.query(`SELECT "id","sku" FROM "products" WHERE "id" = ANY($1)`, [ids])) as Array<{ id: string; sku: string }>) skuOf.set(p.id, p.sku);
@@ -88,6 +90,8 @@ export class ProcessExecutionService {
       const opFlows = flows.filter((f) => f.operationId === o.id);
       const valueIn = opFlows.filter((f) => f.direction === 'in').reduce((s, f) => s + Number(f.valueBase), 0);
       const valueOut = opFlows.filter((f) => f.direction === 'out').reduce((s, f) => s + Number(f.valueBase), 0);
+      // D7: value written off as scrap AT this operation has left its WIP too (the good yield carries input value minus this scrap)
+      const scrapValue = results.filter((r) => r.operationId === o.id && r.outcomeClass === 'scrap').reduce((s, r) => s + Number(r.value ?? 0), 0);
       const status: OperationLedgerRow['status'] = rs.some((r) => r.status === 'running')
         ? 'running'
         : rs.some((r) => r.status === 'completed')
@@ -108,7 +112,8 @@ export class ProcessExecutionService {
         runs: rs.filter((r) => r.status !== 'skipped').length,
         consumed: sum(opFlows.filter((f) => f.direction === 'in')),
         yielded: sum(opFlows.filter((f) => f.direction === 'out')),
-        wipValueBase: Math.max(0, valueIn - valueOut).toFixed(4),
+        wipValueBase: Math.max(0, valueIn - valueOut - scrapValue).toFixed(4),
+        scrappedValueBase: scrapValue.toFixed(4),
         outcomes: results.filter((r) => r.operationId === o.id).map((r) => ({ outcomeClass: r.outcomeClass, quantity: r.quantity })),
         plan: {
           inputs: def.inputs
@@ -139,6 +144,7 @@ export class ProcessExecutionService {
         rawConsumedValueBase: raw.toFixed(4),
         operationWipValueBase: operations.reduce((s, o) => s + Number(o.wipValueBase), 0).toFixed(4),
         intermediateOnHandValueBase: onHand.reduce((s, x) => s + Number(x.valueBase), 0).toFixed(4),
+        scrappedValueBase: operations.reduce((s, o) => s + Number(o.scrappedValueBase), 0).toFixed(4),
       },
     };
   }
@@ -262,7 +268,12 @@ export class ProcessExecutionService {
       const flows = await tx.getRepository(OperationFlow).find({ where: { runId } });
       const valueIn = flows.filter((f) => f.direction === 'in').reduce((s, f) => s + Number(f.valueBase), 0);
       const outs = flows.filter((f) => f.direction === 'out');
-      if (outs.length > 0 && valueIn > 0) {
+      // D7 (UX stage 5): value already written off as SCRAP booked against this operation during this run left the operation's WIP - it is not carried by the good yield.
+      // Yield value = run input value - that scrap (a later run of the same operation only sees scrap recorded after it started). No schema change: the result rows already carry operationId + valueBase.
+      const scrapRows = (await tx.query(`SELECT COALESCE(SUM("valueBase"), 0) AS n FROM "work_order_results" WHERE "workOrderId" = $1 AND "operationId" = $2 AND "outcomeClass" = 'scrap' AND "createdAt" >= $3`, [workOrderId, op.id, run.startedAt])) as Array<{ n: string }>;
+      const scrapValue = Number(scrapRows[0]?.n ?? 0);
+      const valueOut = Math.max(0, valueIn - scrapValue);
+      if (outs.length > 0 && valueOut > 0) {
         const outDefs = await tx.getRepository(ProcessOutput).find({ where: { versionId: def.version.id, operationId: op.id } });
         const weightOf = (productId: string) => outDefs.filter((d) => d.productId === productId).reduce((s, d) => Math.max(s, d.allocationWeight), 0);
         const basis = outs.map((f) => weightOf(f.productId) * f.quantity);
@@ -270,7 +281,7 @@ export class ProcessExecutionService {
         if (total > 0) {
           let assigned = 0;
           for (let i = 0; i < outs.length; i++) {
-            const share = i === outs.length - 1 ? valueIn - assigned : Number(((valueIn * basis[i]) / total).toFixed(4));
+            const share = i === outs.length - 1 ? valueOut - assigned : Number(((valueOut * basis[i]) / total).toFixed(4));
             assigned += share;
             await tx.getRepository(OperationFlow).update(outs[i].id, { valueBase: Math.max(0, share).toFixed(4) });
           }
@@ -280,7 +291,7 @@ export class ProcessExecutionService {
       run.completedAt = new Date();
       run.completedByUserId = actorUserId;
       const saved = await tx.getRepository(OperationRun).save(run);
-      await this.audit.record({ actorUserId, organizationId: null, action: 'manufacturing.process.operation_completed', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: run.id, after: { operationCode: op.code, runNo: run.runNo, valueIn: valueIn.toFixed(4) } }, tx);
+      await this.audit.record({ actorUserId, organizationId: null, action: 'manufacturing.process.operation_completed', resource: 'work_order', resourceId: workOrderId, result: 'success', correlationId: run.id, after: { operationCode: op.code, runNo: run.runNo, valueIn: valueIn.toFixed(4), scrapValue: scrapValue.toFixed(4), valueOut: valueOut.toFixed(4) } }, tx);
       return saved;
     });
   }

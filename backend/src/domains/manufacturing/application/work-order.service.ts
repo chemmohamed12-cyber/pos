@@ -1,3 +1,4 @@
+import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, Like } from 'typeorm';
@@ -42,6 +43,8 @@ export class WorkOrderService {
     @Inject(INVENTORY_VALUATION_CONTRACT) private readonly valuation: InventoryValuationContract,
     private readonly routings: RoutingService,
     @Optional() private readonly processes?: ProcessDefinitionService,
+    // D6 (UX stage 5): the accounting pre-flight for scrap / recovery; absent / unbound => no GL => no gate (same pattern as the inventory posting policy)
+    @Optional() private readonly postingPolicy?: InventoryPostingPolicyRegistry,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -52,6 +55,23 @@ export class WorkOrderService {
     const wo = await (manager ?? this.dataSource).getRepository(WorkOrder).findOne({ where: { id: workOrderId } });
     if (!wo) throw new NotFoundException(`Work Order "${workOrderId}" not found.`);
     return wo;
+  }
+
+  /**
+   * D6 - read-only: can scrap / recovery be recorded right now? Runs the SAME accounting pre-flight the operations run, so the screen can show the blocking reason (and where to fix it) BEFORE
+   * the user fills a form. Exposes only a yes/no and the actionable message - never account balances or configuration values other than the key name already in the message.
+   */
+  async scrapReadiness(manager?: EntityManager): Promise<{ ready: boolean; reason: string | null }> {
+    const gate = this.postingPolicy?.get()?.assertManufacturingScrapPostable;
+    if (!gate) return { ready: true, reason: null };
+    try {
+      await this.postingPolicy!.get()!.assertManufacturingScrapPostable!('scrap', manager ?? this.dataSource.manager);
+      await this.postingPolicy!.get()!.assertManufacturingScrapPostable!('recovery', manager ?? this.dataSource.manager);
+      return { ready: true, reason: null };
+    } catch (err) {
+      if (err instanceof ConflictException) return { ready: false, reason: err.message };
+      throw err;
+    }
   }
 
   async listWorkOrders(manager?: EntityManager): Promise<WorkOrder[]> {
@@ -756,6 +776,8 @@ export class WorkOrderService {
       const repo = tx.getRepository(WorkOrderResult);
       const existing = await repo.findOne({ where: { workOrderId, outcomeClass: 'scrap', requestId } });
       if (existing) return existing; // a retried request: no second effect
+      // D6: the accounts the scrap journal needs must resolve BEFORE anything is consumed or written (fail closed, actionable message, nothing recorded)
+      await this.postingPolicy?.get()?.assertManufacturingScrapPostable?.('scrap', tx);
       const wo = await tx.getRepository(WorkOrder).findOneOrFail({ where: { id: workOrderId } });
       if (wo.quantityProduced + wo.quantityScrapped + quantity > wo.quantityPlanned) {
         throw new ConflictException(`Cannot scrap ${quantity} — Work Order "${workOrderId}" has only ${wo.quantityPlanned - wo.quantityProduced - wo.quantityScrapped} remaining of its ${wo.quantityPlanned}-unit plan.`);
@@ -810,6 +832,7 @@ export class WorkOrderService {
       const repo = tx.getRepository(WorkOrderResult);
       const existing = await repo.findOne({ where: { workOrderId, outcomeClass: 'recovered', requestId } });
       if (existing) return existing;
+      await this.postingPolicy?.get()?.assertManufacturingScrapPostable?.('recovery', tx);
       const source = await repo.findOne({ where: { id: sourceResultId, workOrderId, outcomeClass: 'scrap' } });
       if (!source) throw new ConflictException(`Scrap result "${sourceResultId}" was not found on Work Order "${workOrderId}".`);
       const prior: Array<{ n: string | null }> = await tx.query(

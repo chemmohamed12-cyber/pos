@@ -1,3 +1,4 @@
+import { InventoryPostingPolicyService } from '../../accounting/application/inventory-posting-policy.service';
 import { randomUUID } from 'crypto';
 import { WorkOrderService } from '../application/work-order.service';
 import { RoutingService } from '../application/routing.service';
@@ -76,12 +77,13 @@ export async function setUpMfgKit(namePrefix: string): Promise<MfgKit> {
   new FinancialEventService(h.controlPlane, currencies, journals, audit, events, registry, cfg).onModuleInit();
   new InventoryCostingHandlerService(registry, valuation).onModuleInit();
   const policy = new InventoryPostingPolicyRegistry();
-  policy.bind({ assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }), listManualReceiptReasons: () => [], assertSaleReturnPostable: async () => undefined, assertSupplierInvoicePostable: async () => undefined });
+  const realPolicy = new InventoryPostingPolicyService(cfg, new InventoryPostingPolicyRegistry()); // D6: the real scrap / recovery pre-flight; the other gates stay stubs
+  policy.bind({ assertManualReceiptReason: async () => ({ glAccountCode: 'stub' }), listManualReceiptReasons: () => [], assertSaleReturnPostable: async () => undefined, assertSupplierInvoicePostable: async () => undefined, assertManufacturingScrapPostable: (kind, m) => realPolicy.assertManufacturingScrapPostable(kind, m) });
   const products = new ProductsService(h.controlPlane, audit, events);
   const inventory = new InventoryService(h.controlPlane, audit, products as never, inert, numbering, events, valuation as never, policy);
   const bom = new BomService(h.controlPlane, audit, products);
   const processes = new ProcessDefinitionService(h.controlPlane, audit);
-  const wo = new WorkOrderService(h.controlPlane, inventory, numbering, processEngine, audit, events, bom, valuation as never, new RoutingService(h.controlPlane, audit, products), processes);
+  const wo = new WorkOrderService(h.controlPlane, inventory, numbering, processEngine, audit, events, bom, valuation as never, new RoutingService(h.controlPlane, audit, products), processes, policy);
   const exec = new ProcessExecutionService(h.controlPlane, wo, processes, audit, valuation as never);
 
   const dsOf = (k: 'A' | 'B') => h.connections.getDataSource(k === 'A' ? h.companyAId : h.companyBId);

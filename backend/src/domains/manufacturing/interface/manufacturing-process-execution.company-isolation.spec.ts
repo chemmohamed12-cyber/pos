@@ -246,6 +246,109 @@ describe('Manufacturing Engine S4 - process execution (graph, runs, per-operatio
     expect(r3.status).toBe('running');
   });
 
+  describe('D7 - the operation ledger nets scrap booked against the operation out of the good yield', () => {
+    const op = async (id: string, code: string) => (await k.exec.getExecution(id, await k.mgr())).operations.find((x) => x.code === code)!;
+    const num = (v: string) => Number(v);
+
+    async function setUp(tag: string) {
+      p.d7raw ??= await k.product('S4-D7RAW', 'D7 raw');
+      if (!p.d7stocked) {
+        await k.stock([{ productId: p.d7raw, sku: 'S4-D7RAW', quantity: 5000, unitCost: '1.00' }]);
+        p.d7stocked = 'y';
+      }
+      p[`d7item-${tag}`] = await k.product(`S4-D7I-${tag}`, `D7 item ${tag}`);
+      p[`d7mid-${tag}`] = await k.product(`S4-D7M-${tag}`, `D7 mid ${tag}`);
+    }
+
+    it('S4-13 130 consumed, 13 scrapped, 9 good: the yield carries 117, the operation holds nothing, and the order closes at zero WIP', async () => {
+      const m = await k.mgr();
+      await setUp('a');
+      const item = p['d7item-a'];
+      const v = await k.processes.createDraft(item, { name: 'D7 single', operations: [{ code: 'MAKE', name: 'Make', operationTypeCode: 'transform', sequenceNo: 10 }], edges: [], inputs: [{ operationCode: 'MAKE', componentProductId: p.d7raw, quantityPerUnit: 13 }], outputs: [{ operationCode: 'MAKE', productId: item, quantityPerUnit: 1, role: 'good' }] }, k.actor, m);
+      await k.processes.activate(v.version.id, k.actor, m);
+      const o = await k.wo.createProcessWorkOrder(item, 10, k.warehouseId, null, k.actor, m);
+      await k.wo.release(o.id, k.actor, m);
+      await k.wo.materialIssue(o.id, p.d7raw, 130, k.actor, 'd7a-iss', m);
+      const r = await k.exec.startOperation(o.id, 'MAKE', k.actor, 'd7a-s', m);
+      await k.exec.recordConsumption(o.id, r.id, p.d7raw, 130, k.actor, 'd7a-c', m);
+      await k.exec.recordScrapAt(o.id, r.id, 1, 'cracked', k.actor, 'd7a-scrap', m);
+      await k.exec.recordYield(o.id, r.id, item, 9, k.actor, 'd7a-y', m);
+      await k.exec.completeRun(o.id, r.id, k.actor, m);
+      const row = await op(o.id, 'MAKE');
+      expect(row.yielded[0]).toMatchObject({ quantity: 9 });
+      expect(num(row.yielded[0].valueBase)).toBeCloseTo(117, 4);
+      expect(num(row.scrappedValueBase)).toBeCloseTo(13, 4);
+      expect(num(row.wipValueBase)).toBeCloseTo(0, 4);
+      await k.wo.receiveProcessOutputs(o.id, 9, k.actor, 'd7a-out', m);
+      await k.flush();
+      expect(await k.wo.computeWipValue(o.id, m)).toBeCloseTo(0, 4);
+      await k.wo.complete(o.id, k.actor, m);
+    });
+
+    it('S4-14 without scrap the yield still carries the whole input value (unchanged behaviour)', async () => {
+      const m = await k.mgr();
+      await setUp('b');
+      const item = p['d7item-b'];
+      const v = await k.processes.createDraft(item, { name: 'D7 no scrap', operations: [{ code: 'MAKE', name: 'Make', operationTypeCode: 'transform', sequenceNo: 10 }], edges: [], inputs: [{ operationCode: 'MAKE', componentProductId: p.d7raw, quantityPerUnit: 5 }], outputs: [{ operationCode: 'MAKE', productId: item, quantityPerUnit: 1, role: 'good' }] }, k.actor, m);
+      await k.processes.activate(v.version.id, k.actor, m);
+      const o = await k.wo.createProcessWorkOrder(item, 4, k.warehouseId, null, k.actor, m);
+      await k.wo.release(o.id, k.actor, m);
+      await k.wo.materialIssue(o.id, p.d7raw, 20, k.actor, 'd7b-iss', m);
+      const r = await k.exec.startOperation(o.id, 'MAKE', k.actor, 'd7b-s', m);
+      await k.exec.recordConsumption(o.id, r.id, p.d7raw, 20, k.actor, 'd7b-c', m);
+      await k.exec.recordYield(o.id, r.id, item, 4, k.actor, 'd7b-y', m);
+      await k.exec.completeRun(o.id, r.id, k.actor, m);
+      const row = await op(o.id, 'MAKE');
+      expect(num(row.yielded[0].valueBase)).toBeCloseTo(20, 4);
+      expect(num(row.scrappedValueBase)).toBeCloseTo(0, 4);
+      expect(num(row.wipValueBase)).toBeCloseTo(0, 4);
+    });
+
+    it('S4-15 scrap in an EARLIER operation: the intermediate carries only the good value, and the next operation consumes it at that carried value', async () => {
+      const m = await k.mgr();
+      await setUp('c');
+      const item = p['d7item-c'];
+      const mid = p['d7mid-c'];
+      const v = await k.processes.createDraft(
+        item,
+        {
+          name: 'D7 two steps',
+          operations: [
+            { code: 'FIRST', name: 'First', operationTypeCode: 'transform', sequenceNo: 10 },
+            { code: 'SECOND', name: 'Second', operationTypeCode: 'transform', sequenceNo: 20 },
+          ],
+          edges: [{ from: 'FIRST', to: 'SECOND' }],
+          inputs: [{ operationCode: 'FIRST', componentProductId: p.d7raw, quantityPerUnit: 13 }, { operationCode: 'SECOND', componentProductId: mid, quantityPerUnit: 1 }],
+          outputs: [{ operationCode: 'FIRST', productId: mid, quantityPerUnit: 1, role: 'good', intermediate: true }, { operationCode: 'SECOND', productId: item, quantityPerUnit: 1, role: 'good' }],
+        },
+        k.actor,
+        m,
+      );
+      await k.processes.activate(v.version.id, k.actor, m);
+      const o = await k.wo.createProcessWorkOrder(item, 10, k.warehouseId, null, k.actor, m);
+      await k.wo.release(o.id, k.actor, m);
+      await k.wo.materialIssue(o.id, p.d7raw, 130, k.actor, 'd7c-iss', m);
+      const r1 = await k.exec.startOperation(o.id, 'FIRST', k.actor, 'd7c-s1', m);
+      await k.exec.recordConsumption(o.id, r1.id, p.d7raw, 130, k.actor, 'd7c-c1', m);
+      await k.exec.recordScrapAt(o.id, r1.id, 1, 'cracked', k.actor, 'd7c-scrap', m);
+      await k.exec.recordYield(o.id, r1.id, mid, 9, k.actor, 'd7c-y1', m);
+      await k.exec.completeRun(o.id, r1.id, k.actor, m);
+      expect(num((await op(o.id, 'FIRST')).yielded[0].valueBase)).toBeCloseTo(117, 4);
+      const r2 = await k.exec.startOperation(o.id, 'SECOND', k.actor, 'd7c-s2', m);
+      await k.exec.recordConsumption(o.id, r2.id, mid, 9, k.actor, 'd7c-c2', m);
+      await k.exec.recordYield(o.id, r2.id, item, 9, k.actor, 'd7c-y2', m);
+      await k.exec.completeRun(o.id, r2.id, k.actor, m);
+      const second = await op(o.id, 'SECOND');
+      expect(num(second.consumed[0].valueBase)).toBeCloseTo(117, 4);
+      expect(num(second.yielded[0].valueBase)).toBeCloseTo(117, 4);
+      expect(num(second.wipValueBase)).toBeCloseTo(0, 4);
+      const view = await k.exec.getExecution(o.id, m);
+      expect(num(view.totals.scrappedValueBase)).toBeCloseTo(13, 4);
+      expect(num(view.totals.operationWipValueBase)).toBeCloseTo(0, 4);
+      expect(num(view.totals.intermediateOnHandValueBase)).toBeCloseTo(0, 4);
+    });
+  });
+
   it('S4-11 Company B (the witness) holds no process execution data', async () => {
     const b = await k.h.connections.getDataSource(k.h.companyBId);
     for (const t of ['mfg_operation_runs', 'mfg_operation_flows', 'mfg_process_versions']) expect((await b.query(`SELECT count(*)::int AS n FROM "${t}"`))[0].n).toBe(0);

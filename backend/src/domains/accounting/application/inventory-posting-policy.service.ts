@@ -10,6 +10,7 @@ export const MANUAL_RECEIPT_REASON_ACCOUNTS_KEY = 'accounting.inventory_manual_r
 const COGS_ACCOUNT_KEY = 'accounting.inventory_cogs_account_code';
 const OPENING_BALANCE_ACCOUNT_KEY = 'accounting.inventory_opening_balance_account_code';
 const OPENING_CORRECTION_ACCOUNT_KEY = 'accounting.inventory_opening_correction_account_code';
+const MANUFACTURING_SCRAP_LOSS_ACCOUNT_KEY = 'accounting.manufacturing_scrap_loss_account_code';
 const SALES_RETURNS_ACCOUNT_KEY = 'accounting.sales_returns_account_code';
 const PPV_ACCOUNT_KEY = 'accounting.purchase_price_variance_account_code';
 const COST_DIFFERENCE_AFTER_RECEIPT_KEY = 'accounting.purchase_cost_difference_after_receipt_account_code';
@@ -49,6 +50,25 @@ export class InventoryPostingPolicyService implements InventoryPostingPolicy, On
     if (kind === 'correction' && acc!.accountType !== 'equity') {
       throw new ConflictException(`An opening correction cannot post: the configured account ${code} (${key}) is "${acc!.accountType}", not equity - a correction must never go through profit and loss`);
     }
+  }
+
+  /**
+   * D6 (stage 5) - fail-closed pre-flight of manufacturing scrap / recovery. Mirrors what `handleWorkOrderScrapRecognized` / `handleWorkOrderRecoveryReceived` resolve at event time, so an
+   * unconfigured or invalid scrap-loss account stops the operation BEFORE any WIP, stock, valuation or result write instead of leaving a rejected event behind a completed movement.
+   */
+  async assertManufacturingScrapPostable(kind: 'scrap' | 'recovery', manager?: EntityManager): Promise<void> {
+    if (!manager) throw new Error('InventoryPostingPolicyService: a Company EntityManager is required to validate manufacturing scrap accounts');
+    const what = kind === 'scrap' ? 'Scrap cannot be recorded' : 'A recovery cannot be recorded';
+    const accounts = manager.getRepository(GLAccount);
+    const control = kind === 'scrap' ? 'wip' : 'inventory';
+    const ctl = await accounts.findOne({ where: { controlFunction: control, isActive: true, isPostable: true } });
+    if (!ctl) throw new ConflictException(`${what}: no active postable account has the "${control}" control function. Define it in the chart of accounts first.`);
+    const code = String(this.config.get<unknown>(MANUFACTURING_SCRAP_LOSS_ACCOUNT_KEY) ?? '').trim();
+    if (!code) throw new ConflictException(`${what}: the manufacturing scrap-loss account is not configured. Set it in Accounting policy (${MANUFACTURING_SCRAP_LOSS_ACCOUNT_KEY}) to an active, postable, non-control expense account, then retry - nothing was recorded.`);
+    const acc = await accounts.findOne({ where: { code } });
+    const problem = this.accountProblem(acc);
+    if (problem) throw new ConflictException(`${what}: the configured scrap-loss account ${code} (${MANUFACTURING_SCRAP_LOSS_ACCOUNT_KEY}) ${problem}. Fix it in Accounting policy, then retry - nothing was recorded.`);
+    if (acc!.accountType !== 'expense') throw new ConflictException(`${what}: the configured scrap-loss account ${code} is "${acc!.accountType}", not an expense account. Fix it in Accounting policy, then retry - nothing was recorded.`);
   }
 
   /** C2 - the explicit business date must fall in an open fiscal period; same gate the journal posting itself applies later (org-unit-less, like the inventory events). */

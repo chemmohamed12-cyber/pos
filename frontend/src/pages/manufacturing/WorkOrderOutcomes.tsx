@@ -30,6 +30,7 @@ export function WorkOrderOutcomes({
   remainingPlanned,
   results,
   products,
+  scrap,
   onChanged,
 }: {
   workOrderId: string;
@@ -37,11 +38,15 @@ export function WorkOrderOutcomes({
   remainingPlanned: number;
   results: WorkOrderResultRow[];
   products: Array<{ id: string; name: string }>;
+  /** D6: the accounting pre-flight result - while it fails, scrap and recovery are blocked with its reason (and a link to fix it when the user may). */
+  scrap: { ready: boolean; reason: string | null };
   onChanged: () => void;
 }) {
   const { t } = useLanguage();
   const { can } = useAuth();
   const canRecord = can('manufacturing.work_order.outcome_record', 'editable');
+  const canFixPolicy = can('accounting.account.edit', 'editable');
+  const scrapBlocked = !scrap.ready;
   const [scrapQty, setScrapQty] = useState('');
   const [scrapReason, setScrapReason] = useState('');
   const [rec, setRec] = useState({ sourceResultId: '', productId: '', quantity: '', value: '' });
@@ -118,6 +123,13 @@ export function WorkOrderOutcomes({
           <p className="mfg-note" style={{ marginBlockStart: 0 }}>
             {t('mfg2.oo.scrap.help')}
           </p>
+          {scrapBlocked && (
+            <div style={{ marginBlockEnd: 10 }} data-testid="scrap-blocked">
+              <BlockedReason danger to="/accounting/policy" linkText={canFixPolicy ? t('mfg2.oo.scrap.fix_link') : undefined}>
+                {scrap.reason}
+              </BlockedReason>
+            </div>
+          )}
           <div className="mfg-grid cols-3">
             <FormField label={t('mfg2.col.quantity')} hint={t('mfg2.oo.scrap.remaining').split('{0}').join(String(remainingPlanned))} error={scrapQtyError}>
               {(p) => <input {...p} type="number" min={1} max={remainingPlanned} step={1} value={scrapQty} onChange={(e) => setScrapQty(e.target.value)} />}
@@ -130,7 +142,7 @@ export function WorkOrderOutcomes({
             className="btn btn-danger"
             type="button"
             data-testid="wo-scrap-submit"
-            disabled={busy !== null || !scrapNum || !!scrapQtyError || scrapReason.trim().length < 3}
+            disabled={busy !== null || scrapBlocked || !scrapNum || !!scrapQtyError || scrapReason.trim().length < 3}
             onClick={() =>
               run(
                 'scrap',
@@ -187,7 +199,7 @@ export function WorkOrderOutcomes({
             className="btn btn-primary"
             type="button"
             data-testid="wo-recovery-submit"
-            disabled={busy !== null || !rec.sourceResultId || !rec.productId || !Number(rec.quantity) || !Number(rec.value)}
+            disabled={busy !== null || scrapBlocked || !rec.sourceResultId || !rec.productId || !Number(rec.quantity) || !Number(rec.value)}
             onClick={() =>
               run(
                 'recovery',
