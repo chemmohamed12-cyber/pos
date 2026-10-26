@@ -1,0 +1,95 @@
+{
+  "at": "2026-10-26T16:30:09.034Z",
+  "results": [
+    {
+      "id": "S0",
+      "name": "org tree created (root + 2 branches)",
+      "ok": true,
+      "detail": "root=d7945fd1-266c-435d-bab9-f6f7d8fddd5a k=a550b38d-3b4e-496a-ada2-612e77533fe4 t=cca3ade5-2426-4873-a04e-5b48856714b9"
+    },
+    {
+      "id": "S1",
+      "name": "admin creates warehouses with owning branch",
+      "ok": true,
+      "detail": "201/201"
+    },
+    {
+      "id": "S2",
+      "name": "admin: warehouse with no branch refused (2 branches)",
+      "ok": true,
+      "detail": "status 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Select the branch. / يجب اختيار الفرع.\"},\"meta\":{\"correla"
+    },
+    {
+      "id": "S3",
+      "name": "admin creates vehicles with branch",
+      "ok": true,
+      "detail": "201/201"
+    },
+    {
+      "id": "S4",
+      "name": "restricted user assigned to branch كتامه",
+      "ok": true,
+      "detail": "status 201"
+    },
+    {
+      "id": "R1",
+      "name": "restricted: warehouse list only own branch",
+      "ok": true,
+      "detail": "status 200 codes=WH-K,SLOC-000001"
+    },
+    {
+      "id": "R2",
+      "name": "restricted: vehicle list only own branch",
+      "ok": true,
+      "detail": "status 200 codes=V-K"
+    },
+    {
+      "id": "R3",
+      "name": "restricted: other-branch vehicle overview = 404",
+      "ok": true,
+      "detail": "status 404"
+    },
+    {
+      "id": "R4",
+      "name": "restricted: create warehouse in other branch = 404",
+      "ok": true,
+      "detail": "status 404"
+    },
+    {
+      "id": "R5",
+      "name": "restricted: create warehouse without branch -> own branch",
+      "ok": true,
+      "detail": "status 201 branch ok=true"
+    },
+    {
+      "id": "R6",
+      "name": "restricted: create org unit = denied",
+      "ok": true,
+      "detail": "status 404"
+    },
+    {
+      "id": "R7",
+      "name": "restricted: org report denied",
+      "ok": true,
+      "detail": "status 404"
+    },
+    {
+      "id": "A1",
+      "name": "admin: org report returns",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "id": "A2",
+      "name": "admin: archive branch with attached warehouses/vehicles refused",
+      "ok": true,
+      "detail": "status 409 {\"success\":false,\"error\":{\"code\":\"CONFLICT\",\"message\":\"3 warehouses still attached. / 3 مخازن ما زالت مرتبطة. 1 treasury accounts still atta"
+    }
+  ],
+  "ids": {
+    "companyId": "1479c896-3284-499f-a461-17093568f946",
+    "root": "d7945fd1-266c-435d-bab9-f6f7d8fddd5a",
+    "k": "a550b38d-3b4e-496a-ada2-612e77533fe4",
+    "t": "cca3ade5-2426-4873-a04e-5b48856714b9"
+  }
+}

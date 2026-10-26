@@ -1,0 +1,373 @@
+
+> daii-backend@1.1.13 test:db-guard
+> node --test tools/testing/db-guard.test.js tools/testing/db-guard-statements.test.js tools/testing/db-guard-admin.test.js tools/testing/db-guard-final-entry.test.js tools/testing/biz-evidence.test.js tools/testing/db-guard-process.test.js tools/testing/db-guard.coverage.test.js
+
+TAP version 13
+# Subtest: evidence stays inside the approved evidence directory; header pins commit/version/env and carries no credentials
+ok 1 - evidence stays inside the approved evidence directory; header pins commit/version/env and carries no credentials
+  ---
+  duration_ms: 305.995
+  ...
+# Subtest: finalize writes a manifest and re-verifies every file; tampering or a missing file fails BEFORE any cleanup
+ok 2 - finalize writes a manifest and re-verifies every file; tampering or a missing file fails BEFORE any cleanup
+  ---
+  duration_ms: 313.7797
+  ...
+# Subtest: fingerprint: equal for unchanged data, different after a change, "absent" for missing tables (fake ds)
+ok 3 - fingerprint: equal for unchanged data, different after a change, "absent" for missing tables (fake ds)
+  ---
+  duration_ms: 3.3403
+  ...
+# Subtest: a credential value inside any evidence file fails finalize (STOP before cleanup); a clean run passes
+ok 4 - a credential value inside any evidence file fails finalize (STOP before cleanup); a clean run passes
+  ---
+  duration_ms: 405.3281
+  ...
+# Subtest: the proposed entry: complete once approvedBy/approvedOn are filled; incomplete (ignored) as shipped; no role patterns; postgres only as admin
+not ok 5 - the proposed entry: complete once approvedBy/approvedOn are filled; incomplete (ignored) as shipped; no role patterns; postgres only as admin
+  ---
+  duration_ms: 10.1273
+  location: 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\org-integ\\backend\\tools\\testing\\db-guard-admin.test.js:19:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    the shipped approval list has exactly the dedicated-cluster entry (this file tests the SUPERSEDED 5544 proposal as a fixture)
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\tools\testing\db-guard-admin.test.js:20:10)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    node:internal/test_runner/harness:255:12
+    node:internal/process/task_queues:140:7
+    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+  ...
+# Subtest: business targets: only disposable names t01..t99; every protected / system / ambient / restore / dev database is refused as a business target
+ok 6 - business targets: only disposable names t01..t99; every protected / system / ambient / restore / dev database is refused as a business target
+  ---
+  duration_ms: 4.8636
+  ...
+# Subtest: administrative connection: exact CREATE/DROP of approved disposable names + read-only catalog statements are allowed
+ok 7 - administrative connection: exact CREATE/DROP of approved disposable names + read-only catalog statements are allowed
+  ---
+  duration_ms: 9.3411
+  ...
+# Subtest: administrative connection: business work is impossible — writes, DDL on objects, COPY, GRANT, extra CREATE DATABASE clauses, role and system changes
+ok 8 - administrative connection: business work is impossible — writes, DDL on objects, COPY, GRANT, extra CREATE DATABASE clauses, role and system changes
+  ---
+  duration_ms: 0.5152
+  ...
+# Subtest: create/drop can affect ONLY the exact disposable names: ambient, restore copies, dev, system and look-alike names are refused
+ok 9 - create/drop can affect ONLY the exact disposable names: ambient, restore copies, dev, system and look-alike names are refused
+  ---
+  duration_ms: 1.478
+  ...
+# Subtest: no role patterns are approved: any role DDL is refused on every connection type
+ok 10 - no role patterns are approved: any role DDL is refused on every connection type
+  ---
+  duration_ms: 0.8755
+  ...
+# Subtest: on a business connection (a disposable database) ordinary data statements work; database-level DDL is still pattern-bound
+ok 11 - on a business connection (a disposable database) ordinary data statements work; database-level DDL is still pattern-bound
+  ---
+  duration_ms: 0.4949
+  ...
+# Subtest: end to end with the guard installed on a fake pg.Client: refused statements never reach the driver
+ok 12 - end to end with the guard installed on a fake pg.Client: refused statements never reach the driver
+  ---
+  duration_ms: 12.0984
+  ...
+# Subtest: the existing provisioning harness issues ONLY statements this policy allows (drift protection on its source)
+ok 13 - the existing provisioning harness issues ONLY statements this policy allows (drift protection on its source)
+  ---
+  duration_ms: 3468.2928
+  ...
+# Subtest: exactly one approved entry: complete, real approver text, valid date, no role patterns, postgres administrative-only
+not ok 14 - exactly one approved entry: complete, real approver text, valid date, no role patterns, postgres administrative-only
+  ---
+  duration_ms: 12.8257
+  location: 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\org-integ\\backend\\tools\\testing\\db-guard-final-entry.test.js:14:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\tools\testing\db-guard-final-entry.test.js:16:10)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    node:internal/test_runner/harness:255:12
+    node:internal/process/task_queues:140:7
+    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+  ...
+# Subtest: the pinned system_identifier equals the one recorded when the dedicated cluster was created; the cluster is loopback+scram only; the test role is least-privilege
+ok 15 - the pinned system_identifier equals the one recorded when the dedicated cluster was created; the cluster is loopback+scram only; the test role is least-privilege
+  ---
+  duration_ms: 2.0778
+  ...
+# Subtest: semantics: postgres is administrative-only; business targets are t00…t12 disposable names only; everything protected stays blocked; other ports blocked
+not ok 16 - semantics: postgres is administrative-only; business targets are t00…t12 disposable names only; everything protected stays blocked; other ports blocked
+  ---
+  duration_ms: 9.5567
+  location: 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\org-integ\\backend\\tools\\testing\\db-guard-final-entry.test.js:42:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    127.0.0.1:5544/postgres
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\tools\testing\db-guard-final-entry.test.js:53:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: statements: administrative connections create/drop only disposable names and never do business work; no role operations
+ok 17 - statements: administrative connections create/drop only disposable names and never do business work; no role operations
+  ---
+  duration_ms: 8.2256
+  ...
+# Subtest: no credential value is in the policy file, the cluster facts, or the provisioning tool (checked against the live User-scope variables when available)
+ok 18 - no credential value is in the policy file, the cluster facts, or the provisioning tool (checked against the live User-scope variables when available)
+  ---
+  duration_ms: 63.3793
+  ...
+# Subtest: parseCliTarget: long, short, = forms, URI and key=value
+ok 19 - parseCliTarget: long, short, = forms, URI and key=value
+  ---
+  duration_ms: 16.3326
+  ...
+# Subtest: libpq CLIs: approved explicit target passes; everything else is refused
+ok 20 - libpq CLIs: approved explicit target passes; everything else is refused
+  ---
+  duration_ms: 5.8353
+  ...
+# Subtest: pg_restore --list without a target reads a file only and is allowed; with a target it is checked
+ok 21 - pg_restore --list without a target reads a file only and is allowed; with a target it is checked
+  ---
+  duration_ms: 1.1198
+  ...
+# Subtest: cluster management binaries are always refused; a renamed shim with --dbname is still treated as a DB client
+ok 22 - cluster management binaries are always refused; a renamed shim with --dbname is still treated as a DB client
+  ---
+  duration_ms: 1.6299
+  ...
+# Subtest: shell strings mentioning DB binaries are refused (cannot be verified); harmless strings pass
+ok 23 - shell strings mentioning DB binaries are refused (cannot be verified); harmless strings pass
+  ---
+  duration_ms: 6.5027
+  ...
+# Subtest: child_process wrapper: refused command never reaches the real function; allowed one does; Node children inherit the guard
+ok 24 - child_process wrapper: refused command never reaches the real function; allowed one does; Node children inherit the guard
+  ---
+  duration_ms: 8.5028
+  ...
+# Subtest: util.promisify(execFile) keeps resolving { stdout, stderr } and goes through the GUARDED function, not the original
+ok 25 - util.promisify(execFile) keeps resolving { stdout, stderr } and goes through the GUARDED function, not the original
+  ---
+  duration_ms: 8.9302
+  ...
+# Subtest: installAll: pg.Client connect guard + pg.native refused + idempotent (fake pg, no env propagation)
+ok 26 - installAll: pg.Client connect guard + pg.native refused + idempotent (fake pg, no env propagation)
+  ---
+  duration_ms: 2.4263
+  ...
+# Subtest: nodeOptionsWithGuard is idempotent and keeps existing options
+ok 27 - nodeOptionsWithGuard is idempotent and keeps existing options
+  ---
+  duration_ms: 3.4619
+  ...
+# Subtest: disposable databases matching the approved pattern may be created and dropped
+ok 28 - disposable databases matching the approved pattern may be created and dropped
+  ---
+  duration_ms: 15.717
+  ...
+# Subtest: everything else is refused: other names, ambient, maintenance, dev, restore copies, production-like
+ok 29 - everything else is refused: other names, ambient, maintenance, dev, restore copies, production-like
+  ---
+  duration_ms: 1.8163
+  ...
+# Subtest: quoting / comment / case tricks do not hide a statement
+ok 30 - quoting / comment / case tricks do not hide a statement
+  ---
+  duration_ms: 2.0155
+  ...
+# Subtest: role DDL requires a matching rolePatterns entry; ALTER SYSTEM and tablespaces are never allowed
+ok 31 - role DDL requires a matching rolePatterns entry; ALTER SYSTEM and tablespaces are never allowed
+  ---
+  duration_ms: 5.691
+  ...
+# Subtest: pg_terminate_backend is only allowed with datname + application_name filters and its own pid excluded
+ok 32 - pg_terminate_backend is only allowed with datname + application_name filters and its own pid excluded
+  ---
+  duration_ms: 1.0029
+  ...
+# Subtest: ordinary data statements are not affected (including words that merely contain create/drop)
+ok 33 - ordinary data statements are not affected (including words that merely contain create/drop)
+  ---
+  duration_ms: 0.725
+  ...
+# Subtest: statements on a server that is not approved are not judged here (the connection itself is refused by connect())
+ok 34 - statements on a server that is not approved are not judged here (the connection itself is refused by connect())
+  ---
+  duration_ms: 3.0421
+  ...
+# Subtest: installed on pg.Client.query: a refused statement never reaches the underlying query (promise and callback styles)
+ok 35 - installed on pg.Client.query: a refused statement never reaches the underlying query (promise and callback styles)
+  ---
+  duration_ms: 16.6536
+  ...
+# Subtest: every database-capable tool is guarded or classified as an operator tool
+not ok 36 - every database-capable tool is guarded or classified as an operator tool
+  ---
+  duration_ms: 2328.3497
+  location: 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\org-integ\\backend\\tools\\testing\\db-guard.coverage.test.js:35:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   'tools/maintenance/company-migration-catchup.js: database-capable and neither guarded nor classified as an operator tool',
+    +   'tools/maintenance/company-migration-status.js: database-capable and neither guarded nor classified as an operator tool'
+    + ]
+    - []
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'tools/maintenance/company-migration-catchup.js: database-capable and neither guarded nor classified as an operator tool'
+    1: 'tools/maintenance/company-migration-status.js: database-capable and neither guarded nor classified as an operator tool'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\tools\testing\db-guard.coverage.test.js:50:10)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    node:internal/test_runner/harness:255:12
+    node:internal/process/task_queues:140:7
+    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+  ...
+# Subtest: jest is configured with the guard (globalSetup + setupFiles) and cannot silently lose it
+ok 37 - jest is configured with the guard (globalSetup + setupFiles) and cannot silently lose it
+  ---
+  duration_ms: 3.0776
+  ...
+# Subtest: non-pg database drivers are mapped to a throwing stub in jest (fail closed if one is ever installed)
+ok 38 - non-pg database drivers are mapped to a throwing stub in jest (fail closed if one is ever installed)
+  ---
+  duration_ms: 4.0449
+  ...
+# Subtest: the shipped source tree uses only the pg driver (TypeORM type postgres)
+ok 39 - the shipped source tree uses only the pg driver (TypeORM type postgres)
+  ---
+  duration_ms: 3745.4341
+  ...
+# Subtest: default deny: empty approval list refuses everything, including a perfectly isolated-looking target
+ok 40 - default deny: empty approval list refuses everything, including a perfectly isolated-looking target
+  ---
+  duration_ms: 7.7249
+  ...
+# Subtest: approved loopback entry allows only pattern-matching databases as business targets; postgres only as admin
+ok 41 - approved loopback entry allows only pattern-matching databases as business targets; postgres only as admin
+  ---
+  duration_ms: 1.3993
+  ...
+# Subtest: hard denials cannot be approved: daii_dev, port 5433, production-like names, remote hosts
+ok 42 - hard denials cannot be approved: daii_dev, port 5433, production-like names, remote hosts
+  ---
+  duration_ms: 6.0988
+  ...
+# Subtest: unknown / empty identity is refused
+ok 43 - unknown / empty identity is refused
+  ---
+  duration_ms: 0.5584
+  ...
+# Subtest: an entry without approvedBy / approvedOn / identityEvidence is ignored (a proposal is not an approval)
+ok 44 - an entry without approvedBy / approvedOn / identityEvidence is ignored (a proposal is not an approval)
+  ---
+  duration_ms: 16.9888
+  ...
+# Subtest: an unreadable approval list fails closed
+ok 45 - an unreadable approval list fails closed
+  ---
+  duration_ms: 5.9823
+  ...
+# Subtest: the shipped approval list approves exactly one entry: the dedicated 5546 cluster (never 5433/5544/5656)
+not ok 46 - the shipped approval list approves exactly one entry: the dedicated 5546 cluster (never 5433/5544/5656)
+  ---
+  duration_ms: 9.8202
+  location: 'D:\\CLAUDE-CODE\\XNEXUS-WORKSPACE\\1-hosting\\daii.xnexustech.com\\release-new\\.claude\\worktrees\\org-integ\\backend\\tools\\testing\\db-guard.test.js:72:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\tools\testing\db-guard.test.js:74:10)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: ambient resolution: unset variables fall back to the application default daii_dev, which is refused
+ok 47 - ambient resolution: unset variables fall back to the application default daii_dev, which is refused
+  ---
+  duration_ms: 2.6598
+  ...
+# Subtest: ambient resolution: backend/.env values (daii_dev on 5433) are refused; a shell override to an approved target passes
+ok 48 - ambient resolution: backend/.env values (daii_dev on 5433) are refused; a shell override to an approved target passes
+  ---
+  duration_ms: 2.3567
+  ...
+# Subtest: refusal happens BEFORE any connection: a refused target never reaches the underlying connect (callback and promise styles)
+ok 49 - refusal happens BEFORE any connection: a refused target never reaches the underlying connect (callback and promise styles)
+  ---
+  duration_ms: 9.7925
+  ...
+# Subtest: manual HTTP scripts: only a loopback API base is allowed
+ok 50 - manual HTTP scripts: only a loopback API base is allowed
+  ---
+  duration_ms: 4.5533
+  ...
+1..50
+# tests 50
+# suites 0
+# pass 45
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7693.5964

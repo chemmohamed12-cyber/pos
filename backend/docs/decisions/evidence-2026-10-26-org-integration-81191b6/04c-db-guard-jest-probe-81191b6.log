@@ -1,0 +1,18 @@
+
+> daii-backend@1.1.13 test:db-guard:jest-probe
+> jest -c tools/testing/guard-probe/jest.probe.config.js
+
+PASS tools/testing/guard-probe/probe.spec.js
+  √ pg.Client is refused before any socket (13 ms)
+  √ pg.Pool is refused (4 ms)
+  √ TypeORM DataSource.initialize is refused (113 ms)
+  √ pg.native is refused (3 ms)
+  √ libpq CLI without explicit target and cluster binaries are refused; promisified execFile too (5 ms)
+  √ a harmless promisified execFile still resolves {stdout, stderr} (702 ms)
+  √ a Node child inherits the guard (NODE_OPTIONS) and is refused too (432 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        4.245 s
+Ran all test suites.

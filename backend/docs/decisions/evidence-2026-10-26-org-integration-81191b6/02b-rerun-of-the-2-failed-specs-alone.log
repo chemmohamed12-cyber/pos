@@ -1,0 +1,35 @@
+
+=== REGRESSION: src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+PASS src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts (53.282 s)
+  Company database pool — several OS processes at once (real Postgres, isolated instance only)
+    √ the migration created the unique index, and the database itself refuses a second registration of a database name (159 ms)
+    √ the migration refuses (and changes nothing) when duplicates already exist, naming them (79 ms)
+    √ 6 separate processes, 3 pooled databases: exactly 3 Companies are created, every database has ONE owner, and the losers leave no Company behind (37103 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        53.359 s, estimated 59 s
+Ran all test suites matching /src\\foundation\\company\\company-database-pool.multi-process.real-pg.spec.ts/i.
+RESULT PASS src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+[31m[Nest] 9924  - [39m٢٦‏/١٠‏/٢٠٢٦، ٧:٢٠:١٥ م [31m  ERROR[39m [38;5;3m[RestoreManagerService] [39m[31mRestore failed for operation "f19dd653-7e70-45b3-8a44-b52083c3b4a4"[39m
+Error: Restored Company audit chain is broken at seq 2 — restore rejected.
+    at RestoreManagerService.confirmAndRestore (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\src\foundation\release\restore-manager.service.ts:223:21)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Object.<anonymous> (D:\CLAUDE-CODE\XNEXUS-WORKSPACE\1-hosting\daii.xnexustech.com\release-new\.claude\worktrees\org-integ\backend\src\foundation\release\restore-manager-audit-chain.real-pg.spec.ts:180:5)
+PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts (22.279 s)
+  Area 14 — RestoreManagerService audit-chain branch, real Postgres (2026-09-25)
+    √ zero audit rows (pre-Area-14 backup) — restore succeeds, chain never checked (338 ms)
+    √ audit rows present + valid chain — restore succeeds (191 ms)
+    √ audit rows present + broken chain — restore rejected (338 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        22.399 s, estimated 25 s
+Ran all test suites matching /src\\foundation\\release\\restore-manager-audit-chain.real-pg.spec.ts/i.
+RESULT PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+
+REGRESSION DONE: 2/2 passed
