@@ -240,6 +240,8 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #8f98ad;
+}
+
 /* Phone widths: the sidebar becomes an off-canvas drawer (logical properties, so it opens from the reading-start edge in both ar and en). */
 .nav-toggle,
 .nav-backdrop {
