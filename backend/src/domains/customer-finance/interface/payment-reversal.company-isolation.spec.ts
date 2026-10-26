@@ -357,7 +357,8 @@ describe('T2 — customer payment reversal through the owning document — real-
     await inv('400.00', '2026-09-24'); // 30 days late (edge of 0-30)
     await payments.recordPayment(c2, i2, '50.00', 'bank_transfer', ctx.A.bank1102, null, actor, ds.manager);
     await payments.recordOnAccountPayment(c2, null, '25.00', 'bank_transfer', ctx.A.bank1102, null, actor, ds.manager);
-    const sum = await statements.getAccountSummary(c2, actor, { asOf }, ds.manager);
+    // the payments above are recorded 'now' (real clock) while the aging uses a fixed as-of date: pass the collection period explicitly so the test does not depend on the day it runs
+    const sum = await statements.getAccountSummary(c2, actor, { asOf, from: '2000-01-01', to: '2100-01-01' }, ds.manager);
     expect(sum.aging).toEqual({ '0-30': '500.00', '31-60': '150.00', '61-90': '0.00', '90+': '300.00' });
     expect(sum.notYetDue).toBe('100.00');
     expect(sum.overdue).toBe('850.00');
