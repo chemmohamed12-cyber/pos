@@ -72,3 +72,103 @@ Files needing extra **architectural / accounting review** before the merge: `fin
 
 ## 7. Evidence index (`evidence-2026-10-26-vehicle-workspace-stage-c/`)
 `regression-phase4-22of22.log`, `regression-final-18of18.log` (pre-fix, superseded), `vw-api-checks3.txt` (dev preview 42/42), `rehearsal/` (engine deploy log, smoke 36/36, Stage C acceptance 42/42 on the deployed slot, rollback, schema signatures, down-test, source checksum), `MANIFEST-rehearsal-package.json`, `*.zip.sha256`, and the scripts used (`vw-prep-c.js`, `vw-api-checks3.js`, `vw-apply-c.js`, `vw-reset-expenses.js`). Companion documents: float design, Phase 2 review, handover (`VEHICLE-DRIVER-WORKSPACE-*`).
+
+
+---
+
+# ITERATION 2 — closure of integration conflicts, integrated-candidate verification (2026-10-26, later)
+
+**Status: INTEGRATION VERIFIED TECHNICALLY — APPROVALS PENDING (7/7) — MERGE: HOLD — verdict: NOT READY FOR MERGE.**
+Blocking items: **D-1 … D-7 all PENDING** (register `VEHICLE-DRIVER-WORKSPACE-DECISION-REGISTER-2026-10-26.md`; no decision text, approver, date or evidence reference has been recorded for any of them) **and the integrated candidate contains `feature/org-structure-gate0`, whose own report says NOT READY FOR MERGE** (§I2, §I6). Nothing was merged to `release/1.1.12`, released or deployed; the release engine was not modified; 5173/3500 untouched.
+
+## I0. Corrections to what was reported earlier
+1. The Stage C acceptance script has **41 checks, not 42** ("42" counted its final `ALL PASSED` line). All 41 PASS on the dev preview, on the 1.1.10-engine rehearsal slot and on the integrated 1.1.13-engine slot. Earlier mentions of "42/42" mean 41/41.
+2. Harness exit codes **are** captured now: `biz-run.js --regression` returns 0 on success and 1 on failure (observed: 1 on the one real failure of the org spec, 0 on every clean run). The earlier 22-spec Phase 4 run (`c7a3f6f`) was started in a background group and its exit status was not recorded; the per-spec `RESULT PASS` lines and `REGRESSION DONE: 22/22` stand, and the integrated run below has `HARNESS-EXIT=0` recorded.
+
+## I1. Integrated candidate (exact identity)
+| Item | Value |
+|---|---|
+| Branch | `integration/vw-candidate-on-1.1.12` (a **trial / verification branch**, not the release line); base `release/1.1.12` = `3a4c811` (includes the 1.1.13 patch `4ae21ba`) |
+| **Final commit** | **`9e56426`** (= code `02465cb` + a test-list file; clean tree) |
+| Entering the candidate | the vehicle-workspace branch (merge `763658c`; code `c7a3f6f`, head `255465f`, 18 commits) · `feature/org-structure-gate0` (merge `c7196fb`; 15 non-merge commits not already in the release line, head `2cf8873`) · `feature/direct-sale-shipping` **only** commit `cd6e89e` (re-committed as `2348b5f`; its second commit `b661124` and the uncommitted work in the main checkout are **not** included) · integration tests `02465cb`, list `9e56426`. 39 commits over `release/1.1.12` (37 non-merge) |
+| Version label | the scratch export's `package.json` was set to `1.1.14` **for the rehearsal only** (the committed tree says 1.1.13) so the 1.1.13 engine would accept an upgrade. **D-5 (release version) is PENDING — this label is not a decision.** |
+| Source checksum (`git ls-tree -r 9e56426 -- backend/src frontend/src`, SHA-256) | `0f90007aaaa4430bf2c49a855ad8e337c4bdbe77131c5a5d0a33e30852e44529` |
+| Package | `Daii-Release-v1.1.14-2026-10-26.zip`, SHA-256 `d95dbf148e755376eb7b74d791a107d32de27a1e00621d85ad5f9d44ae8a9f88`, type full, 4,453 manifest files / 0 problems / VERIFY PASSED, **333 migrations** (1.1.13 has 320; +13 = 5 vehicle workspace + 7 org engine + 1 direct-sale terminology) |
+| Package ↔ commit | package `src/` (1,115 non-spec files) is byte-identical to `git archive 9e56426 backend/src` minus `*.spec.ts` (per-file SHA-256 diff empty); only the `package.json` version label differs from the commit |
+A first build whose zip name said 1.1.13 but whose manifest said 1.1.14 was discarded and rebuilt (`--skip-install`) so name, manifest and label agree.
+
+## I2. Integration conflicts — resolved, both sides' rules kept, proven by tests on the candidate
+| Conflict | Resolution (commit) | Proof |
+|---|---|---|
+| **`feature/direct-sale-shipping` × `recordOutcome`** (`delivery.service.ts`) | order kept: (1) a direct sale accepts only `delivered`; (2) for `delivered`: the per-item gate, then the cash-on-delivery collection rule; (3) action = `direct_handover` for a direct sale, else the usual map. `unit-specs.txt`: union (`2348b5f`) | new real-PG spec **X1–X5**: non-delivered outcomes refused for a direct sale; a direct sale without cash is handed over created→delivered; **a direct sale with a cash amount is refused until a collection is recorded, then handed over**; a rejected collection does not satisfy the hand-over; a normal shipment is unchanged — 5/5 PASS (harness exit 0) |
+| **`feature/org-structure-gate0` × `shipment.controller.ts`** | both rules compose with AND: org branch scope first (`filterVisible` / `assertVisible`), then the F-1 access rule (`visibleVehicles` / `assertCanReadVehicle`); the same AND is applied to the new endpoints (`/vehicle-workspace/:id`, `custody-reconciliation`, handover declaration) so they do not bypass the branch scope (`c7196fb`) | specs **I1–I4** added to `vehicle-access…spec`: a branch-restricted fleet reader sees only in-scope + legacy vehicles; an unrestricted driver still sees only his own; **an assigned driver outside his branch scope gets 404**; a user with neither right sees nothing. The org branch's own `vehicle-branch` spec was adapted (it now runs as an administrator, because the F-1 rule applies on top) and passes 10/10 |
+| org × direct-sale in `getOrderSnapshot` (a conflict *between those two branches*, not with this work) | both optional fields kept (`branchOrgUnitId`, `shippingMethod`) | compiles; exercised by the specs above and the org suites |
+| both branches independently fixed the **same fragile negative control** in `release-migration-registry.real-pg.spec.ts` | the org branch's version kept (cut-off tree → nothing half-undone, a stronger assertion); mine dropped | spec 21/21 PASS |
+**Not changed (documented):** shipment-level branch scope for the *new* routes that take a `shipmentId` (collections, line events, expenses) — only the vehicle-level routes are scoped. `vehicles.branch` (free text) and `vehicles.orgUnitId` **both remain**; nothing was removed or backfilled.
+
+## I3. Verification of the integrated candidate (`9e56426`) — evidence in `evidence-…/integrated-candidate/`
+| Gate | Verdict | Evidence |
+|---|---|---|
+| Real-PG regression, 34 specs (vehicle workspace/float 22, direct-sale integration, org suites ×8, release-line company gate ×3) | **PASS 34/34, `HARNESS-EXIT=0`** | `regression-integrated-34of34.log` |
+| Backend unit suite | **PASS 76 suites / 624 tests** | run output |
+| backend `tsc --noEmit`, frontend `tsc -b`, frontend model tests 14/14, ESLint 0 errors (5 baseline warnings), official package build `VERIFY: PASSED` | **PASS** | `package-build.log` |
+| Engine rehearsal on the **1.1.13 engine** (installed baseline = the 1.1.13 package `35192265…`, unmodified; isolated DBs `daii_test_biz_t97_*`; Company fan-out on) | **PASS** | `04-deploy.log`: `succeeded`; events incl. `release.deploy.company_gate`, company backups / fan-out / migration / verified, atomic swap; platform and Company DB 320 → **333** migrations |
+| Upgrade schema == fresh-install schema | **PASS** (`dc688a33…`, `6d877cca…`) | `schema-signatures.json` |
+| `down()` ×13 back to the 1.1.13 baseline schema | **FAIL — one constraint, org-owned** | table/column/index/constraint counts identical; the only difference: the `org_units` parent FK is `org_units_parentId_fkey … ON DELETE CASCADE` at baseline but `FK_org_units_parent … ON DELETE RESTRICT` after the org migration's `down()` (`OrgUnitLifecycle1790021000000`). **None of the five vehicle-workspace migrations or the direct-sale migration leaves a difference.** Classification: reversibility limit of the org branch's migration (owner: org-structure team); it does not affect upgrade, application rollback or this feature, but the candidate cannot claim byte-exact database rollback while it includes the org branch |
+| Deployed smoke (swapped slot) | **PASS 36/36** | `05-smoke.log` |
+| Stage C acceptance on the deployed integrated slot (41 checks incl. driver-vs-driver isolation) | **PASS 41/41** | `07-stage-c-acceptance-integrated.log` |
+| **Browser acceptance on the deployed integrated slot** (the UI served by the package itself, `127.0.0.1:3690`) | **PASS** | mobile 375 px as the driver: all four sections, 0 overflow, 0 touch targets < 44 px; recorded a collection and an item delivery through the UI (Deliver stays disabled while items are outstanding); **claimed an expense through the UI**. Desktop 1280 px as admin: all sections 0 overflow; **approved (a different user) and posted that expense through the UI — float 1,000 → 955, difference 0.00**; the driver sees "you cannot approve your own expense" |
+| Rollback to the previous slot (1.1.13) on the upgraded schema | **PASS** | `07-rollback-smoke.log`: login 201; treasury / customers / vehicles / shipments / supplier-payments 200; Stage C route 404 (absent) |
+Differences between the rehearsal and the target environment: isolated cluster 5546, `NODE_ENV=development`, `ENTITLEMENT_MODE=unlicensed-full`, version label 1.1.14 added for the rehearsal, engine = the installed 1.1.13 package driven by the local harness (not the host's Release Center UI).
+
+## I4. Decision register (7) — actual status
+| # | Decision | Status | Blocks |
+|---|---|---|---|
+| D-1 float GL account per company | **PENDING** (no approver recorded) | configuration of any target company |
+| D-2 `custody_*` categories → accounts | **PENDING** | same |
+| D-3 roles: approve / post / reverse / assign float / confirm | **PENDING** | granting any role (no template changed) |
+| D-4 partial-delivery stock / receivable effect | **PENDING** — behaviour unchanged | any change to partial delivery |
+| D-5 release version / order | **PENDING** — the 1.1.14 label is rehearsal-only | packaging |
+| D-6 keep `branch` + `orgUnitId` together | **PENDING** — both kept, visibility rules AND-composed | removing either |
+| D-7 owner acceptance of limitations | **PENDING** | merge approval |
+The register holds the facts each owner needs. A technical PASS above is **not** an approval of any of them.
+
+## I5. Residual risks added by this iteration
+(a) the org migration's `down()` changes one FK (§I3) — org-owned; (b) shipment-level branch scope on the new shipment-keyed routes is not applied (§I2); (c) the integrated candidate is a **trial** — the three branches have not been reviewed together by their owners; (d) `feature/direct-sale-shipping` has uncommitted work in the main checkout and a second commit (`b661124`) that are not included — the owner must confirm `cd6e89e` alone is the intended slice; (e) the rehearsal used a 1.1.14 label; the real number is undecided.
+
+## I6. Merge options (no merge performed)
+1. **Vehicle workspace alone onto `release/1.1.12`** — proven conflict-free (`git merge-tree`); regression and the rehearsal on the 1.1.10 engine passed at `c7a3f6f`. **The 1.1.13-engine rehearsal of this exact subset has not been run** (only the integrated candidate was); if the CTO prefers this path it must be repeated first. Still needs D-1…D-5 and D-7.
+2. **Integrated candidate `9e56426`** — fully verified above, but it contains org-structure (NOT READY FOR MERGE by its own report; the `down()` FK difference) and a partial direct-sale slice; needs the org team's gate and the direct-sale owner's confirmation first.
+3. **Sequence**: land direct-sale and org (each through its owner's gate) onto `release/1.1.12` first, then this work, using `2348b5f` / `c7196fb` / `02465cb` as the integration reference.
+**Recommendation: NOT READY FOR MERGE.** Reasons, in order: (1) D-1…D-7 PENDING; (2) org-structure's own NOT READY status and the `down()` FK difference; (3) direct-sale slice confirmation; (4) the real version number (D-5).
+
+
+---
+
+# Iteration 3 — CTO directive verification (2026-10-26, late)
+
+**Status: NOT READY FOR MERGE.** No merge, release, deployment or production change was made. Full-schema dumps were not kept; their SHA-256 signatures are in the logs.
+
+## Gate table
+Evidence folder: `evidence-2026-10-26-vehicle-workspace-stage-c/`.
+
+| Gate | Subject | Result | Evidence |
+|---|---|---|---|
+| G1 Standalone Vehicle Workspace on the 1.1.13 engine — package from 763658c (code c7a3f6f), sha 72141584…, 325 migrations | standalone | **PASS** — deploy `succeeded`; 320→325; upgrade schema == fresh install (`ac36b89c…` / `62151525…`); `down()` ×5 == 1.1.13 baseline byte-exact (`da43946e…` / `99912a1e…`); re-up == first upgrade; second run no-op; smoke 36/36; Stage C acceptance 42 PASS lines, 0 FAIL; rollback to the previous 1.1.13 slot on the upgraded schema: health 200, Stage C route 404 | `standalone-763658c/` |
+| G2 Integrated candidate on the 1.1.13 engine — package from 282ed63 (scratch label 1.1.14, sha 5ac36fde…, 333 migrations) | integrated | **PASS with one named exception** — deploy `succeeded`, company gate + fan-out verified, 320→333; upgrade == fresh (`dc688a33…` / `6d877cca…`); `down()` ×13 differs from baseline only in the `org_units` parent FK (DEF-ORG-FK-DOWN); re-up == first upgrade; smoke 36/36; Stage C acceptance 42 PASS, 0 FAIL; rollback: health 200, Stage C route 404 | `integrated-282ed63/` |
+| G3 Regression on the integrated head | 282ed63 | **PASS** 35/35 specs, 282 tests, harness exit 0 | `integrated-282ed63/regression-35of35.log.gz` |
+| G4 Unit / static on the integrated head (a600732, code 282ed63) | integrated | **PASS** unit 76 suites / 624 tests; backend `tsc --noEmit` 0; ESLint (delivery, shipment, organization) 0; frontend `tsc -b` 0 | `integrated-282ed63/int-*.log` |
+| G5 `shipmentId` route audit (company isolation, branch scope, ownership, driver assignment, authorization) | integrated | **PASS** — S1–S5 real-PG positive and negative cases; every delivery route calls `DeliveryOrgScopeService.assert*` before the service; no bypass found. Limitation: the pending-remittance list and the categories list carry no record id, so they are not record-scoped | `delivery-org-scope.integration.real-pg.spec.ts` |
+| G6 DEF-ORG-FK-DOWN | integrated | **ACCEPTED EXCEPTION** — design hardening; restoring CASCADE would weaken deletion protection. R1–R3 pass; up/no-op/down/up proved. Data reversibility = application rollback with the schema kept, or the engine's per-Company restore point | decision doc §1; `integrated-282ed63/updownup-*.json` |
+| G7 Direct-sale slice | integrated | cd6e89e only; b661124 not added (presentation-only, would conflict in Shipments.tsx / SalesOrdersList.tsx); X1–X5 pass | decision doc §2 |
+| G8 Browser acceptance on the packaged builds | both | **NOT RUN** on the 1.1.13-engine deployments in this iteration (API-level acceptance only). Earlier browser acceptance on the isolated preview (:5696/:3697) stands for c7a3f6f | — |
+| G9 Company-specific D-1/D-2/D-3 data (real accounts, categories, role mapping) and external finance sign-off | — | **NOT VERIFIED / BLOCKED** — nothing fabricated; posting must not be enabled in any company until recorded | decision register |
+| G10 Release number / merge order (D-5) | — | **OPEN** — Release Owner; "1.1.14" is a scratch label only | decision doc §3 |
+
+## Corrections and caveats
+- An earlier regression log showing 30/35 was contaminated by overlapping runs in one namespace and is discarded; the clean rerun is 35/35.
+- The acceptance script prints 42 PASS lines (elsewhere called "41 checks"); the PASS-line count is authoritative.
+- The org-structure engine itself still self-reports NOT READY FOR MERGE; the direct-sale branch's uncommitted work was not evaluated.
+
+## Verdict
+Technical gates G1–G7 are evidenced. G8–G10 remain open, so the status stays **NOT READY FOR MERGE**.

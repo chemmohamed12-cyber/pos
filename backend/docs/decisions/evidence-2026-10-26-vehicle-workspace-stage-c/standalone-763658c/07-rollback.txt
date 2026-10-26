@@ -1,0 +1,1 @@
+﻿rollback: previous 1.1.13 slot ran on upgraded schema (325); health 200; Stage C route 404; stopped
