@@ -418,18 +418,21 @@ function ShipmentsSection(props: {
   openId: string | null;
 }) {
   const tr = useTr();
-  const rows = filterByTab(props.shipments, props.tab);
+  const [partialOnly, setPartialOnly] = useState(false);
+  // "Partially delivered" is DERIVED by the server from the per-item delivery records (every item accounted for, some units came back) - not a shipment state.
+  const partialCount = props.shipments.filter((s) => s.lineProgress.status === 'partial').length;
+  const rows = partialOnly ? props.shipments.filter((s) => s.lineProgress.status === 'partial') : filterByTab(props.shipments, props.tab);
   return (
     <section>
       <div className="vw-chips" role="tablist" aria-label={tr('تصفية الشحنات حسب الحالة', 'Filter shipments by status')}>
         {TABS.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={props.tab === t.key} className={`vw-filter ${props.tab === t.key ? 'active' : ''}`} onClick={() => props.onTab(t.key)}>
+          <button key={t.key} type="button" role="tab" aria-selected={!partialOnly && props.tab === t.key} className={`vw-filter ${!partialOnly && props.tab === t.key ? 'active' : ''}`} onClick={() => { setPartialOnly(false); props.onTab(t.key); }}>
             {tr(t.ar, t.en)} <span className="vw-count">{props.counts[t.key]}</span>
           </button>
         ))}
-        <span className="vw-filter disabled" aria-disabled="true" title={tr('لا توجد بيانات تسليم جزئي مسجلة بعد', 'No partial-delivery data is recorded yet')}>
-          {tr('تسليم جزئي', 'Partial delivery')} <span className="vw-count">{tr('غير متاح', 'n/a')}</span>
-        </span>
+        <button type="button" role="tab" aria-selected={partialOnly} className={`vw-filter ${partialOnly ? 'active' : ''}`} onClick={() => setPartialOnly(true)} title={tr('مشتقة من سجلات التسليم بالبنود', 'Derived from the per-item delivery records')}>
+          {tr('تسليم جزئي', 'Partial delivery')} <span className="vw-count">{partialCount}</span>
+        </button>
       </div>
       {props.truncated && (
         <div className="vw-banner warn" role="status">
@@ -466,6 +469,11 @@ function ShipmentsSection(props: {
                     )}
                     <span dir="ltr">{tr('بوليصة', 'WB')} {s.waybillNumber}</span>
                   </div>
+                  {(s.lineProgress.status === 'in_progress' || s.lineProgress.status === 'partial') && (
+                    <div className="vw-card-meta">
+                      <span className={`vw-chip ${s.lineProgress.status === 'partial' ? 'warn' : 'go'}`}>{s.lineProgress.status === 'partial' ? tr('تسليم جزئي', 'Partially delivered') : tr('تسجيل البنود جارٍ', 'Item delivery in progress')}</span>
+                    </div>
+                  )}
                   {isCashOnDelivery(s) && (
                     <div className="vw-card-cod">
                       {tr('تحصيل عند التسليم', 'Cash on delivery')}: <strong>{money(s.codAmount as string)}</strong>

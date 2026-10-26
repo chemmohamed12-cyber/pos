@@ -111,7 +111,9 @@ export function CollectionsPanel(props: {
                   {money(c.amount)} · {c.method}
                 </div>
                 <span className={`vw-chip ${v[2]}`}>{tr(v[0], v[1])}</span>{' '}
-                <span className={`vw-chip ${c.remittanceStatus === 'remitted' ? 'ok' : 'muted'}`}>{c.remittanceStatus === 'remitted' ? tr('تم التوريد', 'Remitted') : tr('بانتظار التوريد', 'Awaiting remittance')}</span>
+                {c.verificationStatus !== 'rejected' && (
+                  <span className={`vw-chip ${c.remittanceStatus === 'remitted' ? 'ok' : 'muted'}`}>{c.remittanceStatus === 'remitted' ? tr('تم التوريد', 'Remitted') : tr('بانتظار التوريد', 'Awaiting remittance')}</span>
+                )}
                 <div className="vw-note">{fmtDateTime(c.occurredAt)}</div>
                 {c.rejectionReason && <div className="vw-note">{tr('سبب الرفض: ', 'Rejection reason: ')}{c.rejectionReason}</div>}
                 {options.length > 0 && rejectFor !== c.id && (

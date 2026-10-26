@@ -33,7 +33,7 @@ export interface TabDef {
   en: string;
 }
 
-/** Display label -> canonical backend state(s). "Partially delivered" has NO canonical state or data source (decision D-1), so it is deliberately not a tab with a count. */
+/** Display label -> canonical backend state(s). "Partially delivered" is NOT a canonical state (decision D-1): it is a derived filter over the server-computed per-item progress, not part of TABS. */
 export const TABS: readonly TabDef[] = [
   { key: 'all', states: null, ar: 'الكل', en: 'All' },
   { key: 'new', states: ['created'], ar: 'جديدة', en: 'New' },
