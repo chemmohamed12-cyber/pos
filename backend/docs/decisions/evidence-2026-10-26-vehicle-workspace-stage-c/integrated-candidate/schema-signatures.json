@@ -1,0 +1,74 @@
+{
+ "after-down-daii_test_biz_t97_down_co1.json": {
+  "db": "daii_test_biz_t97_down_co1",
+  "schemaSha256": "9b4518161da0a162b795f5e075053e1a388550fa78bdc5a986ea1f6c3964d22a",
+  "tables": 202,
+  "columns": 1928,
+  "indexes": 616,
+  "constraints": 1782,
+  "migrations": 320
+ },
+ "after-down-daii_test_biz_t97_down_main.json": {
+  "db": "daii_test_biz_t97_down_main",
+  "schemaSha256": "d89746822f28e1f99dfc0b48d90e23373970203e22fa0ad7f4d8b6e89dea779e",
+  "tables": 202,
+  "columns": 1928,
+  "indexes": 616,
+  "constraints": 1797,
+  "migrations": 320
+ },
+ "fresh-daii_test_biz_t97_fresh_co1.json": {
+  "db": "daii_test_biz_t97_fresh_co1",
+  "schemaSha256": "6d877ccacba979cd8e85ce5c11abf7eb004d75e3d4e357bf0e52c7f2ab2096c1",
+  "tables": 207,
+  "columns": 2009,
+  "indexes": 647,
+  "constraints": 1835,
+  "migrations": 333
+ },
+ "fresh-daii_test_biz_t97_fresh_main.json": {
+  "db": "daii_test_biz_t97_fresh_main",
+  "schemaSha256": "dc688a3390602407832c1287fae0d3fecdacd148bdb3542c1f251228511c4c57",
+  "tables": 207,
+  "columns": 2009,
+  "indexes": 647,
+  "constraints": 1850,
+  "migrations": 333
+ },
+ "post-daii_test_biz_t97_rh_co1.json": {
+  "db": "daii_test_biz_t97_rh_co1",
+  "schemaSha256": "6d877ccacba979cd8e85ce5c11abf7eb004d75e3d4e357bf0e52c7f2ab2096c1",
+  "tables": 207,
+  "columns": 2009,
+  "indexes": 647,
+  "constraints": 1835,
+  "migrations": 333
+ },
+ "post-daii_test_biz_t97_rh_main.json": {
+  "db": "daii_test_biz_t97_rh_main",
+  "schemaSha256": "dc688a3390602407832c1287fae0d3fecdacd148bdb3542c1f251228511c4c57",
+  "tables": 207,
+  "columns": 2009,
+  "indexes": 647,
+  "constraints": 1850,
+  "migrations": 333
+ },
+ "pre-daii_test_biz_t97_rh_co1.json": {
+  "db": "daii_test_biz_t97_rh_co1",
+  "schemaSha256": "99912a1ecdcab306305249726f6bae54669c160c18fe147c08fa675c7ddda5e0",
+  "tables": 202,
+  "columns": 1928,
+  "indexes": 616,
+  "constraints": 1782,
+  "migrations": 320
+ },
+ "pre-daii_test_biz_t97_rh_main.json": {
+  "db": "daii_test_biz_t97_rh_main",
+  "schemaSha256": "da43946ecf0a7cafd05b88827b2e3cdbd0eb35ffea833dec5f37354c054faea4",
+  "tables": 202,
+  "columns": 1928,
+  "indexes": 616,
+  "constraints": 1797,
+  "migrations": 320
+ }
+}
