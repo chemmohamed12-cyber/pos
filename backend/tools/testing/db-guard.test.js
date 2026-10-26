@@ -69,11 +69,13 @@ test('an unreadable approval list fails closed', () => {
   assert.throws(() => guard.loadPolicy('Z:/does/not/exist.json'), guard.DbGuardError);
 });
 
-test('the shipped approval list approves exactly one entry: the dedicated 5546 cluster (never 5433/5544/5656)', () => {
+test('the shipped approval list approves exactly two entries: the dedicated 5546 cluster and the CTO-approved 5544 h3reg instance (never 5433/5656; 5544 only for daii_test_h3reg_*)', () => {
   const p = guard.loadPolicy();
-  assert.equal(p.approved.length, 1);
-  assert.equal(p.approved[0].port, 5546);
+  assert.deepEqual(p.approved.map((a) => a.port).sort(), [5544, 5546]);
   for (const bad of [5433, 5544, 5656]) assert.equal(guard.evaluate({ host: '127.0.0.1', port: bad, database: 'daii_test_biz_t01' }, p).allowed, false, String(bad));
+  for (const bad of [5433, 5656]) assert.equal(guard.evaluate({ host: '127.0.0.1', port: bad, database: 'daii_test_h3reg_run' }, p).allowed, false, `h3reg on ${bad}`);
+  assert.equal(guard.evaluate({ host: '127.0.0.1', port: 5544, database: 'daii_test_h3reg_run' }, p).allowed, true);
+  assert.equal(guard.evaluate({ host: '127.0.0.1', port: 5544, database: 'daii_dev' }, p).allowed, false);
 });
 
 test('ambient resolution: unset variables fall back to the application default daii_dev, which is refused', () => {
