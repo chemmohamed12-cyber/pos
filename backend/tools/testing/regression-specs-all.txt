@@ -138,3 +138,5 @@ src/domains/procurement/interface/procurement-branch.real-pg.spec.ts
 src/domains/reports/interface/org-report.real-pg.spec.ts
 src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts
 src/domains/procurement/interface/supplier-payment-branch.company-isolation.spec.ts
+src/domains/accounting/interface/work-order-branch.company-isolation.spec.ts
+src/domains/accounting/application/financial-events/org-company-level-decisions.guard.spec.ts
