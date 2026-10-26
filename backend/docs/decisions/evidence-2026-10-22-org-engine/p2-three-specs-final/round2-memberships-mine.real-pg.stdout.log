@@ -1,0 +1,6 @@
+﻿
+=== REGRESSION: src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+
+REGRESSION DONE: 1/1 passed
+

@@ -1,0 +1,24 @@
+﻿      √ accounting: selects exactly the closure, runs every migration of it, runs nothing unrelated (10881 ms)
+      √ manufacturing: selects exactly the closure, runs every migration of it, runs nothing unrelated (5035 ms)
+      √ sales (sales → finance → accounting chain): selects exactly the closure, runs every migration of it, runs 
+      √ Release N provisions the Company; business data is written; a bystander Company exists (3410 ms)
+      √ Release N+1 preflight: READY, pending == exactly the 4 new migrations, only in-scope tags (1768 ms)
+      √ Release N+1 runs ONLY the pending migrations, exactly once; history and business data are preserved (357 ms)
+      √ re-running the same release is a no-op (idempotent) (115 ms)
+      √ a later release whose entitlement NARROWS (manufacturing dropped) removes nothing and runs nothing (2721 ms)
+      √ the bystander Company's database was never touched (3 ms)
+      √ RB-1 proof: appRoot = restored PREVIOUS tree (lacks N+1 classes) + migrationTreePath = FAILED slot → undo 
+      √ safety fallback preserved: classes genuinely unavailable (failed-slot path lacks them) → undo rejects, backup 
+      √ legacy in-place path unchanged: no migrationTreePath → appRoot is used (appRoot = the tree holding the 
+      √ WIRING rollbackAfterSwap: rollbackSwap() → failedPath → undo(failedPath) → classes resolved from the candidate 
+      √ WIRING rollbackReleaseStaged (operator rollback of a COMMITted release): same failedPath → undo → rolled_back, 
+      √ WIRING fail-safe preserved: failed slot genuinely lacks the classes and the backup restore fails → FAILED-SAFE 
+      √ no manifest on disk (production config): undo of an accounting+manufacturing run resolves through the fixed 
+      √ NEGATIVE CONTROL — the pre-fix 6-tag registry makes the same undo fail (proves this test detects the H3 
+      √ a migration that throws mid-batch rolls the WHOLE batch back and is recorded as failed (2707 ms)
+      √ a migration the manifest ships but whose class is missing from the artifact → preflight BLOCKED (tag/migration 
+      √ PRE-FIX registry + a release shipping a manufacturing migration → preflight was already BLOCKED (loud, not 
+      √ KNOWN GAP (characterization): an entitled tag whose directory is absent from the artifact and which ships no 
+Test Suites: 1 passed, 1 total
+Tests:       21 passed, 21 total
+Time:        95.379 s
