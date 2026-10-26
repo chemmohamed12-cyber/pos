@@ -9,11 +9,11 @@
   "rolePatterns": [],
   "approvedBy": "<CTO to fill in>",
   "approvedOn": "<date>",
-  "identityEvidence": "Isolated throwaway cluster D:\DAII-ISOLATED-PG\data (docs/acceptance/ISOLATED_TEST_ENVIRONMENT.md section 3), PostgreSQL 18.6, listen_addresses=127.0.0.1, started 2026-10-26 with pg_ctl",
+  "identityEvidence": "Isolated throwaway cluster D:/DAII-ISOLATED-PG/data (docs/acceptance/ISOLATED_TEST_ENVIRONMENT.md section 3), PostgreSQL 18.6, listen_addresses=127.0.0.1, started 2026-10-26 with pg_ctl",
   "expectedSystemIdentifier": "7692905965783805068",
   "scope": {
     "businessTests": "ONLY databases matching databasePatterns; every other database on this cluster (restore_*, *_ambient, company_*, pool_*, rehearsal_*) stays denied",
     "roles": "no role patterns approved"
   },
-  "commandAfterApproval": "cd backend; set DB_HOST=127.0.0.1 DB_PORT=5544 DB_USER=isolated_admin DB_PASSWORD=<from D:\DAII-ISOLATED-PG\pw.txt> DB_NAME=daii_test_h3reg_ambient; npm run build; npx jest --runInBand src/foundation/release/release-migration-registry.real-pg.spec.ts"
+  "commandAfterApproval": "cd backend; set DB_HOST=127.0.0.1 DB_PORT=5544 DB_USER=isolated_admin DB_PASSWORD=<from D:/DAII-ISOLATED-PG/pw.txt> DB_NAME=daii_test_h3reg_ambient; npm run build; npx jest --runInBand src/foundation/release/release-migration-registry.real-pg.spec.ts"
 }
