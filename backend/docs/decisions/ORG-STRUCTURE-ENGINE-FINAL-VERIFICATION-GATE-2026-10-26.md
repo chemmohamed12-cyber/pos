@@ -21,6 +21,8 @@ Reasons, each reviewable below: (1) five attribution rules are undecided, so sup
 ## 3. Phase 3 — Warehouse Excel import, browser (file 16; tested code `2d4eb06` ≡ `a4e0daf`)
 Branch selection is mandatory (button disabled **and** server `Select the branch` when forced); rows are attributed to the chosen branch; header errors, header-only, blank-name, duplicate-in-file and already-existing-code files create no unexpected records (the import is per-row by design: valid rows commit, rejected rows are listed and create nothing); a restricted user choosing an out-of-scope branch gets 404 and nothing is created, choosing their own branch works. One UX limitation: a file that is not an Excel workbook returns the generic "An unexpected error occurred." (pre-existing behaviour, no data effect). Earlier browser acceptance (tree edit/archive/reactivate, vehicles, warehouses, organizational report, restricted-user views) is in file 8.
 
+> **Superseding detail:** the up/down check below was repeated with full schema fingerprints, seeded data and logs; its final result and the reversibility limits are in `ORG-STRUCTURE-ENGINE-FINAL-REPORT-2026-10-26.md` §1 (evidence 19–19d), which also carries the consolidated test table and the readiness recommendation (NOT READY FOR MERGE).
+
 ## 4. Development database state
 `daii_dev` and Alpha / Beta / Gamma / Delta carry the 7 migrations (file 1). Migration reversibility proven on a disposable database (file 19): full up (322 migrations, the 7 present) → second `up` is a no-op → `down` ×7 removes the columns/log table/index with a seeded org row present → `up` again restores everything and the seeded row survives. (The parent FK deliberately stays `RESTRICT` after `down`.)
 
