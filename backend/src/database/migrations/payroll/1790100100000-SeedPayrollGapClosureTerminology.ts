@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { seedTerminologyOwned, unseedTerminologyOwned } from '../../seed-helpers/terminology-ownership';
 
 /**
  * Payroll gap closure (2026-10-25) — Arabic / English labels for the new Run Detail panels (exceptions, inputs, actors, payouts, reconciliation), the revision /
@@ -167,13 +168,10 @@ export class SeedPayrollGapClosureTerminology1790100100000 implements MigrationI
   ];
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    for (const [code, ar, en] of this.rows) {
-      const category = code.startsWith('action.') ? 'action' : code.startsWith('panel.') ? 'panel' : 'field';
-      await queryRunner.query(`INSERT INTO "terminology_entries" ("code", "category", "ar", "en") VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING`, [code, category, ar, en]);
-    }
+    await seedTerminologyOwned(queryRunner, 'payroll', this.name, this.rows.map(([code, ar, en]) => [code, code.startsWith('action.') ? 'action' : code.startsWith('panel.') ? 'panel' : 'field', ar, en] as const), 'preserve');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DELETE FROM "terminology_entries" WHERE code = ANY($1)`, [this.rows.map(([code]) => code)]);
+    await unseedTerminologyOwned(queryRunner, 'payroll', this.name, this.rows.map(([code, ar, en]) => [code, '', ar, en] as const));
   }
 }

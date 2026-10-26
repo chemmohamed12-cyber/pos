@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../context/LanguageContext';
-import { currentLang, loadingLabel } from '../../lib/displayNames';
+import { loadingLabel } from '../../lib/displayNames';
 
 interface Employee {
   id: string;

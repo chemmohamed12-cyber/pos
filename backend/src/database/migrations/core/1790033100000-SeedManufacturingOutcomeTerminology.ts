@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { seedTerminologyOwned, unseedTerminologyOwned } from '../../seed-helpers/terminology-ownership';
 
 /** Manufacturing Engine S1 (2026-10-24) - movement-type labels for scrap / recovery. Data only; ON CONFLICT DO NOTHING; `down` removes exactly these rows. */
 export class SeedManufacturingOutcomeTerminology1790033100000 implements MigrationInterface {
@@ -13,12 +14,10 @@ export class SeedManufacturingOutcomeTerminology1790033100000 implements Migrati
   ];
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    for (const [code, category, ar, en] of this.rows) {
-      await queryRunner.query(`INSERT INTO "terminology_entries" ("code", "category", "ar", "en") VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING`, [code, category, ar, en]);
-    }
+    await seedTerminologyOwned(queryRunner, 'manufacturing', this.name, this.rows, 'preserve');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DELETE FROM "terminology_entries" WHERE code = ANY($1)`, [this.rows.map(([code]) => code)]);
+    await unseedTerminologyOwned(queryRunner, 'manufacturing', this.name, this.rows);
   }
 }

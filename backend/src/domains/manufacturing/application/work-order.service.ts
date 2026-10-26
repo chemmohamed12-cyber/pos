@@ -654,6 +654,7 @@ export class WorkOrderService {
       await woRepo.update(wo.id, { quantityProduced: wo.quantityProduced + outputQuantity });
 
       await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
+        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the entry to the work order's branch (null = company level, as before)
         idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}`,
         workOrderId: wo.id,
         finishedProductId: wo.finishedProductId,
@@ -730,6 +731,7 @@ export class WorkOrderService {
         await this.valuation.recordReceiptCost(o.productId, wo.warehouseId, q, unit, `manufacturing:work_order:${wo.id}:fg_output:${requestId}:${o.productId}:receipt`, tx);
         if (Number(total) > 0) {
           await this.events.publish(tx, 'manufacturing.work_order.finished_goods_received', {
+            orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the entry to the work order's branch (null = company level, as before)
             idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${requestId}:${o.productId}`,
             workOrderId: wo.id,
             finishedProductId: o.productId,
@@ -796,6 +798,7 @@ export class WorkOrderService {
       );
       if (valueOutput > 0) {
         await this.events.publish(tx, 'manufacturing.work_order.scrap_recognized', {
+          orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the entry to the work order's branch (null = company level, as before)
           idempotencyKey: `manufacturing:work_order:${wo.id}:scrap:${requestId}`,
           workOrderId: wo.id,
           finishedProductId: wo.finishedProductId,
@@ -859,6 +862,7 @@ export class WorkOrderService {
         repo.create({ workOrderId: wo.id, operationId: null, outcomeClass: 'recovered', productId, quantity, valueBase: total, requestId, reason: null, sourceResultId: source.id, createdByUserId: actorUserId }),
       );
       await this.events.publish(tx, 'manufacturing.work_order.recovery_received', {
+        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the entry to the work order's branch (null = company level, as before)
         idempotencyKey: `manufacturing:work_order:${wo.id}:recovery:${requestId}`,
         workOrderId: wo.id,
         productId,

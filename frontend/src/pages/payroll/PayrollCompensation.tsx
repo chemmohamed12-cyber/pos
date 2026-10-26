@@ -2,8 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
-import { STATUS_NAMES, currentLang, loadingLabel, nameOf } from '../../lib/displayNames';
-import { fmtDate } from '../../lib/formatDateTime';
 import { StatusBadge } from '../../components/StatusBadge';
 
 interface Employee {

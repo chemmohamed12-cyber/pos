@@ -4,7 +4,6 @@ import { api } from '../../lib/api';
 import { ErrorText, toUiError, type UiError } from '../../components/ErrorText';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusBadge } from '../../components/StatusBadge';
-import { loadingLabel } from '../../lib/displayNames';
 import { useAuth } from '../../context/AuthContext';
 
 interface PayrollPeriod {

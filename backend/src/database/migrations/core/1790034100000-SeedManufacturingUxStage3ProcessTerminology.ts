@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { seedTerminologyOwned, unseedTerminologyOwned } from '../../seed-helpers/terminology-ownership';
 
 /** Manufacturing UX redesign stage 3 (process editor) (2026-10-25) - AR/EN terminology. Upsert by code; `down` removes exactly these rows. */
 export class SeedManufacturingUxStage3ProcessTerminology1790034100000 implements MigrationInterface {
@@ -142,12 +143,10 @@ export class SeedManufacturingUxStage3ProcessTerminology1790034100000 implements
   ];
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    for (const [code, category, ar, en] of this.rows) {
-      await queryRunner.query(`INSERT INTO "terminology_entries" ("code", "category", "ar", "en") VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO UPDATE SET "ar" = EXCLUDED."ar", "en" = EXCLUDED."en"`, [code, category, ar, en]);
-    }
+    await seedTerminologyOwned(queryRunner, 'manufacturing', this.name, this.rows, 'update');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DELETE FROM "terminology_entries" WHERE code = ANY($1)`, [this.rows.map(([code]) => code)]);
+    await unseedTerminologyOwned(queryRunner, 'manufacturing', this.name, this.rows);
   }
 }
