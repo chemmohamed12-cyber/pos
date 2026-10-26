@@ -1,0 +1,7 @@
+# Source-to-evidence manifest (2026-10-26)
+- Candidate commit: da1063f (tree == merge commit 1a0d187). Code last changed in 282ed63; da1063f adds docs (b71a11d) and the version bump to 1.1.14 (package.json + lock, backend and frontend).
+- Package: Daii-Release-v1.1.14-2026-10-26.zip, SHA-256 dc757941816072fd4045136cdb62a51413d92d44daed2c05442c2ddc6416a1b4, built from `git archive da1063f` (package-build.log), 333 migrations, MANIFEST version 1.1.14.
+- Regression on da1063f: final-regression.log.gz - 36 specs, 285 tests, harness exit 0 (ns biz_t98_).
+- Regression on merge commit 1a0d187: pm-regression.log.gz - 36 PASS, 0 FAIL, harness exit 0 (ns biz_t97_). Unit 76/624 on both (unit-*.log). tsc, eslint, frontend tsc -b: 0 errors.
+- Engine rehearsal (unmodified 1.1.13 engine): 00-summary.log, 04-deploy.log (succeeded, 320->333, company gate + fan-out), 05-smoke.log (36/0), 06-stagec-acceptance.log (42 PASS, 0 FAIL), updownup-*.json (up / no-op / down / up), 07-rollback.txt (previous 1.1.13 slot on upgraded schema: health 200, Stage C route 404). Upgrade == fresh install (dc688a33... / 6d877cca...). down() differs from the 1.1.13 baseline only in the org_units parent FK (CASCADE -> RESTRICT): accepted exception.
+- Packaged-browser acceptance 1-10: 08-browser-acceptance-282ed63.md (package from 282ed63; da1063f differs by docs + version metadata only, API acceptance re-run on the final package).

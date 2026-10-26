@@ -172,3 +172,29 @@ Evidence folder: `evidence-2026-10-26-vehicle-workspace-stage-c/`.
 
 ## Verdict
 Technical gates G1–G7 are evidenced. G8–G10 remain open, so the status stays **NOT READY FOR MERGE**.
+
+
+---
+
+# Iteration 4 — CTO final execution directive: closure and merge (2026-10-26)
+
+**Result: MERGED AND VERIFIED (local repository only; nothing pushed, nothing deployed).**
+
+- Final source commit: **da1063f** (integration/vw-candidate-on-1.1.12). Merge commit: **1a0d187adf6063c6dc24008be00b43892d55c8c6** on **release/1.1.12** (parents 3a4c811, da1063f; merge-commit tree identical to da1063f).
+- Approved version: **1.1.14** (next after 1.1.13 in 1.1.10 -> 1.1.11 -> 1.1.12 -> 1.1.13; no branch holds a higher version; bump commit da1063f, same four files as earlier release commits).
+- Package: `Daii-Release-v1.1.14-2026-10-26.zip`, SHA-256 `dc757941816072fd4045136cdb62a51413d92d44daed2c05442c2ddc6416a1b4`, 333 migrations.
+
+| Gate | Status | Tested commit / evidence (`evidence-2026-10-26-vehicle-workspace-stage-c/final-da1063f/`) |
+|---|---|---|
+| G1 Standalone on 1.1.13 engine | PASS | 763658c package, earlier folder `standalone-763658c/` (source unchanged for that gate) |
+| G2 Integrated on 1.1.13 engine | PASS (accepted exception) | da1063f package; deploy 320->333, upgrade==fresh, smoke 36/0, acceptance 42/0, rollback to previous slot OK |
+| G3 Regression | PASS | da1063f 36 specs / 285 tests exit 0; merge commit 1a0d187 36 PASS 0 FAIL exit 0 |
+| G4 Unit / static | PASS | 76 suites / 624 tests, tsc, eslint (0 errors), frontend tsc -b, on da1063f and 1a0d187 |
+| G5 shipmentId route audit | PASS | S1-S5 in the regression list |
+| G6 org_units parent FK after rollback | ACCEPTED EXCEPTION | migration core/1790021000000-OrgUnitLifecycle; RESTRICT kept; the only schema difference after down() (verified element by element on platform and Company DBs); R1-R3 tests; schema rollback != data rollback (recovery = app rollback with schema kept, or the engine's per-Company restore point) |
+| G7 Direct-sale slice | PASS | cd6e89e only; b661124 excluded; X1-X5 in the regression list |
+| G8 Packaged-browser acceptance | PASS | scenarios 1-10 on the package from 282ed63 (`08-browser-acceptance-282ed63.md`); final package differs only by docs + version metadata, its API acceptance was re-run (42/0) |
+| G9 Company financial configuration | BLOCKED FOR FINANCIAL ACTIVATION | no real chart of accounts / category mapping / role assignment was available or verified; nothing fabricated. The code fails closed (no float account, unmapped category, wrong permission, self-approval, over-float all refused - acceptance log). Activation per company is a separate configuration step |
+| G10 Release version | PASS | 1.1.14, see above |
+
+Notes: the browser run exposed three cosmetic items (raw category keys in the dropdown, custody accounts listed in the float picker though the service refuses them, reason text kept after submit); none blocks. The merge is local to the repository; no push, release creation or deployment was performed.

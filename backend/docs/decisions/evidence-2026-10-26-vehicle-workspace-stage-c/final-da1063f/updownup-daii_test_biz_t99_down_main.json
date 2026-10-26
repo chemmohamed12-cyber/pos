@@ -1,0 +1,32 @@
+{
+ "db": "daii_test_biz_t99_down_main",
+ "migrationsBefore": 320,
+ "up": {
+  "success": true,
+  "error": null
+ },
+ "migrationsAfterUp": 333,
+ "noop": {
+  "success": true,
+  "error": null
+ },
+ "migrationsAfterNoop": 333,
+ "fk": [
+  {
+   "conname": "FK_org_units_parent",
+   "def": "FOREIGN KEY (\"parentId\") REFERENCES org_units(id) ON DELETE RESTRICT"
+  }
+ ],
+ "orgUnitColumns": [
+  "id",
+  "type",
+  "name",
+  "parentId",
+  "createdAt",
+  "code",
+  "status",
+  "archivedAt"
+ ],
+ "parentWithChildDeleteRefused": true,
+ "leafDeleteWorks": true
+}
