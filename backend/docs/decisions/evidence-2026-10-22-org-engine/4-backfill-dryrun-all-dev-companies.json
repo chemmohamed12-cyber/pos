@@ -1,0 +1,554 @@
+{
+  "mode": "DRY-RUN (read-only)",
+  "generatedAt": "2026-10-26T00:15:33.808Z",
+  "companies": [
+    {
+      "company": "Alpha Trading Co",
+      "database": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+      "units": [
+        {
+          "type": "branch",
+          "status": "active",
+          "n": 3
+        },
+        {
+          "type": "company",
+          "status": "active",
+          "n": 1
+        },
+        {
+          "type": "company",
+          "status": "archived",
+          "n": 1
+        }
+      ],
+      "issues": [],
+      "documents": [
+        {
+          "table": "sales_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 2,
+          "stamped": 0,
+          "unassigned": 2,
+          "derivable": 0,
+          "notDerivable": 2
+        },
+        {
+          "table": "sales_invoices",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 2,
+          "stamped": 0,
+          "unassigned": 2,
+          "derivable": 0,
+          "notDerivable": 2
+        },
+        {
+          "table": "fulfillment_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 2,
+          "stamped": 0,
+          "unassigned": 2,
+          "derivable": 0,
+          "notDerivable": 2
+        },
+        {
+          "table": "shipments",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 2,
+          "stamped": 0,
+          "unassigned": 2,
+          "derivable": 0,
+          "notDerivable": 2
+        },
+        {
+          "table": "purchase_orders",
+          "column": "orgUnitId",
+          "installed": true,
+          "total": 2,
+          "stamped": 0,
+          "unassigned": 2,
+          "derivable": 0,
+          "notDerivable": 2
+        }
+      ],
+      "dryRun": {
+        "runId": null,
+        "writes": "none (read-only connection)",
+        "steps": [
+          {
+            "table": "sales_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "20.00"
+            },
+            "checksumAfter": {
+              "totalAmount": "20.00"
+            }
+          },
+          {
+            "table": "sales_invoices",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "20.00"
+            },
+            "checksumAfter": {
+              "totalAmount": "20.00"
+            }
+          },
+          {
+            "table": "fulfillment_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {},
+            "checksumAfter": {}
+          },
+          {
+            "table": "shipments",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "codAmount": "0"
+            },
+            "checksumAfter": {
+              "codAmount": "0"
+            }
+          },
+          {
+            "table": "purchase_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmountBase": "92.00"
+            },
+            "checksumAfter": {
+              "totalAmountBase": "92.00"
+            }
+          }
+        ]
+      },
+      "conflicts": {
+        "sales_orders": 0,
+        "purchase_orders": 0
+      },
+      "warehouses": {
+        "total": 13,
+        "linked": 0
+      },
+      "vehicles": {
+        "total": 1,
+        "linked": 0,
+        "legacy_text_unassigned": 0
+      }
+    },
+    {
+      "company": "Beta Trading Co",
+      "database": "company_0894c2a717f34fceaf6a299530ccf61f",
+      "units": [],
+      "issues": [],
+      "documents": [
+        {
+          "table": "sales_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "sales_invoices",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "fulfillment_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "shipments",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "purchase_orders",
+          "column": "orgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        }
+      ],
+      "dryRun": {
+        "runId": null,
+        "writes": "none (read-only connection)",
+        "steps": [
+          {
+            "table": "sales_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "sales_invoices",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "fulfillment_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {},
+            "checksumAfter": {}
+          },
+          {
+            "table": "shipments",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "codAmount": "0"
+            },
+            "checksumAfter": {
+              "codAmount": "0"
+            }
+          },
+          {
+            "table": "purchase_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmountBase": "0"
+            },
+            "checksumAfter": {
+              "totalAmountBase": "0"
+            }
+          }
+        ]
+      },
+      "conflicts": {
+        "sales_orders": 0,
+        "purchase_orders": 0
+      },
+      "warehouses": {
+        "total": 0,
+        "linked": 0
+      },
+      "vehicles": {
+        "total": 0,
+        "linked": 0,
+        "legacy_text_unassigned": 0
+      }
+    },
+    {
+      "company": "Delta Trading Co",
+      "database": "company_dfa1105448b84ad8b8ae8d7bd8719353",
+      "units": [],
+      "issues": [],
+      "documents": [
+        {
+          "table": "sales_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "sales_invoices",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "fulfillment_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "shipments",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "purchase_orders",
+          "column": "orgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        }
+      ],
+      "dryRun": {
+        "runId": null,
+        "writes": "none (read-only connection)",
+        "steps": [
+          {
+            "table": "sales_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "sales_invoices",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "fulfillment_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {},
+            "checksumAfter": {}
+          },
+          {
+            "table": "shipments",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "codAmount": "0"
+            },
+            "checksumAfter": {
+              "codAmount": "0"
+            }
+          },
+          {
+            "table": "purchase_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmountBase": "0"
+            },
+            "checksumAfter": {
+              "totalAmountBase": "0"
+            }
+          }
+        ]
+      },
+      "conflicts": {
+        "sales_orders": 0,
+        "purchase_orders": 0
+      },
+      "warehouses": {
+        "total": 0,
+        "linked": 0
+      },
+      "vehicles": {
+        "total": 0,
+        "linked": 0,
+        "legacy_text_unassigned": 0
+      }
+    },
+    {
+      "company": "Gamma Trading Co",
+      "database": "company_98d3391ce5464c63a3e9fab11e55263c",
+      "units": [],
+      "issues": [],
+      "documents": [
+        {
+          "table": "sales_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "sales_invoices",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "fulfillment_orders",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "shipments",
+          "column": "branchOrgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        },
+        {
+          "table": "purchase_orders",
+          "column": "orgUnitId",
+          "installed": true,
+          "total": 0,
+          "stamped": 0,
+          "unassigned": 0,
+          "derivable": 0,
+          "notDerivable": 0
+        }
+      ],
+      "dryRun": {
+        "runId": null,
+        "writes": "none (read-only connection)",
+        "steps": [
+          {
+            "table": "sales_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "sales_invoices",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmount": "0"
+            },
+            "checksumAfter": {
+              "totalAmount": "0"
+            }
+          },
+          {
+            "table": "fulfillment_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {},
+            "checksumAfter": {}
+          },
+          {
+            "table": "shipments",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "codAmount": "0"
+            },
+            "checksumAfter": {
+              "codAmount": "0"
+            }
+          },
+          {
+            "table": "purchase_orders",
+            "installed": true,
+            "assigned": 0,
+            "byBranch": [],
+            "checksumBefore": {
+              "totalAmountBase": "0"
+            },
+            "checksumAfter": {
+              "totalAmountBase": "0"
+            }
+          }
+        ]
+      },
+      "conflicts": {
+        "sales_orders": 0,
+        "purchase_orders": 0
+      },
+      "warehouses": {
+        "total": 0,
+        "linked": 0
+      },
+      "vehicles": {
+        "total": 0,
+        "linked": 0,
+        "legacy_text_unassigned": 0
+      }
+    }
+  ]
+}

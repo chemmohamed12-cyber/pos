@@ -236,6 +236,8 @@ export class SalesOrdersService implements SalesOrdersReadContract {
     // `sales_orders.warehouseId` has no FK — an unknown warehouse is rejected up front (404, the inventory contract's own error) instead of
     // surfacing later as a misleading "insufficient stock" 409 from the reservation step, after the order/rep numbers were already consumed.
     await this.inventory.getWarehouse(warehouseId, manager);
+    // Org engine Stage 5 — the order's branch is the warehouse's owning branch (a business relationship resolved on the server, never a client field).
+    const branchOrgUnitId = await this.inventory.getWarehouseBranchId(warehouseId, manager);
 
     // Resolved once, used for two related checks below: (1) a caller may
     // create the order under a DIFFERENT rep's name only when they hold
@@ -323,6 +325,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
           repSequenceNumber,
           createdByUserId: actorUserId,
           warehouseId,
+          branchOrgUnitId,
           shippingMethod,
           skipDeposit,
         }),
@@ -536,7 +539,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
    * remittance was never granted per-order Scope, same reason
    * `getCustomerSnapshot` is itself unscoped).
    */
-  async getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null> {
+  async getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null } | null> {
     const order = await (manager ?? this.dataSource).getRepository(SalesOrder).findOne({ where: { id: orderId } });
     if (!order) return null;
     return {
@@ -545,6 +548,7 @@ export class SalesOrdersService implements SalesOrdersReadContract {
       customerId: order.customerId,
       salesRepUserId: order.salesRepUserId,
       totalAmount: order.totalAmount,
+      branchOrgUnitId: order.branchOrgUnitId ?? null,
     };
   }
 

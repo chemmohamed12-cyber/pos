@@ -1,0 +1,46 @@
+######## FULL REGRESSION (first run, cluster shared with other sessions)
+--- FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts (30.76 s)
+  ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+Tests:       3 passed, 3 total
+Tests:       1 passed, 1 total
+Tests:       8 passed, 8 total
+Tests:       7 passed, 7 total
+Tests:       5 passed, 5 total
+--- FAIL src/foundation/company/memberships-mine.real-pg.spec.ts (26.767 s)
+  ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+Tests:       7 passed, 7 total
+Tests:       4 passed, 4 total
+Tests:       4 passed, 4 total
+Tests:       8 passed, 8 total
+--- FAIL src/foundation/release/release-migration-registry.real-pg.spec.ts (35.398 s)
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › accoun
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › manufa
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › sales 
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N provisions the Company; business data
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing Company receives a newer release › Release N provisions the Company; business data
+--- FAIL src/foundation/release/release-upload.http.spec.ts (23.499 s)
+  ● Release Center upload over HTTP - RELEASE_UPLOAD_MAX_MB › a file above the cap is a 413 naming the cap and the setting, and leaves no temp file
+    read ECONNRESET
+Tests:       1 failed, 2 passed, 3 total
+Tests:       8 passed, 8 total
+Tests:       3 passed, 3 total
+Tests:       12 passed, 12 total
+######## RERUN SET 1 (under load from other sessions)
+--- FAIL src/foundation/release/release-upload.http.spec.ts (56.002 s)
+  ● Release Center upload over HTTP - RELEASE_UPLOAD_MAX_MB › a file above the cap is a 413 naming the cap and the setting, and leaves no temp file
+    read ECONNRESET
+Tests:       1 failed, 2 passed, 3 total
+Tests:       3 passed, 3 total
+Tests:       7 passed, 7 total
+Tests:       3 passed, 3 total
+  ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+Tests:       3 passed, 3 total
+--- FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts (60.214 s)
+  ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+Tests:       3 passed, 3 total
+Tests:       7 passed, 7 total
+Tests:       3 passed, 3 total

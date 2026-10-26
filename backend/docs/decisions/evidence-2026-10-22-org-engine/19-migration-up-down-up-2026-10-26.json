@@ -1,0 +1,156 @@
+﻿{
+  "testedCommit": "263e2739b9e7f8bee92244fca44f27fade2a1a70",
+  "workingTreeDirtyFiles": 0,
+  "startedAt": "2026-10-26T11:07:21.763Z",
+  "cluster": {
+    "port": 5546,
+    "version": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit",
+    "system_identifier": "7695619915229547252"
+  },
+  "disposableDatabase": {
+    "name": "daii_test_biz_t96_migdown",
+    "existedBefore": false,
+    "createdByThisRun": true,
+    "nameMatchesGuardPattern": true,
+    "otherDatabasesOnClusterUntouched": 60
+  },
+  "tags": [
+    "accounting",
+    "attendance",
+    "commission",
+    "core",
+    "finance",
+    "hr",
+    "inventory",
+    "logistics",
+    "manufacturing",
+    "payroll",
+    "procurement",
+    "sales",
+    "targets"
+  ],
+  "connectedTo": {
+    "db": "daii_test_biz_t96_migdown",
+    "port": 5546
+  },
+  "step1_up": {
+    "migrationsApplied": 322,
+    "orgEngineMigrationsApplied": [
+      "OrgUnitLifecycle1790021000000",
+      "AddVehicleOrgUnit1790021100000",
+      "AddSalesOrderBranch1790021200000",
+      "AddSalesInvoiceBranch1790021300000",
+      "AddFulfillmentOrderBranch1790021400000",
+      "AddShipmentBranch1790021500000",
+      "OrgMigrationLog1790021600000"
+    ],
+    "executedRows": 322,
+    "schema": {
+      "hash": "ac4084dbe36f5732",
+      "columns": 127,
+      "indexes": 58,
+      "constraints": 95
+    }
+  },
+  "step2_upAgainApplied": 0,
+  "step3_seededBeforeDown": {
+    "orgUnits": 3,
+    "salesOrder": {
+      "orderNumber": "SO-MIG",
+      "total": "250.00"
+    },
+    "vehicle": {
+      "code": "V-MIG",
+      "plateNumber": "P 1",
+      "branch": "Branch"
+    },
+    "branchStampOnOrder": true,
+    "vehicleOrgUnit": true,
+    "logRows": 1,
+    "archivedUnitStatus": "archived"
+  },
+  "step4_down": {
+    "undone": [
+      "OrgMigrationLog1790021600000",
+      "AddShipmentBranch1790021500000",
+      "AddFulfillmentOrderBranch1790021400000",
+      "AddSalesInvoiceBranch1790021300000",
+      "AddSalesOrderBranch1790021200000",
+      "AddVehicleOrgUnit1790021100000",
+      "OrgUnitLifecycle1790021000000"
+    ],
+    "undoneExactlyTheSevenOrgEngineMigrations": true,
+    "executedRows": 315,
+    "schema": {
+      "hash": "ada10a51dcce4bf0",
+      "columns": 110,
+      "indexes": 49,
+      "constraints": 85
+    },
+    "columnsRemoved": {
+      "org_units.status/archivedAt": true,
+      "vehicles.orgUnitId": true,
+      "sales_orders.branchOrgUnitId": true,
+      "org_migration_log table": true,
+      "single-root index": true
+    },
+    "parentFkDeleteRuleAfterDown": [
+      "r"
+    ],
+    "businessRowsAfterDown": {
+      "orgUnits": 3,
+      "salesOrder": {
+        "orderNumber": "SO-MIG",
+        "total": "250.00"
+      },
+      "vehicle": {
+        "code": "V-MIG",
+        "plateNumber": "P 1",
+        "branch": "Branch"
+      }
+    },
+    "archivedUnitStillPresentButStatusLost": true
+  },
+  "step5_upAfterDown": {
+    "migrationsApplied": [
+      "OrgUnitLifecycle1790021000000",
+      "AddVehicleOrgUnit1790021100000",
+      "AddSalesOrderBranch1790021200000",
+      "AddSalesInvoiceBranch1790021300000",
+      "AddFulfillmentOrderBranch1790021400000",
+      "AddShipmentBranch1790021500000",
+      "OrgMigrationLog1790021600000"
+    ],
+    "schemaFingerprintEqualsStep1": true,
+    "schema": {
+      "hash": "ac4084dbe36f5732",
+      "columns": 127,
+      "indexes": 58,
+      "constraints": 95
+    },
+    "businessRowsAfterUp": {
+      "orgUnits": 3,
+      "salesOrder": {
+        "orderNumber": "SO-MIG",
+        "total": "250.00"
+      },
+      "vehicle": {
+        "code": "V-MIG",
+        "plateNumber": "P 1",
+        "branch": "Branch"
+      }
+    },
+    "dataInNewColumnsAfterRoundTrip": {
+      "salesOrderBranchStamp": null,
+      "vehicleOrgUnit": null,
+      "archivedUnitStatus": "active",
+      "orgMigrationLogTableRows": 0
+    }
+  },
+  "cleanup": {
+    "disposableDatabaseDropped": true,
+    "otherDatabasesBefore": 60,
+    "otherDatabasesAfter": 60
+  },
+  "finishedAt": "2026-10-26T11:07:26.161Z"
+}

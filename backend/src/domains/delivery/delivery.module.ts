@@ -10,6 +10,7 @@ import { CustodyExpenseService } from './application/custody-expense.service';
 import { CustodyHandover } from './infrastructure/custody-handover.entity';
 import { CustodyHandoverService } from './application/custody-handover.service';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
 import { VehicleWorkspaceService } from './application/vehicle-workspace.service';
@@ -41,6 +42,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     AuditModule,
     NumberingModule,
     ApprovalEngineModule,
+    ScopeModule, // org-engine branch scope on the vehicle endpoints (integration of the org engine and the vehicle workspace)
     EventsModule,
     AuthenticationModule,
     AuthorizationModule,

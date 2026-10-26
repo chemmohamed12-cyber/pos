@@ -13,6 +13,9 @@ import { PermissionService } from '../../../foundation/permission/permission.ser
 import { Role } from '../../../foundation/authorization/role.entity';
 import { UserRole } from '../../../foundation/authorization/user-role.entity';
 import { RolePermission } from '../../../foundation/permission/role-permission.entity';
+import { OrganizationService } from '../../../foundation/organization/organization.service';
+import { AccessScope, AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 import type { CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 
@@ -27,6 +30,9 @@ describe('F-1 — vehicle read access is enforced on the server (list / overview
   let controllerOf: (k: 'A' | 'B') => Promise<ShipmentController>;
   let shipments: ShipmentService;
   const sys = randomUUID();
+  const unrestricted = (): AccessScope => ({ userId: sys, unrestricted: true, unitIds: new Set<string>() });
+  const restrictedTo = (...units: string[]): AccessScope => ({ userId: sys, unrestricted: false, unitIds: new Set(units) });
+  let scope: AccessScope = unrestricted();
   const users: Record<string, string> = {};
   const vehicles: Record<string, { id: string; driverUserId: string | null }> = {};
   let companyOverviewId = '';
@@ -59,7 +65,9 @@ describe('F-1 — vehicle read access is enforced on the server (list / overview
     const permissions = new PermissionService(dsA.getRepository(RolePermission), authorization);
     shipments = new ShipmentService(h.controlPlane, numbering, new ProcessEngineService(h.controlPlane), authorization, audit, inert, inventory, inert, treasury, inert, inert, inert);
     const access = new VehicleAccessService(authorization, permissions);
-    controllerOf = async () => new ShipmentController(shipments, access);
+    const scopes = new AccessScopeService(inert, inert);
+    jest.spyOn(scopes, 'forRequest').mockImplementation(async () => scope);
+    controllerOf = async () => new ShipmentController(shipments, access, new OrgContextService(scopes));
 
     for (const k of ['A', 'B'] as const) {
       const ds = await dsOf(k);
@@ -155,5 +163,52 @@ describe('F-1 — vehicle read access is enforced on the server (list / overview
     await expect(c.getVehicleOverview(await reqOf('B', users.driver1), vehicles.vb.id)).rejects.toThrow(NotFoundException);
     expect(await listIds('A', users.admin)).not.toContain(vehicles.vb.id);
     await expect((await controllerOf('A')).getVehicleOverview(await reqOf('A', users.admin), vehicles.vb.id)).rejects.toThrow(NotFoundException);
+  });
+
+  // ---- Integration (trial branch integration/vw-org-on-1.1.12): the org-engine branch scope AND the F-1 access rule hold TOGETHER on the vehicle list / overview ----
+  describe('I - branch scope AND F-1 access rule together', () => {
+    const ids: Record<string, string> = {};
+    beforeAll(async () => {
+      const dsA = await dsOf('A');
+      const org = new OrganizationService(dsA);
+      ids.root = (await org.createUnit('company', 'INT Mother')).id;
+      ids.cairo = (await org.createUnit('branch', 'INT Cairo', ids.root)).id;
+      ids.tanta = (await org.createUnit('branch', 'INT Tanta', ids.root)).id;
+      await dsA.query(`UPDATE "vehicles" SET "orgUnitId" = $1 WHERE id = $2`, [ids.cairo, vehicles.v1.id]); // driver1's vehicle: Cairo
+      await dsA.query(`UPDATE "vehicles" SET "orgUnitId" = $1 WHERE id = $2`, [ids.tanta, vehicles.v2.id]); // driver2's vehicle: Tanta
+      // v3 stays UNLINKED (legacy): visible by the org rule to everyone, so only the F-1 rule applies
+    });
+    afterEach(() => {
+      scope = unrestricted();
+    });
+
+    it('I1 a fleet reader restricted to Tanta sees only the Tanta vehicle and the legacy (unlinked) one - NOT Cairo\'s (org scope), although a fleet reader would otherwise see all', async () => {
+      scope = restrictedTo(ids.tanta);
+      expect(await listIds('A', users.admin)).toEqual([vehicles.v2.id, vehicles.v3.id].sort());
+      await expect(overview(users.admin, vehicles.v1.id)).rejects.toThrow(NotFoundException);
+      expect((await overview(users.admin, vehicles.v2.id)).warehouseId).not.toBeUndefined();
+    });
+
+    it('I2 the F-1 rule is not weakened by the org scope: an UNRESTRICTED driver still sees only his own vehicle; an unrestricted fleet reader sees all three', async () => {
+      scope = unrestricted();
+      expect(await listIds('A', users.driver1)).toEqual([vehicles.v1.id]);
+      await expect(overview(users.driver1, vehicles.v2.id)).rejects.toThrow(NotFoundException);
+      expect(await listIds('A', users.admin)).toEqual(all());
+    });
+
+    it('I3 the org rule is not weakened by being the assigned driver: driver1 (Cairo vehicle) whose scope reaches only Tanta gets "not found" for his own out-of-scope vehicle (both rules must pass)', async () => {
+      scope = restrictedTo(ids.tanta);
+      expect(await listIds('A', users.driver1)).toEqual([]);
+      await expect(overview(users.driver1, vehicles.v1.id)).rejects.toThrow(NotFoundException);
+      scope = restrictedTo(ids.cairo);
+      expect(await listIds('A', users.driver1)).toEqual([vehicles.v1.id]);
+      expect((await overview(users.driver1, vehicles.v1.id)).warehouseId).not.toBeUndefined();
+    });
+
+    it('I4 a user with neither right (sales rep) sees nothing under any scope; a legacy unlinked vehicle is subject to the F-1 rule only', async () => {
+      scope = restrictedTo(ids.cairo);
+      expect(await listIds('A', users.salesRep)).toEqual([]);
+      expect(await listIds('A', users.warehouseWorker)).toEqual([vehicles.v1.id, vehicles.v3.id].sort());
+    });
   });
 });

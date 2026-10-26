@@ -4,6 +4,8 @@ import { DeliveryService } from '../application/delivery.service';
 import { LineDeliveryService } from '../application/line-delivery.service';
 import { CustodyExpenseService } from '../application/custody-expense.service';
 import { CustodyHandoverService } from '../application/custody-handover.service';
+import { ShipmentService } from '../../shipment/application/shipment.service';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -158,7 +160,14 @@ export class DeliveryController {
     private readonly lineDeliveries: LineDeliveryService,
     private readonly expenses: CustodyExpenseService,
     private readonly handovers: CustodyHandoverService,
+    private readonly shipments: ShipmentService,
+    private readonly orgContext: OrgContextService,
   ) {}
+
+  /** org-engine rule (kept): a vehicle of a branch outside the caller's scope answers 404 - applied in front of the F-1 / cash-visibility rules, which still apply in the services. */
+  private async assertVehicleInOrgScope(req: CompanyScopedRequest, vehicleId: string): Promise<void> {
+    await this.orgContext.assertVisible(req, (await this.shipments.getVehicle(vehicleId, req.companyContext!.dataSource.manager)).orgUnitId);
+  }
 
   @Post('outcomes')
   async recordOutcome(@Req() req: CompanyScopedRequest, @Body() dto: RecordOutcomeDto) {
@@ -239,6 +248,7 @@ export class DeliveryController {
   @Post('custody-handovers')
   async declareHandover(@Req() req: CompanyScopedRequest, @Body() dto: DeclareHandoverDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInOrgScope(req, dto.vehicleId);
     return this.handovers.declare(dto.vehicleId, dto.amount, dto.note ?? null, dto.clientKey ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -253,6 +263,7 @@ export class DeliveryController {
   @Get('custody-reconciliation/:vehicleId')
   async reconciliation(@Req() req: CompanyScopedRequest, @Param('vehicleId', ParseUUIDPipe) vehicleId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInOrgScope(req, vehicleId);
     return this.handovers.getReconciliation(vehicleId, req.user.id, req.companyContext.dataSource.manager);
   }
 

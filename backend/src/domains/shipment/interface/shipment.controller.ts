@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards, ParseUUIDPipe } from '@nestjs/common';
-import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { IsArray, IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ShipmentService } from '../application/shipment.service';
 import { VehicleAccessService } from '../application/vehicle-access.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/c
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
 
 class CreateShipmentDto {
   @IsString()
@@ -68,6 +69,10 @@ class UpdateShippingCompanyDto {
 }
 
 class CreateVehicleDto {
+  @IsOptional()
+  @IsString()
+  orgUnitId?: string;
+
   @IsString()
   code!: string;
 
@@ -91,7 +96,18 @@ class CreateVehicleDto {
   parentWarehouseId?: string;
 }
 
+class ApplyVehicleMappingDto {
+  /** The vehicles the owner confirmed from the mapping report; only an unambiguous `proposed` match is ever applied. */
+  @IsArray()
+  @IsString({ each: true })
+  vehicleIds!: string[];
+}
+
 class UpdateVehicleDto {
+  @IsOptional()
+  @IsString()
+  orgUnitId?: string;
+
   @IsOptional()
   @IsString()
   plateNumber?: string;
@@ -193,6 +209,7 @@ export class ShipmentController {
   constructor(
     private readonly shipments: ShipmentService,
     private readonly vehicleAccess: VehicleAccessService,
+    private readonly orgContext: OrgContextService,
   ) {}
 
   @Post()
@@ -274,12 +291,22 @@ export class ShipmentController {
 
   // ---- Company Vehicles (CTO directive §2) ----
 
-  /** F-1: a fleet reader sees every vehicle; anyone else (a driver) only the vehicles they are the assigned driver of. */
+  /** Org engine Stage 3 — a vehicle of a branch the caller cannot reach answers 404, like a missing one. An unlinked (legacy) vehicle is visible to everyone. */
+  private async assertVehicleInScope(req: CompanyScopedRequest, id: string): Promise<void> {
+    const vehicle = await this.shipments.getVehicle(id, req.companyContext!.dataSource.manager);
+    await this.orgContext.assertVisible(req, vehicle.orgUnitId);
+  }
+
+  /**
+   * Integration of two rules, BOTH kept (neither weakened): the org-engine branch scope (a vehicle of an unreachable branch is not visible) AND the F-1 access rule (a fleet reader sees
+   * every vehicle in scope; anyone else - a driver - only the vehicles they are the assigned driver of).
+   */
   @Get('vehicles')
   async listVehicles(@Req() req: CompanyScopedRequest) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
-    return this.vehicleAccess.visibleVehicles(await this.shipments.listVehicles(manager), req.user.id, manager);
+    const inScope = await this.orgContext.filterVisible(req, await this.shipments.listVehicles(manager));
+    return this.vehicleAccess.visibleVehicles(inScope, req.user.id, manager);
   }
 
   @UseGuards(PermissionGuard)
@@ -287,6 +314,8 @@ export class ShipmentController {
   @Post('vehicles')
   async createVehicle(@Req() req: CompanyScopedRequest, @Body() dto: CreateVehicleDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    // Org engine Stage 2 — the branch is resolved and validated on the server (active branch, inside the caller's scope); required once the Company has branches.
+    const orgUnitId = await this.orgContext.resolveBranch(req, { requested: dto.orgUnitId, required: true });
     return this.shipments.createVehicle(
       dto.code,
       dto.plateNumber,
@@ -296,7 +325,38 @@ export class ShipmentController {
       req.user.id,
       dto.parentWarehouseId ?? null,
       req.companyContext.dataSource.manager,
+      orgUnitId,
     );
+  }
+
+  /** Legacy free-text branch -> validated branch: a report only, nothing is applied or guessed. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Get('vehicles-branch-mapping-report')
+  async vehicleBranchMappingReport(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    return this.shipments.vehicleBranchMappingReport(req.companyContext.dataSource.manager);
+  }
+
+  /** Owner-confirmed application of the mapping report: each listed vehicle is re-checked (still unassigned, exactly one branch with that name, inside the caller's scope) and then edited through the normal audited path. Ambiguous / unmatched / no-text vehicles are skipped with a reason, never guessed. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Post('vehicles-branch-mapping-apply')
+  async applyVehicleBranchMapping(@Req() req: CompanyScopedRequest, @Body() dto: ApplyVehicleMappingDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    const manager = req.companyContext.dataSource.manager;
+    const report = await this.shipments.vehicleBranchMappingReport(manager);
+    const applied: Array<{ vehicleId: string; code: string; orgUnitId: string }> = [];
+    const skipped: Array<{ vehicleId: string; reason: string }> = [];
+    for (const id of dto.vehicleIds) {
+      const row = report.rows.find((r) => r.vehicleId === id);
+      if (!row) { skipped.push({ vehicleId: id, reason: 'not_found_or_already_assigned' }); continue; }
+      if (row.status !== 'proposed') { skipped.push({ vehicleId: id, reason: row.status }); continue; }
+      const orgUnitId = await this.orgContext.resolveBranch(req, { requested: row.candidates[0].id });
+      await this.shipments.updateVehicle(id, { orgUnitId }, req.user.id, manager);
+      applied.push({ vehicleId: id, code: row.code, orgUnitId: orgUnitId! });
+    }
+    return { applied, skipped };
   }
 
   @UseGuards(PermissionGuard)
@@ -304,7 +364,9 @@ export class ShipmentController {
   @Post('vehicles/:id')
   async updateVehicle(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: UpdateVehicleDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    return this.shipments.updateVehicle(id, dto, req.user.id, req.companyContext.dataSource.manager);
+    await this.assertVehicleInScope(req, id);
+    const orgUnitId = dto.orgUnitId ? await this.orgContext.resolveBranch(req, { requested: dto.orgUnitId }) : undefined;
+    return this.shipments.updateVehicle(id, { plateNumber: dto.plateNumber, branch: dto.branch, ...(orgUnitId ? { orgUnitId } : {}) }, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** F-1: the assigned driver or a fleet reader; any other user gets "not found" (the vehicle is not revealed). */
@@ -312,6 +374,7 @@ export class ShipmentController {
   async getVehicleOverview(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     const manager = req.companyContext.dataSource.manager;
+    await this.assertVehicleInScope(req, id); // org scope AND the F-1 access rule
     await this.vehicleAccess.assertCanReadVehicle(await this.shipments.getVehicle(id, manager), req.user.id, manager);
     return this.shipments.getCustodianOverview('vehicle', id, manager);
   }
@@ -321,6 +384,7 @@ export class ShipmentController {
   @Post('vehicles/:id/driver')
   async setVehicleDriver(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleDriverDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleDriver(id, dto.driverUserId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -329,6 +393,7 @@ export class ShipmentController {
   @Post('vehicles/:id/status')
   async setVehicleStatus(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleStatusDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleStatus(id, dto.status, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -337,6 +402,7 @@ export class ShipmentController {
   @Post('vehicles/:id/settlement-account')
   async setVehicleSettlementAccount(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleSettlementAccountDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleSettlementAccount(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 

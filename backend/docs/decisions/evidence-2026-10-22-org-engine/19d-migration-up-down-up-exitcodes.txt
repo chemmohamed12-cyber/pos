@@ -1,0 +1,3 @@
+﻿exit code of the successful run: 0
+command: cd backend; DB_HOST=127.0.0.1 DB_PORT=5546 DB_USER=daii_biz_test DB_PASSWORD=*** MIG_DB=daii_test_biz_t96_migdown npx ts-node --transpile-only tools/testing/_tmp-migration-updown.ts   (script copied from 19b, run from a clean tree at 263e273 = tested code of a4e0daf)
+first attempt: exit 1 after 6 s - the script's own seed insert violated sales_orders_salesRepUserId_fkey (test-script defect: no user row); the disposable database was dropped, the script fixed (user row added, cleanup in the failure path), and re-run from a fresh database. No product code or migration was involved.

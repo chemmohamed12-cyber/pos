@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { ReportsService } from './application/reports.service';
 import { CustomerAccountsService } from './application/customer-accounts.service';
 import { ReportsController } from './interface/reports.controller';
+import { OrgReportController } from './interface/org-report.controller';
+import { OrgReportService } from './application/org-report.service';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 import { CompanyModule } from '../../foundation/company/company.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
 import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
@@ -45,8 +48,10 @@ import { CustomerFinanceModule } from '../customer-finance/customer-finance.modu
     // Area 21 Operational Company Scoping Retrofit (2026-09-28) — for `CompanyContextGuard`.
     CompanyModule,
     DatabaseRegistryModule,
+    // Org engine Stage 7 — the caller's scope for the organizational report.
+    ScopeModule,
   ],
-  controllers: [ReportsController],
-  providers: [ReportsService, CustomerAccountsService],
+  controllers: [ReportsController, OrgReportController],
+  providers: [ReportsService, CustomerAccountsService, OrgReportService],
 })
 export class ReportsModule {}

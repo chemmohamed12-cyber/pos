@@ -167,7 +167,7 @@ export const SALES_CUSTOMERS_CONTRACT = Symbol('SALES_CUSTOMERS_CONTRACT');
  */
 export interface SalesOrdersReadContract {
   /** P4 Tranche-2 (returns domain) — widened with `warehouseId`, still an object-shape subset of the real `Promise<SalesOrder>`. */
-  getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<{ customerId: string; warehouseId: string | null }>;
+  getOrder(orderId: string, requestingUserId: string, manager?: EntityManager): Promise<{ customerId: string; warehouseId: string | null; branchOrgUnitId: string | null }>;
   getOrderLines(orderId: string, manager?: EntityManager): Promise<
     Array<{ id: string; productId: string; quantity: number; unitPrice: string; discountAmount: string; lineTotal: string }>
   >;
@@ -179,7 +179,7 @@ export interface SalesOrdersReadContract {
    * contract method" precedent as `warehouseId` on `getOrder` above,
    * not a new method.
    */
-  getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string } | null>;
+  getOrderSnapshot(orderId: string, manager?: EntityManager): Promise<{ id: string; orderNumber: string; customerId: string; salesRepUserId: string; totalAmount: string; branchOrgUnitId: string | null } | null>;
   /** P4 Tranche-2 (returns domain) — narrowed from the real `Promise<SalesOrderLine | null>` to the 4 fields actually read. */
   getOrderLineById(lineId: string, manager?: EntityManager): Promise<{ salesOrderId: string; productId: string; quantity: number; lineTotal: string } | null>;
   /** P4 Tranche-2 (returns domain) — real return is already a primitive `Promise<string>`. */

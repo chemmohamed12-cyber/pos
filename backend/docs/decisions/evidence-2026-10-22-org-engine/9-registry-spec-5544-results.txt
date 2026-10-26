@@ -1,0 +1,5 @@
+﻿registry spec on 5544 - isolated_admin, DB_NAME=daii_test_h3reg_run
+
+[1] branch edc2d7a/0b48ab6 as-is (before fixture fix): Tests:       1 failed, 20 passed, 21 total Time:        177.656 s -> 1 failed: NEGATIVE CONTROL (Expected 322 / Received 320)
+[2] baseline eabd3fd (integration tip, built in a throwaway worktree, since removed): Tests:       21 passed, 21 total Time:        147.802 s
+[3] branch + negative-control fixture fix: Tests:       21 passed, 21 total Time:        128.583 s, estimated 176 s
