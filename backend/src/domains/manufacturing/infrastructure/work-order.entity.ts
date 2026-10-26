@@ -37,6 +37,11 @@ export class WorkOrder {
   @Column({ type: 'uuid', nullable: true })
   wipWarehouseId!: string | null;
 
+  /** Org engine WP-C (decision D-C option A) — the work order's branch = the PRODUCTION warehouse's owning branch at creation (stamped, never rewritten); `null` = unassigned / created before the decision. WIP, material issue/return and finished-goods postings carry it. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  branchOrgUnitId!: string | null;
+
   @Column({ type: 'uuid', nullable: true })
   createdByUserId!: string | null;
 

@@ -1,5 +1,6 @@
 import { FinancialEvent } from '../../infrastructure/financial-event.entity';
 import { HandlerContext, HandlerResult, JournalDraftLine } from './handler-registry';
+import { readPaymentAllocations } from './supplier-payment-allocations';
 
 /**
  * ADR-048 (original) + ADR-054/ADR-057 (GRNI, Option B) — Procurement's
@@ -160,6 +161,11 @@ export async function handleSupplierPaymentRecorded(event: FinancialEvent, ctx: 
   const bank = bankCode ? await ctx.findAccountByCode(bankCode) : null;
   if (!ap) return { kind: 'rejected', reason: 'supplier_payment.recorded: no AP control account in the chart' };
   if (!bank) return { kind: 'rejected', reason: 'supplier_payment.recorded: the paying Treasury account is not GL-mapped to an active chart account' };
+  // WP-A: v2 payloads attribute the AP side per invoice branch and the bank side to the paying account's branch; v1 (no allocations) stays one unit-less pair.
+  const alloc = readPaymentAllocations(p, amount);
+  if (alloc && !alloc.ok) return { kind: 'rejected', reason: `supplier_payment.recorded: ${alloc.reason}` };
+  const apLines = alloc?.ok ? alloc.groups.map((g) => ({ accountId: ap, debit: g.amount, orgUnitId: g.orgUnitId, description: 'Accounts payable' })) : [{ accountId: ap, debit: amount, description: 'Accounts payable' }];
+  const bankLine = alloc?.ok ? { accountId: bank, credit: amount, orgUnitId: str(p.bankOrgUnitId), description: 'Cash / bank' } : { accountId: bank, credit: amount, description: 'Cash / bank' };
   return {
     kind: 'draft',
     draft: {
@@ -167,10 +173,7 @@ export async function handleSupplierPaymentRecorded(event: FinancialEvent, ctx: 
       description: `Supplier payment ${str(p.paymentNumber) ?? event.sourceEntityId} paid`,
       transactionCurrencyCode: event.transactionCurrencyCode,
       orgUnitId: event.orgUnitId,
-      lines: [
-        { accountId: ap, debit: amount, description: 'Accounts payable' },
-        { accountId: bank, credit: amount, description: 'Cash / bank' },
-      ],
+      lines: [...apLines, bankLine],
     },
   };
 }

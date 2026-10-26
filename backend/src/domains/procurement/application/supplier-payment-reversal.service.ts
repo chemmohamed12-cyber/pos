@@ -75,6 +75,9 @@ export class SupplierPaymentReversalService {
       }
 
       const { glAccountCode } = await this.treasury.requireGlMappedAccount(payment.treasuryAccountId, m);
+      // Org engine WP-A: mirror the attribution STAMPED when the payment was recorded (never today's branch of the invoice/account); NULL for payments recorded before the decision.
+      const stamped: Array<{ supplierInvoiceId: string; orgUnitId: string | null }> = await m.query(`SELECT "supplierInvoiceId", "orgUnitId" FROM "supplier_payment_allocations" WHERE "supplierPaymentId" = $1`, [paymentId]);
+      const unitOfInvoice = new Map(stamped.map((r) => [r.supplierInvoiceId, r.orgUnitId]));
       const reversalLeg = await this.treasury.reverseOwnedLeg(payment.treasuryTransactionId, `supplier payment ${payment.paymentNumber}: ${why}`, actorUserId, m);
 
       await this.numbering.registerDocumentType(REVERSAL_DOCUMENT_TYPE, REVERSAL_PREFIX, true, m);
@@ -108,12 +111,12 @@ export class SupplierPaymentReversalService {
       await this.events.publish(m, AP_EVENT_TOPICS.supplierPaymentReversed, {
         idempotencyKey: `procurement:supplier_payment:${paymentId}:reversed`,
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: null, // attributed per LINE (allocations below)
         currency: 'EGP',
         sourceEntityType: 'supplier_payment' as const,
         sourceEntityId: paymentId,
         externalDocument: null,
-        payloadVersion: 1,
+        payloadVersion: 2,
         supplierPaymentId: paymentId,
         paymentNumber: payment.paymentNumber,
         reversalNumber,
@@ -123,6 +126,8 @@ export class SupplierPaymentReversalService {
         glAccountCode,
         reversalOf: paymentId,
         reason: why,
+        bankOrgUnitId: payment.bankOrgUnitId ?? null,
+        allocations: buckets.map((b) => ({ invoiceId: b.supplierInvoiceId, amount: Number(b.net).toFixed(2), orgUnitId: b.supplierInvoiceId ? (unitOfInvoice.get(b.supplierInvoiceId) ?? null) : null })),
       });
 
       for (const id of invoiceIds) await this.resyncStatusAfterReversal(id, actorUserId, m);

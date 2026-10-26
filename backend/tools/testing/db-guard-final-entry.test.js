@@ -11,11 +11,21 @@ const BACKEND = path.join(__dirname, '..', '..');
 const T = (database, port = 5546, host = '127.0.0.1') => ({ host, port, database });
 const facts = JSON.parse(fs.readFileSync(path.join(BACKEND, 'docs', 'decisions', 'evidence-2026-10-12-biz-cluster-rebuild', 'cluster-facts.json'), 'utf8')); // current cluster (rebuilt 2026-10-12)
 
-test('exactly one approved entry: complete, real approver text, valid date, no role patterns, postgres administrative-only', () => {
+test('exactly two approved entries (dedicated 5546 cluster; CTO-approved 5544 h3reg instance, 2026-10-26): complete, real approver text, valid date, no role patterns, postgres administrative-only', () => {
   const p = guard.loadPolicy();
-  assert.equal(p.approved.length, 1);
+  assert.deepEqual(p.approved.map((a) => a.port).sort(), [5544, 5546]);
   assert.equal(p.incomplete, 0);
-  const e = p.approved[0];
+  for (const x of p.approved) {
+    assert.equal(x.host, '127.0.0.1');
+    assert.doesNotMatch(x.approvedBy, /<|>|TBD|TODO/i);
+    assert.match(x.approvedOn, /^\d{4}-\d{2}-\d{2}$/);
+    assert.deepEqual(x.rolePatterns, []);
+    assert.deepEqual(x.databases, []);
+    assert.deepEqual(x.adminDatabases, ['postgres']);
+  }
+  const h = p.approved.find((a) => a.port === 5544);
+  assert.deepEqual(h.databasePatterns, ['^daii_test_h3reg_[a-z0-9_]*$']);
+  const e = p.approved.find((a) => a.port === 5546);
   assert.equal(e.port, 5546);
   assert.equal(e.host, '127.0.0.1');
   assert.doesNotMatch(e.approvedBy, /<|>|TBD|TODO/i);
@@ -49,9 +59,14 @@ test('semantics: postgres is administrative-only; business targets are t00…t12
   for (const bad of ['daii_test_ambient', 'daii_test_fanout_ambient', 'daii_test_h3_ambient', 'daii_dev', 'daii', 'restore_old_daii_dev', 'restore_quiet_daii_dev', 'restore_company_x', 'template0', 'template1', 'pool_b_663466', 'company_abc', 'daii_test_x']) {
     assert.equal(guard.evaluate(T(bad), p).allowed, false, bad);
   }
-  for (const [db, port, host] of [['daii_test_biz_t01', 5433], ['daii_test_biz_t01', 5544], ['daii_test_biz_t01', 5656], ['postgres', 5433], ['postgres', 5544], ['postgres', 5656], ['daii_test_biz_t01', 5546, 'db.example.com']]) {
+  for (const [db, port, host] of [['daii_test_biz_t01', 5433], ['daii_test_biz_t01', 5544], ['daii_test_biz_t01', 5656], ['postgres', 5433], ['postgres', 5656], ['daii_test_biz_t01', 5546, 'db.example.com'], ['daii_dev', 5544], ['restore_x', 5544], ['daii_test_h3reg_ambient', 5544], ['daii_test_h3reg_x', 5546], ['daii_test_h3reg_x', 5433]]) {
     assert.equal(guard.evaluate(T(db, port, host || '127.0.0.1'), p).allowed, false, `${host || '127.0.0.1'}:${port}/${db}`);
   }
+  // the approved 5544 instance: loopback, daii_test_h3reg_* business names only, postgres administrative-only
+  assert.equal(guard.evaluate(T('daii_test_h3reg_run', 5544), p).role, 'business');
+  assert.equal(guard.evaluate(T('postgres', 5544), p).role, 'admin');
+  assert.equal(guard.evaluate(T('postgres', 5544), p, { businessOnly: true }).allowed, false);
+  assert.equal(guard.evaluate(T('daii_test_h3reg_run', 5544, 'db.example.com'), p).allowed, false);
 });
 
 test('statements: administrative connections create/drop only disposable names and never do business work; no role operations', () => {

@@ -17,7 +17,7 @@ const T = (database, port = 5544, host = '127.0.0.1') => ({ host, port, database
 const admin = (sql) => guard.checkAdminStatement(sql, T('postgres'), policy) || guard.checkStatement(sql, T('postgres'), policy);
 
 test('the proposed entry: complete once approvedBy/approvedOn are filled; incomplete (ignored) as shipped; no role patterns; postgres only as admin', () => {
-  assert.equal(guard.loadPolicy().approved.length, 1, 'the shipped approval list has exactly the dedicated-cluster entry (this file tests the SUPERSEDED 5544 proposal as a fixture)');
+  assert.deepEqual(guard.loadPolicy().approved.map((a) => a.port).sort(), [5544, 5546], 'the shipped approval list has exactly the dedicated 5546 entry and the CTO-approved 5544 h3reg entry (2026-10-26); this file tests the SUPERSEDED 5544 proposal as a fixture');
   assert.equal(JSON.stringify(proposed.rolePatterns), '[]');
   assert.deepEqual(proposed.adminDatabases, ['postgres']);
   assert.deepEqual(proposed.databases, []);

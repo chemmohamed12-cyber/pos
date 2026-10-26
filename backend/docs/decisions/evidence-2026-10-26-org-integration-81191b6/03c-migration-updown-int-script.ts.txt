@@ -1,0 +1,134 @@
+/*
+ * Integrated-tree migration check (org engine on release line 1.1.13) on disposable databases of cluster 5546 (DB guard: daii_test_biz_tNN names only).
+ *  A. fresh DB -> ALL migrations (fingerprint F_full)
+ *  B. fresh DB -> release-line migrations ONLY (the 9 org migrations withheld = a database at the 1.1.13 head), then the 9 org migrations applied as older-timestamp pending
+ *     migrations (the real upgrade order) -> fingerprint must equal F_full
+ *  C. on B: seed rows using the new columns, undo every migration with a timestamp >= the oldest org migration (newest first, org + interleaved release-line), record schema/data effects,
+ *     re-apply, compare fingerprint with F_full
+ */
+require('./db-guard-register');
+import { execSync } from 'child_process';
+import { createHash, randomUUID } from 'crypto';
+import { readdirSync } from 'fs';
+import { join } from 'path';
+import { DataSource } from 'typeorm';
+
+const ORG = ['1790021000000', '1790021100000', '1790021200000', '1790021300000', '1790021400000', '1790021500000', '1790021600000', '1790031000000', '1790031100000'];
+const base = { host: process.env.DB_HOST!, port: Number(process.env.DB_PORT), username: process.env.DB_USER!, password: process.env.DB_PASSWORD! };
+const DB_A = process.env.MIG_DB_A!, DB_B = process.env.MIG_DB_B!;
+const APP_ROOT = process.cwd();
+
+function files(withOrg: boolean): string[] {
+  const root = join(APP_ROOT, 'dist', 'database', 'migrations');
+  const out: string[] = [];
+  for (const d of readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory())) {
+    for (const f of readdirSync(join(root, d.name))) {
+      if (!/^[0-9].*\.js$/.test(f)) continue;
+      if (!withOrg && ORG.some((t) => f.startsWith(t))) continue;
+      out.push(join(root, d.name, f));
+    }
+  }
+  return out;
+}
+const mk = (db: string, withOrg: boolean) => new DataSource({ type: 'postgres', ...base, database: db, migrations: files(withOrg), migrationsTableName: 'migrations', synchronize: false } as never);
+
+async function fingerprint(ds: DataSource) {
+  const cols = await ds.query(`SELECT table_name,column_name,data_type,is_nullable,column_default FROM information_schema.columns WHERE table_schema=current_schema() ORDER BY 1,2`);
+  const idx = await ds.query(`SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname=current_schema() ORDER BY 1,2`);
+  const con = await ds.query(`SELECT conrelid::regclass::text AS tbl, conname, contype, confdeltype, pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE connamespace=current_schema()::regnamespace ORDER BY 1,2`);
+  return { hash: createHash('sha256').update(JSON.stringify({ cols, idx, con })).digest('hex'), cols, idx, con, columns: cols.length, indexes: idx.length, constraints: con.length };
+}
+const brief = (f: Awaited<ReturnType<typeof fingerprint>>) => ({ hash: f.hash.slice(0, 16), columns: f.columns, indexes: f.indexes, constraints: f.constraints });
+const diff = (a: Awaited<ReturnType<typeof fingerprint>>, b: Awaited<ReturnType<typeof fingerprint>>) => {
+  const s = (x: unknown[]) => new Set(x.map((v) => JSON.stringify(v)));
+  const d = (p: unknown[], q: unknown[]) => [...s(p)].filter((v) => !s(q).has(v));
+  return { colsOnlyInFirst: d(a.cols, b.cols), colsOnlyInSecond: d(b.cols, a.cols), idxOnlyInFirst: d(a.idx, b.idx), idxOnlyInSecond: d(b.idx, a.idx), conOnlyInFirst: d(a.con, b.con), conOnlyInSecond: d(b.con, a.con) };
+};
+
+async function main() {
+  const out: Record<string, unknown> = {};
+  out.testedCommit = execSync('git rev-parse HEAD', { cwd: APP_ROOT }).toString().trim();
+  out.dirtyFiles = execSync('git status --short', { cwd: APP_ROOT }).toString().split('\n').filter((l) => l.trim() && !l.includes('_tmp-migration-updown-int.ts')).length;
+  out.startedAt = new Date().toISOString();
+  const admin = new DataSource({ type: 'postgres', ...base, database: 'postgres' });
+  await admin.initialize();
+  out.cluster = (await admin.query(`SELECT inet_server_port() AS port, version() AS version`))[0];
+  const before = (await admin.query(`SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY 1`)).map((r: { datname: string }) => r.datname);
+  for (const d of [DB_A, DB_B]) { if (before.includes(d)) throw new Error(`refusing: ${d} already exists`); await admin.query(`CREATE DATABASE "${d}"`); }
+  out.orgMigrationFilesInDist = files(true).length - files(false).length;
+
+  // A. full up from empty
+  const a = mk(DB_A, true); await a.initialize();
+  const ranA = await a.runMigrations({ transaction: 'each' });
+  const fA = await fingerprint(a);
+  out.A_fullUp = { applied: ranA.length, schema: brief(fA), noopRerun: (await a.runMigrations({ transaction: 'each' })).length };
+  await a.destroy();
+
+  // B. release-line head, then org migrations
+  const b0 = mk(DB_B, false); await b0.initialize();
+  const ranHead = await b0.runMigrations({ transaction: 'each' });
+  const fHead = await fingerprint(b0);
+  await b0.destroy();
+  const b = mk(DB_B, true); await b.initialize();
+  const ranOrg = await b.runMigrations({ transaction: 'each' });
+  const fB = await fingerprint(b);
+  out.B_releaseHeadThenOrg = { releaseLineApplied: ranHead.length, orgApplied: ranOrg.map((m) => m.name), orgAppliedCount: ranOrg.length, schema: brief(fB), equalsFullUp: fB.hash === fA.hash, schemaDiffVsFull: fB.hash === fA.hash ? null : diff(fA, fB), releaseHeadSchema: brief(fHead) };
+
+  // C. seed, down, up
+  const userId = randomUUID(), root = randomUUID(), br = randomUUID(), arch = randomUUID(), cust = randomUUID(), so = randomUUID(), veh = randomUUID();
+  await b.query(`INSERT INTO users (id,"fullName",email) VALUES ($1,'Mig Tester','mig-int@test.local')`, [userId]);
+  await b.query(`INSERT INTO org_units (id,type,name) VALUES ($1,'company','Root')`, [root]);
+  await b.query(`INSERT INTO org_units (id,type,name,"parentId") VALUES ($1,'branch','Branch',$2)`, [br, root]);
+  await b.query(`INSERT INTO org_units (id,type,name,"parentId",status,"archivedAt") VALUES ($1,'branch','Old',$2,'archived',now())`, [arch, root]);
+  await b.query(`INSERT INTO customers (id,code,name,"creditLimit","paymentTermsDays") VALUES ($1,'C-1','Cust','1000',30)`, [cust]);
+  await b.query(`INSERT INTO sales_orders (id,"orderNumber","customerId","salesRepUserId","totalAmount","repSequenceNumber","createdByUserId","branchOrgUnitId") VALUES ($1,'SO-MIG',$2,$3,'250.00',1,$3,$4)`, [so, cust, userId, br]);
+  await b.query(`INSERT INTO vehicles (id,code,"plateNumber",branch,status,"orgUnitId") VALUES ($1,'V-MIG','P 1','Branch','active',$2)`, [veh, br]);
+  const biz = async () => ({ orgUnits: Number((await b.query(`SELECT count(*)::int n FROM org_units`))[0].n), so: (await b.query(`SELECT "orderNumber","totalAmount"::text t FROM sales_orders WHERE id=$1`, [so]))[0] ?? null, veh: (await b.query(`SELECT code,"plateNumber" FROM vehicles WHERE id=$1`, [veh]))[0] ?? null });
+  const bizBefore = await biz();
+
+  const undone: string[] = [];
+  const names = async () => new Set<string>((await b.query(`SELECT name FROM migrations`)).map((r: { name: string }) => r.name));
+  let remainingOrg = ORG.length;
+  while (remainingOrg > 0) {
+    const pre = await names();
+    await b.undoLastMigration({ transaction: 'each' });
+    const post = await names();
+    const gone = [...pre].filter((n) => !post.has(n));
+    undone.push(...gone);
+    remainingOrg = ORG.filter((t) => post.has([...post].find((n) => n.endsWith(t)) ?? '')).length;
+    if (undone.length > 40) throw new Error('undo loop did not converge');
+  }
+  const fDown = await fingerprint(b);
+  const has = async (sql: string) => (await b.query(sql)).length > 0;
+  out.C_down = {
+    undoneCount: undone.length, undone,
+    orgMigrationsUndone: ORG.filter((t) => undone.some((n) => n.endsWith(t))).length, onlyOrgUndone: undone.every((n) => ORG.some((t) => n.endsWith(t))),
+    schemaAfterDown: brief(fDown),
+    schemaEqualsReleaseLineHead: fDown.hash === fHead.hash, schemaDiffVsReleaseHead: fDown.hash === fHead.hash ? null : diff(fHead, fDown),
+    removed: {
+      'sales_orders.branchOrgUnitId': !(await has(`SELECT 1 FROM information_schema.columns WHERE table_name='sales_orders' AND column_name='branchOrgUnitId'`)),
+      'work_orders.branchOrgUnitId': !(await has(`SELECT 1 FROM information_schema.columns WHERE table_name='work_orders' AND column_name='branchOrgUnitId'`)),
+      'supplier_payments.bankOrgUnitId': !(await has(`SELECT 1 FROM information_schema.columns WHERE table_name='supplier_payments' AND column_name='bankOrgUnitId'`)),
+      'supplier_payment_allocations.orgUnitId': !(await has(`SELECT 1 FROM information_schema.columns WHERE table_name='supplier_payment_allocations' AND column_name='orgUnitId'`)),
+      'org_migration_log table': !(await has(`SELECT 1 FROM information_schema.tables WHERE table_name='org_migration_log'`)),
+    },
+    businessRowsAfterDown: await biz(), businessRowsBefore: bizBefore,
+  };
+  const reran = await b.runMigrations({ transaction: 'each' });
+  const fUp = await fingerprint(b);
+  out.C_upAgain = { applied: reran.length, schema: brief(fUp), equalsFullUp: fUp.hash === fA.hash, schemaDiffVsFull: fUp.hash === fA.hash ? null : diff(fA, fUp), businessRowsAfterUp: await biz(),
+    stampsAfterRoundTrip: { salesOrderBranch: (await b.query(`SELECT "branchOrgUnitId" b FROM sales_orders WHERE id=$1`, [so]))[0].b, vehicleOrgUnit: (await b.query(`SELECT "orgUnitId" o FROM vehicles WHERE id=$1`, [veh]))[0].o, archivedStatus: (await b.query(`SELECT status FROM org_units WHERE id=$1`, [arch]))[0].status } };
+  await b.destroy();
+
+  for (const d of [DB_A, DB_B]) await admin.query(`DROP DATABASE "${d}" WITH (FORCE)`);
+  const after = (await admin.query(`SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY 1`)).map((r: { datname: string }) => r.datname);
+  out.cleanup = { dropped: !after.includes(DB_A) && !after.includes(DB_B), dbsBefore: before.length, dbsAfter: after.length };
+  await admin.destroy();
+  out.finishedAt = new Date().toISOString();
+  console.log(JSON.stringify(out, null, 2));
+}
+main().catch(async (e) => {
+  console.error('ERR', e.message);
+  try { const x = new DataSource({ type: 'postgres', ...base, database: 'postgres' }); await x.initialize(); for (const d of [DB_A, DB_B]) await x.query(`DROP DATABASE IF EXISTS "${d}" WITH (FORCE)`); await x.destroy(); } catch (_) { /* best effort */ }
+  process.exit(1);
+});

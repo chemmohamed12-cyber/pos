@@ -1,0 +1,138 @@
+﻿{
+  "testedCommit": "81191b65456629bfc3cac64f6d21dee4d36da0da",
+  "dirtyFiles": 1,
+  "startedAt": "2026-10-26T16:21:38.187Z",
+  "cluster": {
+    "port": 5546,
+    "version": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit"
+  },
+  "orgMigrationFilesInDist": 9,
+  "A_fullUp": {
+    "applied": 329,
+    "schema": {
+      "hash": "150bd6ba0869582a",
+      "columns": 1948,
+      "indexes": 626,
+      "constraints": 1807
+    },
+    "noopRerun": 0
+  },
+  "B_releaseHeadThenOrg": {
+    "releaseLineApplied": 320,
+    "orgApplied": [
+      "OrgUnitLifecycle1790021000000",
+      "AddVehicleOrgUnit1790021100000",
+      "AddSalesOrderBranch1790021200000",
+      "AddSalesInvoiceBranch1790021300000",
+      "AddFulfillmentOrderBranch1790021400000",
+      "AddShipmentBranch1790021500000",
+      "OrgMigrationLog1790021600000",
+      "AddSupplierPaymentOrgAttribution1790031000000",
+      "AddWorkOrderBranch1790031100000"
+    ],
+    "orgAppliedCount": 9,
+    "schema": {
+      "hash": "150bd6ba0869582a",
+      "columns": 1948,
+      "indexes": 626,
+      "constraints": 1807
+    },
+    "equalsFullUp": true,
+    "schemaDiffVsFull": null,
+    "releaseHeadSchema": {
+      "hash": "9956420c46751b86",
+      "columns": 1928,
+      "indexes": 616,
+      "constraints": 1797
+    }
+  },
+  "C_down": {
+    "undoneCount": 14,
+    "undone": [
+      "AddWorkOrderBranch1790031100000",
+      "AddSupplierPaymentOrgAttribution1790031000000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateSupplierPaymentReversals1790030400000",
+      "CreateBankStatementsAndCashSessions1790030300000",
+      "SeedTreasuryDocumentTerminology1790030200000",
+      "CreateTreasuryDocuments1790030100000",
+      "CreateCustomerPaymentReversals1790030000000"
+    ],
+    "orgMigrationsUndone": 2,
+    "schemaAfterDown": {
+      "hash": "023526f3bc9dad78",
+      "columns": 1815,
+      "indexes": 586,
+      "constraints": 1708
+    },
+    "equalsReleaseHeadMinusUndoneNotComparable": "the interleaved release-line migrations were undone too, so the post-down schema is not the release head",
+    "removed": {
+      "sales_orders.branchOrgUnitId": true,
+      "work_orders.branchOrgUnitId": true,
+      "supplier_payments.bankOrgUnitId": true,
+      "supplier_payment_allocations.orgUnitId": true,
+      "org_migration_log table": true
+    },
+    "businessRowsAfterDown": {
+      "orgUnits": 3,
+      "so": {
+        "orderNumber": "SO-MIG",
+        "t": "250.00"
+      },
+      "veh": {
+        "code": "V-MIG",
+        "plateNumber": "P 1"
+      }
+    },
+    "businessRowsBefore": {
+      "orgUnits": 3,
+      "so": {
+        "orderNumber": "SO-MIG",
+        "t": "250.00"
+      },
+      "veh": {
+        "code": "V-MIG",
+        "plateNumber": "P 1"
+      }
+    }
+  },
+  "C_upAgain": {
+    "applied": 14,
+    "schema": {
+      "hash": "150bd6ba0869582a",
+      "columns": 1948,
+      "indexes": 626,
+      "constraints": 1807
+    },
+    "equalsFullUp": true,
+    "schemaDiffVsFull": null,
+    "businessRowsAfterUp": {
+      "orgUnits": 3,
+      "so": {
+        "orderNumber": "SO-MIG",
+        "t": "250.00"
+      },
+      "veh": {
+        "code": "V-MIG",
+        "plateNumber": "P 1"
+      }
+    },
+    "stampsAfterRoundTrip": {
+      "salesOrderBranch": null,
+      "vehicleOrgUnit": null,
+      "archivedStatus": "active"
+    }
+  },
+  "cleanup": {
+    "dropped": true,
+    "dbsBefore": 80,
+    "dbsAfter": 80
+  },
+  "finishedAt": "2026-10-26T16:21:47.713Z"
+}

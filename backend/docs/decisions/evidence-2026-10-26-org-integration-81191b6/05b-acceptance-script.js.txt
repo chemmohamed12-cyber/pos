@@ -1,0 +1,85 @@
+// Integrated-tree acceptance (API level, real backend :3641 from commit 81191b6). Seeds the org tree + restricted user, then exercises branch scope/denials.
+const path = require('path');
+const BACK = 'D:/CLAUDE-CODE/XNEXUS-WORKSPACE/1-hosting/daii.xnexustech.com/release-new/.claude/worktrees/org-integ/backend';
+const { Client } = require(path.join(BACK, 'node_modules/pg'));
+const bcrypt = require(path.join(BACK, 'node_modules/bcrypt'));
+const { randomUUID } = require('crypto');
+const API = 'http://127.0.0.1:3641/api';
+const CP = 'daii_test_biz_t94_orgi_cp', CO = 'daii_test_biz_t94_orgi_co';
+const cfg = (database) => ({ host: '127.0.0.1', port: 5546, user: 'daii_biz_test', password: process.env.PGPW, database });
+const results = [];
+const rec = (id, name, ok, detail) => { results.push({ id, name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${id} ${name} :: ${detail}`); };
+async function call(tok, method, url, body) {
+  const r = await fetch(API + url, { method, headers: { 'content-type': 'application/json', ...(tok ? { authorization: `Bearer ${tok}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  let j = null; try { j = await r.json(); } catch (_) {}
+  return { status: r.status, body: j, data: j && j.data !== undefined ? j.data : j };
+}
+async function login(email, password, companyId) {
+  const l = await call(null, 'POST', '/auth/login', { email, password });
+  if (l.status >= 300) throw new Error('login ' + email + ' ' + l.status + JSON.stringify(l.body).slice(0, 200));
+  const s = await call(l.data.accessToken, 'POST', '/auth/select-company', { companyId });
+  if (s.status >= 300) throw new Error('select ' + s.status + JSON.stringify(s.body).slice(0, 200));
+  return s.data.accessToken;
+}
+(async () => {
+  const cp = new Client(cfg(CP)), co = new Client(cfg(CO));
+  await cp.connect(); await co.connect();
+  const companyId = (await cp.query('SELECT id FROM companies LIMIT 1')).rows[0].id;
+  // restricted user
+  const email = 'branch.user@example.test', pw = 'Branch#2026';
+  const uid = randomUUID();
+  await cp.query(`INSERT INTO users (id,"fullName",email,status) VALUES ($1,'Branch User',$2,'active')`, [uid, email]);
+  await cp.query(`INSERT INTO credentials ("userId","passwordHash","passwordChangedAt") VALUES ($1,$2,now())`, [uid, await bcrypt.hash(pw, 10)]);
+  await cp.query(`INSERT INTO user_company_memberships (id,"userId","companyId","roleKey") VALUES ($1,$2,$3,'member')`, [randomUUID(), uid, companyId]).catch(async () => {
+    await cp.query(`INSERT INTO user_company_memberships (id,"userId","companyId","roleKey") VALUES ($1,$2,$3,'admin')`, [randomUUID(), uid, companyId]);
+  });
+  await co.query(`INSERT INTO users (id,"fullName",email,status) VALUES ($1,'Branch User',$2,'active')`, [uid, email]);
+  const roles = (await co.query(`SELECT id,key FROM roles WHERE key IN ('inventory.manager','logistics.manager')`)).rows;
+  console.log('roles found', roles.map((r) => r.key));
+  for (const r of roles) await co.query(`INSERT INTO user_roles (id,"userId","roleId") VALUES ($1,$2,$3)`, [randomUUID(), uid, r.id]);
+
+  const admin = await login('bv.admin@example.test', 'BvAdmin#2026', companyId);
+  const mk = async (tok, name, type, parentId) => (await call(tok, 'POST', '/organization/units', { name, type, parentId })).data;
+  const root = await mk(admin, 'ضى', 'company');
+  const k = await mk(admin, 'كتامه', 'branch', root.id);
+  const t = await mk(admin, 'طنطا', 'branch', root.id);
+  rec('S0', 'org tree created (root + 2 branches)', !!(root && k && t), `root=${root && root.id} k=${k && k.id} t=${t && t.id}`);
+  const wk = (await call(admin, 'POST', '/inventory/warehouses', { code: 'WH-K', name: 'مخزن كتامه', orgUnitId: k.id }));
+  const wt = (await call(admin, 'POST', '/inventory/warehouses', { code: 'WH-T', name: 'مخزن طنطا', orgUnitId: t.id }));
+  rec('S1', 'admin creates warehouses with owning branch', wk.status < 300 && wt.status < 300, `${wk.status}/${wt.status}`);
+  const noBr = await call(admin, 'POST', '/inventory/warehouses', { code: 'WH-X', name: 'no branch' });
+  rec('S2', 'admin: warehouse with no branch refused (2 branches)', noBr.status >= 400, `status ${noBr.status} ${JSON.stringify(noBr.body).slice(0, 120)}`);
+  const vk = await call(admin, 'POST', '/shipments/vehicles', { code: 'V-K', plateNumber: 'K 1', orgUnitId: k.id });
+  const vt = await call(admin, 'POST', '/shipments/vehicles', { code: 'V-T', plateNumber: 'T 1', orgUnitId: t.id });
+  rec('S3', 'admin creates vehicles with branch', vk.status < 300 && vt.status < 300, `${vk.status}/${vt.status}`);
+  // membership of restricted user on كتامه
+  const mem = await call(admin, 'POST', `/organization/units/${k.id}/members`, { userId: uid });
+  rec('S4', 'restricted user assigned to branch كتامه', mem.status < 300, `status ${mem.status}`);
+
+  const u = await login(email, pw, companyId);
+  const wl = await call(u, 'GET', '/inventory/warehouses');
+  const codes = (Array.isArray(wl.data) ? wl.data : wl.data && wl.data.items || []).map((w) => w.code);
+  rec('R1', 'restricted: warehouse list only own branch', wl.status === 200 && codes.includes('WH-K') && !codes.includes('WH-T'), `status ${wl.status} codes=${codes}`);
+  const vl = await call(u, 'GET', '/shipments/vehicles');
+  const vc = (Array.isArray(vl.data) ? vl.data : vl.data && vl.data.items || []).map((v) => v.code);
+  rec('R2', 'restricted: vehicle list only own branch', vl.status === 200 && vc.includes('V-K') && !vc.includes('V-T'), `status ${vl.status} codes=${vc}`);
+  const vtId = (await co.query(`SELECT id FROM vehicles WHERE code='V-T'`)).rows[0].id;
+  const ov = await call(u, 'GET', `/shipments/vehicles/${vtId}/overview`);
+  rec('R3', 'restricted: other-branch vehicle overview = 404', ov.status === 404, `status ${ov.status}`);
+  const cw = await call(u, 'POST', '/inventory/warehouses', { code: 'WH-R1', name: 'x', orgUnitId: t.id });
+  rec('R4', 'restricted: create warehouse in other branch = 404', cw.status === 404, `status ${cw.status}`);
+  const cw2 = await call(u, 'POST', '/inventory/warehouses', { code: 'WH-R2', name: 'x' });
+  const br2 = (await co.query(`SELECT "orgUnitId" o FROM warehouses WHERE code='WH-R2'`)).rows[0];
+  rec('R5', 'restricted: create warehouse without branch -> own branch', cw2.status < 300 && br2 && br2.o === k.id, `status ${cw2.status} branch ok=${br2 && br2.o === k.id}`);
+  const cu = await call(u, 'POST', '/organization/units', { name: 'hack', type: 'department', parentId: k.id });
+  rec('R6', 'restricted: create org unit = denied', cu.status === 404 || cu.status === 403, `status ${cu.status}`);
+  const rep = await call(u, 'GET', '/reports/organization/overview');
+  rec('R7', 'restricted: org report denied', rep.status === 404 || rep.status === 403, `status ${rep.status}`);
+  const imp = await call(admin, 'GET', '/reports/organization/overview');
+  rec('A1', 'admin: org report returns', imp.status === 200, `status ${imp.status}`);
+  const arch = await call(admin, 'POST', `/organization/units/${k.id}/archive`, { confirm: true });
+  rec('A2', 'admin: archive branch with attached warehouses/vehicles refused', arch.status >= 400, `status ${arch.status} ${JSON.stringify(arch.body).slice(0, 140)}`);
+  require('fs').writeFileSync(process.argv[2], JSON.stringify({ at: new Date().toISOString(), results, ids: { companyId, root: root.id, k: k.id, t: t.id } }, null, 2));
+  await cp.end(); await co.end();
+  process.exit(results.every((r) => r.ok) ? 0 : 1);
+})().catch((e) => { console.error('ERR', e.message); process.exit(2); });

@@ -21,3 +21,10 @@ export async function purchaseOrderBranchOf(m: EntityManager, purchaseOrderId: s
   const rows: Array<{ unit: string | null }> = await m.query(`SELECT "orgUnitId" AS unit FROM "purchase_orders" WHERE "id" = $1`, [purchaseOrderId]);
   return rows[0]?.unit ?? null;
 }
+
+/** The branch of a treasury account (`treasury_accounts.orgUnitId`), `null` when unassigned. */
+export async function treasuryAccountBranchOf(m: EntityManager, treasuryAccountId: string | null | undefined): Promise<string | null> {
+  if (!treasuryAccountId) return null;
+  const rows: Array<{ unit: string | null }> = await m.query(`SELECT "orgUnitId" AS unit FROM "treasury_accounts" WHERE "id" = $1`, [treasuryAccountId]);
+  return rows[0]?.unit ?? null;
+}

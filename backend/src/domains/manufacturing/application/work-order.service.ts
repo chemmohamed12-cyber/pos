@@ -212,7 +212,9 @@ export class WorkOrderService {
     return (manager ?? this.dataSource).transaction(async (txManager) => {
       const workOrderNumber = await this.numbering.getNextNumber('work_order', txManager);
       const repo = txManager.getRepository(WorkOrder);
-      const wo = await repo.save(repo.create({ workOrderNumber, finishedProductId, quantityPlanned, warehouseId, createdByUserId: actorUserId }));
+      // Org engine WP-C: the work order belongs to the branch of its production warehouse (resolved on the server, stamped once).
+      const branchOrgUnitId = await this.inventory.getWarehouseBranchId(warehouseId, txManager);
+      const wo = await repo.save(repo.create({ workOrderNumber, finishedProductId, quantityPlanned, warehouseId, branchOrgUnitId, createdByUserId: actorUserId }));
       await this.processEngine.start(WORK_ORDER_PROCESS, WORK_ORDER_ENTITY_TYPE, wo.id, txManager);
       await this.audit.record(
         {
@@ -257,7 +259,7 @@ export class WorkOrderService {
     const wipCode = `WIP-${wo.workOrderNumber}`;
     let wipWarehouse = await this.inventory.findOperationalSubLocation(wo.warehouseId, wipCode, manager);
     if (!wipWarehouse) {
-      wipWarehouse = await this.inventory.createWarehouse(wipCode, `WIP — ${wo.workOrderNumber}`, null, null, wo.warehouseId, 'operational', manager);
+      wipWarehouse = await this.inventory.createWarehouse(wipCode, `WIP — ${wo.workOrderNumber}`, null, null, wo.warehouseId, 'operational', manager, wo.branchOrgUnitId); // the WIP location carries the work order's branch
     }
     const wipWarehouseId = wipWarehouse.id;
 
@@ -402,6 +404,7 @@ export class WorkOrderService {
       }
 
       await this.events.publish(txManager, 'manufacturing.work_order.material_issued', {
+        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the WIP / inventory entry to the work order's branch (null = company level, as before)
         idempotencyKey: `manufacturing:work_order:${wo.id}:material_issue:${issueLineId}`,
         workOrderId: wo.id,
         componentProductId,
@@ -504,6 +507,7 @@ export class WorkOrderService {
       await componentRepo.save(component);
 
       await this.events.publish(txManager, 'manufacturing.work_order.material_returned', {
+        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the WIP / inventory entry to the work order's branch (null = company level, as before)
         idempotencyKey: `manufacturing:work_order:${wo.id}:material_return:${returnLineId}`,
         workOrderId: wo.id,
         componentProductId,
@@ -681,6 +685,7 @@ export class WorkOrderService {
       await woRepo.update(wo.id, { quantityProduced: wo.quantityProduced + outputQuantity });
 
       await this.events.publish(txManager, 'manufacturing.work_order.finished_goods_received', {
+        orgUnitId: wo.branchOrgUnitId ?? null, // WP-C: attributes the WIP / inventory entry to the work order's branch (null = company level, as before)
         idempotencyKey: `manufacturing:work_order:${wo.id}:fg_output:${outputEventId}`,
         workOrderId: wo.id,
         finishedProductId: wo.finishedProductId,

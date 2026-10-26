@@ -1,0 +1,372 @@
+﻿npx : FAIL src/foundation/release/release-migration-registry.real-pg.spec.ts (25.525 s)
+At line:1 char:770
++ ... t=Get-Date; npx jest --runInBand --verbose src/foundation/release/rel ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/founda...c.ts (25.525 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: 
+entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › accounting: selects exactly the 
+closure, runs every migration of it, runs nothing unrelated
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_accounting" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at foundation/release/release-migration-registry.real-pg.spec.ts:265:19
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: 
+entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › manufacturing: selects exactly 
+the closure, runs every migration of it, runs nothing unrelated
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_manufacturing" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at foundation/release/release-migration-registry.real-pg.spec.ts:265:19
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: 
+entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › sales (sales → finance → 
+accounting chain): selects exactly the closure, runs every migration of it, runs nothing unrelated
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_sales" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at foundation/release/release-migration-registry.real-pg.spec.ts:265:19
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › Release N provisions the Company; business data is written; a bystander Company 
+exists
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › Release N+1 preflight: READY, pending == exactly the 4 new migrations, only 
+in-scope tags
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › Release N+1 runs ONLY the pending migrations, exactly once; history and business 
+data are preserved
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › re-running the same release is a no-op (idempotent)
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › a later release whose entitlement NARROWS (manufacturing dropped) removes nothing 
+and runs nothing
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › upgrade: existing 
+Company receives a newer release › the bystander Company's database was never touched
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_upgrade" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:301:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › RB-1 proof: appRoot = restored PREVIOUS 
+tree (lacks N+1 classes) + migrationTreePath = FAILED slot → undo succeeds, exactly the 4 migrations reverted, no 
+backup restore
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › safety fallback preserved: classes 
+genuinely unavailable (failed-slot path lacks them) → undo rejects, backup restore is engaged, DB left exactly as 
+migrated
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › legacy in-place path unchanged: no 
+migrationTreePath → appRoot is used (appRoot = the tree holding the classes)
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackAfterSwap: rollbackSwap() 
+→ failedPath → undo(failedPath) → classes resolved from the candidate slot → status rolled_back, no backup restore
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING rollbackReleaseStaged (operator 
+rollback of a COMMITted release): same failedPath → undo → rolled_back, LKG popped, no backup restore
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › WIRING fail-safe preserved: failed slot 
+genuinely lacks the classes and the backup restore fails → FAILED-SAFE (explicit, recoverable), DB untouched
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › no manifest on disk (production config): 
+undo of an accounting+manufacturing run resolves through the fixed registry
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › rollback: 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › NEGATIVE CONTROL — the pre-fix 6-tag 
+registry makes the same undo fail (proves this test detects the H3 registry defect)
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_undo" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:435:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: 
+fail closed, recoverable, no partial migration › a migration that throws mid-batch rolls the WHOLE batch back and is 
+recorded as failed
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_fail" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:561:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: 
+fail closed, recoverable, no partial migration › a migration the manifest ships but whose class is missing from the 
+artifact → preflight BLOCKED (tag/migration drift)
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_fail" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:561:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: 
+fail closed, recoverable, no partial migration › PRE-FIX registry + a release shipping a manufacturing migration → 
+preflight was already BLOCKED (loud, not silent)
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_fail" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:561:13)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › failure safety: 
+fail closed, recoverable, no partial migration › KNOWN GAP (characterization): an entitled tag whose directory is 
+absent from the artifact and which ships no file is silently empty — not blocked
+
+    QueryFailedError: DbGuardError: DB guard REFUSED statement on 127.0.0.1:5544/postgres — DROP DATABASE 
+"daii_test_biz_t85_h3reg_79496_fail" is not an approved disposable database name. Nothing was executed.
+
+      at PostgresQueryRunner.query (../../../local-preview/backend/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+      at DataSource.query (../../../local-preview/backend/src/data-source/DataSource.ts:541:20)
+      at foundation/testing/saas-characterization.helpers.ts:57:5
+      at withAdmin (foundation/testing/saas-characterization.helpers.ts:45:12)
+      at createDisposableDatabase (foundation/testing/saas-characterization.helpers.ts:56:3)
+      at newEnv (foundation/release/release-migration-registry.real-pg.spec.ts:124:3)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:561:13)
+
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+      403 |
+      404 |     afterAll(async () => {
+    > 405 |       if (env.ds.isInitialized) await env.ds.destroy();
+          |               ^
+      406 |     });
+      407 |   });
+      408 |
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:405:15)
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+      445 |
+      446 |     afterAll(async () => {
+    > 447 |       if (env.ds.isInitialized) await env.ds.destroy();
+          |               ^
+      448 |     });
+      449 |
+      450 |     it('RB-1 proof: appRoot = restored PREVIOUS tree (lacks N+1 classes) + migrationTreePath = FAILED slot 
+→ undo succeeds, exactly the 4 migrations reverted, no backup restore', async () => {
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:447:15)
+
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ds')
+
+      565 |     });
+      566 |     afterAll(async () => {
+    > 567 |       if (env.ds.isInitialized) await env.ds.destroy();
+          |               ^
+      568 |     });
+      569 |
+      570 |     it('a migration that throws mid-batch rolls the WHOLE batch back and is recorded as failed', async () 
+=> {
+
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:567:15)
+
+Test Suites: 1 failed, 1 total
+Tests:       21 failed, 21 total
+Snapshots:   0 total
+Time:        25.698 s
+Ran all test suites matching /src\\foundation\\release\\release-migration-registry.real-pg.spec.ts/i.
