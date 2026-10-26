@@ -1,0 +1,36 @@
+// Executes the OWNER-APPROVED legacy backfill for Alpha only (approval: project owner, chat, 2026-10-26, after reviewing the full-chain preview). Uses OrgLegacyService.backfill (single transaction,
+// only NULL references are written, every write logged in org_migration_log, amount checksums verified inside, aborts if any checksum changes).
+const path = require('path');
+const fs = require('fs');
+const [appRoot, envFile, outFile] = process.argv.slice(2);
+const env = Object.fromEntries(fs.readFileSync(envFile, 'utf8').split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+if (String(env.DB_PORT) !== '5433' || env.DB_NAME !== 'daii_dev') throw new Error('refusing: daii_dev on :5433 only');
+const req = (p) => require(path.join(appRoot, p));
+const { DataSource } = req('node_modules/typeorm');
+const { Client } = req('node_modules/pg');
+const { OrgLegacyService } = req('dist/foundation/organization/org-legacy.service.js');
+(async () => {
+  const cp = new Client({ host: env.DB_HOST, port: Number(env.DB_PORT), user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
+  await cp.connect();
+  const db = (await cp.query(`SELECT r."databaseName" FROM database_registries r JOIN companies c ON c.id=r."companyId" WHERE c.name='Alpha Trading Co'`)).rows[0].databaseName;
+  await cp.end();
+  const ds = new DataSource({ type: 'postgres', host: env.DB_HOST, port: Number(env.DB_PORT), username: env.DB_USER, password: env.DB_PASSWORD, database: db });
+  await ds.initialize();
+  const svc = new OrgLegacyService(ds);
+  const snap = async () => ({
+    sales_orders: (await ds.query(`SELECT count(*)::int n, count("branchOrgUnitId")::int stamped, COALESCE(sum("totalAmount"),0)::text total FROM sales_orders`))[0],
+    sales_invoices: (await ds.query(`SELECT count(*)::int n, count("branchOrgUnitId")::int stamped, COALESCE(sum("totalAmount"),0)::text total FROM sales_invoices`))[0],
+    fulfillment_orders: (await ds.query(`SELECT count(*)::int n, count("branchOrgUnitId")::int stamped FROM fulfillment_orders`))[0],
+    shipments: (await ds.query(`SELECT count(*)::int n, count("branchOrgUnitId")::int stamped FROM shipments`))[0],
+    purchase_orders: (await ds.query(`SELECT count(*)::int n, count("orgUnitId")::int stamped, COALESCE(sum("totalAmountBase"),0)::text total FROM purchase_orders`))[0],
+    logRows: Number((await ds.query(`SELECT count(*)::int n FROM org_migration_log`))[0].n),
+  });
+  const before = await snap();
+  const run = await svc.backfill({ actorUserId: null });
+  const after = await snap();
+  const log = await svc.log(run.runId);
+  const out = { database: db, approvedBy: 'project owner (chat, 2026-10-26)', before, run, after, logRowsForRun: log.length, logSample: log.slice(0, 10), at: new Date().toISOString() };
+  fs.writeFileSync(outFile, JSON.stringify(out, null, 2));
+  console.log(JSON.stringify({ runId: run.runId, steps: run.steps.map((s) => `${s.table}=${s.assigned}`), checksumsEqual: run.steps.every((s) => JSON.stringify(s.checksumBefore) === JSON.stringify(s.checksumAfter)), stampedAfter: Object.fromEntries(Object.entries(after).filter(([k]) => k !== 'logRows').map(([k, v]) => [k, `${v.stamped}/${v.n}`])), logRowsForRun: log.length, totalsUnchanged: ['sales_orders', 'sales_invoices', 'purchase_orders'].every((k) => before[k].total === after[k].total) }));
+  await ds.destroy();
+})().catch((e) => { console.error('ERR', e.message); process.exit(1); });

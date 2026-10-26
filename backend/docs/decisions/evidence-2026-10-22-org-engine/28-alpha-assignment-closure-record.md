@@ -18,3 +18,10 @@ Through the application's own `InventoryService.setWarehouseOrgUnit` (the method
 
 ## 4. Approval still required
 The backfill itself has **not** been executed and is **not** approved by the assignment answer. It needs the owner's explicit approval of this preview; afterwards: execute via `POST organization/legacy/backfill` semantics (service `OrgLegacyService.backfill` with confirm), then record post-application verification (rows listed from `org_migration_log`, checksums, counts). Status: **AWAITING EXPLICIT BACKFILL APPROVAL**.
+
+## 5. Backfill executed after explicit approval (update)
+**Approval:** the project owner, personally, in chat on 2026-10-26 ("Approve and execute"), after reviewing the full-chain preview (file 27) and confirming Alpha's historical orders belong to كتامه. **Executed** with `OrgLegacyService.backfill` on Alpha only (script `29b-…`, result `29-…`, exit code 0), run id `ac6e4c19-048d-45e4-8591-d5737a8bf4c6`.
+- **Changed rows (all previously NULL):** sales orders 2, invoices 2, fulfillment orders 2, shipments 2, purchase orders 2 = **10 rows, 10 rows in `org_migration_log`** (from NULL to كتامه, source `warehouse.owning_branch` / `sales_order.branch`).
+- **Verification afterwards (files 29, 30, 31):** stamped/total = 2/2 in each of the five tables; **order, invoice and purchase-order totals identical before/after** (checksums inside the run and re-computed outside it); a new dry-run over the four companies assigns **0** (idempotent) with 0 unassigned and 0 conflicts for Alpha; Beta/Gamma/Delta unchanged (no data); Alpha organization unchanged (root «ضى», archived `mother`, 0 orphans, single-root index).
+- **Remaining exceptions:** Alpha's one vehicle has no branch (no legacy text, no assignment given) — left unassigned; the 2 `purchase_orders`/`sales_orders` links are the only attribution derived from history.
+- **Rollback:** by restoring a backup of the Alpha database (the dev data is test data; for real data `down` would drop the stamped columns and lose the stamps — see the final report §1). Status: **CLOSED**.
