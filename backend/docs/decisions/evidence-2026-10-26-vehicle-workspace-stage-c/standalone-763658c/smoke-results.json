@@ -1,0 +1,188 @@
+{
+ "when": "2026-10-26T16:15:00.946Z",
+ "base": "http://127.0.0.1:3690/api",
+ "passed": 36,
+ "failed": 0,
+ "results": [
+  {
+   "name": "UI served at / (frontend bundle from the package)",
+   "pass": true,
+   "detail": "200"
+  },
+  {
+   "name": "wrong password refused",
+   "pass": true,
+   "detail": "401"
+  },
+  {
+   "name": "maker login + select-company",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "checker login + select-company",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "company-scoped route refused before company selection (403/401)",
+   "pass": true,
+   "detail": "403"
+  },
+  {
+   "name": "anonymous refused",
+   "pass": true,
+   "detail": "401"
+  },
+  {
+   "name": "/auth/me returns the user with permissions for the selected company",
+   "pass": true,
+   "detail": "{\"id\":\"a7f3e803-1436-4abb-bc2b-860f92cf16bd\",\"email\":\"admin@daii.example\",\"fullName\":\"Rehearsal Admin\",\"roles\":[],\"ident"
+  },
+  {
+   "name": "policy: clearing account",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "policy: receipt reason profile",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "fail-closed: the four procurement cost-account policy keys are listed and UNSET (no guessed default)",
+   "pass": true,
+   "detail": "accounting.sales_returns_account_code,accounting.purchase_price_variance_account_code,accounting.purchase_cost_difference_after_receipt_account_code,accounting.purchase_return_cost_difference_account_code,accounting.purc"
+  },
+  {
+   "name": "seeded mapped bank account visible",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "create customer-collection document (draft)",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "submit",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "maker cannot approve own document (maker != checker)",
+   "pass": true,
+   "detail": "403"
+  },
+  {
+   "name": "checker approves",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "execute (Treasury leg + customer payment + GL)",
+   "pass": true,
+   "detail": "201 executed"
+  },
+  {
+   "name": "replayed execute with the same key does not double-post",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "exactly one Treasury leg + one payment + one journal for the document",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "customer payment reversal",
+   "pass": true,
+   "detail": "201 {\"reversalId\":\"0e7848e5-9949-4ca2-a7e2-1520c80be339\",\"reversalNumber\":\"PREV-2026"
+  },
+  {
+   "name": "duplicate customer-payment reversal refused (409)",
+   "pass": true,
+   "detail": "409"
+  },
+  {
+   "name": "invoice re-opened after reversal (remaining back to 900.00)",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "fund the bank through an approved misc-receipt document",
+   "pass": true,
+   "detail": "201"
+  },
+  {
+   "name": "allocated supplier payment (2 invoices)",
+   "pass": true,
+   "detail": "201 {\"id\":\"8b0c4f07-0759-483d-bf18-cd3ecc0ea673\",\"paymentNumber\":\"SPAY-2026-000001\",\"supplierId\":\"583c01"
+  },
+  {
+   "name": "invoice states paid / partially_paid",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "reason shorter than 3 characters refused (400)",
+   "pass": true,
+   "detail": "400"
+  },
+  {
+   "name": "SUPPLIER PAYMENT REVERSAL via the deployed route",
+   "pass": true,
+   "detail": "201 {\"reversalId\":\"4cd00cd5-acff-47ed-8dd2-f1a37211b82b\",\"reversalNumber\":\"SPREV-2026-000001\",\"paymentId"
+  },
+  {
+   "name": "both supplier invoices re-opened to posted",
+   "pass": true,
+   "detail": "posted/posted"
+  },
+  {
+   "name": "Treasury balance returns to the pre-payment value",
+   "pass": true,
+   "detail": "5000.00 -> 4550.00 -> 5000.00"
+  },
+  {
+   "name": "duplicate / concurrent reversals all refused (no second effect)",
+   "pass": true,
+   "detail": "409,409,409,409"
+  },
+  {
+   "name": "exactly one reversal record, one reversal event POSTED",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "reverse route needs authentication (401)",
+   "pass": true,
+   "detail": "401"
+  },
+  {
+   "name": "posting-exceptions view shows NO exception for payment legs (reversal legs are covered by their own event)",
+   "pass": true,
+   "detail": "200 rows=0 "
+  },
+  {
+   "name": "Treasury (RH-BANK ledger) == GL 1102",
+   "pass": true,
+   "detail": "5000.00 vs 5000.00"
+  },
+  {
+   "name": "AP subledger (payment-related) == GL AP 2101",
+   "pass": true,
+   "detail": "0.00 vs 0.00"
+  },
+  {
+   "name": "AR subledger (payment-related) == GL AR 1110",
+   "pass": true,
+   "detail": "0.00 vs 0.00"
+  },
+  {
+   "name": "every posted journal balanced; no non-POSTED financial event",
+   "pass": true,
+   "detail": ""
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "db": "daii_test_biz_t94_down_co1",
+ "migrationsBefore": 320,
+ "up": {
+  "success": true,
+  "error": null
+ },
+ "migrationsAfterUp": 325,
+ "noop": {
+  "success": true,
+  "error": null
+ },
+ "migrationsAfterNoop": 325,
+ "fk": [
+  {
+   "conname": "org_units_parentId_fkey",
+   "def": "FOREIGN KEY (\"parentId\") REFERENCES org_units(id) ON DELETE CASCADE"
+  }
+ ],
+ "orgUnitColumns": [
+  "id",
+  "type",
+  "name",
+  "parentId",
+  "createdAt",
+  "code"
+ ],
+ "parentWithChildDeleteRefused": false,
+ "invariantError": "Cannot read properties of undefined (reading 'id')"
+}

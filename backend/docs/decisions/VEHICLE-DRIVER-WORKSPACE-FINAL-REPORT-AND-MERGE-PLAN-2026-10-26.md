@@ -141,3 +141,34 @@ The register holds the facts each owner needs. A technical PASS above is **not**
 2. **Integrated candidate `9e56426`** — fully verified above, but it contains org-structure (NOT READY FOR MERGE by its own report; the `down()` FK difference) and a partial direct-sale slice; needs the org team's gate and the direct-sale owner's confirmation first.
 3. **Sequence**: land direct-sale and org (each through its owner's gate) onto `release/1.1.12` first, then this work, using `2348b5f` / `c7196fb` / `02465cb` as the integration reference.
 **Recommendation: NOT READY FOR MERGE.** Reasons, in order: (1) D-1…D-7 PENDING; (2) org-structure's own NOT READY status and the `down()` FK difference; (3) direct-sale slice confirmation; (4) the real version number (D-5).
+
+
+---
+
+# Iteration 3 — CTO directive verification (2026-10-26, late)
+
+**Status: NOT READY FOR MERGE.** No merge, release, deployment or production change was made. Full-schema dumps were not kept; their SHA-256 signatures are in the logs.
+
+## Gate table
+Evidence folder: `evidence-2026-10-26-vehicle-workspace-stage-c/`.
+
+| Gate | Subject | Result | Evidence |
+|---|---|---|---|
+| G1 Standalone Vehicle Workspace on the 1.1.13 engine — package from 763658c (code c7a3f6f), sha 72141584…, 325 migrations | standalone | **PASS** — deploy `succeeded`; 320→325; upgrade schema == fresh install (`ac36b89c…` / `62151525…`); `down()` ×5 == 1.1.13 baseline byte-exact (`da43946e…` / `99912a1e…`); re-up == first upgrade; second run no-op; smoke 36/36; Stage C acceptance 42 PASS lines, 0 FAIL; rollback to the previous 1.1.13 slot on the upgraded schema: health 200, Stage C route 404 | `standalone-763658c/` |
+| G2 Integrated candidate on the 1.1.13 engine — package from 282ed63 (scratch label 1.1.14, sha 5ac36fde…, 333 migrations) | integrated | **PASS with one named exception** — deploy `succeeded`, company gate + fan-out verified, 320→333; upgrade == fresh (`dc688a33…` / `6d877cca…`); `down()` ×13 differs from baseline only in the `org_units` parent FK (DEF-ORG-FK-DOWN); re-up == first upgrade; smoke 36/36; Stage C acceptance 42 PASS, 0 FAIL; rollback: health 200, Stage C route 404 | `integrated-282ed63/` |
+| G3 Regression on the integrated head | 282ed63 | **PASS** 35/35 specs, 282 tests, harness exit 0 | `integrated-282ed63/regression-35of35.log.gz` |
+| G4 Unit / static on the integrated head (a600732, code 282ed63) | integrated | **PASS** unit 76 suites / 624 tests; backend `tsc --noEmit` 0; ESLint (delivery, shipment, organization) 0; frontend `tsc -b` 0 | `integrated-282ed63/int-*.log` |
+| G5 `shipmentId` route audit (company isolation, branch scope, ownership, driver assignment, authorization) | integrated | **PASS** — S1–S5 real-PG positive and negative cases; every delivery route calls `DeliveryOrgScopeService.assert*` before the service; no bypass found. Limitation: the pending-remittance list and the categories list carry no record id, so they are not record-scoped | `delivery-org-scope.integration.real-pg.spec.ts` |
+| G6 DEF-ORG-FK-DOWN | integrated | **ACCEPTED EXCEPTION** — design hardening; restoring CASCADE would weaken deletion protection. R1–R3 pass; up/no-op/down/up proved. Data reversibility = application rollback with the schema kept, or the engine's per-Company restore point | decision doc §1; `integrated-282ed63/updownup-*.json` |
+| G7 Direct-sale slice | integrated | cd6e89e only; b661124 not added (presentation-only, would conflict in Shipments.tsx / SalesOrdersList.tsx); X1–X5 pass | decision doc §2 |
+| G8 Browser acceptance on the packaged builds | both | **NOT RUN** on the 1.1.13-engine deployments in this iteration (API-level acceptance only). Earlier browser acceptance on the isolated preview (:5696/:3697) stands for c7a3f6f | — |
+| G9 Company-specific D-1/D-2/D-3 data (real accounts, categories, role mapping) and external finance sign-off | — | **NOT VERIFIED / BLOCKED** — nothing fabricated; posting must not be enabled in any company until recorded | decision register |
+| G10 Release number / merge order (D-5) | — | **OPEN** — Release Owner; "1.1.14" is a scratch label only | decision doc §3 |
+
+## Corrections and caveats
+- An earlier regression log showing 30/35 was contaminated by overlapping runs in one namespace and is discarded; the clean rerun is 35/35.
+- The acceptance script prints 42 PASS lines (elsewhere called "41 checks"); the PASS-line count is authoritative.
+- The org-structure engine itself still self-reports NOT READY FOR MERGE; the direct-sale branch's uncommitted work was not evaluated.
+
+## Verdict
+Technical gates G1–G7 are evidenced. G8–G10 remain open, so the status stays **NOT READY FOR MERGE**.
