@@ -19,6 +19,12 @@ export class PayrollGapClosureCore1790100000000 implements MigrationInterface {
   name = 'PayrollGapClosureCore1790100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // D-4 (CTO 2026-10-26): the new CHK_payroll_periods_range invariant is never weakened. A period whose start is after its end cannot satisfy it, so refuse BEFORE any change,
+    // naming the rows (the migration is transactional, nothing is altered); the rows must be corrected deliberately - the migration does not guess the intended dates.
+    const inverted: Array<{ code: string; startDate: string; endDate: string }> = await queryRunner.query(`SELECT "code", "startDate"::text AS "startDate", "endDate"::text AS "endDate" FROM "payroll_periods" WHERE "startDate" > "endDate" ORDER BY "code"`);
+    if (inverted.length > 0) {
+      throw new Error(`PayrollGapClosureCore refused: ${inverted.length} payroll period(s) have startDate after endDate and must be corrected first: ${inverted.map((p) => `${p.code} (${p.startDate} > ${p.endDate})`).join(', ')}`);
+    }
     // ---- runs ---------------------------------------------------------------------------------------------------------------------
     await queryRunner.query(`
       ALTER TABLE "payroll_runs"
