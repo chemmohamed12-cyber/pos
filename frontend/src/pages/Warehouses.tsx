@@ -164,9 +164,19 @@ export function Warehouses() {
         <ExcelImportExport
           templateUrl="/api/inventory/warehouses/import-template"
           exportUrl="/api/inventory/warehouses/export"
-          importUrl="/api/inventory/warehouses/import"
+          importUrl={`/api/inventory/warehouses/import${hasBranches && orgUnitId ? `?orgUnitId=${encodeURIComponent(orgUnitId)}` : ''}`}
           onImported={load}
-        />
+          importBlockedReason={hasBranches && !orgUnitId ? (ar ? 'اختر الفرع المالك للمخازن المستوردة أولاً.' : 'Choose the owning branch of the imported warehouses first.') : undefined}
+        >
+          {hasBranches && (
+            <select value={orgUnitId} onChange={(e) => setOrgUnitId(e.target.value)} aria-label={ar ? 'الفرع المالك للمخازن المستوردة' : 'Owning branch of the imported warehouses'} data-testid="warehouse-import-branch">
+              <option value="">{ar ? '— الفرع المالك للاستيراد —' : '— owning branch for the import —'}</option>
+              {unitChoices.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          )}
+        </ExcelImportExport>
       )}
 
       {can('inventory.warehouse.create', 'editable') && (
