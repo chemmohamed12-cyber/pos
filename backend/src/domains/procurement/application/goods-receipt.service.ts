@@ -12,6 +12,7 @@ import { InventoryService } from '../../inventory-warehouse/application/inventor
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { ProductLifecycleGate } from './product-lifecycle-gate.service';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { purchaseOrderBranchOf } from './procurement-org';
 
 const GR_DOCUMENT_TYPE = 'goods_receipt';
 const PO_ENTITY_TYPE = 'purchase_order';
@@ -196,7 +197,7 @@ export class GoodsReceiptService {
       await this.events.publish(txManager, AP_EVENT_TOPICS.goodsReceiptPosted, {
         idempotencyKey: `procurement:goods_receipt:${gr.id}:posted`,
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: await purchaseOrderBranchOf(txManager, gr.purchaseOrderId),
         currency: 'EGP',
         sourceEntityType: 'goods_receipt' as const,
         sourceEntityId: gr.id,

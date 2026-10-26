@@ -30,9 +30,14 @@ export class Vehicle {
   @Column({ type: 'uuid', nullable: true })
   shippingCompanyId!: string | null;
 
-  /** Free text for V1 (CTO's own field list is just "Branch") — not a full Branch entity, no such concept exists elsewhere in this codebase yet. */
+  /** LEGACY free text (V1). Kept for compatibility and audited migration (org engine D-8): when `orgUnitId` is set this mirrors the branch NAME at the time of assignment; it is no longer the source of truth. */
   @Column({ type: 'varchar', length: 128, nullable: true })
   branch!: string | null;
+
+  /** Org engine Stage 2 — the validated owning branch (`org_units`, type `branch`). `null` = unassigned legacy vehicle or a Company without branches. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  orgUnitId!: string | null;
 
   /** Auto-created Operational Sub-location (CTO directive §4) — this vehicle's own goods-in-transit location. */
   @Column({ type: 'uuid', nullable: true })
@@ -41,6 +46,10 @@ export class Vehicle {
   /** Auto-created Custody Treasury account (CTO directive §6) — COD money currently in this vehicle/driver's hands, not yet remitted. */
   @Column({ type: 'uuid', nullable: true })
   custodyAccountId!: string | null;
+
+  /** Separate EXPENSE FLOAT Treasury account (policy 2026-10-26): driver expenses are paid from here, never from customer collections. Must differ from `custodyAccountId`. */
+  @Column({ type: 'uuid', nullable: true })
+  expenseFloatAccountId!: string | null;
 
   /** Where remitted money ultimately lands for this vehicle specifically — falls back to the owning company's settlement account when null (see `DeliveryService.remitCollection`). */
   @Column({ type: 'uuid', nullable: true })

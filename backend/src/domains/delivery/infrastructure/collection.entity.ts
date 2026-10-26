@@ -61,6 +61,31 @@ export class Collection {
   @Column({ type: 'uuid', nullable: true })
   treasuryTransactionId!: string | null;
 
+  /**
+   * Vehicle Driver Workspace, Stage C / C1 (D-3): the OPERATIONAL confirmation step, separate from recording (the driver) and from remittance/posting (finance). `recorded` = the
+   * driver says he took the cash; `confirmed` = someone other than the collector verified it; `rejected` = it was not (its custody leg is reversed and it no longer counts
+   * toward the expected total). Confirmation posts NOTHING - the only GL trigger stays `collection.remitted`.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'recorded' })
+  verificationStatus!: 'recorded' | 'confirmed' | 'rejected';
+
+  @Column({ type: 'uuid', nullable: true })
+  confirmedByUserId!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  confirmedAt!: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  rejectionReason!: string | null;
+
+  /** Client-supplied idempotency key (a retry of the same submit returns the same collection instead of recording the cash twice). Unique when present. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  clientKey!: string | null;
+
+  /** The per-shipment custody record this collection belongs to (`shipment_custodies`). */
+  @Column({ type: 'uuid', nullable: true })
+  custodyId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   occurredAt!: Date;
 }

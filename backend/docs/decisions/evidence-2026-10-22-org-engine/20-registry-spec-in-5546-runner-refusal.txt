@@ -1,0 +1,30 @@
+Why release-migration-registry.real-pg.spec cannot run from the main runner (tools/testing/biz-run.js, pinned to cluster 5546)
+Excerpt of the runner's own output for that spec in the final full regression (HEAD a4e0daf); the spec's helper `assertIsolatedInstance()` refuses any instance but 127.0.0.1:5544.
+The same spec run separately on 5544 at the same code: 21/21 PASS (14-registry-spec-5544-final-run.log).
+
+FAIL src/foundation/release/release-migration-registry.real-pg.spec.ts (18.837 s)
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › accounting: selects exactly the clos
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+      20 | export function assertIsolatedInstance(): void {
+      21 |   if (DB_HOST !== '127.0.0.1' || DB_PORT !== 5544 || !DB_USER || !DB_PASSWORD) {
+    > 22 |     throw new Error('Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).');
+         |           ^
+      23 |   }
+      24 | }
+      25 |
+
+      at assertIsolatedInstance (foundation/testing/saas-characterization.helpers.ts:22:11)
+      at Object.<anonymous> (foundation/release/release-migration-registry.real-pg.spec.ts:228:27)
+
+  ● H3 — Release Engine migration selection / upgrade / undo / failure safety (real PG, isolated) › forward: entitlement-driven selection through resolveEntitlementTags + runReleaseMigrations › manufacturing: selects exactly the c
+
+    Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).
+
+      20 | export function assertIsolatedInstance(): void {
+      21 |   if (DB_HOST !== '127.0.0.1' || DB_PORT !== 5544 || !DB_USER || !DB_PASSWORD) {
+    > 22 |     throw new Error('Refusing to run: these characterization specs only run against the isolated PostgreSQL instance (DB_HOST=127.0.0.1 DB_PORT=5544 + isolated credentials). Never the shared dev server (5433).');
+         |           ^
+      23 |   }
+      24 | }

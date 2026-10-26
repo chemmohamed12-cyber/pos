@@ -1,0 +1,33 @@
+Re-run set 1 (3 specs x3, during other sessions' load):
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT FAIL src/foundation/release/release-upload.http.spec.ts
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+RESULT FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+REGRESSION DONE: 7/9 passed
+
+Failure signatures in set 1:
+FAIL src/foundation/release/release-upload.http.spec.ts (56.002 s)
+    ● Release Center upload over HTTP - RELEASE_UPLOAD_MAX_MB › a file above the cap is a 413 naming the cap and the setting, and leaves no temp file
+    read ECONNRESET
+    ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts (60.214 s)
+    ● Test suite failed to run
+    QueryFailedError: permission denied to terminate process
+
+Re-run set 2 (quiet window):
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT PASS src/foundation/release/release-upload.http.spec.ts
+REGRESSION DONE: 9/9 passed

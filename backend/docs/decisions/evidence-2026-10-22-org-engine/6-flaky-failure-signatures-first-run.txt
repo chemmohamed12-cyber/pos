@@ -1,0 +1,10 @@
+== area14-company-audit at [1183]
+     ● Test suite failed to run
+       QueryFailedError: permission denied to terminate process
+== memberships-mine at [1462]
+     ● Test suite failed to run
+       QueryFailedError: permission denied to terminate process
+== release-upload.http at [2627]
+       × a file above the cap is a 413 naming the cap and the setting, and leaves no temp file (19 ms)
+     ● Release Center upload over HTTP - RELEASE_UPLOAD_MAX_MB › a file above the cap is a 413 naming the cap and the setting, and leaves no temp file
+       read ECONNRESET

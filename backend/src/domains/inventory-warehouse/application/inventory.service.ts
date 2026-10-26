@@ -112,6 +112,38 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return repo.save(repo.create({ code, name, location, responsibleUserId, parentWarehouseId, kind, status: 'active', orgUnitId }));
   }
 
+  /**
+   * Org engine Stage 4 — read-only audit of how warehouses reference the organization tree. Classification per warehouse:
+   *   ok · unassigned (no unit) · not_branch (linked to a department / legacy 'warehouse' unit …) · archived_unit · missing_unit (dangling id) ·
+   *   custody_mismatch (an operational custody sub-location whose own unit differs from its parent warehouse's).
+   * Nothing is changed; stock balances and movement history are untouched. The caller decides, per row, what to fix.
+   */
+  async warehouseOrgAudit(manager?: EntityManager): Promise<{
+    branchesActive: number;
+    totals: Record<string, number>;
+    rows: Array<{ warehouseId: string; code: string; name: string; kind: string; status: string; orgUnitId: string | null; unitName: string | null; unitType: string | null; classification: string }>;
+  }> {
+    const runner = manager ?? this.dataSource;
+    const branchesActive = Number((await runner.query(`SELECT count(*)::int AS n FROM "org_units" WHERE "type" = 'branch' AND "status" = 'active'`))[0].n);
+    const data: Array<{ id: string; code: string; name: string; kind: string; status: string; orgUnitId: string | null; parentWarehouseId: string | null; uname: string | null; utype: string | null; ustatus: string | null; parentUnit: string | null }> =
+      await runner.query(
+        `SELECT w."id", w."code", w."name", w."kind", w."status", w."orgUnitId", w."parentWarehouseId", u."name" AS uname, u."type" AS utype, u."status" AS ustatus, p."orgUnitId" AS "parentUnit"
+           FROM "warehouses" w LEFT JOIN "org_units" u ON u."id" = w."orgUnitId" LEFT JOIN "warehouses" p ON p."id" = w."parentWarehouseId" ORDER BY w."code"`,
+      );
+    const rows = data.map((w) => {
+      let classification = 'ok';
+      if (!w.orgUnitId) classification = w.kind === 'operational' && w.parentUnit ? 'custody_mismatch' : 'unassigned';
+      else if (!w.utype) classification = 'missing_unit';
+      else if (w.ustatus !== 'active') classification = 'archived_unit';
+      else if (w.utype !== 'branch') classification = 'not_branch';
+      else if (w.kind === 'operational' && w.parentUnit && w.parentUnit !== w.orgUnitId) classification = 'custody_mismatch';
+      return { warehouseId: w.id, code: w.code, name: w.name, kind: w.kind, status: w.status, orgUnitId: w.orgUnitId, unitName: w.uname, unitType: w.utype, classification };
+    });
+    const totals: Record<string, number> = {};
+    for (const r of rows) totals[r.classification] = (totals[r.classification] ?? 0) + 1;
+    return { branchesActive, totals, rows };
+  }
+
   private async assertOrgUnitExists(orgUnitId: string, manager?: EntityManager): Promise<void> {
     const rows: unknown[] = await (manager ?? this.dataSource).query(`SELECT 1 FROM "org_units" WHERE "id" = $1`, [orgUnitId]);
     if (rows.length === 0) throw new BadRequestException(`Organization unit "${orgUnitId}" not found.`);
@@ -154,6 +186,15 @@ export class InventoryService implements InventoryReservationContract, Inventory
     return warehouse;
   }
 
+  /** Org engine Stage 5 — effective owning branch of a warehouse: its own `orgUnitId`, else (an operational custody sub-location) its parent warehouse's. Read-only. */
+  async getWarehouseBranchId(warehouseId: string, manager?: EntityManager): Promise<string | null> {
+    const rows: Array<{ own: string | null; parentUnit: string | null }> = await (manager ?? this.dataSource).query(
+      `SELECT w."orgUnitId" AS own, p."orgUnitId" AS "parentUnit" FROM "warehouses" w LEFT JOIN "warehouses" p ON p."id" = w."parentWarehouseId" WHERE w."id" = $1`,
+      [warehouseId],
+    );
+    return rows[0] ? (rows[0].own ?? rows[0].parentUnit ?? null) : null;
+  }
+
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — active/inactive toggle, audited like every other status change in this codebase. */
   async setWarehouseStatus(warehouseId: string, status: WarehouseStatus, actorUserId: string | null, manager?: EntityManager): Promise<Warehouse> {
     const warehouse = await this.getWarehouse(warehouseId, manager);
@@ -184,6 +225,8 @@ export class InventoryService implements InventoryReservationContract, Inventory
   async importWarehouseRows(
     rows: Array<{ code: string; name: string }>,
     manager?: EntityManager,
+    /** Org engine Stage 4 — the validated owning branch for every imported warehouse (null in a Company without branches). */
+    orgUnitId: string | null = null,
   ): Promise<{ succeeded: Warehouse[]; rejected: Array<{ row: number; errors: string[] }> }> {
     const succeeded: Warehouse[] = [];
     const rejected: Array<{ row: number; errors: string[] }> = [];
@@ -205,7 +248,7 @@ export class InventoryService implements InventoryReservationContract, Inventory
       seenCodesInFile.add(code);
 
       try {
-        succeeded.push(await this.createWarehouse(code, name, null, null, null, 'main', manager));
+        succeeded.push(await this.createWarehouse(code, name, null, null, null, 'main', manager, orgUnitId));
       } catch (err) {
         rejected.push({ row: rowNumber, errors: [err instanceof Error ? err.message : 'Unknown error creating warehouse.'] });
       }

@@ -1,11 +1,15 @@
-import { Inject, BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { Inject, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager, Not } from 'typeorm';
 import { DeliveryOutcome } from '../infrastructure/delivery-outcome.entity';
 import { Collection } from '../infrastructure/collection.entity';
+import { ShipmentCustody } from '../infrastructure/shipment-custody.entity';
+import { ShipmentLineDelivery } from '../infrastructure/shipment-line-delivery.entity';
+import { computeDeliveryProgress } from './line-delivery-progress';
 import { DeliveryOutcomeType } from '../domain/delivery-outcome-type';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
+import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import {
   FULFILLMENT_CONTRACT,
   FulfillmentContract,
@@ -41,6 +45,7 @@ export class DeliveryService implements LogisticsDeliveryContract {
     @Inject(INVENTORY_LOGISTICS_CONTRACT) private readonly inventory: InventoryLogisticsContract,
     private readonly audit: AuditService,
     private readonly events: EventBusService,
+    private readonly numbering: NumberingService,
     @Inject(FINANCE_CUSTOMER_LEDGER_CONTRACT) private readonly customerLedger: FinanceCustomerLedgerContract,
     @Inject(FINANCE_INVOICE_CONTRACT) private readonly invoices: FinanceInvoiceContract,
   ) {}
@@ -63,7 +68,36 @@ export class DeliveryService implements LogisticsDeliveryContract {
     manager?: EntityManager,
   ): Promise<DeliveryOutcome> {
     const record = await (manager ?? this.dataSource).transaction(async (txManager) => {
-      const action = OUTCOME_TO_SHIPMENT_ACTION[outcome];
+      // Direct sale from the company: the only outcome is the counter hand-over (the stock/COGS exit below is the same as any delivery); there is no failed/refused/returned leg because nothing ever left the warehouse.
+      const directSale = await this.shipments.isDirectSale(shipmentId, txManager);
+      if (directSale && outcome !== 'delivered') {
+        throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - only a hand-over ("delivered") can be recorded.`);
+      }
+      // Stage C / F-2 (2026-10-22): a cash-on-delivery shipment is never confirmed delivered without the collection that the delivery is for (enforced here, on the server — a UI
+      // restriction is not enough). The collection keeps its own lifecycle (recorded -> remitted -> GL at remittance); this only refuses a "delivered" outcome that has none.
+      if (outcome === 'delivered') {
+        // Stage C / C2 (D-1): once per-line delivery events exist, the shipment can only be confirmed delivered when every line is accounted for (delivered + returned == shipped); with
+        // no events the legacy whole-shipment flow is unchanged. Serialised with the line recording by the same per-shipment lock.
+        await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:lines:${shipmentId}`]);
+        const lineEvents = await txManager.getRepository(ShipmentLineDelivery).find({ where: { shipmentId } });
+        if (lineEvents.length > 0) {
+          const lineSnap = await this.shipments.getShipmentLinesSnapshot(shipmentId, txManager);
+          const open = computeDeliveryProgress(lineSnap?.lines ?? [], lineEvents).lines.filter((l) => l.outstanding > 0);
+          if (open.length > 0) {
+            throw new ConflictException(`Shipment "${shipmentId}" still has ${open.length} line(s) not accounted for (delivered or returned) - record them before confirming the delivery. Nothing was changed.`);
+          }
+        }
+        const snapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+        if (snapshot && snapshot.codAmount !== null && Number(snapshot.codAmount) > 0) {
+          const collected = await this.getCollectionForShipmentUnscoped(shipmentId, txManager); // latest NON-rejected one
+          if (!collected) {
+            throw new ConflictException(
+              `Shipment "${shipmentId}" is cash on delivery (${snapshot.codAmount}): record the collection before confirming the delivery. Nothing was changed.`,
+            );
+          }
+        }
+      }
+      const action = directSale ? 'direct_handover' : OUTCOME_TO_SHIPMENT_ACTION[outcome];
       if (action) {
         await this.shipments.transitionShipment(shipmentId, action, actorUserId, txManager);
       }
@@ -132,46 +166,75 @@ export class DeliveryService implements LogisticsDeliveryContract {
     method: string,
     collectorUserId: string,
     manager?: EntityManager,
+    clientKey?: string | null,
   ): Promise<Collection> {
     // V1 Release Audit MEDIUM fix — unlike recordOutcome (which delegates
     // to transitionShipment's own check), this had no assigned-driver/
     // admin verification at all; any authenticated user could record a
     // fabricated cash collection against any shipment.
     await this.shipments.assertDriverOrAdmin(shipmentId, collectorUserId, manager);
-
-    // Shipping Screen Redesign directive §8/§13 — idempotency: nothing
-    // previously stopped a double-click (or a retried request) from
-    // calling this endpoint twice for the same shipment and posting two
-    // Treasury cash-in entries for one real-world collection. A shipment
-    // has at most one real COD collection event, same invariant
-    // `ReturnsService.initiateCustodyReturn` already relies on via this
-    // exact method — reused here as a guard, not duplicated.
-    const existing = await this.getCollectionForShipmentUnscoped(shipmentId, manager);
-    if (existing) {
-      throw new ConflictException(`Shipment "${shipmentId}" already has a recorded collection (${existing.id}) — cannot record a second one.`);
+    if (clientKey !== undefined && clientKey !== null && !/^[A-Za-z0-9_.:-]{8,64}$/.test(clientKey)) {
+      throw new BadRequestException('clientKey must be 8-64 characters (letters, digits, _ . : -).');
     }
 
-    const custodian = await this.shipments.getCustodianForShipment(shipmentId, manager);
-    let custodyTransactionId: string | null = null;
-    if (custodian) {
-      const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId, manager);
-      const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipmentSnapshot!.fulfillmentOrderId, manager);
-      const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId, manager);
-      const custodyTxn = await this.treasury.cashIn(
-        custodian.custodyAccountId,
-        amount,
-        orderSnapshot?.customerId ?? null,
-        fulfillmentOrder.salesOrderId,
-        shipmentId,
-        'cod_collection_custody',
-        collectorUserId,
-        manager,
-      );
-      custodyTransactionId = custodyTxn.id;
-    }
-
+    // Stage C / F-2 (2026-10-22): the whole recording is ONE transaction serialised per shipment. Before, the custody `cash_in` committed first and the collection row afterwards (a
+    // failure in between left cash in the custody account with no collection record) and the "already collected?" check was an unlocked read, so concurrent submits could post
+    // the cash twice. Now: lock -> check -> validate -> custody cash_in -> collection row -> event, all or nothing.
+    // Stage C / C1 (D-2): a cash-on-delivery shipment may be collected in several instalments (a driver who takes the money in two goes); the server invariant is that the
+    // collections still counting (recorded + confirmed - a rejected one leaves the sum) never exceed the expected amount. A shipment WITHOUT an expected amount keeps the legacy
+    // rule of at most one collection. A retry carrying the same `clientKey` returns the first result instead of recording the cash again.
+    let replayed = false;
     const collection = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:collection:${shipmentId}`]);
       const repo = txManager.getRepository(Collection);
+
+      if (clientKey) {
+        const prior = await repo.findOne({ where: { clientKey } });
+        if (prior) {
+          if (prior.shipmentId !== shipmentId || prior.collectorUserId !== collectorUserId || Number(prior.amount) !== Number(amount)) {
+            throw new ConflictException('This clientKey was already used for a different collection.');
+          }
+          replayed = true;
+          return prior;
+        }
+      }
+
+      if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+        throw new BadRequestException('The collected amount must be a positive number with at most two decimals.');
+      }
+      const shipmentSnapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+      const expected = shipmentSnapshot && shipmentSnapshot.codAmount !== null && Number(shipmentSnapshot.codAmount) > 0 ? shipmentSnapshot.codAmount : null;
+      const live = (await repo.find({ where: { shipmentId }, order: { occurredAt: 'ASC' } })).filter((c) => c.verificationStatus !== 'rejected');
+      const liveCents = live.reduce((sum, c) => sum + toCents(c.amount), 0);
+      if (expected === null) {
+        // Shipping Screen Redesign directive §8/§13 — no expected amount: at most one real COD collection event (the invariant `ReturnsService.initiateCustodyReturn` relies on).
+        if (live.length > 0) throw new ConflictException(`Shipment "${shipmentId}" already has a recorded collection (${live[0].id}) — cannot record a second one.`);
+      } else if (liveCents + toCents(amount) > toCents(expected)) {
+        const remaining = Math.max(0, toCents(expected) - liveCents) / 100;
+        throw new ConflictException(
+          `The collected amount ${amount} would exceed the cash-on-delivery amount ${expected} of this shipment (already collected ${(liveCents / 100).toFixed(2)}, remaining ${remaining.toFixed(2)}). Nothing was recorded.`,
+        );
+      }
+
+      const custody = await this.ensureCustodyRecord(shipmentId, shipmentSnapshot, expected, collectorUserId, txManager);
+      const custodian = await this.shipments.getCustodianForShipment(shipmentId, txManager);
+      let custodyTransactionId: string | null = null;
+      if (custodian) {
+        const fulfillmentOrder = await this.fulfillment.getFulfillmentOrder(shipmentSnapshot!.fulfillmentOrderId, txManager);
+        const orderSnapshot = await this.salesOrders.getOrderSnapshot(fulfillmentOrder.salesOrderId, txManager);
+        const custodyTxn = await this.treasury.cashIn(
+          custodian.custodyAccountId,
+          amount,
+          orderSnapshot?.customerId ?? null,
+          fulfillmentOrder.salesOrderId,
+          shipmentId,
+          'cod_collection_custody',
+          collectorUserId,
+          txManager,
+        );
+        custodyTransactionId = custodyTxn.id;
+      }
+
       const saved = await repo.save(
         repo.create({
           shipmentId,
@@ -180,16 +243,15 @@ export class DeliveryService implements LogisticsDeliveryContract {
           collectorUserId,
           custodyAccountId: custodian?.custodyAccountId ?? null,
           custodyTransactionId,
+          verificationStatus: 'recorded',
+          clientKey: clientKey ?? null,
+          custodyId: custody.id,
         }),
       );
-      // Finance-ready event (ADR-018) — amount, currency-implicit (EGP, same as Deposit Control),
-      // party, and date all present without a Finance callback into Delivery.
+      // Finance-ready event (ADR-018) — amount, currency-implicit (EGP, same as Deposit Control), party, and date all present without a Finance callback into Delivery.
       //
-      // ADR-042 D3 (F09) — purely operational, by design: this topic NEVER gets a GL handler (that
-      // is `collection.remitted`'s job, at `remitCollection` time — see ADR-042 D3a-D3h for the full
-      // reasoning). The `idempotencyKey` below is still added (ADR-042 D0) purely for hygiene: even
-      // an `IGNORED` (handler-less) `FinancialEvent` row should carry the right identity, so a
-      // future reader never sees a wrong dedup on this topic's own audit trail.
+      // ADR-042 D3 (F09) — purely operational, by design: this topic NEVER gets a GL handler (that is `collection.remitted`'s job, at `remitCollection` time — see ADR-042 D3a-D3h).
+      // The `idempotencyKey` below is still added (ADR-042 D0) purely for hygiene: even an `IGNORED` (handler-less) `FinancialEvent` row should carry the right identity.
       await this.events.publish(txManager, 'collection.recorded', {
         idempotencyKey: `collection:${saved.id}:recorded`,
         shipmentId,
@@ -200,6 +262,7 @@ export class DeliveryService implements LogisticsDeliveryContract {
       });
       return saved;
     });
+    if (replayed) return collection;
     // F09-H2 (RBW Gap 2) — matches every other financial-event publisher in this codebase.
     await this.events.dispatchAfterCommit(manager);
 
@@ -212,12 +275,109 @@ export class DeliveryService implements LogisticsDeliveryContract {
         resourceId: collection.id,
         result: 'success',
         correlationId: null,
-        after: { shipmentId, amount, method, custodyAccountId: collection.custodyAccountId, custodyTransactionId },
+        after: { shipmentId, amount, method, custodyAccountId: collection.custodyAccountId, custodyTransactionId: collection.custodyTransactionId, custodyId: collection.custodyId },
       },
       manager,
     );
 
     return collection;
+  }
+
+  /** Stage C / C3: the custody record of a shipment for the expense flow - same lazy creation as the first collection. The caller holds its own transaction. */
+  async openCustody(shipmentId: string, actorUserId: string, txManager: EntityManager): Promise<ShipmentCustody> {
+    const snapshot = await this.shipments.getShipmentSnapshot(shipmentId, txManager);
+    if (!snapshot) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
+    const expected = snapshot.codAmount !== null && Number(snapshot.codAmount) > 0 ? snapshot.codAmount : null;
+    return this.ensureCustodyRecord(shipmentId, snapshot, expected, actorUserId, txManager);
+  }
+
+  /**
+   * Stage C / C1 - the per-shipment custody record, created by the first collection (never for a shipment that carries no cash). Runs inside the caller's transaction, which already
+   * holds the per-shipment advisory lock, so two collections cannot both create it; the unique index on `shipmentId` is the backstop. Vehicle, driver and the vehicle's free-text
+   * branch are copied at that moment (D-6: no branch entity, no branch security).
+   */
+  private async ensureCustodyRecord(
+    shipmentId: string,
+    snapshot: { vehicleId: string | null; driverUserId: string | null } | null,
+    expectedAmount: string | null,
+    actorUserId: string,
+    txManager: EntityManager,
+  ): Promise<ShipmentCustody> {
+    const repo = txManager.getRepository(ShipmentCustody);
+    const existing = await repo.findOne({ where: { shipmentId } });
+    if (existing) return existing;
+    let branch: string | null = null;
+    if (snapshot?.vehicleId) branch = (await this.shipments.getVehicle(snapshot.vehicleId, txManager)).branch ?? null;
+    await this.numbering.registerDocumentType('shipment_custody', 'CUS', true, txManager);
+    const custodyNumber = await this.numbering.getNextNumber('shipment_custody', txManager);
+    return repo.save(
+      repo.create({ custodyNumber, shipmentId, vehicleId: snapshot?.vehicleId ?? null, driverUserId: snapshot?.driverUserId ?? null, branch, expectedAmount, openedByUserId: actorUserId }),
+    );
+  }
+
+  /**
+   * Stage C / C1 (D-3) - someone OTHER than the collector confirms that the cash the driver recorded was really received. Operational only: nothing is posted (the cash already sits
+   * in the custody account since recording; the GL entry happens at remittance). Idempotent for an already-confirmed row; refused for a rejected or remitted one.
+   */
+  async confirmCollection(collectionId: string, actorUserId: string, manager?: EntityManager): Promise<Collection> {
+    const found = await (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { id: collectionId } });
+    if (!found) throw new NotFoundException(`Collection "${collectionId}" not found.`);
+    await this.shipments.getShipment(found.shipmentId, actorUserId, manager); // same scope check as remit
+    const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:collection:${found.shipmentId}`]);
+      const repo = txManager.getRepository(Collection);
+      const c = await repo.findOne({ where: { id: collectionId } });
+      if (!c) throw new NotFoundException(`Collection "${collectionId}" not found.`);
+      if (c.verificationStatus === 'confirmed') return null; // idempotent - nothing changes, nothing audited twice
+      if (c.verificationStatus === 'rejected') throw new ConflictException(`Collection "${collectionId}" was rejected - it cannot be confirmed.`);
+      if (c.collectorUserId === actorUserId) throw new ForbiddenException('A collection must be confirmed by someone other than the person who recorded it.');
+      c.verificationStatus = 'confirmed';
+      c.confirmedByUserId = actorUserId;
+      c.confirmedAt = new Date();
+      return repo.save(c);
+    });
+    if (!saved) return (await (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { id: collectionId } }))!;
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'delivery.collection.confirmed', resource: 'collection', resourceId: saved.id, result: 'success', correlationId: null, after: { shipmentId: saved.shipmentId, amount: saved.amount } },
+      manager,
+    );
+    return saved;
+  }
+
+  /**
+   * Stage C / C1 (D-3) - the confirmer says the cash was NOT received. The custody `cash_in` leg is reversed through the Treasury's owner-reversal (an append-only offsetting leg;
+   * it refuses when the custody account no longer holds the money - fail closed) and the collection stops counting toward the expected total. A reason is mandatory. Refused once
+   * the collection is confirmed or remitted: from then on finance's own reversal path applies.
+   */
+  async rejectCollection(collectionId: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<Collection> {
+    const why = (reason ?? '').trim();
+    if (why.length < 3 || why.length > 255) throw new BadRequestException('A rejection reason of 3-255 characters is required.');
+    const found = await (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { id: collectionId } });
+    if (!found) throw new NotFoundException(`Collection "${collectionId}" not found.`);
+    await this.shipments.getShipment(found.shipmentId, actorUserId, manager);
+    const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:collection:${found.shipmentId}`]);
+      const repo = txManager.getRepository(Collection);
+      const c = await repo.findOne({ where: { id: collectionId } });
+      if (!c) throw new NotFoundException(`Collection "${collectionId}" not found.`);
+      if (c.verificationStatus === 'rejected') return null; // idempotent
+      if (c.verificationStatus !== 'recorded' || c.remittanceStatus === 'remitted') {
+        throw new ConflictException(`Collection "${collectionId}" is already confirmed or remitted - it can no longer be rejected here.`);
+      }
+      if (c.collectorUserId === actorUserId) throw new ForbiddenException('A collection must be rejected by someone other than the person who recorded it.');
+      if (c.custodyTransactionId) await this.treasury.reverseOwnedLeg(c.custodyTransactionId, `collection ${c.id} rejected: ${why}`, actorUserId, txManager);
+      c.verificationStatus = 'rejected';
+      c.rejectionReason = why;
+      c.confirmedByUserId = actorUserId;
+      c.confirmedAt = new Date();
+      return repo.save(c);
+    });
+    if (!saved) return (await (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { id: collectionId } }))!;
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'delivery.collection.rejected', resource: 'collection', resourceId: saved.id, result: 'success', correlationId: null, after: { shipmentId: saved.shipmentId, amount: saved.amount, reason: why } },
+      manager,
+    );
+    return saved;
   }
 
   /**
@@ -233,7 +393,17 @@ export class DeliveryService implements LogisticsDeliveryContract {
 
   async getCollectionForShipment(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<Collection | null> {
     await this.shipments.assertDriverOrAdmin(shipmentId, actorUserId, manager);
-    return (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { shipmentId }, order: { occurredAt: 'DESC' } });
+    return (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { shipmentId, verificationStatus: Not('rejected') }, order: { occurredAt: 'DESC' } });
+  }
+
+  /** Every collection of a shipment (rejected ones included), oldest first - driver-or-admin scoped like the single read above. */
+  async listCollectionsForShipment(shipmentId: string, actorUserId: string, manager?: EntityManager): Promise<Collection[]> {
+    await this.shipments.assertDriverOrAdmin(shipmentId, actorUserId, manager);
+    return this.listCollectionsForShipmentUnscoped(shipmentId, manager);
+  }
+
+  async listCollectionsForShipmentUnscoped(shipmentId: string, manager?: EntityManager): Promise<Collection[]> {
+    return (manager ?? this.dataSource).getRepository(Collection).find({ where: { shipmentId }, order: { occurredAt: 'ASC', id: 'ASC' } });
   }
 
   /**
@@ -243,7 +413,7 @@ export class DeliveryService implements LogisticsDeliveryContract {
    * on any of these shipments.
    */
   async listPendingRemittances(manager?: EntityManager): Promise<Collection[]> {
-    return (manager ?? this.dataSource).getRepository(Collection).find({ where: { remittanceStatus: 'pending' }, order: { occurredAt: 'ASC' } });
+    return (manager ?? this.dataSource).getRepository(Collection).find({ where: { remittanceStatus: 'pending', verificationStatus: Not('rejected') }, order: { occurredAt: 'ASC' } });
   }
 
   /**
@@ -263,7 +433,8 @@ export class DeliveryService implements LogisticsDeliveryContract {
    * financial history view, not a driver acting on their own delivery.
    */
   async getCollectionForShipmentUnscoped(shipmentId: string, manager?: EntityManager): Promise<Collection | null> {
-    return (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { shipmentId }, order: { occurredAt: 'DESC' } });
+    // Stage C / C1: the latest collection that still counts (a rejected one was never collected).
+    return (manager ?? this.dataSource).getRepository(Collection).findOne({ where: { shipmentId, verificationStatus: Not('rejected') }, order: { occurredAt: 'DESC' } });
   }
 
   /**
@@ -314,6 +485,9 @@ export class DeliveryService implements LogisticsDeliveryContract {
     if (collection.remittanceStatus === 'remitted') {
       throw new ConflictException(`Collection "${collectionId}" has already been remitted.`);
     }
+    if (collection.verificationStatus === 'rejected') {
+      throw new ConflictException(`Collection "${collectionId}" was rejected - it cannot be remitted.`);
+    }
 
     // --- Pre-transaction reads only (ADR-042 D3c) — resolve WHICH settlement account and WHAT
     // Customer Ledger entry this remittance will post, before opening the one atomic transaction
@@ -356,6 +530,9 @@ export class DeliveryService implements LogisticsDeliveryContract {
       cashInSalesOrderId = fulfillmentOrder.salesOrderId;
     }
 
+    // Separate expense float policy: a collection is never remitted into a vehicle's expense float (even through the explicit `treasuryAccountId` override).
+    await this.shipments.assertNotAnExpenseFloat(settlementAccountId, manager);
+
     // Customer Financial Account / AR (CTO directive) — bridges the EXISTING COD/Collection flow
     // into the Customer Ledger: money already left the custodian and lands in a real company
     // Treasury account at THIS point, so this is where AR actually gets reduced, not at mere
@@ -390,6 +567,22 @@ export class DeliveryService implements LogisticsDeliveryContract {
     // `FinanceTreasuryContract.cashIn`/`.transfer` is what makes this possible without any new
     // transaction architecture. ---
     const saved = await (manager ?? this.dataSource).transaction(async (txManager) => {
+      // Stage C / C1: serialise with record/confirm/reject on this shipment and re-read the row under the lock - a concurrent rejection (or a second remit) must not be overtaken
+      // by a stale copy. A collection still only `recorded` is confirmed by the remittance itself (finance receiving the money is the strongest confirmation; legacy flow preserved).
+      await txManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`delivery:collection:${collection.shipmentId}`]);
+      const fresh = await txManager.getRepository(Collection).findOne({ where: { id: collectionId } });
+      if (!fresh) throw new NotFoundException(`Collection "${collectionId}" not found.`);
+      if (fresh.remittanceStatus === 'remitted') throw new ConflictException(`Collection "${collectionId}" has already been remitted.`);
+      if (fresh.verificationStatus === 'rejected') throw new ConflictException(`Collection "${collectionId}" was rejected - it cannot be remitted.`);
+      if (fresh.verificationStatus === 'recorded') {
+        fresh.verificationStatus = 'confirmed';
+        fresh.confirmedByUserId = actorUserId;
+        fresh.confirmedAt = new Date();
+      }
+      collection.verificationStatus = fresh.verificationStatus;
+      collection.confirmedByUserId = fresh.confirmedByUserId;
+      collection.confirmedAt = fresh.confirmedAt;
+
       let settlementTransactionId: string;
       if (isTransfer) {
         const { out } = await this.treasury.transfer(
@@ -480,4 +673,9 @@ export class DeliveryService implements LogisticsDeliveryContract {
 
     return saved;
   }
+}
+
+/** Whole cents of a 2-decimal amount string (integer arithmetic for the collected-total invariant - never float sums of money). */
+function toCents(amount: string): number {
+  return Math.round(Number(amount) * 100);
 }

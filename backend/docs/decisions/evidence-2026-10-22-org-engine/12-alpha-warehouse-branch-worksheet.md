@@ -1,0 +1,21 @@
+# Alpha — warehouses awaiting an owning-branch decision (read-only worksheet, 2026-10-26)
+
+Active branches of Alpha: rana, طنطا, كتامه.
+
+No branch is suggested. The last column is for the owner. A warehouse that is a custody sub-location of another warehouse follows its parent; assign the parent.
+
+| code | name | kind | status | parent warehouse | responsible user | stock movements | sales orders | purchase orders | vehicle custody | name/code mentions a branch (FACT, not a decision) | OWNING BRANCH (owner decision) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | مخزن المفكك | main | active |  |  | 1 | 0 | 0 | 0 |  |  |
+| 10 | مخزن الصيانة | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 1001 | مخزن الخامات | main | active |  |  | 7 | 2 | 2 | 0 |  |  |
+| 2 | مخزن البلاستيك | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 3 | مخزن المطبوعات | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 4 | مخزن انتاج تحت التشغيل | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 5 | مخزن منتج تام مصنع | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 6 | مخزن منتج تام مشتري | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 7 | مخزن السيارة 1 | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 8 | مخزن سيارة 2 | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| 9 | مخزن سيارة 3 | main | active |  |  | 0 | 0 | 0 | 0 |  |  |
+| PREP-000001 | تحت التجهيز | operational | active | 1001 |  | 4 | 0 | 0 | 0 |  |  |
+| SLOC-000001 | 2019-1 — ع ب ب - 2019 | operational | active | 1001 |  | 4 | 0 | 0 | 1 |  |  |

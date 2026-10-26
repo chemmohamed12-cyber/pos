@@ -1,0 +1,42 @@
+PASS setup: driver1 sees an out-for-delivery COD shipment on his vehicle and the float is assigned :: RSH-2026-000105
+PASS AUTH driver1 -> driver2 vehicle workspace = 404
+PASS AUTH driver2 -> driver1 vehicle workspace = 404
+PASS AUTH driver1 -> driver2 vehicle reconciliation = 404
+PASS AUTH driver1 may read his own reconciliation
+PASS AUTH driver1 cannot list another driver's shipment expenses
+PASS AUTH driver1 cannot read another driver's shipment line events
+PASS AUTH driver1 cannot record a collection on another driver's shipment
+PASS AUTH driver1 cannot claim an expense on another driver's shipment
+PASS AUTH driver1 cannot declare a handover for another vehicle
+PASS AUTH driver1 cannot assign/unassign a float
+PASS AUTH driver1 cannot approve (decide) an expense
+PASS AUTH driver1 cannot post an expense
+PASS AUTH driver1 cannot reverse an expense
+PASS AUTH driver1 cannot confirm/reject collections or handovers (finance permission)
+PASS AUTH unauthenticated = 401
+PASS COLL driver records an instalment :: 201
+PASS COLL retry with the same clientKey returns the same collection (idempotent)
+PASS COLL over-collection is refused by the server (409) :: {"success":false,"error":{"code":"CONFLICT","message":"The collected amount 701 would exceed the cash-on-delivery amount
+PASS COLL the collector cannot confirm his own collection
+PASS COLL a different finance user confirms it :: 201
+PASS COLL rejection (with reason) by a different user
+PASS COLL totals computed on the server: the rejected 50.00 does not count :: {"expected":"1200.00","recorded":"500.00","confirmed":"100.00","rejected":"50.00","counted":"600.00","remaining":"600.00"}
+PASS HANDOVER driver declares within the cash he is expected to carry :: 201 {"id":"ce9b03ef-7feb-4148-9067-620d1e4f2fdc","handoverNumber":"CHO-2026-000001","vehicleId":"b91793a
+PASS HANDOVER above the expected cash is refused (409)
+PASS HANDOVER the declarer cannot confirm his own handover
+PASS HANDOVER a different user confirms it
+PASS FLOAT a vehicle without a float cannot claim (409, fail closed) :: {"success":false,"error":{"code":"CONFLICT","message":"No expense float is assigned to this vehicle - assign one (and fu
+PASS FLOAT an unmapped category is refused (409)
+PASS FLOAT driver claims an expense (pending approval) :: 201
+PASS FLOAT the claimant cannot approve his own expense
+PASS FLOAT posting before approval is refused
+PASS FLOAT a separate approver approves :: 201 {"id":"8af9b149-89ca-41b9-bd00-4268f0217db7","expenseNumber":"CEX-2026-000001","custodyId":"3ed8a157
+PASS FLOAT explicit posting pays out of the float :: 201
+PASS FLOAT float balance fell by exactly 75.00 :: 1000.00 -> 925.00
+PASS FLOAT customer-collection custody balance is untouched by the expense :: 1300.00 -> 1300.00
+PASS FLOAT expense does not reduce the cash the driver must hand over
+PASS FLOAT posting twice does not pay twice
+PASS FLOAT an expense larger than the float is refused at posting (collections not used) :: 409 {"success":false,"error":{"code":"CONFLICT","message":"Insufficient treasury balance: requested 99999.00, avai
+PASS FLOAT finance reverses the posted expense :: 201
+PASS FLOAT float restored after the reversal :: 1000.00
+PASS FLOAT reconciliation difference is 0.00 (expected == actual) :: {"assigned":true,"balance":"1000.00","expectedBalance":"1000.00","difference":"0.00","pendingApproval":"0.00","approvedNotPosted":"0.00","posted":"0.00","reversed":"75.00","availableAfterCommitments":"1000.00"}

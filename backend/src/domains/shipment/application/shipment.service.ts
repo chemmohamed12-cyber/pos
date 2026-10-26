@@ -29,7 +29,9 @@ import { LogisticsShipmentContract } from '../../../foundation/module-registry/c
 import { UsersService } from '../../../foundation/identity/users.service';
 
 const ENTITY_TYPE = 'shipment';
-const DRIVER_ACTIONS = new Set(['pickup', 'depart', 'arrive_for_delivery', 'deliver', 'fail_delivery']);
+const DRIVER_ACTIONS = new Set(['pickup', 'depart', 'arrive_for_delivery', 'deliver', 'fail_delivery', 'direct_handover']);
+/** The Sales Order shipping method meaning "the customer takes the goods at the company's own counter" - no driver, route, carrier or custody leg (see `isDirectSale`). Compared by value so Shipment never imports Sales' domain file. */
+const DIRECT_SALE_METHOD = 'direct_sale';
 const CUSTODY_ACCOUNT_TYPE_CODE = 'custody';
 const SHIPPING_ORDER_DOCUMENT_TYPE = 'shipping_order';
 
@@ -122,14 +124,16 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     driverUserId: string | null,
     actorUserId: string,
     manager?: EntityManager,
+    /** Org engine Stage 2 — the custodian's branch, inherited by its custody sub-location and custody treasury account. */
+    orgUnitId: string | null = null,
   ): Promise<{ warehouseId: string; custodyAccountId: string }> {
     await this.numbering.registerDocumentType('shipping_sub_location', 'SLOC', false, manager);
     await this.numbering.registerDocumentType('shipping_custody_account', 'CUST', false, manager);
     const warehouseCode = await this.numbering.getNextNumber('shipping_sub_location', manager);
     const custodyCode = await this.numbering.getNextNumber('shipping_custody_account', manager);
 
-    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational', manager);
-    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(manager), actorUserId, manager);
+    const warehouse = await this.inventory.createWarehouse(warehouseCode, displayName, null, driverUserId, parentWarehouseId, 'operational', manager, orgUnitId);
+    const custodyAccount = await this.treasury.createAccount(custodyCode, `${displayName} — عهدة`, await this.getCustodyAccountTypeId(manager), actorUserId, manager, orgUnitId);
     return { warehouseId: warehouse.id, custodyAccountId: custodyAccount.id };
   }
 
@@ -197,6 +201,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
           vehicleId,
           rshNumber,
           salesOrderId: fulfillmentOrder.salesOrderId,
+          branchOrgUnitId: orderSnapshot?.branchOrgUnitId ?? null, // Org engine Stage 5 — inherited from the sales order
           salesOrderNumber: orderSnapshot?.orderNumber ?? null,
           salesRepUserId: orderSnapshot?.salesRepUserId ?? null,
         }),
@@ -270,11 +275,29 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     return (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { salesOrderId } });
   }
 
+  /**
+   * Direct sale from the company - the owning Sales Order's shipping method is `direct_sale`. Derived live from the order
+   * (single source of truth, no second copy on the shipment to drift); a legacy shipment without an order is never one.
+   */
+  async isDirectSale(shipmentId: string, manager?: EntityManager): Promise<boolean> {
+    const shipment = await (manager ?? this.dataSource).getRepository(Shipment).findOne({ where: { id: shipmentId } });
+    if (!shipment?.salesOrderId) return false;
+    const order = await this.salesOrders.getOrderSnapshot(shipment.salesOrderId, manager);
+    return order?.shippingMethod === DIRECT_SALE_METHOD;
+  }
+
+  private async assertNotDirectSale(shipmentId: string, what: string, manager?: EntityManager): Promise<void> {
+    if (await this.isDirectSale(shipmentId, manager)) {
+      throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - ${what} does not apply (the goods are handed over at the company's own counter).`);
+    }
+  }
+
   async assignDriver(shipmentId: string, driverUserId: string, actorUserId: string, manager?: EntityManager): Promise<string> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     if (!access.allows('logistics.shipment.assign_driver')) {
       throw new ForbiddenException('Only a dispatcher/admin may assign a driver to a shipment.');
     }
+    await this.assertNotDirectSale(shipmentId, 'assigning a driver', manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
@@ -318,6 +341,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     if (shippingCompanyId && vehicleId) {
       throw new BadRequestException('A shipment is routed through a shipping company or a vehicle, never both.');
     }
+    if (shippingCompanyId || vehicleId) await this.assertNotDirectSale(shipmentId, 'routing through a shipping company or vehicle', manager);
 
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
@@ -389,6 +413,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     manager?: EntityManager,
   ): Promise<Shipment> {
     await this.assertDriverOrAdmin(shipmentId, actorUserId, manager);
+    await this.assertNotDirectSale(shipmentId, 'a carrier waybill', manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipment = await repo.findOne({ where: { id: shipmentId } });
     if (!shipment) throw new NotFoundException(`Shipment "${shipmentId}" not found.`);
@@ -440,7 +465,9 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const isAssignedDriver = shipment.driverUserId === actorUserId;
     const isAdmin = access.allows('logistics.shipment.act_any');
-    if (!isAssignedDriver && !isAdmin) {
+    // A direct sale has no driver at all: the hand-over (and any collection) is done at the company's counter, so the warehouse staff who work the shipments board may act as well as an admin.
+    const isCounterStaff = !isAssignedDriver && !isAdmin && access.allows('logistics.shipment.board_all') && (await this.isDirectSale(shipmentId, manager));
+    if (!isAssignedDriver && !isAdmin && !isCounterStaff) {
       throw new ForbiddenException('Only the assigned driver (or an admin) may act on this shipment.');
     }
   }
@@ -515,6 +542,15 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       }
     }
 
+    // Direct sale from the company: the only lifecycle action is the counter hand-over; every driver/transit/failure action (and the hand-over on any other shipment) is refused up front.
+    const directSale = await this.isDirectSale(shipmentId, manager);
+    if (directSale && action !== 'direct_handover') {
+      throw new ConflictException(`Shipment "${shipmentId}" belongs to a direct sale from the company - action "${action}" does not apply; it is completed by the counter hand-over.`);
+    }
+    if (!directSale && action === 'direct_handover') {
+      throw new ConflictException(`Shipment "${shipmentId}" is not a direct sale from the company - the counter hand-over does not apply.`);
+    }
+
     const run = async (m: EntityManager): Promise<string> => {
       await this.processEngine.transition(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, action, actorUserId, m);
       const newState = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, shipmentId, m);
@@ -553,7 +589,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async listShipments(
     actorUserId: string,
     manager?: EntityManager,
-  ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>> {
+  ): Promise<Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }>> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const repo = (manager ?? this.dataSource).getRepository(Shipment);
     const shipments = access.allows('logistics.shipment.board_all')
@@ -589,12 +625,12 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     s: Shipment,
     repNameById: Map<string, string>,
     manager?: EntityManager,
-  ): Promise<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }> {
+  ): Promise<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }> {
     const state = await this.processEngine.getState(SHIPMENT_PROCESS, ENTITY_TYPE, s.id, manager);
     const salesRepName = s.salesRepUserId ? repNameById.get(s.salesRepUserId) ?? null : null;
-    if (!s.salesOrderId) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
+    if (!s.salesOrderId) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName, shippingMethod: null };
     const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
-    if (!order) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName };
+    if (!order) return { ...s, state, customerName: null, governorate: null, totalAmount: null, salesRepName, shippingMethod: null };
     const customer = await this.customers.getCustomerSnapshot(order.customerId, manager);
     return {
       ...s,
@@ -603,7 +639,63 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       governorate: customer?.governorate ?? null,
       totalAmount: order.totalAmount,
       salesRepName,
+      shippingMethod: order.shippingMethod ?? null,
     };
+  }
+
+  /**
+   * Vehicle Driver Workspace, Stage C / F-4 (2026-10-22) — the shipments of ONE vehicle, filtered on the server (the board read had no vehicle filter, so the screen downloaded every
+   * shipment and filtered in the browser). Same scope rule as the board: whoever may see every shipment of the Company (`board_all`, `read_any`, `act_any`) gets all of this
+   * vehicle's shipments, everyone else only the ones they are the assigned driver of. States come from ONE batched read of the process instances (not one per row); newest
+   * first, capped at `limit` (default 300) with an explicit `truncated` flag so a cut-off list is never presented as complete. Read-only.
+   */
+  async listShipmentsForVehicle(
+    vehicleId: string,
+    actorUserId: string,
+    opts: { limit?: number } = {},
+    manager?: EntityManager,
+  ): Promise<{ rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null }>; truncated: boolean }> {
+    const limit = Math.min(500, Math.max(1, opts.limit ?? 300));
+    const runner = manager ?? this.dataSource;
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const seesAll = access.allows('logistics.shipment.board_all') || access.allows('logistics.shipment.read_any') || access.allows('logistics.shipment.act_any');
+    const found = await runner.getRepository(Shipment).find({
+      where: seesAll ? { vehicleId } : { vehicleId, driverUserId: actorUserId },
+      order: { createdAt: 'DESC' },
+      take: limit + 1,
+    });
+    const truncated = found.length > limit;
+    const shipments = truncated ? found.slice(0, limit) : found;
+    const stateRows: Array<{ id: string; state: string }> = shipments.length
+      ? await runner.query(
+          `SELECT "entityId"::text AS id, "currentState" AS state FROM "process_instances" WHERE "definitionKey" = $1 AND "entityType" = $2 AND "entityId"::text = ANY($3::text[])`,
+          [SHIPMENT_PROCESS.key, ENTITY_TYPE, shipments.map((s) => s.id)],
+        )
+      : [];
+    const stateById = new Map(stateRows.map((r) => [r.id, r.state]));
+    const orderCache = new Map<string, { customerName: string | null; governorate: string | null; totalAmount: string | null }>();
+    const rows = [];
+    for (const s of shipments) {
+      let extra = { customerName: null as string | null, governorate: null as string | null, totalAmount: null as string | null };
+      if (s.salesOrderId) {
+        const cached = orderCache.get(s.salesOrderId);
+        if (cached) extra = cached;
+        else {
+          const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
+          const customer = order ? await this.customers.getCustomerSnapshot(order.customerId, manager) : null;
+          extra = { customerName: customer?.name ?? null, governorate: customer?.governorate ?? null, totalAmount: order?.totalAmount ?? null };
+          orderCache.set(s.salesOrderId, extra);
+        }
+      }
+      rows.push({ ...s, state: stateById.get(s.id) ?? 'created', ...extra });
+    }
+    return { rows, truncated };
+  }
+
+  /** F-3: a driver's display NAME (and nothing else about the user) for the workspace header — resolved on the server so the screen needs no user-list permission. */
+  async getUserDisplayName(userId: string): Promise<string | null> {
+    const found = await this.users.findByIds([userId]);
+    return found[0]?.fullName ?? null;
   }
 
   private async buildUserNameMap(): Promise<Map<string, string>> {
@@ -628,7 +720,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     options: { page: number; pageSize: number },
     manager?: EntityManager,
   ): Promise<{
-    rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null }>;
+    rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null; salesRepName: string | null; shippingMethod: string | null }>;
     total: number;
   }> {
     const access = await this.authorization.workflowAccess(actorUserId, manager);
@@ -769,6 +861,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     fulfillmentOrderId: string;
     shippingCompanyId: string | null;
     vehicleId: string | null;
+    driverUserId: string | null;
     codAmount: string | null;
     salesOrderId: string | null;
   } | null> {
@@ -779,6 +872,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       fulfillmentOrderId: shipment.fulfillmentOrderId,
       shippingCompanyId: shipment.shippingCompanyId,
       vehicleId: shipment.vehicleId,
+      driverUserId: shipment.driverUserId,
       codAmount: shipment.codAmount,
       // Returns Engine Phase B — `Shipment.salesOrderId` already exists on
       // the entity (RSH migration) but this snapshot never surfaced it,
@@ -923,6 +1017,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   ): Promise<ShippingCompany> {
     const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
     const company = await this.getShippingCompany(shippingCompanyId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     const before = { treasuryAccountId: company.treasuryAccountId };
     company.treasuryAccountId = treasuryAccountId;
     const saved = await repo.save(company);
@@ -981,6 +1076,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     actorUserId: string,
     parentWarehouseId: string | null = null,
     manager?: EntityManager,
+    /** Org engine Stage 2 — the VALIDATED branch (resolved by `OrgContextService`); `null` for a Company without branches. */
+    orgUnitId: string | null = null,
   ): Promise<Vehicle> {
     const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const existing = await repo.findOne({ where: { code } });
@@ -993,7 +1090,8 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         plateNumber,
         driverUserId,
         shippingCompanyId,
-        branch,
+        branch: orgUnitId ? await this.branchNameOf(orgUnitId, manager) : branch, // legacy text mirrors the branch name once a branch is assigned
+        orgUnitId,
         warehouseId: null,
         custodyAccountId: null,
         settlementAccountId: null,
@@ -1008,6 +1106,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       driverUserId,
       actorUserId,
       manager,
+      orgUnitId,
     );
     saved.warehouseId = warehouseId;
     saved.custodyAccountId = custodyAccountId;
@@ -1022,7 +1121,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         resourceId: saved.id,
         result: 'success',
         correlationId: null,
-        after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId },
+        after: { code, plateNumber, shippingCompanyId, warehouseId, custodyAccountId, orgUnitId },
       },
       manager,
     );
@@ -1039,13 +1138,35 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     return vehicle;
   }
 
-  /** CTO directive §2 — "تعديل" (edit): plate number and branch. Driver changes go through `setVehicleDriver` (its own audited action). */
-  async updateVehicle(vehicleId: string, updates: { plateNumber?: string; branch?: string | null }, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
-    const repo = (manager ?? this.dataSource).getRepository(Vehicle);
+  private async branchNameOf(orgUnitId: string, manager?: EntityManager): Promise<string | null> {
+    const rows: Array<{ name: string }> = await (manager ?? this.dataSource).query(`SELECT "name" FROM "org_units" WHERE "id" = $1`, [orgUnitId]);
+    return rows[0]?.name ?? null;
+  }
+
+  /**
+   * CTO directive §2 — "تعديل" (edit): plate number and branch. Driver changes go through `setVehicleDriver` (its own audited action).
+   * Org engine Stage 2: `orgUnitId` is the VALIDATED branch (resolved by the controller); a change is propagated to the vehicle's custody sub-location and custody
+   * treasury account so custody stays inside the branch. The legacy `branch` text is only accepted for a vehicle in a Company without branches (resolved `orgUnitId` null).
+   */
+  async updateVehicle(
+    vehicleId: string,
+    updates: { plateNumber?: string; branch?: string | null; orgUnitId?: string | null },
+    actorUserId: string,
+    manager?: EntityManager,
+  ): Promise<Vehicle> {
+    const runner = manager ?? this.dataSource;
+    const repo = runner.getRepository(Vehicle);
     const vehicle = await this.getVehicle(vehicleId, manager);
-    const before = { plateNumber: vehicle.plateNumber, branch: vehicle.branch };
+    const before = { plateNumber: vehicle.plateNumber, branch: vehicle.branch, orgUnitId: vehicle.orgUnitId };
     if (updates.plateNumber !== undefined) vehicle.plateNumber = updates.plateNumber;
-    if (updates.branch !== undefined) vehicle.branch = updates.branch;
+    if (updates.orgUnitId !== undefined && updates.orgUnitId !== vehicle.orgUnitId) {
+      vehicle.orgUnitId = updates.orgUnitId;
+      if (updates.orgUnitId) vehicle.branch = await this.branchNameOf(updates.orgUnitId, manager);
+      if (vehicle.warehouseId) await runner.query(`UPDATE "warehouses" SET "orgUnitId" = $1 WHERE "id" = $2`, [updates.orgUnitId, vehicle.warehouseId]);
+      if (vehicle.custodyAccountId) await runner.query(`UPDATE "treasury_accounts" SET "orgUnitId" = $1 WHERE "id" = $2`, [updates.orgUnitId, vehicle.custodyAccountId]);
+    } else if (updates.branch !== undefined && !vehicle.orgUnitId) {
+      vehicle.branch = updates.branch;
+    }
     const saved = await repo.save(vehicle);
     await this.audit.record(
       {
@@ -1057,11 +1178,35 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         result: 'success',
         correlationId: null,
         before,
-        after: updates,
+        after: { plateNumber: saved.plateNumber, branch: saved.branch, orgUnitId: saved.orgUnitId },
       },
       manager,
     );
     return saved;
+  }
+
+  /**
+   * Legacy mapping report (org engine D-8). For every vehicle that still has no validated branch: the old free text and what it could correspond to. NOTHING is applied
+   * here — `proposed` (one active branch has exactly that name) still needs an owner to confirm through the normal edit; `ambiguous` / `unmatched` / `no_text` are never guessed.
+   */
+  async vehicleBranchMappingReport(manager?: EntityManager): Promise<{
+    branchesAvailable: number;
+    rows: Array<{ vehicleId: string; code: string; plateNumber: string; legacyText: string | null; status: 'proposed' | 'ambiguous' | 'unmatched' | 'no_text'; candidates: Array<{ id: string; name: string }> }>;
+  }> {
+    const runner = manager ?? this.dataSource;
+    const vehicles = await runner.getRepository(Vehicle).find({ order: { code: 'ASC' } });
+    const branches: Array<{ id: string; name: string }> = await runner.query(`SELECT "id","name" FROM "org_units" WHERE "type" = 'branch' AND "status" = 'active'`);
+    const norm = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+    const rows = vehicles
+      .filter((v) => !v.orgUnitId)
+      .map((v) => {
+        const text = v.branch && v.branch.trim() ? v.branch : null;
+        if (!text) return { vehicleId: v.id, code: v.code, plateNumber: v.plateNumber, legacyText: null, status: 'no_text' as const, candidates: [] };
+        const candidates = branches.filter((b) => norm(b.name) === norm(text));
+        const status = candidates.length === 1 ? ('proposed' as const) : candidates.length > 1 ? ('ambiguous' as const) : ('unmatched' as const);
+        return { vehicleId: v.id, code: v.code, plateNumber: v.plateNumber, legacyText: text, status, candidates };
+      });
+    return { branchesAvailable: branches.length, rows };
   }
 
   /** CTO directive §2 — "تغيير السائق" (change driver), its own explicit action distinct from a general edit. */
@@ -1114,6 +1259,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async setVehicleSettlementAccount(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
     const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const vehicle = await this.getVehicle(vehicleId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     vehicle.settlementAccountId = treasuryAccountId;
     const saved = await repo.save(vehicle);
     await this.audit.record(
@@ -1127,6 +1273,64 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         correlationId: null,
         after: { treasuryAccountId },
       },
+      manager,
+    );
+    return saved;
+  }
+
+  /**
+   * Separate EXPENSE FLOAT (CTO policy 2026-10-26): assign the Treasury account a vehicle's driver expenses are paid from. Fail closed - the account must exist, be active, GL-mapped, of type
+   * `cash`, and must not be (or be used as) any collection custody account, settlement account, shipping-company account or another vehicle's float: expenses can never reach customer
+   * collections. Unassigning is refused while the float still holds money or a claim is waiting. Funding / replenishment are ordinary Treasury transfer documents.
+   */
+  /** Collections can never be settled into a driver expense float: a settlement / company account may not be any vehicle's float. */
+  async assertNotAnExpenseFloat(treasuryAccountId: string | null, manager?: EntityManager): Promise<void> {
+    if (!treasuryAccountId) return;
+    const rows: Array<{ n: number }> = await (manager ?? this.dataSource).query(`SELECT count(*)::int AS n FROM "vehicles" WHERE "expenseFloatAccountId" = $1`, [treasuryAccountId]);
+    if (rows[0].n > 0) throw new ConflictException('This account is a vehicle expense float - customer collections can never be settled into it.');
+  }
+
+  async setVehicleExpenseFloat(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const m = manager ?? this.dataSource.manager;
+    const vehicle = await this.getVehicle(vehicleId, m);
+    if (treasuryAccountId === null) {
+      if (vehicle.expenseFloatAccountId) {
+        const { balances } = await this.treasury.getAllTreasuryBalances(undefined, m);
+        const bal = balances.find((b) => b.treasuryAccountId === vehicle.expenseFloatAccountId)?.balance ?? '0.00';
+        if (Math.round(Number(bal) * 100) !== 0) throw new ConflictException(`The expense float still holds ${bal} - return it to a company account (a transfer document) before unassigning it.`);
+        const open: Array<{ n: number }> = await m.query(`SELECT count(*)::int AS n FROM "custody_expenses" WHERE "vehicleId" = $1 AND "status" IN ('pending_approval','approved')`, [vehicleId]);
+        if (open[0].n > 0) throw new ConflictException('There are expense claims waiting for approval or posting on this float - finish or cancel them first.');
+      }
+    } else {
+      const acct: Array<{ status: string; glAccountCode: string | null; type: string }> = await m.query(
+        `SELECT a."status", a."glAccountCode", t."code" AS type FROM "treasury_accounts" a JOIN "treasury_account_types" t ON t.id = a."accountTypeId" WHERE a.id = $1`,
+        [treasuryAccountId],
+      );
+      if (acct.length === 0) throw new NotFoundException(`Treasury account "${treasuryAccountId}" not found.`);
+      if (acct[0].status !== 'active') throw new ConflictException('The expense float account is inactive.');
+      if (!acct[0].glAccountCode?.trim()) throw new ConflictException('The expense float account is not GL-mapped - Accounting must map it first.');
+      const clash: Array<{ n: number }> = await m.query(
+        `SELECT (SELECT count(*) FROM "vehicles" WHERE ("custodyAccountId" = $1 OR "settlementAccountId" = $1 OR "expenseFloatAccountId" = $1) AND id <> $2)
+              + (SELECT count(*) FROM "shipping_companies" WHERE "custodyAccountId" = $1 OR "treasuryAccountId" = $1) AS n`,
+        [treasuryAccountId, vehicleId],
+      );
+      if (Number(clash[0].n) > 0) throw new ConflictException('This account is already used as a collection custody / settlement account or as another vehicle\'s float - an expense float must be its own account.');
+      if (vehicle.custodyAccountId === treasuryAccountId || vehicle.settlementAccountId === treasuryAccountId) {
+        throw new ConflictException('The expense float cannot be the vehicle\'s own collection custody or settlement account.');
+      }
+      if (acct[0].type !== 'cash') throw new ConflictException(`The expense float must be a cash account (this one is "${acct[0].type}").`);
+    }
+    vehicle.expenseFloatAccountId = treasuryAccountId;
+    let saved: Vehicle;
+    try {
+      saved = await m.getRepository(Vehicle).save(vehicle);
+    } catch (e) {
+      // the database backstops (unique float per vehicle, float never a collection account) win a race the checks above could not see
+      if ((e as { code?: string }).code === '23505' || (e as { code?: string }).code === '23514') throw new ConflictException('This account cannot be this vehicle\'s expense float (already another vehicle\'s float, or a collection account).');
+      throw e;
+    }
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'shipment.vehicle.expense_float_set', resource: 'vehicle', resourceId: vehicleId, result: 'success', correlationId: null, after: { treasuryAccountId } },
       manager,
     );
     return saved;

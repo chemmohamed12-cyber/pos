@@ -129,3 +129,11 @@ src/domains/procurement/interface/procurement-purchase-return.company-isolation.
 src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts
 src/foundation/release/company-schema-check.real-pg.spec.ts
 src/foundation/database-registry/company-schema-admission.real-pg.spec.ts
+src/foundation/organization/organization-integrity.real-pg.spec.ts
+src/domains/shipment/interface/vehicle-branch.real-pg.spec.ts
+src/foundation/scope/org-context.real-pg.spec.ts
+src/domains/inventory-warehouse/interface/warehouse-branch.real-pg.spec.ts
+src/domains/sales-orders/interface/branch-stamping.real-pg.spec.ts
+src/domains/procurement/interface/procurement-branch.real-pg.spec.ts
+src/domains/reports/interface/org-report.real-pg.spec.ts
+src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts

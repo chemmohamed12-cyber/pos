@@ -101,13 +101,16 @@ export class TreasuryService implements FinanceTreasuryContract {
     return type;
   }
 
-  async createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager): Promise<TreasuryAccount> {
+  async createAccount(code: string, name: string, accountTypeId: string, actorUserId: string, manager?: EntityManager, orgUnitId: string | null = null): Promise<TreasuryAccount> {
     const repo = (manager ?? this.dataSource).getRepository(TreasuryAccount);
     const existing = await repo.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Treasury account code "${code}" is already in use.`);
     await this.getAccountType(accountTypeId, manager); // 404s if the type doesn't exist — never silently accept an orphan type id
 
-    const saved = await repo.save(repo.create({ code, name, accountTypeId }));
+    if (orgUnitId && !(await (manager ?? this.dataSource).query(`SELECT 1 FROM "org_units" WHERE "id" = $1`, [orgUnitId])).length) {
+      throw new BadRequestException(`Organization unit "${orgUnitId}" not found.`);
+    }
+    const saved = await repo.save(repo.create({ code, name, accountTypeId, orgUnitId }));
     await this.audit.record(
       {
         actorUserId,
@@ -749,6 +752,29 @@ export class TreasuryService implements FinanceTreasuryContract {
    * `TreasuryService` directly. Same non-emitting contract semantics and
    * additive `manager?` as `cashOut`/`cashIn`.
    */
+  async cashOutForCustodyExpense(
+    accountId: string,
+    amount: string,
+    reference: string | null,
+    reason: string | null,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<TreasuryTransaction> {
+    return this.cashOutDirect(accountId, amount, null, null, reference, reason, actorUserId, manager, counter);
+  }
+
+  async reverseCustodyExpense(
+    transactionId: string,
+    reason: string,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<TreasuryTransaction> {
+    const legs = await this.reverseTransaction(transactionId, reason, actorUserId, manager, { ownerBypass: true, counter });
+    return legs[0];
+  }
+
   async cashOutForSupplier(
     accountId: string,
     amount: string,

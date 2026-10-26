@@ -526,18 +526,24 @@ describe('H3 — Release Engine migration selection / upgrade / undo / failure s
     });
 
     it('NEGATIVE CONTROL — the pre-fix 6-tag registry makes the same undo fail (proves this test detects the H3 registry defect)', async () => {
-      const rel = await mkRelease(env, filesFor(rootFull, N1_ONLY_IDS), randomUUID());
-      const fwd = makeService(env, rootFull);
-      await fwd.priv.runReleaseMigrations(rel, rootFull, discoverMigrationTags(rootFull));
+      // The control only proves anything when the NEWEST executed migration is one the pre-fix registry cannot load (accounting / manufacturing): `undoLastMigration` always
+      // reverts the newest executed migration first. A later release that adds migrations in old-registry tags (core, sales, inventory, logistics, finance, hr) newer than
+      // the N+1-only ones would otherwise let the old registry undo them successfully and the control would mis-fire (as it did when the org-engine migrations landed).
+      // So the control uses a tree cut off at the newest N+1-only migration.
+      const newestN1 = Math.max(...N1_ONLY_IDS.map(Number));
+      const rootCtl = buildTree((f) => Number(f.split('-')[0]) > newestN1);
+      const rel = await mkRelease(env, filesFor(rootCtl, N1_ONLY_IDS), randomUUID());
+      const fwd = makeService(env, rootCtl);
+      await fwd.priv.runReleaseMigrations(rel, rootCtl, discoverMigrationTags(rootCtl));
       const executedBeforeUndo = (await executedNames(env.ds)).length;
 
       const restore = { preflight: jest.fn(async () => ({ status: 'failed' })) };
-      const undo = makeService(env, rootFull, [], restore);
+      const undo = makeService(env, rootCtl, [], restore);
       await withOldRegistry(async () => {
         await expect(undo.priv.undoReleaseMigrations(rel, 'actor', null)).rejects.toThrow(/No migration .* was found in the source code/);
       });
       expect(restore.preflight).toHaveBeenCalledTimes(1);
-      expect((await executedNames(env.ds)).length).toBe(executedBeforeUndo);
+      expect((await executedNames(env.ds)).length).toBe(executedBeforeUndo); // nothing half-undone: the cut-off tree makes the newest executed migration one the pre-fix registry cannot load
       await undo.priv.undoReleaseMigrations(rel, 'actor', null); // the fixed registry resolves it
       expect((await executedNames(env.ds)).length).toBeLessThan(executedBeforeUndo);
     });

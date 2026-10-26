@@ -1,0 +1,17 @@
+127.0.0.1:5544/daii_test_h3reg_run  ALLOWED(business)
+127.0.0.1:5544/daii_test_h3reg_ambient  DENIED
+127.0.0.1:5544/daii_test_ambient  DENIED
+127.0.0.1:5544/daii_test_h3_ambient  DENIED
+127.0.0.1:5544/daii_test_fanout_ambient  DENIED
+127.0.0.1:5544/restore_old_daii_dev  DENIED
+127.0.0.1:5544/company_dabcc38172364032a8ed31a537c29027  DENIED
+127.0.0.1:5544/pool_b_663466  DENIED
+127.0.0.1:5544/rehearsal_fresh  DENIED
+127.0.0.1:5544/daii_dev  DENIED
+127.0.0.1:5544/daii_test_other  DENIED
+127.0.0.1:5544/postgres  DENIED
+127.0.0.1:5433/daii_test_h3reg_run  DENIED
+10.0.0.5:5544/daii_test_h3reg_run  DENIED
+localhost:5544/daii_test_h3reg_run  ALLOWED(business)
+127.0.0.1:5546/daii_test_h3reg_run  DENIED
+127.0.0.1:5546/daii_test_biz_t95_x  ALLOWED(business)

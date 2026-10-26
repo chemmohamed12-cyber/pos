@@ -100,12 +100,15 @@ import { SalesReturns } from './pages/SalesReturns';
 import { CustodyReturns } from './pages/CustodyReturns';
 import { CollectionSettlements } from './pages/CollectionSettlements';
 import { CustodianDetail } from './pages/CustodianDetail';
+import { VehicleWorkspace } from './pages/vehicle-workspace/VehicleWorkspace';
+import { VehiclePicker } from './pages/vehicle-workspace/VehiclePicker';
 import { Admin } from './pages/Admin';
 import { Approvals } from './pages/Approvals';
 import { PendingWork } from './pages/PendingWork';
 import { Guide } from './pages/Guide';
 import { ReleaseCenter } from './pages/ReleaseCenter';
 import { Organization } from './pages/Organization';
+import { OrganizationReport } from './pages/OrganizationReport';
 import { CompanyUsers } from './pages/CompanyUsers';
 import { CompanyRoles } from './pages/CompanyRoles';
 import { AcceptInvitation } from './pages/AcceptInvitation';
@@ -250,6 +253,7 @@ function AppRoutes() {
         <Route path="guide" element={<Guide />} />
         <Route path="release-center" element={<ReleaseCenter />} />
         <Route path="organization" element={<Organization />} />
+        <Route path="organization/report" element={<OrganizationReport />} />
         <Route path="company-users" element={<CompanyUsers />} />
         <Route path="company-roles" element={<CompanyRoles />} />
         <Route path="reports-overview" element={<ReportsCover />} />
@@ -330,6 +334,10 @@ function AppRoutes() {
         <Route path="control-plane/companies/new" element={<CreateCompany />} />
         <Route path="control-plane/companies/:id" element={<CompanyDetails />} />
       </Route>
+      {/* Vehicle Driver Workspace (Stage B): a full-screen, mobile-first operational screen — auth-gated, deliberately outside <Layout> so a phone gets the whole viewport (no sidebar). */}
+      <Route path="my-vehicle" element={<RequireAuth><VehiclePicker mine /></RequireAuth>} />
+      <Route path="vehicle-workspace" element={<RequireAuth><VehiclePicker /></RequireAuth>} />
+      <Route path="vehicle-workspace/:vehicleId" element={<RequireAuth><VehicleWorkspace /></RequireAuth>} />
       {/* Print routes: auth-gated, but deliberately outside <Layout> — no sidebar/topbar chrome on a printed document. */}
       <Route path="print/sales-order/:id" element={<RequireAuth><SalesOrderPrint /></RequireAuth>} />
       <Route path="print/waybill/:id" element={<RequireAuth><WaybillPrint /></RequireAuth>} />

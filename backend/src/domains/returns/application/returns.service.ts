@@ -176,7 +176,7 @@ export class ReturnsService implements LogisticsReturnsContract {
     // perform in the common case (COD only ever posts at actual delivery,
     // `DeliveryService.recordCollection`) — but if collection already
     // happened, reject outright rather than silently mishandle money.
-    const existingCollection = await this.delivery.getCollectionForShipmentUnscoped(shipmentId, manager);
+    const existingCollection = (await this.delivery.listCollectionsForShipmentUnscoped(shipmentId, manager)).find((c) => c.verificationStatus !== 'rejected');
     if (existingCollection) {
       throw new ConflictException(
         `Shipment "${shipmentId}" already has a COD collection recorded (${existingCollection.id}) — a custody return after collection requires manual finance reconciliation and is not supported here.`,

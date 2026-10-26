@@ -75,3 +75,4 @@ src/foundation/release/release.controller.company-migrations.spec.ts
 src/foundation/release/company-catch-up.service.spec.ts
 src/foundation/release/release-operation-lock.spec.ts
 src/foundation/database-registry/company-schema-admission.spec.ts
+src/domains/shipment/domain/shipment-process.direct-handover.spec.ts

@@ -1,0 +1,59 @@
+{
+ "at": "2026-10-22T05:48:35.398Z",
+ "results": [
+  {
+   "n": "driver sees only own shipments (not the other driver's, not the unassigned one)",
+   "pass": true,
+   "d": "9 of 12"
+  },
+  {
+   "n": "another driver's shipment detail refused",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "another driver's tracking refused",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "another driver's shipment cannot be moved (pickup)",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "another driver's shipment cannot get an outcome",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "another driver's collection record cannot be read",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "invalid transition refused by the server (pickup on an out_for_delivery shipment)",
+   "pass": true,
+   "d": "409 {\"success\":false,\"error\":{\"code\":\"CONFLICT\",\"message\":\"Action \\\"pickup\\\" is not "
+  },
+  {
+   "n": "unknown action refused",
+   "pass": true,
+   "d": 403
+  },
+  {
+   "n": "a driver cannot use a non-driver action (return_to_sender)",
+   "pass": true,
+   "d": ""
+  },
+  {
+   "n": "all refused attempts changed no shipment state",
+   "pass": true,
+   "d": ""
+  }
+ ],
+ "findings": {
+  "otherVehicleOverviewStatus": 200,
+  "vehicleListStatus": 200
+ }
+}

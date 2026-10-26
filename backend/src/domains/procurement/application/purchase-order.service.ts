@@ -41,7 +41,7 @@ export class PurchaseOrderService {
     private readonly numbering: NumberingService,
     private readonly audit: AuditService,
     private readonly lifecycleGate: ProductLifecycleGate,
-    @Inject(INVENTORY_RESERVATION_CONTRACT) private readonly warehouses: Pick<InventoryReservationContract, 'getWarehouse'>,
+    @Inject(INVENTORY_RESERVATION_CONTRACT) private readonly warehouses: Pick<InventoryReservationContract, 'getWarehouse' | 'getWarehouseBranchId'>,
   ) {}
 
   private async statesFor(ids: string[], manager?: EntityManager): Promise<Map<string, string>> {
@@ -75,6 +75,8 @@ export class PurchaseOrderService {
     if (supplier.status !== 'active') throw new ConflictException(`Supplier "${supplier.legalName}" is inactive — cannot raise a Purchase Order against it.`);
     // `purchase_orders.warehouseId` has no FK — an unknown warehouse is rejected (404) before any mutation, same as an unknown supplier above.
     await this.warehouses.getWarehouse(input.warehouseId, externalManager);
+    // Org engine Stage 6 — the PO's organizational reference is the ordering warehouse's owning branch (server-derived; `null` for an unassigned warehouse).
+    const orgUnitId = await this.warehouses.getWarehouseBranchId(input.warehouseId, externalManager);
 
     // D7 as amended by CR-2026-10-15: every item must exist and be active (before any mutation; a missing id is a 409, never a raw FK error).
     await this.lifecycleGate.assertEligible(input.lines.map((l) => l.productId), ['active'], 'Cannot create this Purchase Order', externalManager);
@@ -101,6 +103,7 @@ export class PurchaseOrderService {
           poNumber,
           supplierId: input.supplierId,
           warehouseId: input.warehouseId,
+          orgUnitId,
           totalAmountBase: totalAmountBase.toFixed(2),
           notes: input.notes ?? null,
           sourceRfqId: input.sourceRfqId ?? null,

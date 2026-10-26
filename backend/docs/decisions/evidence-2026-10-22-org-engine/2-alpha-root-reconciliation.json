@@ -1,0 +1,97 @@
+{
+ "mode": "APPLY",
+ "before": [
+  {
+   "id": "06a2b8cf-8ad2-4f6d-993c-3db97634ede8",
+   "type": "company",
+   "name": "mother",
+   "parentId": null,
+   "status": "active"
+  },
+  {
+   "id": "8efbebac-192f-459e-a49a-8f5637bc1a83",
+   "type": "branch",
+   "name": "rana",
+   "parentId": "06a2b8cf-8ad2-4f6d-993c-3db97634ede8",
+   "status": "active"
+  },
+  {
+   "id": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "type": "company",
+   "name": "Daii",
+   "parentId": null,
+   "status": "active"
+  },
+  {
+   "id": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+   "type": "branch",
+   "name": "ﬂ «„Â",
+   "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "status": "active"
+  },
+  {
+   "id": "b4b67729-2d97-4353-a047-a5d150867388",
+   "type": "branch",
+   "name": "ÿ‰ÿ«",
+   "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "status": "active"
+  }
+ ],
+ "report": {
+  "canonicalId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+  "renamedTo": "÷Ï",
+  "movedChildren": [
+   {
+    "id": "8efbebac-192f-459e-a49a-8f5637bc1a83",
+    "name": "rana",
+    "from": "mother"
+   }
+  ],
+  "archivedRoots": [
+   {
+    "id": "06a2b8cf-8ad2-4f6d-993c-3db97634ede8",
+    "name": "mother"
+   }
+  ],
+  "dryRun": false
+ },
+ "after": [
+  {
+   "id": "06a2b8cf-8ad2-4f6d-993c-3db97634ede8",
+   "type": "company",
+   "name": "mother",
+   "parentId": null,
+   "status": "archived"
+  },
+  {
+   "id": "8efbebac-192f-459e-a49a-8f5637bc1a83",
+   "type": "branch",
+   "name": "rana",
+   "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "status": "active"
+  },
+  {
+   "id": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "type": "company",
+   "name": "÷Ï",
+   "parentId": null,
+   "status": "active"
+  },
+  {
+   "id": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+   "type": "branch",
+   "name": "ﬂ «„Â",
+   "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "status": "active"
+  },
+  {
+   "id": "b4b67729-2d97-4353-a047-a5d150867388",
+   "type": "branch",
+   "name": "ÿ‰ÿ«",
+   "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+   "status": "active"
+  }
+ ],
+ "singleRootIndex": true
+}
+

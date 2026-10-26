@@ -14,6 +14,7 @@ import { InventoryService } from '../../inventory-warehouse/application/inventor
 import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../../foundation/module-registry/contracts/inventory-events.contract';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { warehouseBranchOf } from './procurement-org';
 
 const ENTITY_TYPE = 'purchase_return';
 const DOCUMENT_TYPE = 'purchase_return';
@@ -275,7 +276,7 @@ export class PurchaseReturnService {
       await this.events.publish(m, AP_EVENT_TOPICS.purchaseReturnPosted, {
         idempotencyKey: `procurement:purchase_return:${id}:posted`,
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: await warehouseBranchOf(m, doc.warehouseId),
         currency: 'EGP',
         sourceEntityType: 'purchase_return' as const,
         sourceEntityId: id,
