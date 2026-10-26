@@ -408,9 +408,20 @@ export class ShipmentController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Get('vehicles/:id/expense-float-candidates')
+  async expenseFloatCandidates(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
+    const rows = await this.shipments.listExpenseFloatCandidates(id, req.companyContext.dataSource.manager);
+    return (await this.orgContext.filterVisible(req, rows)).map((r) => ({ id: r.id, code: r.code, name: r.name }));
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
   @Post('vehicles/:id/expense-float')
   async setVehicleExpenseFloat(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SetVehicleExpenseFloatDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.assertVehicleInScope(req, id);
     return this.shipments.setVehicleExpenseFloat(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 

@@ -348,6 +348,10 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     await expect(shipmentSvc.setVehicleExpenseFloat(v, floatA, claimant, m)).rejects.toThrow(/already used as a collection custody \/ settlement account or as another vehicle/);
     const ok = (await treasury.createAccount('C3-FLOAT2', 'float 2', types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
     await treasury.setAccountGlMapping(ok, '1195', claimant, dsA.manager);
+    // the picker's candidate list (integration 2026-10-26) offers exactly what the assignment rule accepts: the new cash account yes; bank / unmapped / custody / this vehicle's settlement / another vehicle's float no
+    const candidates = (await shipmentSvc.listExpenseFloatCandidates(v, m)).map((c) => c.id);
+    expect(candidates).toContain(ok);
+    for (const refused of [bank, bare, custodyA, cashA, floatA]) expect(candidates).not.toContain(refused);
     expect((await shipmentSvc.setVehicleExpenseFloat(v, ok, claimant, m)).expenseFloatAccountId).toBe(ok);
     await treasury.transferDirect(cashA, ok, '25.00', 'fund', 'seed', claimant, m);
     await expect(shipmentSvc.setVehicleExpenseFloat(v, null, claimant, m)).rejects.toThrow(/still holds 25.00/);

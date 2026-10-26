@@ -164,9 +164,13 @@ describe('Vehicle branch — validated organizational reference (real Postgres)'
     await expect(controller.setVehicleStatus(req(dsA), cairoVehicle, { status: 'retired' } as never)).rejects.toThrow(/Not Found/i);
     await expect(controller.getVehicleOverview(req(dsA), cairoVehicle)).rejects.toThrow(/Not Found/i);
     await expect(controller.updateVehicle(req(dsA), cairoVehicle, { plateNumber: 'HACK' } as never)).rejects.toThrow(/Not Found/i);
+    // integration audit 2026-10-26: the expense-float routes keep the branch scope too (assigning a float to / listing candidates for another branch's vehicle -> 404, nothing changes)
+    await expect(controller.setVehicleExpenseFloat(req(dsA), cairoVehicle, { treasuryAccountId: null } as never)).rejects.toThrow(/Not Found/i);
+    await expect(controller.expenseFloatCandidates(req(dsA), cairoVehicle)).rejects.toThrow(/Not Found/i);
     expect((await q(dsA, `SELECT status, "plateNumber" FROM vehicles WHERE id = $1`, [cairoVehicle]))[0]).toEqual({ status: 'active', plateNumber: 'F 1' });
     scope = unrestricted();
     expect((await controller.listVehicles(req(dsA))).map((v) => v.code)).toContain('V-CAIRO-2');
+    expect(await controller.expenseFloatCandidates(req(dsA), cairoVehicle)).toEqual(expect.any(Array)); // in scope again: answered (the list itself is proven by the float-candidates spec)
   });
 
   it('Company B is untouched by all of the above', async () => {

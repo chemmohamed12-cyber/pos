@@ -1290,6 +1290,26 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     if (rows[0].n > 0) throw new ConflictException('This account is a vehicle expense float - customer collections can never be settled into it.');
   }
 
+  /**
+   * The accounts `setVehicleExpenseFloat` WOULD accept for this vehicle (read-only, for the picker): active, GL-mapped, type `cash`, and not any collection custody / settlement / shipping-company
+   * account or another vehicle's float, nor this vehicle's own custody / settlement account. The assignment itself re-validates everything (and the database constraints still backstop it) - this list
+   * only keeps the screen from offering accounts the service would refuse.
+   */
+  async listExpenseFloatCandidates(vehicleId: string, manager?: EntityManager): Promise<Array<{ id: string; code: string; name: string; orgUnitId: string | null }>> {
+    const m = manager ?? this.dataSource.manager;
+    const vehicle = await this.getVehicle(vehicleId, m);
+    return m.query(
+      `SELECT a."id", a."code", a."name", a."orgUnitId"
+         FROM "treasury_accounts" a JOIN "treasury_account_types" t ON t."id" = a."accountTypeId"
+        WHERE a."status" = 'active' AND t."code" = 'cash' AND btrim(coalesce(a."glAccountCode", '')) <> ''
+          AND NOT EXISTS (SELECT 1 FROM "vehicles" v WHERE (v."custodyAccountId" = a."id" OR v."settlementAccountId" = a."id" OR v."expenseFloatAccountId" = a."id") AND v."id" <> $1)
+          AND NOT EXISTS (SELECT 1 FROM "shipping_companies" c WHERE c."custodyAccountId" = a."id" OR c."treasuryAccountId" = a."id")
+          AND a."id" IS DISTINCT FROM $2::uuid AND a."id" IS DISTINCT FROM $3::uuid
+        ORDER BY a."code"`,
+      [vehicleId, vehicle.custodyAccountId ?? null, vehicle.settlementAccountId ?? null],
+    );
+  }
+
   async setVehicleExpenseFloat(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
     const m = manager ?? this.dataSource.manager;
     const vehicle = await this.getVehicle(vehicleId, m);
