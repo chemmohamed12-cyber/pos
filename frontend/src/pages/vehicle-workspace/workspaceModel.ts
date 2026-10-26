@@ -56,7 +56,7 @@ export function isOpen(state: string): boolean {
   return state !== 'delivered' && state !== 'returned';
 }
 
-export function filterByTab(shipments: readonly WsShipment[], key: TabKey): WsShipment[] {
+export function filterByTab<T extends WsShipment>(shipments: readonly T[], key: TabKey): T[] {
   const tab = TABS.find((t) => t.key === key);
   if (!tab || tab.states === null) return [...shipments];
   const states = tab.states as readonly string[];

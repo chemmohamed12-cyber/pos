@@ -49,7 +49,6 @@ describe('C2 — per-line partial-delivery events — real-Postgres, A/B', () =>
       state: shipmentId ? (await ds.query(`SELECT "currentState" AS s FROM "process_instances" WHERE "entityId" = $1`, [shipmentId]))[0].s : null,
     };
   }
-  const collect = async (k: Key, shipmentId: string, amount: string) => service.recordCollection(shipmentId, amount, 'cash', actor, (await dsOf(k)).manager);
   const deliver = async (k: Key, shipmentId: string) => service.recordOutcome(shipmentId, 'delivered', null, actor, (await dsOf(k)).manager);
 
   async function seed(k: Key) {
