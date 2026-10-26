@@ -46,7 +46,7 @@ export class CustodyHandoverService {
     return { collections, expenses, handovers };
   }
 
-  /** The vehicle's expense-float facts: assignment, Treasury balance, and the net amount funded by transfers (in - out) read from the float account's own ledger. */
+  /** The vehicle's expense-float facts: assignment, Treasury balance, and the net amount funded by transfers (in - out) read from the float account's own ledger - every leg counts, exactly like the Treasury balance (a reversal leg offsets its original). */
   async loadFloatFacts(vehicleId: string, manager: EntityManager): Promise<{ assigned: boolean; balance: string | null; netFunded: string | null }> {
     const v: Array<{ f: string | null }> = await manager.query(`SELECT "expenseFloatAccountId" AS f FROM "vehicles" WHERE id = $1`, [vehicleId]);
     const accountId = v[0]?.f ?? null;
@@ -55,7 +55,7 @@ export class CustodyHandoverService {
     const raw = balances.find((b) => b.treasuryAccountId === accountId)?.balance ?? null;
     const balance = raw === null ? null : (Math.round(Number(raw) * 100) / 100).toFixed(2);
     const net: Array<{ n: string }> = await manager.query(
-      `SELECT COALESCE(SUM(CASE WHEN "type" = 'transfer_in' THEN amount WHEN "type" = 'transfer_out' THEN -amount ELSE 0 END),0)::numeric(20,2)::text AS n FROM "treasury_transactions" WHERE "treasuryAccountId" = $1 AND "status" = 'posted'`,
+      `SELECT COALESCE(SUM(CASE WHEN "type" = 'transfer_in' THEN amount WHEN "type" = 'transfer_out' THEN -amount ELSE 0 END),0)::numeric(20,2)::text AS n FROM "treasury_transactions" WHERE "treasuryAccountId" = $1`,
       [accountId],
     );
     return { assigned: true, balance, netFunded: net[0].n };
@@ -65,6 +65,7 @@ export class CustodyHandoverService {
     const m = manager ?? this.dataSource.manager;
     const vehicle = await this.shipments.getVehicle(vehicleId, m);
     await this.vehicleAccess.assertCanReadVehicle(vehicle, actorUserId, m);
+    if (!(await this.vehicleAccess.canSeeVehicleCash(vehicle, actorUserId, m))) throw new NotFoundException(`Vehicle "${vehicleId}" not found.`); // same rule as the workspace read model
     const facts = await this.loadFacts(vehicleId, m);
     const overview = await this.shipments.getCustodianOverview('vehicle', vehicleId, m);
     return {

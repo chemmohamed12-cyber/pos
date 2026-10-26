@@ -56,6 +56,18 @@ export class VehicleAccessService {
     throw new NotFoundException(`Vehicle "${vehicle.id}" not found.`);
   }
 
+  /**
+   * Phase 2 review fix: ONE rule for who may see a vehicle's cash facts (collections, expenses, handovers, reconciliation) - used by the workspace read model AND the direct reconciliation
+   * route, so a role that the workspace hides collections from can no longer read the same figures through the other endpoint. Allowed: the vehicle's own assigned driver, whoever may act on
+   * any shipment (`act_any`), or whoever holds `logistics.collection.view`.
+   */
+  async canSeeVehicleCash(vehicle: Vehicle, actorUserId: string, manager?: EntityManager): Promise<boolean> {
+    if (vehicle.driverUserId === actorUserId) return true;
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    if (access.allows('logistics.shipment.act_any')) return true;
+    return this.permissions.hasAtLeast(actorUserId, 'logistics.collection.view', 'read-only', manager);
+  }
+
   /** A shipping company's overview (its custody balance and stock) has no "assigned driver": fleet readers only. */
   async assertCanReadFleet(actorUserId: string, what: string, manager?: EntityManager): Promise<void> {
     if (await this.canReadFleet(actorUserId, manager)) return;

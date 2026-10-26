@@ -281,10 +281,9 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     const vBare = randomUUID();
     await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-BARE','P-B',$2,$3,'active')`, [vBare, custodyA, bare]);
     await expect(claim(await mkShipment(vBare))).rejects.toThrow(/not GL-mapped/);
-    // 3. a float that equals the collection custody account (data drift) is refused at claim time too
+    // 3. a float that equals the vehicle's collection custody account cannot even exist: the database refuses it (and the service refuses it at assignment and again at claim time)
     const vSame = randomUUID();
-    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-SAME','P-S',$2,$2,'active')`, [vSame, custodyA]);
-    await expect(claim(await mkShipment(vSame))).rejects.toThrow(/collection account/);
+    await expect(dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-SAME','P-S',$2,$2,'active')`, [vSame, custodyA])).rejects.toThrow(/CHK_vehicles_float_not_collection/);
     // 4. category removed from the posting profile after approval: posting refused, stays approved
     const s = await newShipment();
     const x = await claim(s, { category: 'custody_toll', amount: '5.00', reason: 'Toll' });
@@ -296,7 +295,7 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     expect((await expenses.listForShipmentUnscoped(s, await mgr()))[0].status).toBe('approved');
     expect((await expenses.post(x.id, poster, await mgr())).status).toBe('posted');
     expect(await count('custody_expenses')).toBeGreaterThan(0);
-    expect((await (await dsOf('A')).query(`SELECT count(*)::int AS n FROM custody_expenses WHERE "vehicleId" IN ($1,$2,$3)`, [vNone, vBare, vSame]))[0].n).toBe(0);
+    expect((await (await dsOf('A')).query(`SELECT count(*)::int AS n FROM custody_expenses WHERE "vehicleId" IN ($1,$2)`, [vNone, vBare]))[0].n).toBe(0);
   });
 
   it('H8 a retry with the same clientKey returns the first claim (one row, one approval request); the same key for a different expense is refused', async () => {
@@ -354,6 +353,50 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     await expect(shipmentSvc.setVehicleExpenseFloat(v, null, claimant, m)).rejects.toThrow(/still holds 25.00/);
     await treasury.transferDirect(ok, cashA, '25.00', 'return', 'return unused float', claimant, m); // returning the float = a transfer back
     expect((await shipmentSvc.setVehicleExpenseFloat(v, null, claimant, m)).expenseFloatAccountId).toBeNull();
+  });
+
+  it('H12 the accounting posting guard applies: with the fiscal period closed the payout is refused (nothing moves, the expense stays approved) and posts once the period is open again', async () => {
+    const dsA = await dsOf('A');
+    const s = await newShipment();
+    const x = await claim(s, { amount: '12.00' });
+    await decide(x.id, approver, 'approved');
+    const fl = await floatBalance();
+    const journals = await count('accounting_journal_entries');
+    await dsA.query(`UPDATE "process_instances" SET "currentState" = 'closed' WHERE "definitionKey" = 'accounting_fiscal_period'`);
+    try {
+      await expect(expenses.post(x.id, poster, await mgr())).rejects.toThrow();
+      expect((await expenses.listForShipmentUnscoped(s, await mgr()))[0].status).toBe('approved');
+      expect(await floatBalance()).toBe(fl);
+      expect(await count('accounting_journal_entries')).toBe(journals);
+    } finally {
+      await dsA.query(`UPDATE "process_instances" SET "currentState" = 'open' WHERE "definitionKey" = 'accounting_fiscal_period'`);
+    }
+    expect((await expenses.post(x.id, poster, await mgr())).status).toBe('posted');
+  });
+
+  it('H13 a float account can never become a settlement account of a vehicle or a shipping company (collections are not settled into it)', async () => {
+    const dsA = await dsOf('A');
+    const m = await mgr();
+    await expect(shipmentSvc.setVehicleSettlementAccount(vehicleA, floatA, claimant, m)).rejects.toThrow(/vehicle expense float/);
+    const sc = randomUUID();
+    await dsA.query(`INSERT INTO "shipping_companies" ("id","code","name","status") VALUES ($1,'SC-H13','H13 Carrier','active')`, [sc]);
+    await expect(shipmentSvc.setShippingCompanyTreasuryAccount(sc, floatA, claimant, m)).rejects.toThrow(/vehicle expense float/);
+  });
+
+  it('H14 one float, one vehicle: two concurrent assignments of the same new account - exactly one wins; the database backstops the race', async () => {
+    const dsA = await dsOf('A');
+    const m = await mgr();
+    const types = await treasury.listAccountTypes(dsA.manager);
+    const f = (await treasury.createAccount('C3-FLOAT-RACE', 'race float', types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
+    await treasury.setAccountGlMapping(f, '1195', claimant, dsA.manager);
+    const va = randomUUID();
+    const vb = randomUUID();
+    for (const [id, code] of [[va, 'V-RACE-A'], [vb, 'V-RACE-B']]) await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","status") VALUES ($1,$2,$2,'active')`, [id, code]);
+    const results = await Promise.allSettled([shipmentSvc.setVehicleExpenseFloat(va, f, claimant, m), shipmentSvc.setVehicleExpenseFloat(vb, f, claimant, m)]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect((await dsA.query(`SELECT count(*)::int AS n FROM "vehicles" WHERE "expenseFloatAccountId" = $1`, [f]))[0].n).toBe(1);
+    // the database also refuses a float equal to the vehicle's own collection account (backstop behind the service check)
+    await expect(dsA.query(`UPDATE "vehicles" SET "expenseFloatAccountId" = "custodyAccountId" WHERE id = $1`, [vehicleA])).rejects.toThrow(/CHK_vehicles_float_not_collection/);
   });
 
   it('H9 end state: no journal is unbalanced; float GL == funded - posted-and-not-reversed; custody (collections) account and its GL were never touched; Company B untouched', async () => {

@@ -71,6 +71,7 @@ export class VehicleWorkspaceService {
 
     const access = await this.authorization.workflowAccess(actorUserId, manager);
     const seesAllCollections = access.allows('logistics.shipment.act_any') || (await this.permissions.hasAtLeast(actorUserId, 'logistics.collection.view', 'read-only', manager));
+    const seesVehicleCash = await this.vehicleAccess.canSeeVehicleCash(vehicle, actorUserId, manager);
     const visible = new Set(list.rows.filter((s) => seesAllCollections || s.driverUserId === actorUserId).map((s) => s.id));
 
     const ids = [...visible];
@@ -154,7 +155,7 @@ export class VehicleWorkspaceService {
     // anyone else gets null ("not available"), never a partial figure.
     let reconciliation: ReturnType<typeof computeCustodyReconciliation> | null = null;
     let handoverRows: Array<{ id: string; handoverNumber: string; amount: string; status: string; createdAt: Date }> | null = null;
-    if (seesAllCollections || vehicle.driverUserId === actorUserId) {
+    if (seesVehicleCash) {
       const facts = await this.custodyHandovers.loadFacts(vehicleId, manager ?? this.dataSource.manager);
       reconciliation = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance, float: await this.custodyHandovers.loadFloatFacts(vehicleId, manager ?? this.dataSource.manager) });
       handoverRows = facts.handovers.map((x) => ({ id: x.id, handoverNumber: x.handoverNumber, amount: x.amount, status: x.status, createdAt: x.createdAt }));

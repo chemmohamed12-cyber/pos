@@ -980,6 +980,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   ): Promise<ShippingCompany> {
     const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
     const company = await this.getShippingCompany(shippingCompanyId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     const before = { treasuryAccountId: company.treasuryAccountId };
     company.treasuryAccountId = treasuryAccountId;
     const saved = await repo.save(company);
@@ -1171,6 +1172,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async setVehicleSettlementAccount(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
     const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const vehicle = await this.getVehicle(vehicleId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     vehicle.settlementAccountId = treasuryAccountId;
     const saved = await repo.save(vehicle);
     await this.audit.record(
@@ -1194,6 +1196,13 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
    * `cash`, and must not be (or be used as) any collection custody account, settlement account, shipping-company account or another vehicle's float: expenses can never reach customer
    * collections. Unassigning is refused while the float still holds money or a claim is waiting. Funding / replenishment are ordinary Treasury transfer documents.
    */
+  /** Collections can never be settled into a driver expense float: a settlement / company account may not be any vehicle's float. */
+  async assertNotAnExpenseFloat(treasuryAccountId: string | null, manager?: EntityManager): Promise<void> {
+    if (!treasuryAccountId) return;
+    const rows: Array<{ n: number }> = await (manager ?? this.dataSource).query(`SELECT count(*)::int AS n FROM "vehicles" WHERE "expenseFloatAccountId" = $1`, [treasuryAccountId]);
+    if (rows[0].n > 0) throw new ConflictException('This account is a vehicle expense float - customer collections can never be settled into it.');
+  }
+
   async setVehicleExpenseFloat(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
     const m = manager ?? this.dataSource.manager;
     const vehicle = await this.getVehicle(vehicleId, m);
@@ -1225,7 +1234,14 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       if (acct[0].type !== 'cash') throw new ConflictException(`The expense float must be a cash account (this one is "${acct[0].type}").`);
     }
     vehicle.expenseFloatAccountId = treasuryAccountId;
-    const saved = await m.getRepository(Vehicle).save(vehicle);
+    let saved: Vehicle;
+    try {
+      saved = await m.getRepository(Vehicle).save(vehicle);
+    } catch (e) {
+      // the database backstops (unique float per vehicle, float never a collection account) win a race the checks above could not see
+      if ((e as { code?: string }).code === '23505' || (e as { code?: string }).code === '23514') throw new ConflictException('This account cannot be this vehicle\'s expense float (already another vehicle\'s float, or a collection account).');
+      throw e;
+    }
     await this.audit.record(
       { actorUserId, organizationId: null, action: 'shipment.vehicle.expense_float_set', resource: 'vehicle', resourceId: vehicleId, result: 'success', correlationId: null, after: { treasuryAccountId } },
       manager,

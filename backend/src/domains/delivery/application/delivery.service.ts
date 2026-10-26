@@ -525,6 +525,9 @@ export class DeliveryService implements LogisticsDeliveryContract {
       cashInSalesOrderId = fulfillmentOrder.salesOrderId;
     }
 
+    // Separate expense float policy: a collection is never remitted into a vehicle's expense float (even through the explicit `treasuryAccountId` override).
+    await this.shipments.assertNotAnExpenseFloat(settlementAccountId, manager);
+
     // Customer Financial Account / AR (CTO directive) — bridges the EXISTING COD/Collection flow
     // into the Customer Ledger: money already left the custodian and lands in a real company
     // Treasury account at THIS point, so this is where AR actually gets reduced, not at mere

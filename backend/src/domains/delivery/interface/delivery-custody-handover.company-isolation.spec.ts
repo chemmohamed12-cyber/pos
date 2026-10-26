@@ -266,6 +266,43 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
     expect(await treasury.getAccountBalance(acct, await mgr())).toBe('500.00');
   });
 
+  it('K7 (Phase 2 review) the direct reconciliation route follows the SAME visibility rule as the workspace: a fleet reader without collection rights gets "not found", a collection viewer and the vehicle driver can read it', async () => {
+    const dsA = await dsOf('A');
+    const mkRoleUser = async (name: string, nodes: Array<[string, string]>) => {
+      const id = randomUUID();
+      await dsA.query(`INSERT INTO users (id, "fullName", email) VALUES ($1,$2,$3)`, [id, name, `${name}-${id.slice(0, 6)}@k7.local`]);
+      const roleId = randomUUID();
+      await dsA.query(`INSERT INTO roles (id, key) VALUES ($1,$2)`, [roleId, `k7-${name}-${id.slice(0, 6)}`]);
+      for (const [node, access] of nodes) await dsA.query(`INSERT INTO role_permissions (id, "roleId", "nodeKey", access) VALUES ($1,$2,$3,$4)`, [randomUUID(), roleId, node, access]);
+      await dsA.query(`INSERT INTO user_roles (id, "userId", "roleId") VALUES ($1,$2,$3)`, [randomUUID(), id, roleId]);
+      return id;
+    };
+    const fleetOnly = await mkRoleUser('fleetonly', [['logistics.vehicle.view', 'read-only']]);
+    const collViewer = await mkRoleUser('collviewer', [['logistics.vehicle.view', 'read-only'], ['logistics.collection.view', 'read-only']]);
+    await expect(handovers.getReconciliation(vehicleId, fleetOnly, await mgr())).rejects.toThrow(/not found/i);
+    expect((await handovers.getReconciliation(vehicleId, collViewer, await mgr())).vehicleId).toBe(vehicleId);
+    expect((await handovers.getReconciliation(vehicleId, driver, await mgr())).vehicleId).toBe(vehicleId);
+  });
+
+  it('K8 (Phase 2 review) a REVERSED funding transfer keeps the float reconciliation at 0.00 difference (the funded total mirrors the Treasury balance rule); remitting a collection into a float account is refused', async () => {
+    const dsA = await dsOf('A');
+    const v4 = randomUUID();
+    const float4 = await mkFloat('C4-FLOAT4', '100.00');
+    const inLeg = await dsA.query(`SELECT id FROM treasury_transactions WHERE "treasuryAccountId" = $1 AND type = 'transfer_in'`, [float4]);
+    await treasury.reverseTransaction(inLeg[0].id, 'funded the wrong float', claimant, dsA.manager, { ownerBypass: true });
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","driverUserId","expenseFloatAccountId","status") VALUES ($1,'V-C4-4','PLATE-4',$2,$3,'active')`, [v4, driver, float4]);
+    const r = (await handovers.getReconciliation(v4, claimant, await mgr())).reconciliation;
+    expect(r.float.balance).toBe('0.00');
+    expect(r.float.expectedBalance).toBe('0.00');
+    expect(r.float.difference).toBe('0.00');
+    const sid = randomUUID();
+    await dsA.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","vehicleId","driverUserId","codAmount") VALUES ($1,$2,$3,$4,$5,'40.00')`, [sid, randomUUID(), 'WB-C4-V4', v4, driver]);
+    await dsA.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'shipment_lifecycle','shipment',$2,'out_for_delivery')`, [randomUUID(), sid]);
+    const c4 = await collect(sid, '40.00');
+    await expect(deliveryService.remitCollection(c4.id, poster, float4, await mgr())).rejects.toThrow(/vehicle expense float/);
+    expect((await dsA.query(`SELECT "remittanceStatus" AS s FROM collections WHERE id = $1`, [c4.id]))[0].s).toBe('pending');
+  });
+
   it('K6 Company B is untouched', async () => {
     const dsB = await dsOf('B');
     expect(Number((await dsB.query(`SELECT count(*) AS n FROM "custody_handovers"`))[0].n)).toBe(0);
