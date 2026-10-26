@@ -97,3 +97,35 @@ describe('ownership-aware terminology seeding (D-3)', () => {
     expect(f.entries.has('legacy')).toBe(true);
   });
 });
+
+describe('seed migrations stay self-contained (the release engine copies only numbered migration files; a helper inside migrations/ is reported as tag/migration drift and blocks the deploy)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readFileSync } = require('fs') as typeof import('fs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { join } = require('path') as typeof import('path');
+  const norm = (s: string) => s.replace(/\r\n/g, '\n').trim();
+  const helper = norm(readFileSync(join(__dirname, 'terminology-ownership.ts'), 'utf8'));
+  const canonical = norm(
+    "type TerminologyRow = readonly [code: string, category: string, ar: string, en: string];\ntype TerminologySeedMode = 'preserve' | 'update';\n\n" +
+      helper.slice(helper.indexOf('const TABLE =')).replace(/export async function/g, 'async function'),
+  );
+  const seeds = [
+    'core/1790033100000-SeedManufacturingOutcomeTerminology.ts',
+    'core/1790034000000-SeedManufacturingUxStage2Terminology.ts',
+    'core/1790034100000-SeedManufacturingUxStage3ProcessTerminology.ts',
+    'core/1790034200000-SeedManufacturingUxStage3BomTerminology.ts',
+    'core/1790034300000-SeedManufacturingUxStage3ReadinessTerminology.ts',
+    'core/1790034400000-SeedManufacturingUxStage4Terminology.ts',
+    'core/1790034500000-SeedManufacturingUxStage5Terminology.ts',
+    'core/1790034600000-SeedManufacturingUxFollowUpTerminology.ts',
+    'payroll/1790100100000-SeedPayrollGapClosureTerminology.ts',
+  ];
+  it.each(seeds)('%s embeds the canonical ownership block, imports nothing from the helper file', (rel) => {
+    const src = norm(readFileSync(join(__dirname, '..', 'migrations', rel), 'utf8'));
+    const m = /\/\/ <terminology-ownership:begin>[^\n]*\n([\s\S]*?)\n\/\/ <terminology-ownership:end>/.exec(src);
+    expect(m).not.toBeNull();
+    expect(norm(m![1])).toBe(canonical);
+    expect(src).not.toMatch(/from '\.\.\/terminology-ownership'/);
+    expect(src).not.toMatch(/ON CONFLICT \(code\) DO UPDATE/);
+  });
+});
