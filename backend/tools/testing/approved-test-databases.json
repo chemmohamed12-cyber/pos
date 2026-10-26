@@ -37,10 +37,30 @@
         ],
         "roles": "no role patterns approved: CREATE/ALTER/DROP ROLE|USER refused"
       }
+    },
+    {
+      "id": "isolated-5544-h3reg",
+      "host": "127.0.0.1",
+      "port": 5544,
+      "adminDatabases": [
+        "postgres"
+      ],
+      "databases": [],
+      "databasePatterns": [
+        "^daii_test_h3reg_[a-z0-9_]*$"
+      ],
+      "rolePatterns": [],
+      "approvedBy": "CTO - explicit approval in chat on 2026-10-26 ('Approved: add the 5544 isolated-instance entry ... loopback and daii_test_h3reg_* only'); entry prepared by the agent",
+      "approvedOn": "2026-10-26",
+      "identityEvidence": "Isolated throwaway cluster D:/DAII-ISOLATED-PG/data (docs/acceptance/ISOLATED_TEST_ENVIRONMENT.md section 3), PostgreSQL 18.6, listen_addresses=127.0.0.1, started 2026-10-26 with pg_ctl",
+      "expectedSystemIdentifier": "7692905965783805068",
+      "scope": {
+        "businessTests": "ONLY databases matching databasePatterns; every other database on this cluster (restore_*, *_ambient, company_*, pool_*, rehearsal_*) stays denied",
+        "roles": "no role patterns approved"
+      }
     }
   ],
   "notApproved": {
-    "5544": "existing isolated cluster: NO authorised admin credential available to the agent; not used by the business-test program",
     "5656": "not running; excluded"
   }
 }
