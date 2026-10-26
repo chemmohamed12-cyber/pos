@@ -94,7 +94,7 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
 
     // chart + period (Company A)
     for (const [code, name, type, normal, fn] of [
-      ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'], ['1110', 'Accounts receivable', 'asset', 'debit', 'ar'], ['1190', 'Driver custody', 'asset', 'debit', null], ['5900', 'Vehicle expenses', 'expense', 'debit', null], ['3999', 'Cash clearing', 'asset', 'debit', null],
+      ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'], ['1110', 'Accounts receivable', 'asset', 'debit', 'ar'], ['1190', 'Driver custody', 'asset', 'debit', null], ['1195', 'Driver expense float', 'asset', 'debit', null], ['5900', 'Vehicle expenses', 'expense', 'debit', null], ['3999', 'Cash clearing', 'asset', 'debit', null],
     ] as const) {
       await dsA.query(`INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive","controlFunction") VALUES ($1,$2,$3,$4,$5,true,false,true,$6)`, [randomUUID(), code, name, type, normal, fn]);
     }
@@ -123,8 +123,8 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
     deliveryService = delivery;
     const approvals = new ApprovalEngineService(ambient, new ProcessEngineService(ambient), new AuditService(ambient), events, new PermissionService(inert, new AuthorizationService(inert, inert)), { get: () => 24 } as never);
     const permissions = new PermissionService(dsA.getRepository(RolePermission), authorization);
-    handovers = new CustodyHandoverService(h.controlPlane, shipments, new VehicleAccessService(authorization, permissions), authorization, audit, numbering);
-    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury, handovers);
+    handovers = new CustodyHandoverService(h.controlPlane, shipments, new VehicleAccessService(authorization, permissions), authorization, audit, numbering, treasury);
+    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury);
     await expenses.onModuleInit();
 
     cfg['accounting.treasury_disbursement_reason_accounts'] = { custody_fuel: '5900', custody_toll: '5900', SALARY_ADVANCE: '5900' };
@@ -189,14 +189,26 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
     expect(Number((await recon()).derived.cashInDriverHand)).toBe(before + 100 - 40); // the rejected 60 is back in the driver's hand
   });
 
-  it('K4 the reconciliation keeps every fact on its own line and computes the two derived figures on the server (verified rows only); with consistent data the ledger difference is 0.00', async () => {
+  /** A vehicle's separate EXPENSE FLOAT: a GL-mapped cash account funded by a Treasury transfer (the call a transfer document makes after its approvals). */
+  async function mkFloat(code: string, fund: string): Promise<string> {
+    const dsA = await dsOf('A');
+    const types = await treasury.listAccountTypes(dsA.manager);
+    const acct = (await treasury.createAccount(code, `${code} float`, types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
+    await treasury.setAccountGlMapping(acct, '1195', claimant, dsA.manager);
+    await treasury.cashIn(cashAccount, fund, null, null, 'seed', 'seed company cash', claimant, dsA.manager);
+    await treasury.transferDirect(cashAccount, acct, fund, 'FUND', 'float funding', claimant, dsA.manager);
+    return acct;
+  }
+
+  it('K4 the reconciliation keeps every fact on its own line; collections and the separate expense float are reconciled independently (expenses never touch collections); consistent data gives 0.00 differences', async () => {
     const dsA = await dsOf('A');
     // a clean vehicle so the figures are exact
     const v2 = randomUUID();
     const types = await treasury.listAccountTypes(dsA.manager);
     const acct = (await treasury.createAccount('C4-CUST2', 'C4 custody 2', types.find((t) => t.code === 'custody')!.id, claimant, dsA.manager)).id;
     await treasury.setAccountGlMapping(acct, '1190', claimant, dsA.manager);
-    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","driverUserId","custodyAccountId","settlementAccountId","status") VALUES ($1,'V-C4-2','PLATE-2',$2,$3,$4,'active')`, [v2, driver, acct, cashAccount]);
+    const float2 = await mkFloat('C4-FLOAT2', '200.00');
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","driverUserId","custodyAccountId","settlementAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C4-2','PLATE-2',$2,$3,$4,$5,'active')`, [v2, driver, acct, cashAccount, float2]);
     const mk = async (cod: string) => {
       const id = randomUUID();
       await dsA.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","vehicleId","driverUserId","codAmount") VALUES ($1,$2,$3,$4,$5,$6)`, [id, randomUUID(), `WB-C4-V2-${id.slice(0, 6)}`, v2, driver, cod]);
@@ -211,10 +223,12 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
     const c3 = await collect(s3, '90.00');
     await deliveryService.rejectCollection(c3.id, 'not received', approver, await mgr()); // 90 rejected: reversed in the ledger, out of every figure
     await deliveryService.confirmCollection(c1.id, approver, await mgr());
+    const custodyBefore = await treasury.getAccountBalance(acct, await mgr());
     const exp = await expenses.claim({ shipmentId: s1, category: 'custody_fuel', amount: '50.00', reason: 'Fuel' }, claimant, await mgr());
     await approveExpense(exp.id);
     await expenses.post(exp.id, poster, await mgr());
     await expenses.claim({ shipmentId: s2, category: 'custody_toll', amount: '7.00', reason: 'Toll' }, claimant, await mgr()); // pending approval
+    expect(await treasury.getAccountBalance(acct, await mgr())).toBe(custodyBefore); // posting an expense did not move the collection custody account
     const h = await handovers.declare(v2, '100.00', null, null, driver, await mgr());
     await handovers.decide(h.id, 'confirmed', null, approver, await mgr());
     await handovers.declare(v2, '25.00', null, null, driver, await mgr()); // still only declared
@@ -224,30 +238,32 @@ describe('C4 — driver handover and custody reconciliation — real-Postgres, A
     expect(r.collections).toEqual({ recorded: '0.00', confirmed: '800.00', rejected: '90.00', counted: '800.00', remitted: '300.00', notYetRemitted: '500.00' });
     expect(r.expenses).toEqual({ pendingApproval: '7.00', approvedNotPosted: '0.00', posted: '50.00', rejectedOrCancelled: '0.00' });
     expect(r.handovers).toEqual({ declared: '25.00', confirmed: '100.00', rejected: '0.00', handedOver: '125.00' });
-    expect(r.derived.cashInDriverHand).toBe('625.00'); // 800 - 50 - 125
-    expect(r.derived.expectedCustodyAccountBalance).toBe('450.00'); // 800 - 50 - 300
-    expect(r.derived.ledgerDifference).toBe('0.00'); // the custody account really holds 450.00
+    expect(r.derived.cashInDriverHand).toBe('675.00'); // 800 - 125: the 50.00 expense is NOT subtracted - it was paid from the float
+    expect(r.derived.expectedCustodyAccountBalance).toBe('500.00'); // 800 - 300
+    expect(r.derived.ledgerDifference).toBe('0.00'); // the collection custody account really holds 500.00
+    expect(r.float).toEqual({ assigned: true, balance: '150.00', expectedBalance: '150.00', difference: '0.00', pendingApproval: '7.00', approvedNotPosted: '0.00', posted: '50.00', reversed: '0.00', availableAfterCommitments: '143.00' });
   });
 
-  it('K5 posting an expense is refused when it would take the cash below what was already handed over (serialised with the handover); smaller expenses still post', async () => {
+  it('K5 expenses and handovers are independent: a large handover does not block an expense, and an expense never reduces the cash the driver must hand over', async () => {
     const dsA = await dsOf('A');
     const v3 = randomUUID();
     const types = await treasury.listAccountTypes(dsA.manager);
     const acct = (await treasury.createAccount('C4-CUST3', 'C4 custody 3', types.find((t) => t.code === 'custody')!.id, claimant, dsA.manager)).id;
     await treasury.setAccountGlMapping(acct, '1190', claimant, dsA.manager);
-    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","driverUserId","custodyAccountId","settlementAccountId","status") VALUES ($1,'V-C4-3','PLATE-3',$2,$3,$4,'active')`, [v3, driver, acct, cashAccount]);
+    const float3 = await mkFloat('C4-FLOAT3', '300.00');
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","driverUserId","custodyAccountId","settlementAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C4-3','PLATE-3',$2,$3,$4,$5,'active')`, [v3, driver, acct, cashAccount, float3]);
     const sid = randomUUID();
     await dsA.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","vehicleId","driverUserId","codAmount") VALUES ($1,$2,$3,$4,$5,'500.00')`, [sid, randomUUID(), `WB-C4-V3`, v3, driver]);
     await dsA.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'shipment_lifecycle','shipment',$2,'out_for_delivery')`, [randomUUID(), sid]);
     await collect(sid, '500.00');
-    await handovers.declare(v3, '450.00', null, null, driver, await mgr());
-    const big = await claimExpense(sid, '100.00');
-    await approveExpense(big.id);
-    await expect(expenses.post(big.id, poster, await mgr())).rejects.toThrow(/below what was already handed over/);
-    expect((await expenses.listForShipmentUnscoped(sid, await mgr()))[0].status).toBe('approved');
-    const small = await claimExpense(sid, '50.00');
-    await approveExpense(small.id);
-    expect((await expenses.post(small.id, poster, await mgr())).status).toBe('posted');
+    await handovers.declare(v3, '500.00', null, null, driver, await mgr()); // the whole 500.00 of collections is declared handed over
+    const x = await claimExpense(sid, '100.00');
+    await approveExpense(x.id);
+    expect((await expenses.post(x.id, poster, await mgr())).status).toBe('posted'); // paid from the float, not blocked by the handover
+    const r = (await handovers.getReconciliation(v3, claimant, await mgr())).reconciliation;
+    expect(r.derived.cashInDriverHand).toBe('0.00');
+    expect(r.float.balance).toBe('200.00');
+    expect(await treasury.getAccountBalance(acct, await mgr())).toBe('500.00');
   });
 
   it('K6 Company B is untouched', async () => {

@@ -761,6 +761,17 @@ export class TreasuryService implements FinanceTreasuryContract {
     return this.cashOutDirect(accountId, amount, null, null, reference, reason, actorUserId, manager, counter);
   }
 
+  async reverseCustodyExpense(
+    transactionId: string,
+    reason: string,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<TreasuryTransaction> {
+    const legs = await this.reverseTransaction(transactionId, reason, actorUserId, manager, { ownerBypass: true, counter });
+    return legs[0];
+  }
+
   async cashOutForSupplier(
     accountId: string,
     amount: string,

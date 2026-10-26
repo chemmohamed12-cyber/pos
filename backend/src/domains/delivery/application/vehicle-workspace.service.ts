@@ -156,7 +156,7 @@ export class VehicleWorkspaceService {
     let handoverRows: Array<{ id: string; handoverNumber: string; amount: string; status: string; createdAt: Date }> | null = null;
     if (seesAllCollections || vehicle.driverUserId === actorUserId) {
       const facts = await this.custodyHandovers.loadFacts(vehicleId, manager ?? this.dataSource.manager);
-      reconciliation = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance });
+      reconciliation = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance, float: await this.custodyHandovers.loadFloatFacts(vehicleId, manager ?? this.dataSource.manager) });
       handoverRows = facts.handovers.map((x) => ({ id: x.id, handoverNumber: x.handoverNumber, amount: x.amount, status: x.status, createdAt: x.createdAt }));
     }
 

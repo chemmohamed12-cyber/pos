@@ -1,0 +1,4 @@
+# Vehicle workspace expense float
+src/domains/delivery/interface/delivery-custody-expenses.company-isolation.spec.ts
+src/domains/delivery/interface/delivery-custody-handover.company-isolation.spec.ts
+src/domains/delivery/interface/vehicle-workspace.company-isolation.spec.ts

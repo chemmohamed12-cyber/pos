@@ -76,7 +76,7 @@ describe('F-3/F-4/F-5 — vehicle workspace read model — real-Postgres, A/B', 
     const usersStub = { findByIds: async (list: string[]) => list.filter((i) => names[i]).map((i) => ({ id: i, fullName: names[i] })) } as never;
     const shipments = new ShipmentService(h.controlPlane, numbering, new ProcessEngineService(h.controlPlane), authorization, audit, inert, inventory, inert, treasury, salesOrders, customers, usersStub);
     const access = new VehicleAccessService(authorization, permissions);
-    workspace = new VehicleWorkspaceService(h.controlPlane, shipments, access, authorization, permissions, new CustodyHandoverService(h.controlPlane, shipments, access, authorization, new AuditService(h.controlPlane), new NumberingService(h.controlPlane)));
+    workspace = new VehicleWorkspaceService(h.controlPlane, shipments, access, authorization, permissions, new CustodyHandoverService(h.controlPlane, shipments, access, authorization, new AuditService(h.controlPlane), new NumberingService(h.controlPlane), treasury));
 
     for (const k of ['A', 'B'] as const) {
       await (await dsOf(k)).query(`INSERT INTO "warehouses" ("id","code","name","status","kind") VALUES ($1,'WH-MAIN','Main Warehouse','active','main')`, [randomUUID()]);

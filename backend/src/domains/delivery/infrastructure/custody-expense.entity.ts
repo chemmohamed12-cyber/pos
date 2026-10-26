@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type CustodyExpenseStatus = 'pending_approval' | 'approved' | 'rejected' | 'posted' | 'cancelled';
+export type CustodyExpenseStatus = 'pending_approval' | 'approved' | 'rejected' | 'posted' | 'cancelled' | 'reversed';
 
 /**
  * Vehicle Driver Workspace, Stage C / C3 (D-4, D-5) - a claim for money spent out of the cash a driver carries. Prepare (the claimant) is separate from approve (a different person,
@@ -27,9 +27,9 @@ export class CustodyExpense {
   @Column({ type: 'uuid', nullable: true })
   vehicleId!: string | null;
 
-  /** The custody Treasury account the money is paid out of (the vehicle's), fixed when the claim is made. */
+  /** The vehicle's EXPENSE FLOAT Treasury account the money is paid out of (never the collection custody account), fixed when the claim is made. */
   @Column('uuid')
-  custodyAccountId!: string;
+  floatAccountId!: string;
 
   /** A reason code of `accounting.treasury_disbursement_reason_accounts` (prefix `custody_`). */
   @Column({ type: 'varchar', length: 64 })
@@ -80,6 +80,18 @@ export class CustodyExpense {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   cancelReason!: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  reversedByUserId!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  reversedAt!: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  reversalReason!: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  reversalTransactionId!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

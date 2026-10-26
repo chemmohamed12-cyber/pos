@@ -133,6 +133,15 @@ export interface FinanceTreasuryContract {
     counter: { configKey: string; reasonCode: string },
   ): Promise<{ id: string }>;
 
+  /** Reverses the float cash-out of a posted custody expense with the same posting-profile counter (append-only offsetting leg + reversal journal). */
+  reverseCustodyExpense(
+    transactionId: string,
+    reason: string,
+    actorUserId: string,
+    manager: EntityManager,
+    counter: { configKey: string; reasonCode: string },
+  ): Promise<{ id: string }>;
+
   cashOutForSupplier(
     accountId: string,
     amount: string,

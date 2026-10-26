@@ -97,6 +97,11 @@ class DecideExpenseDto {
   note?: string;
 }
 
+class ReverseExpenseDto {
+  @IsString()
+  reason!: string;
+}
+
 class CancelExpenseDto {
   @IsString()
   reason!: string;
@@ -213,6 +218,14 @@ export class DeliveryController {
   async postExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.expenses.post(id, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('finance.cash_document.reverse', 'editable')
+  @Post('custody-expenses/:id/reverse')
+  async reverseExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseExpenseDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.expenses.reverse(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Post('custody-expenses/:id/cancel')

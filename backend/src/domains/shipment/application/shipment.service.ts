@@ -1189,6 +1189,50 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     return saved;
   }
 
+  /**
+   * Separate EXPENSE FLOAT (CTO policy 2026-10-26): assign the Treasury account a vehicle's driver expenses are paid from. Fail closed - the account must exist, be active, GL-mapped, of type
+   * `cash`, and must not be (or be used as) any collection custody account, settlement account, shipping-company account or another vehicle's float: expenses can never reach customer
+   * collections. Unassigning is refused while the float still holds money or a claim is waiting. Funding / replenishment are ordinary Treasury transfer documents.
+   */
+  async setVehicleExpenseFloat(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const m = manager ?? this.dataSource.manager;
+    const vehicle = await this.getVehicle(vehicleId, m);
+    if (treasuryAccountId === null) {
+      if (vehicle.expenseFloatAccountId) {
+        const { balances } = await this.treasury.getAllTreasuryBalances(undefined, m);
+        const bal = balances.find((b) => b.treasuryAccountId === vehicle.expenseFloatAccountId)?.balance ?? '0.00';
+        if (Math.round(Number(bal) * 100) !== 0) throw new ConflictException(`The expense float still holds ${bal} - return it to a company account (a transfer document) before unassigning it.`);
+        const open: Array<{ n: number }> = await m.query(`SELECT count(*)::int AS n FROM "custody_expenses" WHERE "vehicleId" = $1 AND "status" IN ('pending_approval','approved')`, [vehicleId]);
+        if (open[0].n > 0) throw new ConflictException('There are expense claims waiting for approval or posting on this float - finish or cancel them first.');
+      }
+    } else {
+      const acct: Array<{ status: string; glAccountCode: string | null; type: string }> = await m.query(
+        `SELECT a."status", a."glAccountCode", t."code" AS type FROM "treasury_accounts" a JOIN "treasury_account_types" t ON t.id = a."accountTypeId" WHERE a.id = $1`,
+        [treasuryAccountId],
+      );
+      if (acct.length === 0) throw new NotFoundException(`Treasury account "${treasuryAccountId}" not found.`);
+      if (acct[0].status !== 'active') throw new ConflictException('The expense float account is inactive.');
+      if (!acct[0].glAccountCode?.trim()) throw new ConflictException('The expense float account is not GL-mapped - Accounting must map it first.');
+      const clash: Array<{ n: number }> = await m.query(
+        `SELECT (SELECT count(*) FROM "vehicles" WHERE ("custodyAccountId" = $1 OR "settlementAccountId" = $1 OR "expenseFloatAccountId" = $1) AND id <> $2)
+              + (SELECT count(*) FROM "shipping_companies" WHERE "custodyAccountId" = $1 OR "treasuryAccountId" = $1) AS n`,
+        [treasuryAccountId, vehicleId],
+      );
+      if (Number(clash[0].n) > 0) throw new ConflictException('This account is already used as a collection custody / settlement account or as another vehicle\'s float - an expense float must be its own account.');
+      if (vehicle.custodyAccountId === treasuryAccountId || vehicle.settlementAccountId === treasuryAccountId) {
+        throw new ConflictException('The expense float cannot be the vehicle\'s own collection custody or settlement account.');
+      }
+      if (acct[0].type !== 'cash') throw new ConflictException(`The expense float must be a cash account (this one is "${acct[0].type}").`);
+    }
+    vehicle.expenseFloatAccountId = treasuryAccountId;
+    const saved = await m.getRepository(Vehicle).save(vehicle);
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'shipment.vehicle.expense_float_set', resource: 'vehicle', resourceId: vehicleId, result: 'success', correlationId: null, after: { treasuryAccountId } },
+      manager,
+    );
+    return saved;
+  }
+
   // ---- Custody visibility (CTO directive §8/§11) ----
 
   /**

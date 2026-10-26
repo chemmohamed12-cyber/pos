@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { Body, Controller, Get, Param, Post, Query, Req, UnauthorizedException, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { IsIn, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ShipmentService } from '../application/shipment.service';
 import { VehicleAccessService } from '../application/vehicle-access.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
@@ -115,6 +115,12 @@ class SetVehicleStatusDto {
 class SetVehicleSettlementAccountDto {
   @IsOptional()
   @IsString()
+  treasuryAccountId?: string;
+}
+
+class SetVehicleExpenseFloatDto {
+  @IsOptional()
+  @IsUUID()
   treasuryAccountId?: string;
 }
 
@@ -332,6 +338,14 @@ export class ShipmentController {
   async setVehicleSettlementAccount(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: SetVehicleSettlementAccountDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
     return this.shipments.setVehicleSettlementAccount(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
+  }
+
+  @UseGuards(PermissionGuard)
+  @RequirePermission('logistics.vehicle.edit', 'editable')
+  @Post('vehicles/:id/expense-float')
+  async setVehicleExpenseFloat(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SetVehicleExpenseFloatDto) {
+    if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    return this.shipments.setVehicleExpenseFloat(id, dto.treasuryAccountId ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get()

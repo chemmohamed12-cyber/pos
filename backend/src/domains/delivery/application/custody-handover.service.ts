@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { FINANCE_TREASURY_CONTRACT, FinanceTreasuryContract } from '../../../foundation/module-registry/contracts/finance.contract';
 import { DataSource, EntityManager } from 'typeorm';
 import { CustodyHandover } from '../infrastructure/custody-handover.entity';
 import { Collection } from '../infrastructure/collection.entity';
@@ -10,7 +11,7 @@ import { AuditService } from '../../../foundation/audit/audit.service';
 import { NumberingService } from '../../../foundation/numbering/numbering.service';
 import { CustodyReconciliation, computeCustodyReconciliation } from './custody-reconciliation';
 
-/** Postgres advisory-lock key serialising everything that changes the cash a vehicle's driver is carrying (handover declarations and expense postings). */
+/** Postgres advisory-lock key serialising handover declarations / decisions for one vehicle. */
 export const vehicleCashLockKey = (vehicleId: string): string => `delivery:vehicle-cash:${vehicleId}`;
 
 const cents = (a: string): number => Math.round(Number(a) * 100);
@@ -32,6 +33,7 @@ export class CustodyHandoverService {
     private readonly authorization: AuthorizationService,
     private readonly audit: AuditService,
     private readonly numbering: NumberingService,
+    @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
   ) {}
 
   /** Every collection of the vehicle's shipments (legacy rows without a custody record included), every expense and handover of the vehicle - the inputs of the reconciliation. */
@@ -44,6 +46,21 @@ export class CustodyHandoverService {
     return { collections, expenses, handovers };
   }
 
+  /** The vehicle's expense-float facts: assignment, Treasury balance, and the net amount funded by transfers (in - out) read from the float account's own ledger. */
+  async loadFloatFacts(vehicleId: string, manager: EntityManager): Promise<{ assigned: boolean; balance: string | null; netFunded: string | null }> {
+    const v: Array<{ f: string | null }> = await manager.query(`SELECT "expenseFloatAccountId" AS f FROM "vehicles" WHERE id = $1`, [vehicleId]);
+    const accountId = v[0]?.f ?? null;
+    if (!accountId) return { assigned: false, balance: null, netFunded: null };
+    const { balances } = await this.treasury.getAllTreasuryBalances(undefined, manager);
+    const raw = balances.find((b) => b.treasuryAccountId === accountId)?.balance ?? null;
+    const balance = raw === null ? null : (Math.round(Number(raw) * 100) / 100).toFixed(2);
+    const net: Array<{ n: string }> = await manager.query(
+      `SELECT COALESCE(SUM(CASE WHEN "type" = 'transfer_in' THEN amount WHEN "type" = 'transfer_out' THEN -amount ELSE 0 END),0)::numeric(20,2)::text AS n FROM "treasury_transactions" WHERE "treasuryAccountId" = $1 AND "status" = 'posted'`,
+      [accountId],
+    );
+    return { assigned: true, balance, netFunded: net[0].n };
+  }
+
   async getReconciliation(vehicleId: string, actorUserId: string, manager?: EntityManager): Promise<{ vehicleId: string; reconciliation: CustodyReconciliation; handovers: CustodyHandover[] }> {
     const m = manager ?? this.dataSource.manager;
     const vehicle = await this.shipments.getVehicle(vehicleId, m);
@@ -52,7 +69,7 @@ export class CustodyHandoverService {
     const overview = await this.shipments.getCustodianOverview('vehicle', vehicleId, m);
     return {
       vehicleId,
-      reconciliation: computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance }),
+      reconciliation: computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: overview.custodyBalance, float: await this.loadFloatFacts(vehicleId, m) }),
       handovers: facts.handovers,
     };
   }

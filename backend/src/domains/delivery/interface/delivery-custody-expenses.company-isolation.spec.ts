@@ -2,9 +2,6 @@ import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { DeliveryService } from '../application/delivery.service';
 import { CustodyExpenseService } from '../application/custody-expense.service';
-import { CustodyHandoverService } from '../application/custody-handover.service';
-import { VehicleAccessService } from '../../shipment/application/vehicle-access.service';
-import { RolePermission } from '../../../foundation/permission/role-permission.entity';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { TreasuryService } from '../../treasury/application/treasury.service';
 import { JournalEntryService, JOURNAL_ENTRY_DOCUMENT_TYPE } from '../../accounting/application/journal-entry.service';
@@ -37,8 +34,8 @@ import { SalesOrdersReadContract } from '../../../foundation/module-registry/con
 import { setUpTwoCompanyHarness, TwoCompanyHarness } from '../../../foundation/testing/two-company-real-pg-harness';
 
 /**
- * Vehicle Driver Workspace, Stage C / C3 (2026-10-22; D-4, D-5) - real-Postgres proof of the custody-expense flow: a claim is validated against the company posting profile and a
- * GL-mapped custody account (fail closed), EVERY expense needs a separate approver through the FA-01 engine, posting is an explicit Treasury cash-out (balance checked, one GL event,
+ * Vehicle Driver Workspace, Stage C / C3 (2026-10-22; D-4, D-5; reworked 2026-10-26 for the approved SEPARATE EXPENSE FLOAT policy) - real-Postgres proof of the custody-expense flow: a claim is
+ * validated against the company posting profile and a GL-mapped vehicle expense float (fail closed), expenses are paid ONLY from the float and never touch customer collections, EVERY expense needs a separate approver through the FA-01 engine, posting is an explicit Treasury cash-out (balance checked, one GL event,
  * Treasury == GL), a retry changes nothing, and Company B never sees any of it.
  */
 describe('C3 — custody expenses: claim → separate approval → explicit posting — real-Postgres, A/B', () => {
@@ -53,7 +50,10 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
   let approver: string;
   let poster: string;
   let custodyA = '';
-  let shippingCompanyA = '';
+  let floatA = '';
+  let cashA = '';
+  let vehicleA = '';
+  let shipmentSvc: ShipmentService;
   const dsOf = (k: 'A' | 'B') => h.connections.getDataSource(k === 'A' ? h.companyAId : h.companyBId);
   const mgr = async () => (await dsOf('A')).manager;
 
@@ -88,7 +88,7 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
 
     // chart + period (Company A)
     for (const [code, name, type, normal, fn] of [
-      ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'], ['1190', 'Driver custody', 'asset', 'debit', null], ['5900', 'Vehicle expenses', 'expense', 'debit', null], ['3999', 'Cash clearing', 'asset', 'debit', null],
+      ['1101', 'Cash on Hand', 'asset', 'debit', 'bank'], ['1190', 'Driver custody', 'asset', 'debit', null], ['1195', 'Driver expense float', 'asset', 'debit', null], ['5900', 'Vehicle expenses', 'expense', 'debit', null], ['3999', 'Cash clearing', 'asset', 'debit', null],
     ] as const) {
       await dsA.query(`INSERT INTO "accounting_gl_accounts" ("id","code","name","accountType","normalBalance","isPostable","allowManualJournal","isActive","controlFunction") VALUES ($1,$2,$3,$4,$5,true,false,true,$6)`, [randomUUID(), code, name, type, normal, fn]);
     }
@@ -105,8 +105,11 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     await treasury.setAccountGlMapping(cash.id, '1101', claimant, dsA.manager);
     custodyA = (await treasury.createAccount('C3-CUSTODY', 'C3 custody', custodyType, claimant, dsA.manager)).id;
     await treasury.setAccountGlMapping(custodyA, '1190', claimant, dsA.manager);
-    shippingCompanyA = randomUUID();
-    await dsA.query(`INSERT INTO "shipping_companies" ("id","code","name","custodyAccountId","treasuryAccountId","status") VALUES ($1,'SC-C3','C3 Carrier',$2,$3,'active')`, [shippingCompanyA, custodyA, cash.id]);
+    cashA = cash.id;
+    floatA = (await treasury.createAccount('C3-FLOAT', 'C3 expense float', types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
+    await treasury.setAccountGlMapping(floatA, '1195', claimant, dsA.manager);
+    vehicleA = randomUUID();
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","settlementAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-1','PLATE-C3',$2,$3,$4,'active')`, [vehicleA, custodyA, cash.id, floatA]);
 
     const authorization = new AuthorizationService(dsA.getRepository(Role), dsA.getRepository(UserRole));
     const shipments = new ShipmentService(h.controlPlane, numbering, processEngine, authorization, audit, events, inert, inert, treasury, inert, inert, inert);
@@ -114,13 +117,17 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     const salesOrders = { getOrderSnapshot: async () => null } as unknown as SalesOrdersReadContract;
     const delivery = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inert, audit, events, numbering, inert, inert);
     const approvals = new ApprovalEngineService(ambient, new ProcessEngineService(ambient), new AuditService(ambient), events, new PermissionService(inert, new AuthorizationService(inert, inert)), { get: () => 24 } as never);
-    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury, new CustodyHandoverService(h.controlPlane, shipments, new VehicleAccessService(authorization, new PermissionService(dsA.getRepository(RolePermission), authorization)), authorization, audit, numbering));
+    expenses = new CustodyExpenseService(h.controlPlane, delivery, shipments, audit, events, numbering, approvals, config, treasury);
+    shipmentSvc = shipments;
     await expenses.onModuleInit();
 
     cfg['accounting.treasury_disbursement_reason_accounts'] = { custody_fuel: '5900', custody_toll: '5900', SALARY_ADVANCE: '5900' };
     cfg['accounting.cash_movement_clearing_account_code'] = '3999';
     // the driver's cash: 1000.00 sits in the custody account (as if collected)
     await treasury.cashIn(custodyA, '1000.00', null, null, 'seed', 'seed custody cash', claimant, dsA.manager);
+    // the company's cash account holds money; the vehicle's expense FLOAT is funded by an ordinary Treasury transfer (the T3 transfer document does the same call after its approvals)
+    await treasury.cashIn(cash.id, '5000.00', null, null, 'seed', 'seed company cash', claimant, dsA.manager);
+    await treasury.transferDirect(cash.id, floatA, '1000.00', 'FUND-1', 'initial float', claimant, dsA.manager);
   });
 
   afterAll(async () => {
@@ -131,7 +138,7 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
   async function newShipment(): Promise<string> {
     const ds = await dsOf('A');
     const id = randomUUID();
-    await ds.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","shippingCompanyId") VALUES ($1,$2,$3,$4)`, [id, randomUUID(), `WB-C3-${id.slice(0, 8)}`, shippingCompanyA]);
+    await ds.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","vehicleId") VALUES ($1,$2,$3,$4)`, [id, randomUUID(), `WB-C3-${id.slice(0, 8)}`, vehicleA]);
     await ds.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'shipment_lifecycle','shipment',$2,'out_for_delivery')`, [randomUUID(), id]);
     return id;
   }
@@ -147,6 +154,12 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
   }
   const count = async (table: string) => Number((await (await dsOf('A')).query(`SELECT count(*) AS n FROM "${table}"`))[0].n);
   const custodyBalance = async () => treasury.getAccountBalance(custodyA, await mgr());
+  const floatBalance = async () => treasury.getAccountBalance(floatA, await mgr());
+  const fund = async (amount: string) => {
+    const m = await mgr();
+    await treasury.cashIn(cashA, amount, null, null, 'seed', 'top-up company cash', claimant, m);
+    await treasury.transferDirect(cashA, floatA, amount, 'FUND-N', 'replenishment', claimant, m);
+  };
 
   it('H1 categories are the mapped custody_* reasons only; an unmapped, non-custody or malformed category, a bad amount or reason is refused and records nothing', async () => {
     expect(expenses.listCategories()).toEqual(['custody_fuel', 'custody_toll']); // SALARY_ADVANCE is mapped but not a custody category
@@ -187,23 +200,27 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     expect(await count('accounting_journal_entries')).toBe(journals);
   });
 
-  it('H4 posting needs an approved expense; posting moves the cash from the custody account, creates ONE GL journal (Dr expense / Cr custody) and Treasury == GL; a retry changes nothing', async () => {
+  it('H4 posting needs an approved expense; posting pays out of the FLOAT, creates ONE GL journal (Dr expense / Cr float account) and leaves the collection custody account untouched; a retry changes nothing', async () => {
     const s = await newShipment();
     const x = await claim(s, { amount: '150.00' });
+    expect(x.floatAccountId).toBe(floatA);
     await expect(expenses.post(x.id, poster, await mgr())).rejects.toThrow(/Only an approved expense can be posted/);
     await decide(x.id, approver, 'approved');
-    const bal0 = await custodyBalance();
+    const float0 = await floatBalance();
+    const coll0 = await custodyBalance();
     const gl5900 = await glBal('5900');
+    const gl1195 = await glBal('1195');
     const gl1190 = await glBal('1190');
     const journals = await count('accounting_journal_entries');
     const txns = await count('treasury_transactions');
     const posted = await expenses.post(x.id, poster, await mgr());
     expect(posted.status).toBe('posted');
     expect(posted.postedByUserId).toBe(poster);
-    expect(posted.treasuryTransactionId).toBeTruthy();
-    expect(Number(await custodyBalance())).toBe(Number(bal0) - 150);
+    expect(Number(await floatBalance())).toBe(Number(float0) - 150);
+    expect(await custodyBalance()).toBe(coll0); // customer collections were never used
+    expect(await glBal('1190')).toBe(gl1190);
     expect(Number(await glBal('5900'))).toBe(Number(gl5900) + 150);
-    expect(Number(await glBal('1190'))).toBe(Number(gl1190) - 150);
+    expect(Number(await glBal('1195'))).toBe(Number(gl1195) - 150);
     expect((await count('accounting_journal_entries')) - journals).toBe(1);
     const again = await expenses.post(x.id, poster, await mgr());
     expect(again.treasuryTransactionId).toBe(posted.treasuryTransactionId);
@@ -211,16 +228,21 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     expect((await count('accounting_journal_entries')) - journals).toBe(1);
   });
 
-  it('H5 posting is refused when the custody balance does not cover it; the expense stays approved and posts after the cash is there (no overdraw, nothing netted)', async () => {
+  it('H5 the float is the ONLY source: an expense larger than the float is refused even though the collection custody account holds plenty; it posts after a replenishment transfer', async () => {
     const s = await newShipment();
-    const bal = Number(await custodyBalance());
-    const x = await claim(s, { amount: (bal + 500).toFixed(2) });
+    await treasury.cashIn(custodyA, '3000.00', null, null, 'seed', 'more customer cash in custody', claimant, await mgr()); // collections hold plenty
+    const fl = Number(await floatBalance());
+    const coll = Number(await custodyBalance());
+    expect(coll).toBeGreaterThan(fl + 400); // collections could have paid for it - and must not
+    const x = await claim(s, { amount: (fl + 400).toFixed(2) });
     await decide(x.id, approver, 'approved');
     await expect(expenses.post(x.id, poster, await mgr())).rejects.toThrow();
     expect((await expenses.listForShipmentUnscoped(s, await mgr()))[0].status).toBe('approved');
-    expect(Number(await custodyBalance())).toBe(bal);
-    await treasury.cashIn(custodyA, '1000.00', null, null, 'top-up', 'more cash collected', claimant, await mgr());
+    expect(Number(await floatBalance())).toBe(fl);
+    expect(Number(await custodyBalance())).toBe(coll);
+    await fund('1500.00'); // replenishment = an ordinary Treasury transfer
     expect((await expenses.post(x.id, poster, await mgr())).status).toBe('posted');
+    expect(Number(await custodyBalance())).toBe(coll);
   });
 
   it('H6 a rejected expense can never be posted; the claimant can cancel an unposted claim, another user cannot, and a posted one cannot be cancelled', async () => {
@@ -240,17 +262,30 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     await expect(expenses.cancel(p.id, 'too late', claimant, await mgr())).rejects.toThrow(/cannot be cancelled/);
   });
 
-  it('H7 fail closed: a custody account without a GL mapping refuses the claim; a category removed from the posting profile after approval blocks posting and the expense stays approved', async () => {
+  it('H7 fail closed: no float assigned, an unmapped float account, a collection account used as the float, and a category removed from the posting profile all refuse - and record nothing', async () => {
     const dsA = await dsOf('A');
+    const mkShipment = async (vehicle: string) => {
+      const id = randomUUID();
+      await dsA.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","vehicleId") VALUES ($1,$2,$3,$4)`, [id, randomUUID(), `WB-C3-${id.slice(0, 8)}`, vehicle]);
+      await dsA.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'shipment_lifecycle','shipment',$2,'out_for_delivery')`, [randomUUID(), id]);
+      return id;
+    };
     const types = await treasury.listAccountTypes(dsA.manager);
-    const bare = (await treasury.createAccount('C3-BARE', 'unmapped custody', types.find((t) => t.code === 'custody')!.id, claimant, dsA.manager)).id;
-    const sc = randomUUID();
-    await dsA.query(`INSERT INTO "shipping_companies" ("id","code","name","custodyAccountId","status") VALUES ($1,'SC-C3-BARE','Bare',$2,'active')`, [sc, bare]);
-    const sBare = randomUUID();
-    await dsA.query(`INSERT INTO "shipments" ("id","fulfillmentOrderId","waybillNumber","shippingCompanyId") VALUES ($1,$2,$3,$4)`, [sBare, randomUUID(), `WB-C3-BARE`, sc]);
-    await dsA.query(`INSERT INTO "process_instances" ("id","definitionKey","entityType","entityId","currentState") VALUES ($1,'shipment_lifecycle','shipment',$2,'out_for_delivery')`, [randomUUID(), sBare]);
-    await expect(claim(sBare)).rejects.toThrow(/not GL-mapped/);
-
+    const cashType = types.find((t) => t.code === 'cash')!.id;
+    // 1. vehicle with no float
+    const vNone = randomUUID();
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","status") VALUES ($1,'V-C3-NONE','P-N',$2,'active')`, [vNone, custodyA]);
+    await expect(claim(await mkShipment(vNone))).rejects.toThrow(/No expense float is assigned/);
+    // 2. float account that is not GL-mapped
+    const bare = (await treasury.createAccount('C3-BARE-FLOAT', 'bare float', cashType, claimant, dsA.manager)).id;
+    const vBare = randomUUID();
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-BARE','P-B',$2,$3,'active')`, [vBare, custodyA, bare]);
+    await expect(claim(await mkShipment(vBare))).rejects.toThrow(/not GL-mapped/);
+    // 3. a float that equals the collection custody account (data drift) is refused at claim time too
+    const vSame = randomUUID();
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","expenseFloatAccountId","status") VALUES ($1,'V-C3-SAME','P-S',$2,$2,'active')`, [vSame, custodyA]);
+    await expect(claim(await mkShipment(vSame))).rejects.toThrow(/collection account/);
+    // 4. category removed from the posting profile after approval: posting refused, stays approved
     const s = await newShipment();
     const x = await claim(s, { category: 'custody_toll', amount: '5.00', reason: 'Toll' });
     await decide(x.id, approver, 'approved');
@@ -260,6 +295,8 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     cfg['accounting.treasury_disbursement_reason_accounts'] = saved;
     expect((await expenses.listForShipmentUnscoped(s, await mgr()))[0].status).toBe('approved');
     expect((await expenses.post(x.id, poster, await mgr())).status).toBe('posted');
+    expect(await count('custody_expenses')).toBeGreaterThan(0);
+    expect((await (await dsOf('A')).query(`SELECT count(*)::int AS n FROM custody_expenses WHERE "vehicleId" IN ($1,$2,$3)`, [vNone, vBare, vSame]))[0].n).toBe(0);
   });
 
   it('H8 a retry with the same clientKey returns the first claim (one row, one approval request); the same key for a different expense is refused', async () => {
@@ -272,11 +309,59 @@ describe('C3 — custody expenses: claim → separate approval → explicit post
     await expect(claim(s, { clientKey: 'expense-key-0001', amount: '55.00' })).rejects.toThrow(/already used for a different expense/);
   });
 
-  it('H9 Treasury == GL for the custody account after all the above, no journal is unbalanced, and Company B is untouched', async () => {
-    // the seeded custody cash was never journalled (non-emitting cash-in); every POSTED expense was, exactly once: GL == -(sum of posted expenses)
+  it('H10 reversal: finance reverses a posted expense (append-only offsetting leg + reversal journal), the float is restored, collections untouched; only posted ones; idempotent; reason mandatory', async () => {
+    const s = await newShipment();
+    const x = await claim(s, { amount: '40.00' });
+    await expect(expenses.reverse(x.id, 'oops', poster, await mgr())).rejects.toThrow(/Only a posted expense can be reversed/);
+    await decide(x.id, approver, 'approved');
+    await expenses.post(x.id, poster, await mgr());
+    const fl = Number(await floatBalance());
+    const coll = await custodyBalance();
+    const gl5900 = Number(await glBal('5900'));
+    await expect(expenses.reverse(x.id, 'x', poster, await mgr())).rejects.toThrow(/reason of 3-255/);
+    const r = await expenses.reverse(x.id, 'posted to the wrong category', poster, await mgr());
+    expect(r.status).toBe('reversed');
+    expect(r.reversalTransactionId).toBeTruthy();
+    expect(r.reversedByUserId).toBe(poster);
+    expect(Number(await floatBalance())).toBe(fl + 40);
+    expect(Number(await glBal('5900'))).toBe(gl5900 - 40);
+    expect(await custodyBalance()).toBe(coll);
+    const txns = await count('treasury_transactions');
+    expect((await expenses.reverse(x.id, 'again', poster, await mgr())).reversalTransactionId).toBe(r.reversalTransactionId);
+    expect(await count('treasury_transactions')).toBe(txns);
+    const orig = await (await dsOf('A')).query(`SELECT status FROM treasury_transactions WHERE id = $1`, [r.treasuryTransactionId]);
+    expect(orig[0].status).toBe('reversed'); // history kept
+  });
+
+  it('H11 assigning a float is fail-closed: unknown / inactive / unmapped / bank accounts, a collection custody or settlement account and another vehicle\'s float are refused; unassigning needs a zero balance and no open claims', async () => {
+    const dsA = await dsOf('A');
+    const types = await treasury.listAccountTypes(dsA.manager);
+    const m = await mgr();
+    const v = randomUUID();
+    await dsA.query(`INSERT INTO "vehicles" ("id","code","plateNumber","custodyAccountId","settlementAccountId","status") VALUES ($1,'V-C3-ASSIGN','P-A',$2,$3,'active')`, [v, custodyA, cashA]);
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, randomUUID(), claimant, m)).rejects.toThrow(/not found/);
+    const bank = (await treasury.createAccount('C3-BANK', 'bank', types.find((t) => t.code === 'bank')!.id, claimant, dsA.manager)).id;
+    await treasury.setAccountGlMapping(bank, '1101', claimant, dsA.manager);
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, bank, claimant, m)).rejects.toThrow(/must be a cash account/);
+    const bare = (await treasury.createAccount('C3-BARE2', 'bare', types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, bare, claimant, m)).rejects.toThrow(/not GL-mapped/);
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, custodyA, claimant, m)).rejects.toThrow(/already used as a collection custody/);
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, floatA, claimant, m)).rejects.toThrow(/already used as a collection custody \/ settlement account or as another vehicle/);
+    const ok = (await treasury.createAccount('C3-FLOAT2', 'float 2', types.find((t) => t.code === 'cash')!.id, claimant, dsA.manager)).id;
+    await treasury.setAccountGlMapping(ok, '1195', claimant, dsA.manager);
+    expect((await shipmentSvc.setVehicleExpenseFloat(v, ok, claimant, m)).expenseFloatAccountId).toBe(ok);
+    await treasury.transferDirect(cashA, ok, '25.00', 'fund', 'seed', claimant, m);
+    await expect(shipmentSvc.setVehicleExpenseFloat(v, null, claimant, m)).rejects.toThrow(/still holds 25.00/);
+    await treasury.transferDirect(ok, cashA, '25.00', 'return', 'return unused float', claimant, m); // returning the float = a transfer back
+    expect((await shipmentSvc.setVehicleExpenseFloat(v, null, claimant, m)).expenseFloatAccountId).toBeNull();
+  });
+
+  it('H9 end state: no journal is unbalanced; float GL == funded - posted-and-not-reversed; custody (collections) account and its GL were never touched; Company B untouched', async () => {
     const postedSum = Number((await (await dsOf('A')).query(`SELECT COALESCE(SUM(amount),0)::numeric(20,2)::text AS t FROM custody_expenses WHERE status = 'posted'`))[0].t);
-    expect(Number(await glBal('1190'))).toBe(-postedSum);
     expect(Number(await glBal('5900'))).toBe(postedSum);
+    expect(Number(await glBal('1195'))).toBe(Number(await floatBalance()));
+    expect(Number(await glBal('1190'))).toBe(0); // the seed cash-in is non-emitting; no expense ever journalled against the collection custody account
+    expect(Number(await custodyBalance())).toBe(4000); // 1000 seed + 3000 added in H5; no expense ever moved it
     expect((await (await dsOf('A')).query(`SELECT count(*)::int AS n FROM accounting_journal_entries WHERE "postedAt" IS NOT NULL AND "totalDebitBase" <> "totalCreditBase"`))[0].n).toBe(0);
     const dsB = await dsOf('B');
     expect(Number((await dsB.query(`SELECT count(*) AS n FROM "custody_expenses"`))[0].n)).toBe(0);

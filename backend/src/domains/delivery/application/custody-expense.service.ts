@@ -2,8 +2,6 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { DataSource, EntityManager } from 'typeorm';
 import { CustodyExpense } from '../infrastructure/custody-expense.entity';
 import { DeliveryService } from './delivery.service';
-import { CustodyHandoverService, vehicleCashLockKey } from './custody-handover.service';
-import { computeCustodyReconciliation } from './custody-reconciliation';
 import { ShipmentService } from '../../shipment/application/shipment.service';
 import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
@@ -36,8 +34,8 @@ export interface ClaimExpenseInput {
  *  - APPROVE (a DIFFERENT person - the engine enforces maker != checker and the live `finance.cash_document.approve` check). EVERY expense needs it; there is no auto-approve limit.
  *  - POST (an explicit action by someone with `finance.cash_document.execute`): the existing Treasury cash-out from the custody account (balance check, lock, Financial Event, audit).
  *    A retry of a posted expense changes nothing. Recording, approval and posting stay three separate facts.
- * Open policy (reported to the finance owner, not decided here): an expense paid from collected cash lowers the custody balance that the gross remittance expects - until the owner
- * chooses how that is booked, posting is refused when the custody balance does not cover it, and remittance stays gross and fail-closed.
+ * Policy (CTO 2026-10-26, SEPARATE EXPENSE FLOAT): expenses are paid only from the vehicle's own float account, funded and replenished by ordinary Treasury transfer documents;
+ * customer collections are never used, netted or consumed, and remittance stays gross.
  */
 @Injectable()
 export class CustodyExpenseService implements OnModuleInit {
@@ -51,7 +49,6 @@ export class CustodyExpenseService implements OnModuleInit {
     private readonly approvals: ApprovalEngineService,
     private readonly config: ConfigurationEngineService,
     @Inject(FINANCE_TREASURY_CONTRACT) private readonly treasury: FinanceTreasuryContract,
-    private readonly handovers: CustodyHandoverService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -114,11 +111,18 @@ export class CustodyExpenseService implements OnModuleInit {
           return prior;
         }
       }
-      const custodian = await this.shipments.getCustodianForShipment(input.shipmentId, tx);
-      if (!custodian) throw new ConflictException('This shipment has no custody account - there is no cash to spend from. Nothing was recorded.');
+      // Separate EXPENSE FLOAT (CTO policy 2026-10-26): expenses are paid from the vehicle's float account only - never from the collection custody account. Fail closed on every gap.
+      const snap = await this.shipments.getShipmentSnapshot(input.shipmentId, tx);
+      if (!snap?.vehicleId) throw new ConflictException('This shipment has no vehicle - expenses are paid from a vehicle expense float. Nothing was recorded.');
+      const vehicle = await this.shipments.getVehicle(snap.vehicleId, tx);
+      const floatAccountId = vehicle.expenseFloatAccountId;
+      if (!floatAccountId) throw new ConflictException('No expense float is assigned to this vehicle - assign one (and fund it by a Treasury transfer) before claiming expenses. Nothing was recorded.');
+      if (floatAccountId === vehicle.custodyAccountId || floatAccountId === vehicle.settlementAccountId) {
+        throw new ConflictException('The expense float of this vehicle is a collection account - refused. Nothing was recorded.');
+      }
       const { balances } = await this.treasury.getAllTreasuryBalances(undefined, tx);
-      if (!balances.find((b) => b.treasuryAccountId === custodian.custodyAccountId)?.glAccountCode) {
-        throw new ConflictException('The custody account of this vehicle is not GL-mapped - Accounting must map it before expenses can be claimed. Nothing was recorded.');
+      if (!balances.find((b) => b.treasuryAccountId === floatAccountId)?.glAccountCode) {
+        throw new ConflictException('The expense float account of this vehicle is not GL-mapped - Accounting must map it before expenses can be claimed. Nothing was recorded.');
       }
       const custody = await this.delivery.openCustody(input.shipmentId, actorUserId, tx);
       await this.numbering.registerDocumentType('custody_expense', 'CEX', true, tx);
@@ -129,7 +133,7 @@ export class CustodyExpenseService implements OnModuleInit {
           custodyId: custody.id,
           shipmentId: input.shipmentId,
           vehicleId: custody.vehicleId,
-          custodyAccountId: custodian.custodyAccountId,
+          floatAccountId,
           category,
           amount: input.amount,
           reason,
@@ -213,19 +217,8 @@ export class CustodyExpenseService implements OnModuleInit {
       if (!locked) throw new NotFoundException(`Expense "${id}" not found.`);
       if (locked.status === 'posted') return locked;
       if (locked.status !== 'approved') throw new ConflictException(`Only an approved expense can be posted - this one is "${locked.status}".`);
-      // Stage C / C4: serialised with handover declarations - an expense may not take the cash below what the driver has already declared/confirmed as handed over.
-      if (locked.vehicleId) {
-        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [vehicleCashLockKey(locked.vehicleId)]);
-        const facts = await this.handovers.loadFacts(locked.vehicleId, tx);
-        const r = computeCustodyReconciliation({ collections: facts.collections, expenses: facts.expenses, handovers: facts.handovers, custodyBalance: null });
-        const handedOver = Math.round(Number(r.handovers.handedOver) * 100);
-        const remainingAfter = Math.round(Number(r.derived.cashInDriverHand) * 100) + handedOver - Math.round(Number(locked.amount) * 100); // counted - posted - this expense
-        if (handedOver > 0 && handedOver > remainingAfter) {
-          throw new ConflictException(`Posting ${locked.amount} would take the cash below what was already handed over (${r.handovers.handedOver}). Nothing was posted.`);
-        }
-      }
       const leg = await this.treasury.cashOutForCustodyExpense(
-        locked.custodyAccountId,
+        locked.floatAccountId,
         locked.amount,
         locked.expenseNumber,
         `${locked.category}: ${locked.reason}`,
@@ -246,6 +239,36 @@ export class CustodyExpenseService implements OnModuleInit {
         { actorUserId, organizationId: null, action: 'delivery.custody_expense.posted', resource: 'custody_expense', resourceId: id, result: 'success', correlationId: null, after: { expenseNumber: row.expenseNumber, amount: row.amount, treasuryTransactionId: row.treasuryTransactionId, approvedBy: row.decidedByUserId } },
         manager,
       );
+    }
+    return row;
+  }
+
+  /**
+   * Reverses a POSTED expense (finance, with a reason): the Treasury owner-reversal of the float cash-out with the same posting-profile counter - an append-only offsetting leg and a
+   * reversal journal - and the expense becomes `reversed` (history kept). Idempotent for an already-reversed expense. Never touches customer collections.
+   */
+  async reverse(id: string, reason: string, actorUserId: string, manager?: EntityManager): Promise<CustodyExpense> {
+    const why = (reason ?? '').trim();
+    if (why.length < 3 || why.length > 255) throw new BadRequestException('A reason of 3-255 characters is required.');
+    let didReverse = false;
+    const row = await (manager ?? this.dataSource).transaction(async (tx) => {
+      const repo = tx.getRepository(CustodyExpense);
+      const locked = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!locked) throw new NotFoundException(`Expense "${id}" not found.`);
+      if (locked.status === 'reversed') return locked;
+      if (locked.status !== 'posted' || !locked.treasuryTransactionId) throw new ConflictException(`Only a posted expense can be reversed - this one is "${locked.status}".`);
+      const leg = await this.treasury.reverseCustodyExpense(locked.treasuryTransactionId, `${locked.expenseNumber}: ${why}`, actorUserId, tx, { configKey: TREASURY_DISBURSEMENT_REASON_ACCOUNTS_KEY, reasonCode: locked.category });
+      locked.status = 'reversed';
+      locked.reversedByUserId = actorUserId;
+      locked.reversedAt = new Date();
+      locked.reversalReason = why;
+      locked.reversalTransactionId = leg.id;
+      didReverse = true;
+      return repo.save(locked);
+    });
+    if (didReverse) {
+      await this.events.dispatchAfterCommit(manager);
+      await this.audit.record({ actorUserId, organizationId: null, action: 'delivery.custody_expense.reversed', resource: 'custody_expense', resourceId: id, result: 'success', correlationId: null, after: { expenseNumber: row.expenseNumber, amount: row.amount, reason: why, reversalTransactionId: row.reversalTransactionId } }, manager);
     }
     return row;
   }
