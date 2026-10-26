@@ -36,6 +36,10 @@ export class SupplierPayment {
   @Column('uuid')
   recordedByUserId!: string;
 
+  /** Org engine WP-A — the branch of the paying treasury account at the time of payment (bank leg); `null` = unassigned / recorded before the decision. The reversal mirrors it. */
+  @Column({ type: 'uuid', nullable: true })
+  bankOrgUnitId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   occurredAt!: Date;
 }

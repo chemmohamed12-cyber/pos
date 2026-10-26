@@ -1,3 +1,4 @@
+import { purchaseOrderBranchOf, treasuryAccountBranchOf } from './procurement-org';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { SupplierPayment } from '../infrastructure/supplier-payment.entity';
@@ -134,6 +135,11 @@ export class SupplierPaymentService {
       // D2: reject an unmapped paying account BEFORE any treasury/ledger mutation; the mapped GL code travels in the event.
       const { glAccountCode } = await this.treasury.requireGlMappedAccount(treasuryAccountId, m);
 
+      // Org engine WP-A (D-A option B): each allocation carries its invoice's branch (the PO's branch); the bank leg carries the paying account's branch.
+      const bankOrgUnitId = await treasuryAccountBranchOf(m, treasuryAccountId);
+      const allocationUnits: Array<string | null> = [];
+      for (const inv of invoices) allocationUnits.push(await purchaseOrderBranchOf(m, inv.purchaseOrderId));
+
       const treasuryTxn = await this.treasury.cashOutForSupplier(
         treasuryAccountId,
         amount,
@@ -160,13 +166,14 @@ export class SupplierPaymentService {
           treasuryTransactionId: treasuryTxn.id,
           reference,
           recordedByUserId: actorUserId,
+          bankOrgUnitId,
         }),
       );
 
       const allocRepo = m.getRepository(SupplierPaymentAllocation);
       for (let i = 0; i < invoices.length; i++) {
         const part = (cents[i] / 100).toFixed(2);
-        await allocRepo.save(allocRepo.create({ supplierPaymentId: savedPayment.id, supplierInvoiceId: invoices[i].id, amount: part }));
+        await allocRepo.save(allocRepo.create({ supplierPaymentId: savedPayment.id, supplierInvoiceId: invoices[i].id, amount: part, orgUnitId: allocationUnits[i] }));
         await this.ledger.postEntry(
           {
             supplierId,
@@ -188,12 +195,12 @@ export class SupplierPaymentService {
       await this.events.publish(m, AP_EVENT_TOPICS.supplierPaymentRecorded, {
         idempotencyKey: `procurement:supplier_payment:${savedPayment.id}:recorded`,
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: null, // the entry is attributed per LINE (allocations below), not as a whole
         currency: 'EGP',
         sourceEntityType: 'supplier_payment' as const,
         sourceEntityId: savedPayment.id,
         externalDocument: null,
-        payloadVersion: 1,
+        payloadVersion: 2,
         supplierPaymentId: savedPayment.id,
         paymentNumber,
         supplierId,
@@ -202,6 +209,8 @@ export class SupplierPaymentService {
         method,
         treasuryAccountId,
         glAccountCode,
+        bankOrgUnitId,
+        allocations: invoices.map((inv, i) => ({ invoiceId: inv.id, amount: (cents[i] / 100).toFixed(2), orgUnitId: allocationUnits[i] })),
       });
 
       for (const inv of invoices) await this.invoices.recomputeStatus(inv.id, actorUserId, m);

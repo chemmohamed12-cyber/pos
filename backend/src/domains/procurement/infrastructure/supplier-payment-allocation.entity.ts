@@ -21,6 +21,10 @@ export class SupplierPaymentAllocation {
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount!: string;
 
+  /** Org engine WP-A (decision D-A, option B) — the branch of the invoice this allocation settles, stamped when the payment is recorded; `null` = unassigned / recorded before the decision. The payment reversal mirrors THIS value. */
+  @Column({ type: 'uuid', nullable: true })
+  orgUnitId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }
