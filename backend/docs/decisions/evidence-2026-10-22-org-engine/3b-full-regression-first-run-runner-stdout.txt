@@ -1,0 +1,700 @@
+
+=== REGRESSION: src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/accounting-policy-config.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/accounting.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/accounting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+[Nest] 8452  - ٢٢‏/١٠‏/٢٠٢٦، ٩:٣٠:١٧ ص    WARN [EventBusService] Topic "d10.ambient.only" has only ambient-scope subscribers — its Company-outbox events are marked 'skipped' (ADR-075 §5).
+[Nest] 8452  - ٢٢‏/١٠‏/٢٠٢٦، ٩:٣٠:١٧ ص    WARN [EventBusService] Event handler for "d10.fails" failed in Company a07e9349-186a-4682-a1f0-f8738e1e80c5: boom
+RESULT PASS src/domains/accounting/interface/event-engine.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-helper.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/fixed-asset-acquisition-link.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_fa02_disposal_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts:110:5)
+
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-gain-loss.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/fixed-asset-disposal-reconciliation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/fixed-asset.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_general_ledger_isolation_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/accounting/interface/general-ledger.company-isolation.spec.ts:166:5)
+
+RESULT PASS src/domains/accounting/interface/general-ledger.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_tb_footer_company_b","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts:115:5)
+
+RESULT PASS src/domains/accounting/interface/trial-balance-footer.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/cash-flow-date-validation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/grni.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/grni.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-posting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/journal-numbering.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/manual-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/subledger-controllers.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/t0-clean-company-baseline.spec.ts
+RESULT PASS src/domains/accounting/interface/t0-clean-company-baseline.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/wip-control-account.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/wages-payable-control-account.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/wages-payable-control-account.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/wip.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/wip.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/attendance/interface/attendance.company-isolation.spec.ts
+RESULT PASS src/domains/attendance/interface/attendance.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/bom.company-isolation.spec.ts
+RESULT PASS src/domains/commerce/interface/bom.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/price-lists.company-isolation.spec.ts
+RESULT PASS src/domains/commerce/interface/price-lists.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/products.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_items_isolation_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/commerce/interface/products.company-isolation.spec.ts:52:5)
+
+RESULT PASS src/domains/commerce/interface/products.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/product-master-data.company-isolation.spec.ts
+RESULT PASS src/domains/commerce/interface/product-master-data.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/product-name-uniqueness.company-isolation.spec.ts
+RESULT PASS src/domains/commerce/interface/product-name-uniqueness.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commission/interface/commission.company-isolation.spec.ts
+RESULT PASS src/domains/commission/interface/commission.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/crm/interface/customers.company-isolation.spec.ts
+RESULT PASS src/domains/crm/interface/customers.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/crm/interface/customer-profile.company-isolation.spec.ts
+RESULT PASS src/domains/crm/interface/customer-profile.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts
+RESULT PASS src/domains/customer-finance/interface/customer-ledger.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/invoices.company-isolation.spec.ts
+RESULT PASS src/domains/customer-finance/interface/invoices.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts
+RESULT PASS src/domains/customer-finance/interface/on-account-payment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/customer-finance/interface/payments.company-isolation.spec.ts
+RESULT PASS src/domains/customer-finance/interface/payments.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/delivery/interface/delivery.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_courier_isolation_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/delivery/interface/delivery.company-isolation.spec.ts:135:5)
+
+RESULT PASS src/domains/delivery/interface/delivery.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/deposit-control/interface/deposits.company-isolation.spec.ts
+RESULT PASS src/domains/deposit-control/interface/deposits.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+RESULT PASS src/domains/fulfillment/interface/fulfillment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/hr/interface/hr.company-isolation.spec.ts
+RESULT PASS src/domains/hr/interface/hr.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+RESULT PASS src/domains/inventory-valuation/interface/inventory-valuation.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
+RESULT PASS src/domains/inventory-warehouse/interface/inventory.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/inventory-movement-dates.company-isolation.spec.ts
+RESULT PASS src/domains/inventory-warehouse/interface/inventory-movement-dates.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+RESULT PASS src/domains/inventory-warehouse/interface/stock-report-export.scope.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-item-assignment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-transactions.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/manufacturing/interface/manufacturing-entitlement-permission.real-pg.spec.ts
+RESULT PASS src/domains/manufacturing/interface/manufacturing-entitlement-permission.real-pg.spec.ts
+
+=== REGRESSION: src/domains/manufacturing/interface/manufacturing-master-data.company-isolation.spec.ts
+RESULT PASS src/domains/manufacturing/interface/manufacturing-master-data.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/manufacturing/interface/work-order.company-isolation.spec.ts
+RESULT PASS src/domains/manufacturing/interface/work-order.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/payroll/interface/payroll.company-isolation.spec.ts
+RESULT PASS src/domains/payroll/interface/payroll.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/goods-receipt.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/new-item-request.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/new-item-request.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/purchase-order.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/purchase-request.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/purchase-request.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_proc_item_elig_company_a","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts:70:5)
+
+RESULT PASS src/domains/procurement/interface/procurement-item-eligibility.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/rfq-award-visibility.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/rfq-supplier.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/supplier-invoice-ppv-vat.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/supplier-invoice.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-master.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/supplier-master.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-profile.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/supplier-profile.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/supplier-payment.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_sp_isolation_company_a","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/procurement/interface/supplier-payment.company-isolation.spec.ts:91:5)
+
+RESULT PASS src/domains/procurement/interface/supplier-payment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/warehouse-reference.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_wh_ref_company_a","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/procurement/interface/warehouse-reference.company-isolation.spec.ts:78:5)
+
+RESULT PASS src/domains/procurement/interface/warehouse-reference.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/reports/interface/reports.company-isolation.spec.ts
+RESULT PASS src/domains/reports/interface/reports.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+RESULT PASS src/domains/returns/interface/returns-accounting.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/returns.company-isolation.spec.ts
+RESULT PASS src/domains/returns/interface/returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+RESULT PASS src/domains/returns/interface/sales-returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+RESULT PASS src/domains/returns/interface/shipment-returns.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_so_isolation_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/sales-orders/interface/sales-orders.company-isolation.spec.ts:76:5)
+
+RESULT PASS src/domains/sales-orders/interface/sales-orders.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/sales/interface/sales.company-isolation.spec.ts
+RESULT PASS src/domains/sales/interface/sales.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/shipment/interface/shipment.company-isolation.spec.ts
+RESULT PASS src/domains/shipment/interface/shipment.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/targets/interface/targets.company-isolation.spec.ts
+RESULT PASS src/domains/targets/interface/targets.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+RESULT PASS src/domains/treasury/interface/treasury-bank-leg.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/treasury/interface/treasury.company-isolation.spec.ts
+RESULT PASS src/domains/treasury/interface/treasury.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/approval-engine/approval-engine.company-isolation.spec.ts
+RESULT PASS src/foundation/approval-engine/approval-engine.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/commerce/interface/entity-code-sequence.company-isolation.spec.ts
+RESULT PASS src/domains/commerce/interface/entity-code-sequence.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/terminology/platform-role-names.real-pg.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_role_names_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (foundation/terminology/platform-role-names.real-pg.spec.ts:30:5)
+
+RESULT PASS src/foundation/terminology/platform-role-names.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT FAIL src/foundation/audit/area14-company-audit.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/audit/audit-chain-concurrency.real-pg.spec.ts
+RESULT PASS src/foundation/audit/audit-chain-concurrency.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/authentication/auth-me.contract.spec.ts
+RESULT PASS src/foundation/authentication/auth-me.contract.spec.ts
+
+=== REGRESSION: src/foundation/authorization/authorization-context.company-isolation.spec.ts
+RESULT PASS src/foundation/authorization/authorization-context.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/company/area6-company-isolation.acceptance.spec.ts
+RESULT PASS src/foundation/company/area6-company-isolation.acceptance.spec.ts
+
+=== REGRESSION: src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+RESULT PASS src/foundation/company/company-database-pool.multi-process.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-lifecycle-admission.real-pg.spec.ts
+[Nest] 29020  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٧:٤٤ ص     LOG [PreliminaryHoldExpiryScheduler] Preliminary hold expiry skipped for Company 704d0a52-0aa5-4720-bbfb-0dcbf63e52b0: not READY.
+[Nest] 29020  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٧:٤٤ ص     LOG [ApprovalExpiryScheduler] Approval expiry sweep skipped for Company 704d0a52-0aa5-4720-bbfb-0dcbf63e52b0: not READY.
+RESULT PASS src/foundation/company/company-lifecycle-admission.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/la1-layer2-sites-1-5-6-7.real-pg.spec.ts
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣١ ص     LOG [ClosingSnapshotRecoveryScheduler] Closing Snapshot recovery sweep skipped for Company 2c2904cd-60b5-4b57-808a-f90d4afb2739: not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣١ ص     LOG [ClosingSnapshotRecoveryScheduler] Closing Snapshot recovery sweep skipped for Company 2c2904cd-60b5-4b57-808a-f90d4afb2739: not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣١ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation 3156390a-d0e3-4926-b9bc-9f4504d109a3 deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣١ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation 9badbc86-a6f1-472e-9e8a-cb08277a07a3 deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣٢ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation 801763f0-f9d5-42f2-a0b6-2291fc0491d3 deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣٢ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation c2c7dcb3-a8bc-48d1-bbfb-0bc9c86cd7aa deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣٢ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation f7cfa9c8-c4df-4309-b943-b8e22fc016ee deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+[Nest] 9196  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٢٨:٣٣ ص     LOG [MembershipReconciliationScheduler] Membership reconciliation of operation 5761012a-4067-41a9-9e0b-50fa8fe1619e deferred: Company 2c2904cd-60b5-4b57-808a-f90d4afb2739 is not READY.
+RESULT PASS src/foundation/company/la1-layer2-sites-1-5-6-7.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/membership-reconciliation.scheduler.spec.ts
+RESULT PASS src/foundation/company/membership-reconciliation.scheduler.spec.ts
+
+=== REGRESSION: src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts
+RESULT PASS src/domains/accounting/application/closing-snapshot-recovery.scheduler.spec.ts
+
+=== REGRESSION: src/foundation/company/company-lifecycle-layer1.real-pg.spec.ts
+RESULT PASS src/foundation/company/company-lifecycle-layer1.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-membership-provisioning.real-pg.spec.ts
+RESULT PASS src/foundation/company/company-membership-provisioning.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-roles.f3.real-pg.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_f3_roles_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (foundation/company/company-roles.f3.real-pg.spec.ts:79:5)
+
+RESULT PASS src/foundation/company/company-roles.f3.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/company-users.f2.real-pg.spec.ts
+RESULT PASS src/foundation/company/company-users.f2.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/cto-decisions-2026-10-07.real-pg.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_cto_dec_company_b","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (foundation/company/cto-decisions-2026-10-07.real-pg.spec.ts:50:5)
+
+RESULT PASS src/foundation/company/cto-decisions-2026-10-07.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/memberships-mine.real-pg.spec.ts
+RESULT FAIL src/foundation/company/memberships-mine.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/company/permission-path-company-isolation.acceptance.spec.ts
+RESULT PASS src/foundation/company/permission-path-company-isolation.acceptance.spec.ts
+
+=== REGRESSION: src/foundation/database-provisioning/database-provisioning.service.spec.ts
+RESULT PASS src/foundation/database-provisioning/database-provisioning.service.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-connection-manager.service.spec.ts
+RESULT PASS src/foundation/database-registry/company-connection-manager.service.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+  console.log
+    ADR-074 Authorization chain characterization: RETURNED: ["admin"]
+
+      at Object.<anonymous> (foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts:170:13)
+
+  console.log
+    ADR-074 Closing Snapshot chain characterization: RAN OK
+
+      at Object.<anonymous> (foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts:193:13)
+
+RESULT PASS src/foundation/database-registry/company-datasource-factory-impact.characterization.spec.ts
+
+=== REGRESSION: src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+RESULT PASS src/foundation/database-registry/company-datasource-registry-isolation.spec.ts
+
+=== REGRESSION: src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٤ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٤ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٦ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٧ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٧ ص    WARN [InstallationBootstrapService] ENTITLEMENT_MODE=enforced and no installation row: NOT creating one — apply a signed entitlement manifest (POST /api/admin/entitlement/apply).
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٧ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٧ ص     LOG [EntitlementService] No entitlement manifest — running the implicit DAII_STANDARD edition (ENTITLEMENT_MODE=unlicensed-full).
+[Nest] 17516  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٣٩:٠٧ ص     LOG [InstallationBootstrapService] Initialised the implicit unlicensed installation row (implicit-74f718bb45c7bbfe8c015978cf8c9858); required by companies.installationId.
+RESULT PASS src/foundation/entitlement/installation-bootstrap.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/organization/organization.company-isolation.spec.ts
+RESULT PASS src/foundation/organization/organization.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/plans/company-packages.real-pg.spec.ts
+RESULT PASS src/foundation/plans/company-packages.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/platform/platform-authorization.f4.real-pg.spec.ts
+RESULT PASS src/foundation/platform/platform-authorization.f4.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release-orchestration/company-migration-runner.spec.ts
+RESULT PASS src/foundation/release-orchestration/company-migration-runner.spec.ts
+
+=== REGRESSION: src/foundation/release/company-fanout.real-pg.spec.ts
+  console.log
+    Migration "SalesNew1790900001002" failed, error: injected failure in SalesNew
+
+      at Function.log (../../../local-preview/backend/src/platform/PlatformTools.ts:274:17)
+
+RESULT PASS src/foundation/release/company-fanout.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release/release-execution-environment-check.spec.ts
+[Nest] 18076  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٤٦:١١ ص     LOG [ReleaseExecutionService] 
+[Nest] 18076  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٤٦:١١ ص    WARN [ReleaseExecutionService] RELEASE_READINESS_URL is not set: the engine cannot verify that the restarted application answers. The deploy is recorded DEPLOYED_UNVERIFIED.
+RESULT PASS src/foundation/release/release-execution-environment-check.spec.ts
+
+=== REGRESSION: src/foundation/release/release-migration-registry.real-pg.spec.ts
+RESULT FAIL src/foundation/release/release-migration-registry.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+RESULT PASS src/foundation/release/restore-manager-audit-chain.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/scope/access-scope.f6.real-pg.spec.ts
+RESULT PASS src/foundation/scope/access-scope.f6.real-pg.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.migrations.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_inv_c1_ctl_company_b","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts:140:5)
+
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c1.controlled-scenario.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+[Nest] 13628  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٥١:٤٤ ص    WARN [InventoryPostingDispatchService] In-request inventory dispatch failed (events stay queued for the sweep): simulated dispatch outage
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c2.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c3.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c4.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c4.migrations.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c4.migrations.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
+[Nest] 32544  - ٢٢‏/١٠‏/٢٠٢٦، ١٠:٥٥:٣٢ ص    WARN [EventBusService] Event handler for "approval.request.approved" failed in Company 01ad4979-39a7-4958-aba6-1a1aed2b749d: Inventory valuation_write_down GL posting was rejected — see financial event 51bc0264-1d73-484b-a22c-44f487988ba8.
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c6.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/inventory-lifecycle-c6.migrations.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/inventory-lifecycle-c6.migrations.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/document-reversal.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/movement-reason-reference.company-isolation.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_inv_rev_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+      at Object.<anonymous> (domains/accounting/interface/movement-reason-reference.company-isolation.spec.ts:159:5)
+
+RESULT PASS src/domains/accounting/interface/movement-reason-reference.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/movement-reason-reference.migrations.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/movement-reason-reference.migrations.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/release/release-upload.http.spec.ts
+RESULT FAIL src/foundation/release/release-upload.http.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/grni-control-account.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/grni-control-account.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/accounting/interface/d3-clean-run-closure.company-isolation.spec.ts
+RESULT PASS src/domains/accounting/interface/d3-clean-run-closure.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-allocations.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-allocations.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-allocations.migrations.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-allocations.migrations.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-invoice-approval.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-invoice-approval.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-multi-order-invoice.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-multi-order-invoice.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-invoice-charges.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-purchase-return.company-isolation.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts
+RESULT PASS src/domains/procurement/interface/procurement-credit-notes.company-isolation.spec.ts
+
+=== REGRESSION: src/foundation/organization/organization-integrity.real-pg.spec.ts
+RESULT PASS src/foundation/organization/organization-integrity.real-pg.spec.ts
+
+=== REGRESSION: src/domains/shipment/interface/vehicle-branch.real-pg.spec.ts
+RESULT PASS src/domains/shipment/interface/vehicle-branch.real-pg.spec.ts
+
+=== REGRESSION: src/foundation/scope/org-context.real-pg.spec.ts
+RESULT PASS src/foundation/scope/org-context.real-pg.spec.ts
+
+=== REGRESSION: src/domains/inventory-warehouse/interface/warehouse-branch.real-pg.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_warehouse_branch_company_b","attempts":3,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":750}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+
+RESULT PASS src/domains/inventory-warehouse/interface/warehouse-branch.real-pg.spec.ts
+
+=== REGRESSION: src/domains/sales-orders/interface/branch-stamping.real-pg.spec.ts
+RESULT PASS src/domains/sales-orders/interface/branch-stamping.real-pg.spec.ts
+
+=== REGRESSION: src/domains/procurement/interface/procurement-branch.real-pg.spec.ts
+  console.warn
+    [test-teardown] {"database":"daii_test_biz_t90_proc_branch_company_b","attempts":2,"outcome":"dropped-after-retry","originalError":"permission denied to terminate process","finalError":null,"waitedMs":250}
+
+      62 |       const rec: TeardownDropRecord = { database, attempts: attempt, outcome: attempt === 1 ? 'dropped' : 'dropped-after-retry', originalError, finalError: null, waitedMs };
+      63 |       records.push(rec);
+    > 64 |       if (attempt > 1) console.warn(`[test-teardown] ${JSON.stringify(rec)}`);
+         |                                ^
+      65 |       return rec;
+      66 |     } catch (err) {
+      67 |       originalError ??= text(err);
+
+      at dropWithBoundedRetry (foundation/testing/test-teardown-retry.ts:64:32)
+      at dropDatabase (foundation/testing/two-company-real-pg-harness.ts:88:3)
+      at Object.teardown (foundation/testing/two-company-real-pg-harness.ts:184:9)
+
+RESULT PASS src/domains/procurement/interface/procurement-branch.real-pg.spec.ts
+
+=== REGRESSION: src/domains/reports/interface/org-report.real-pg.spec.ts
+RESULT PASS src/domains/reports/interface/org-report.real-pg.spec.ts
+
+=== REGRESSION: src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts
+RESULT PASS src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts
+
+REGRESSION DONE: 131/135 passed

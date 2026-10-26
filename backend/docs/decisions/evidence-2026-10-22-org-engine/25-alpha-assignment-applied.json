@@ -1,0 +1,134 @@
+{
+  "mode": "APPLY",
+  "database": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+  "branch": {
+    "id": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+    "type": "branch",
+    "name": "كتامه",
+    "status": "active"
+  },
+  "plan": [
+    {
+      "code": "1",
+      "name": "مخزن المفكك",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "10",
+      "name": "مخزن الصيانة",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "1001",
+      "name": "مخزن الخامات",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "2",
+      "name": "مخزن البلاستيك",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "3",
+      "name": "مخزن المطبوعات",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "4",
+      "name": "مخزن انتاج تحت التشغيل",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "5",
+      "name": "مخزن منتج تام مصنع",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "6",
+      "name": "مخزن منتج تام مشتري",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "7",
+      "name": "مخزن السيارة 1",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "8",
+      "name": "مخزن سيارة 2",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "9",
+      "name": "مخزن سيارة 3",
+      "kind": "main",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "PREP-000001",
+      "name": "تحت التجهيز",
+      "kind": "operational",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    },
+    {
+      "code": "SLOC-000001",
+      "name": "2019-1 — ع ب ب - 2019",
+      "kind": "operational",
+      "before": null,
+      "after": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "action": "assign"
+    }
+  ],
+  "applied": [
+    "1",
+    "10",
+    "1001",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "PREP-000001",
+    "SLOC-000001"
+  ],
+  "afterAllAssigned": true,
+  "auditRowsForAction": 13,
+  "at": "2026-10-26T12:17:42.708Z"
+}

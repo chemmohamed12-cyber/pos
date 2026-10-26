@@ -1,0 +1,19 @@
+﻿node : PASS src/foundation/release/release-upload.http.spec.ts (28.101 s)
+At C:\Users\chem_\AppData\Local\Temp\claude\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\4
+3afe97d-79f9-432d-b067-105f0437b32b\scratchpad\p2-three-specs.ps1:21 char:5
++     node tools/testing/biz-run.js --regression $list > "$out.stdout.l ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS src/founda...c.ts (28.101 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Release Center upload over HTTP - RELEASE_UPLOAD_MAX_MB
+    ظêأ a file within the 2 MB test cap is accepted and its temp file is removed (91 ms)
+    ظêأ a file above the cap is a 413 naming the cap and the setting, and leaves no temp file (22 ms)
+    ظêأ a chunked upload (no Content-Length) above the cap is stopped by the stream limit itself (17 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        28.197 s
+Ran all test suites matching /src\\foundation\\release\\release-upload.http.spec.ts/i.
+

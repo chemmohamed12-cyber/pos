@@ -1,0 +1,6 @@
+﻿
+=== REGRESSION: src/foundation/audit/area14-company-audit.real-pg.spec.ts
+RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts
+
+REGRESSION DONE: 1/1 passed
+

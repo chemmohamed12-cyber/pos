@@ -1,0 +1,24 @@
+﻿node : PASS src/foundation/company/memberships-mine.real-pg.spec.ts (19.063 s)
+At C:\Users\chem_\AppData\Local\Temp\claude\D--CLAUDE-CODE-XNEXUS-WORKSPACE-1-hosting-daii-xnexustech-com-release-new\4
+3afe97d-79f9-432d-b067-105f0437b32b\scratchpad\p2-three-specs.ps1:21 char:5
++     node tools/testing/biz-run.js --regression $list > "$out.stdout.l ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS src/founda...c.ts (19.063 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  GET /memberships/mine ظ¤ real Postgres (2026-09-25, CTO-authorized)
+    ظêأ Positive: returns only the caller's own memberships (44 ms)
+    ظêأ Multiple Companies: a user with memberships in both A and B gets both back (18 ms)
+    ظêأ No membership: returns an empty array, not an error (5 ms)
+    ظêأ Cross-user protection: there is no parameter through which User A can request User B's memberships (13 ms)
+    ظêأ No Company Context: the request succeeds with only req.user set ظ¤ no companyContext anywhere (8 ms)
+    ظêأ DB boundary: the controller has no Company-DataSource-capable dependency at all (structural), and only the 
+Platform DB is ever queried (empirical) (1 ms)
+    ظêأ Authentication: the controller is gated by JwtAuthGuard only (no CompanyContextGuard, no PermissionGuard)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        19.163 s, estimated 35 s
+Ran all test suites matching /src\\foundation\\company\\memberships-mine.real-pg.spec.ts/i.
+

@@ -1,0 +1,12 @@
+      × NEGATIVE CONTROL — the pre-fix 6-tag registry makes the same undo fail (proves this test detects the H3 
+      ○ skipped safety fallback preserved: classes genuinely unavailable (failed-slot path lacks them) → undo rejects, 
+undoReleaseMigrations resolves the classes the forward deploy ran (H3 RB-1) › NEGATIVE CONTROL — the pre-fix 6-tag 
+    expect(received).rejects.toThrow()
+    Received promise resolved instead of rejected
+    Resolved to value: undefined
+    > 542 |         await expect(undo.priv.undoReleaseMigrations(rel, 'actor', null)).rejects.toThrow(/No migration .* 
+      544 |       expect(restore.preflight).toHaveBeenCalledTimes(1);
+      545 |       expect((await executedNames(env.ds)).length).toBe(executedBeforeUndo);
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 20 skipped, 21 total
+Ran all test suites matching /zz-mutation-negative-control/i with tests matching "NEGATIVE CONTROL".

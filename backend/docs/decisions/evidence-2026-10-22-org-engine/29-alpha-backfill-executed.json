@@ -1,0 +1,247 @@
+{
+  "database": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+  "approvedBy": "project owner (chat, 2026-10-26)",
+  "before": {
+    "sales_orders": {
+      "n": 2,
+      "stamped": 0,
+      "total": "20.00"
+    },
+    "sales_invoices": {
+      "n": 2,
+      "stamped": 0,
+      "total": "20.00"
+    },
+    "fulfillment_orders": {
+      "n": 2,
+      "stamped": 0
+    },
+    "shipments": {
+      "n": 2,
+      "stamped": 0
+    },
+    "purchase_orders": {
+      "n": 2,
+      "stamped": 0,
+      "total": "92.00"
+    },
+    "logRows": 0
+  },
+  "run": {
+    "runId": "ac6e4c19-048d-45e4-8591-d5737a8bf4c6",
+    "dryRun": false,
+    "steps": [
+      {
+        "table": "sales_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmount": "20.00"
+        },
+        "checksumAfter": {
+          "totalAmount": "20.00"
+        }
+      },
+      {
+        "table": "sales_invoices",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmount": "20.00"
+        },
+        "checksumAfter": {
+          "totalAmount": "20.00"
+        }
+      },
+      {
+        "table": "fulfillment_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {},
+        "checksumAfter": {}
+      },
+      {
+        "table": "shipments",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "codAmount": "0"
+        },
+        "checksumAfter": {
+          "codAmount": "0"
+        }
+      },
+      {
+        "table": "purchase_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmountBase": "92.00"
+        },
+        "checksumAfter": {
+          "totalAmountBase": "92.00"
+        }
+      }
+    ]
+  },
+  "after": {
+    "sales_orders": {
+      "n": 2,
+      "stamped": 2,
+      "total": "20.00"
+    },
+    "sales_invoices": {
+      "n": 2,
+      "stamped": 2,
+      "total": "20.00"
+    },
+    "fulfillment_orders": {
+      "n": 2,
+      "stamped": 2
+    },
+    "shipments": {
+      "n": 2,
+      "stamped": 2
+    },
+    "purchase_orders": {
+      "n": 2,
+      "stamped": 2,
+      "total": "92.00"
+    },
+    "logRows": 10
+  },
+  "logRowsForRun": 10,
+  "logSample": [
+    {
+      "tableName": "sales_orders",
+      "columnName": "branchOrgUnitId",
+      "recordId": "af456e14-6eb1-4b70-8c31-52f582804d65",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "warehouse.owning_branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "sales_orders",
+      "columnName": "branchOrgUnitId",
+      "recordId": "7928755a-9002-4bbc-bcae-6c1476169e01",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "warehouse.owning_branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "sales_invoices",
+      "columnName": "branchOrgUnitId",
+      "recordId": "1e7fee7e-e3f8-40df-879b-7afa5a34f7fa",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "sales_invoices",
+      "columnName": "branchOrgUnitId",
+      "recordId": "2232a235-7b8f-48a3-8164-7e11d03276d4",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "fulfillment_orders",
+      "columnName": "branchOrgUnitId",
+      "recordId": "6fdfa3ca-1d82-4886-99cf-0aff6a6fe444",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "fulfillment_orders",
+      "columnName": "branchOrgUnitId",
+      "recordId": "b610a5b7-bbc1-4a47-b512-f5e09ba3fb46",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "shipments",
+      "columnName": "branchOrgUnitId",
+      "recordId": "f0e76ea5-c864-4eef-9118-c29f9310c50a",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "shipments",
+      "columnName": "branchOrgUnitId",
+      "recordId": "6011b186-c370-4f54-a245-82691f7e1db5",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "sales_order.branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "purchase_orders",
+      "columnName": "orgUnitId",
+      "recordId": "3d018da3-210e-4f48-8a17-954b499c5a2e",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "warehouse.owning_branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    },
+    {
+      "tableName": "purchase_orders",
+      "columnName": "orgUnitId",
+      "recordId": "ea1ca144-e1dd-403c-83b4-098ce68f2195",
+      "fromValue": null,
+      "toValue": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "source": "warehouse.owning_branch",
+      "actorUserId": null,
+      "createdAt": "2026-10-26T12:20:05.082Z"
+    }
+  ],
+  "at": "2026-10-26T12:20:05.154Z"
+}

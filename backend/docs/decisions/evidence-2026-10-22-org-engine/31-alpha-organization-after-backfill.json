@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-10-26T12:20:15.723Z",
+  "database": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+  "units": [
+    {
+      "id": "06a2b8cf-8ad2-4f6d-993c-3db97634ede8",
+      "type": "company",
+      "name": "mother",
+      "parentId": null,
+      "status": "archived",
+      "archivedAt": "2026-10-22T08:38:13.351Z"
+    },
+    {
+      "id": "8efbebac-192f-459e-a49a-8f5637bc1a83",
+      "type": "branch",
+      "name": "rana",
+      "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+      "status": "active",
+      "archivedAt": null
+    },
+    {
+      "id": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+      "type": "company",
+      "name": "ضى",
+      "parentId": null,
+      "status": "active",
+      "archivedAt": null
+    },
+    {
+      "id": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+      "type": "branch",
+      "name": "كتامه",
+      "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+      "status": "active",
+      "archivedAt": null
+    },
+    {
+      "id": "b4b67729-2d97-4353-a047-a5d150867388",
+      "type": "branch",
+      "name": "طنطا",
+      "parentId": "2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f",
+      "status": "active",
+      "archivedAt": null
+    }
+  ],
+  "activeRoots": [
+    "ضى 2035c5b0-f1ab-4d4e-b1f5-2d70f2163f7f"
+  ],
+  "archivedRoots": [
+    "mother 06a2b8cf-8ad2-4f6d-993c-3db97634ede8"
+  ],
+  "orphans": [],
+  "singleRootIndex": true,
+  "parentFkDeleteRule": [
+    "r"
+  ],
+  "migrationLogRows": 10,
+  "rowsReferencingUnits": {
+    "warehouses": 13,
+    "vehicles": 0
+  }
+}

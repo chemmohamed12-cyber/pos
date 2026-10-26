@@ -1,0 +1,129 @@
+{
+  "mode": "FULL-CHAIN PREVIEW (transaction rolled back)",
+  "database": "company_f3ea8a2e75814dd4b3f708e606a434f9",
+  "committed": false,
+  "beforeRollback": {
+    "stamped": 0,
+    "log": 0
+  },
+  "afterRollback": {
+    "stamped": 0,
+    "log": 0
+  },
+  "nothingPersisted": true,
+  "preview": {
+    "runId": "95428f57-f8a8-47a4-9ef8-64a2149e81b4",
+    "dryRun": false,
+    "steps": [
+      {
+        "table": "sales_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmount": "20.00"
+        },
+        "checksumAfter": {
+          "totalAmount": "20.00"
+        }
+      },
+      {
+        "table": "sales_invoices",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmount": "20.00"
+        },
+        "checksumAfter": {
+          "totalAmount": "20.00"
+        }
+      },
+      {
+        "table": "fulfillment_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {},
+        "checksumAfter": {}
+      },
+      {
+        "table": "shipments",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "codAmount": "0"
+        },
+        "checksumAfter": {
+          "codAmount": "0"
+        }
+      },
+      {
+        "table": "purchase_orders",
+        "installed": true,
+        "assigned": 2,
+        "byBranch": [
+          {
+            "branch": "3314ab1a-f504-41f8-98f0-8cd1432aa85e",
+            "n": 2
+          }
+        ],
+        "checksumBefore": {
+          "totalAmountBase": "92.00"
+        },
+        "checksumAfter": {
+          "totalAmountBase": "92.00"
+        }
+      }
+    ],
+    "logRowsInsideTransaction": [
+      {
+        "tableName": "fulfillment_orders",
+        "n": 2,
+        "branches": "3314ab1a-f504-41f8-98f0-8cd1432aa85e"
+      },
+      {
+        "tableName": "purchase_orders",
+        "n": 2,
+        "branches": "3314ab1a-f504-41f8-98f0-8cd1432aa85e"
+      },
+      {
+        "tableName": "sales_invoices",
+        "n": 2,
+        "branches": "3314ab1a-f504-41f8-98f0-8cd1432aa85e"
+      },
+      {
+        "tableName": "sales_orders",
+        "n": 2,
+        "branches": "3314ab1a-f504-41f8-98f0-8cd1432aa85e"
+      },
+      {
+        "tableName": "shipments",
+        "n": 2,
+        "branches": "3314ab1a-f504-41f8-98f0-8cd1432aa85e"
+      }
+    ]
+  },
+  "at": "2026-10-26T12:18:15.687Z"
+}
