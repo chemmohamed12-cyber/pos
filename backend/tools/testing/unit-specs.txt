@@ -82,4 +82,3 @@ src/database/payroll-seed-tag.spec.ts
 src/domains/customer-finance/domain/customer-statement-rules.spec.ts
 src/domains/customer-finance/interface/customer-statement-permissions.spec.ts
 src/domains/customer-finance/application/statement-pdf.spec.ts
-src/domains/treasury/application/treasury-ledger-labels.spec.ts
