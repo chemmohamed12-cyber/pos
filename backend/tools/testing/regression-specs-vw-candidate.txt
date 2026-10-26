@@ -24,6 +24,7 @@ src/domains/accounting/interface/accounting-policy-config.company-isolation.spec
 src/foundation/release/release-migration-registry.real-pg.spec.ts
 # --- direct sale together with the vehicle-workspace rules
 src/domains/delivery/interface/delivery-direct-sale-integration.company-isolation.spec.ts
+src/domains/delivery/interface/delivery-org-scope.integration.real-pg.spec.ts
 # --- org-structure engine (its own suites touching vehicles/branches/scope)
 src/foundation/organization/organization-integrity.real-pg.spec.ts
 src/domains/shipment/interface/vehicle-branch.real-pg.spec.ts

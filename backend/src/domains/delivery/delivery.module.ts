@@ -9,6 +9,7 @@ import { CustodyExpense } from './infrastructure/custody-expense.entity';
 import { CustodyExpenseService } from './application/custody-expense.service';
 import { CustodyHandover } from './infrastructure/custody-handover.entity';
 import { CustodyHandoverService } from './application/custody-handover.service';
+import { DeliveryOrgScopeService } from './application/delivery-org-scope.service';
 import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { ScopeModule } from '../../foundation/scope/scope.module';
 import { DeliveryService } from './application/delivery.service';
@@ -58,7 +59,7 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     DatabaseRegistryModule,
   ],
   controllers: [DeliveryController, VehicleWorkspaceController],
-  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, CustodyHandoverService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
+  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, CustodyHandoverService, DeliveryOrgScopeService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
   exports: [DeliveryService, LOGISTICS_DELIVERY_CONTRACT],
 })
 export class DeliveryModule {}

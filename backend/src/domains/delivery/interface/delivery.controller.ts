@@ -4,8 +4,7 @@ import { DeliveryService } from '../application/delivery.service';
 import { LineDeliveryService } from '../application/line-delivery.service';
 import { CustodyExpenseService } from '../application/custody-expense.service';
 import { CustodyHandoverService } from '../application/custody-handover.service';
-import { ShipmentService } from '../../shipment/application/shipment.service';
-import { OrgContextService } from '../../../foundation/scope/org-context.service';
+import { DeliveryOrgScopeService } from '../application/delivery-org-scope.service';
 import { JwtAuthGuard } from '../../../foundation/authentication/jwt-auth.guard';
 import { CompanyContextGuard, CompanyScopedRequest } from '../../../foundation/company/company-context.guard';
 import { RequireModuleGuard, RequireModule } from '../../../foundation/module-registry/require-module.decorator';
@@ -160,24 +159,23 @@ export class DeliveryController {
     private readonly lineDeliveries: LineDeliveryService,
     private readonly expenses: CustodyExpenseService,
     private readonly handovers: CustodyHandoverService,
-    private readonly shipments: ShipmentService,
-    private readonly orgContext: OrgContextService,
+    private readonly orgScope: DeliveryOrgScopeService,
   ) {}
 
-  /** org-engine rule (kept): a vehicle of a branch outside the caller's scope answers 404 - applied in front of the F-1 / cash-visibility rules, which still apply in the services. */
-  private async assertVehicleInOrgScope(req: CompanyScopedRequest, vehicleId: string): Promise<void> {
-    await this.orgContext.assertVisible(req, (await this.shipments.getVehicle(vehicleId, req.companyContext!.dataSource.manager)).orgUnitId);
-  }
+  // Org-engine branch scope (kept, CTO 2026-10-26): every route that addresses a shipment, collection, expense, handover or vehicle first answers 404 when that record's branch is outside the
+  // caller's scope (`DeliveryOrgScopeService`); the ownership / driver-assignment / permission rules still apply afterwards in the services - both must pass.
 
   @Post('outcomes')
   async recordOutcome(@Req() req: CompanyScopedRequest, @Body() dto: RecordOutcomeDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, dto.shipmentId);
     return this.delivery.recordOutcome(dto.shipmentId, dto.outcome, dto.failureReason ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Post('collections')
   async recordCollection(@Req() req: CompanyScopedRequest, @Body() dto: RecordCollectionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, dto.shipmentId);
     return this.delivery.recordCollection(dto.shipmentId, dto.amount, dto.method, req.user.id, req.companyContext.dataSource.manager, dto.clientKey ?? null);
   }
 
@@ -185,12 +183,14 @@ export class DeliveryController {
   @Post('line-events')
   async recordLineEvent(@Req() req: CompanyScopedRequest, @Body() dto: RecordLineDeliveryDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, dto.shipmentId);
     return this.lineDeliveries.record(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('line-events')
   async lineEvents(@Req() req: CompanyScopedRequest, @Query('shipmentId', ParseUUIDPipe) shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.lineDeliveries.getProgress(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -204,12 +204,14 @@ export class DeliveryController {
   @Post('custody-expenses')
   async claimExpense(@Req() req: CompanyScopedRequest, @Body() dto: ClaimExpenseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, dto.shipmentId);
     return this.expenses.claim(dto, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('custody-expenses')
   async listExpenses(@Req() req: CompanyScopedRequest, @Query('shipmentId', ParseUUIDPipe) shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.expenses.listForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -218,6 +220,7 @@ export class DeliveryController {
   @Post('custody-expenses/:id/decide')
   async decideExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideExpenseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertExpense(req, id);
     return this.expenses.decide(id, req.user.id, dto.decision, dto.note, req.companyContext.dataSource.manager);
   }
 
@@ -226,6 +229,7 @@ export class DeliveryController {
   @Post('custody-expenses/:id/post')
   async postExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertExpense(req, id);
     return this.expenses.post(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -234,12 +238,14 @@ export class DeliveryController {
   @Post('custody-expenses/:id/reverse')
   async reverseExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReverseExpenseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertExpense(req, id);
     return this.expenses.reverse(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Post('custody-expenses/:id/cancel')
   async cancelExpense(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelExpenseDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertExpense(req, id);
     return this.expenses.cancel(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -248,7 +254,7 @@ export class DeliveryController {
   @Post('custody-handovers')
   async declareHandover(@Req() req: CompanyScopedRequest, @Body() dto: DeclareHandoverDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    await this.assertVehicleInOrgScope(req, dto.vehicleId);
+    await this.orgScope.assertVehicle(req, dto.vehicleId);
     return this.handovers.declare(dto.vehicleId, dto.amount, dto.note ?? null, dto.clientKey ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -257,19 +263,21 @@ export class DeliveryController {
   @Post('custody-handovers/:id/decide')
   async decideHandover(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DecideHandoverDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertHandover(req, id);
     return this.handovers.decide(id, dto.decision, dto.reason ?? null, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('custody-reconciliation/:vehicleId')
   async reconciliation(@Req() req: CompanyScopedRequest, @Param('vehicleId', ParseUUIDPipe) vehicleId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    await this.assertVehicleInOrgScope(req, vehicleId);
+    await this.orgScope.assertVehicle(req, vehicleId);
     return this.handovers.getReconciliation(vehicleId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('outcomes')
   async getOutcome(@Req() req: CompanyScopedRequest, @Query('shipmentId') shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.delivery.getOutcomeForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -277,12 +285,14 @@ export class DeliveryController {
   @Get('collections/all')
   async listCollections(@Req() req: CompanyScopedRequest, @Query('shipmentId') shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.delivery.listCollectionsForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   @Get('collections')
   async getCollection(@Req() req: CompanyScopedRequest, @Query('shipmentId') shipmentId: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.delivery.getCollectionForShipment(shipmentId, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -311,6 +321,7 @@ export class DeliveryController {
   @Get('collections/by-shipment/:shipmentId')
   async getCollectionForShipmentAsFinance(@Req() req: CompanyScopedRequest, @Param('shipmentId') shipmentId: string) {
     if (!req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertShipment(req, shipmentId);
     return this.delivery.getCollectionForShipmentUnscoped(shipmentId, req.companyContext.dataSource.manager);
   }
 
@@ -320,6 +331,7 @@ export class DeliveryController {
   @Post('collections/:id/confirm')
   async confirmCollection(@Req() req: CompanyScopedRequest, @Param('id') id: string) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertCollection(req, id);
     return this.delivery.confirmCollection(id, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -328,6 +340,7 @@ export class DeliveryController {
   @Post('collections/:id/reject')
   async rejectCollection(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: RejectCollectionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertCollection(req, id);
     return this.delivery.rejectCollection(id, dto.reason, req.user.id, req.companyContext.dataSource.manager);
   }
 
@@ -336,6 +349,7 @@ export class DeliveryController {
   @Post('collections/:id/remit')
   async remitCollection(@Req() req: CompanyScopedRequest, @Param('id') id: string, @Body() dto: RemitCollectionDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
+    await this.orgScope.assertCollection(req, id);
     return this.delivery.remitCollection(id, req.user.id, dto.treasuryAccountId ?? null, req.companyContext.dataSource.manager);
   }
 }
