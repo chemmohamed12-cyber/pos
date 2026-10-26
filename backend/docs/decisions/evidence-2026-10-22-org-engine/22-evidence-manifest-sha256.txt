@@ -1,4 +1,4 @@
-﻿SHA-256 manifest of the org-engine evidence and documents - regenerated 2026-10-26 after the closure-directive documents; candidate a4e0daf; 62 files; (self-excluded)
+﻿SHA-256 manifest - regenerated 2026-10-26 after the owner's decisions and the Alpha assignment; candidate a4e0daf; 69 files; (self-excluded)
 4cbae0c85345c7e61712d208606dff503b1cf803680453063b7b6b713b3f6e18  backend/docs/decisions/evidence-2026-10-22-org-engine/10b-guard-denials.txt
 becb36b07e8259c816c3d9724e1c0529bbe82875db4504992afe41af04871c15  backend/docs/decisions/evidence-2026-10-22-org-engine/10c-mutation-negative-control.log
 676007cf18478919ac1974d53f84d9f914a92fd231cfccd6093f757523745563  backend/docs/decisions/evidence-2026-10-22-org-engine/10-phase1-review-2026-10-26.md
@@ -20,6 +20,13 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  backend/docs/d
 64dbf61d02311796f7ecf2512b77ffe0d70bad93544047859e88618820de08f1  backend/docs/decisions/evidence-2026-10-22-org-engine/21b-full-regression-final-a4e0daf-jest-output.txt
 c02b3cd96492162987d09d7d58057907ccf32aa5137e4eb959db16140ce8f8b2  backend/docs/decisions/evidence-2026-10-22-org-engine/21-full-regression-final-a4e0daf-runner-stdout.txt
 22adb92e7c602bb34d03801568ac7f9a97ca47fdd79a57eb9d171054be378943  backend/docs/decisions/evidence-2026-10-22-org-engine/23-alpha-warehouse-assignment-handover.md
+f25b188e9bbd5719b8d659bb9db6b5b98072079716f6d279a1492c9863d1743c  backend/docs/decisions/evidence-2026-10-22-org-engine/24-alpha-assignment-dryrun.json
+7fd296d58299a4af28ecbab9a2d8d50793679f0d6596c11bd891be5c7cdc29d6  backend/docs/decisions/evidence-2026-10-22-org-engine/25-alpha-assignment-applied.json
+be7f90a2390b50d6b155fd1ce7ad813362660baf0eb62586718cf026bfb7e52c  backend/docs/decisions/evidence-2026-10-22-org-engine/25b-alpha-assign-script.js.txt
+f48c3c3af8f24fb4de260bfd8c0c8ccb978a80a72169e035c4b5eb54ee86e003  backend/docs/decisions/evidence-2026-10-22-org-engine/26-backfill-dryrun-after-alpha-assignment.json
+848ec6f6c38b28710aee2ce574a5c5fb9725fd97fb71cc6816e01774f6a2ba7e  backend/docs/decisions/evidence-2026-10-22-org-engine/27-alpha-backfill-full-chain-preview.json
+3e54c6edd4b741e1e25cf7cefb95d463140f2fc47a18e1c45f43b2ad27377b96  backend/docs/decisions/evidence-2026-10-22-org-engine/27b-alpha-backfill-preview-script.js.txt
+5049e9e32b93481e1953c088c69aa90d797d3c0f8d423ff01da5872dab07e37a  backend/docs/decisions/evidence-2026-10-22-org-engine/28-alpha-assignment-closure-record.md
 315e31a724d5fb8faaebf85db70997e6aed134a6077b8e9ccfaedd3b23bab62a  backend/docs/decisions/evidence-2026-10-22-org-engine/2-alpha-root-reconciliation.json
 fa6e7dc3d524382c867d9aa5e4aad9c36cf2ffac0b5c68ebe3436faedd2b91f8  backend/docs/decisions/evidence-2026-10-22-org-engine/3b-full-regression-first-run-runner-stdout.txt
 05716830628304522be20aaad5542aad23738b98c41b065f2f86948bc7d46b2e  backend/docs/decisions/evidence-2026-10-22-org-engine/3-full-regression-results.txt
@@ -52,7 +59,7 @@ dd8f39e22055cb82f380cca0ec894ddd1903ca01de477561e3f2b6b5df469fef  backend/docs/d
 5c362cb9b7f3f15902435115fdaeadf1cf39d1d37485bc42c7153981e284f4f9  backend/docs/decisions/evidence-2026-10-22-org-engine/p2-three-specs-final/round3-release-upload.http.stdout.log
 68b07bd2b50cb199bd3cbe62de7df66c2817dec143793de43477dabdde131745  backend/docs/decisions/evidence-2026-10-22-org-engine/p2-three-specs-final/summary.txt
 8f26ea21f68cb341c69813ad2eb71da5d3c9bb7b2132e4baca3e3d05ce9c6638  backend/docs/decisions/evidence-2026-10-22-org-engine/PROPOSED-approved-test-databases-5544-entry.json
-c94fc1e1bebd1952cb71f565bee429317c6c2927983020efc14872d5fffee150  backend/docs/decisions/ORG-STRUCTURE-ENGINE-ATTRIBUTION-DECISION-REGISTER-2026-10-26.md
+ca70443605bc1d7a1b0be8b0a3499227996054ef9b5470c32bf474f6d738b513  backend/docs/decisions/ORG-STRUCTURE-ENGINE-ATTRIBUTION-DECISION-REGISTER-2026-10-26.md
 3d5960a22a050efcf3bed4b7bb0794fe5d4df2ea24d2daa3aca4fb0efe4e7108  backend/docs/decisions/ORG-STRUCTURE-ENGINE-CANDIDATE-REGISTER-2026-10-26.md
 1a0e93596ef197675f35056c661df1f1156b5baa0ee6bc5145103340c7c73ed3  backend/docs/decisions/ORG-STRUCTURE-ENGINE-DECISION-IMPACT-PLAN-2026-10-26.md
 5735526246f7fb4976bd698eeef90e39836403b5c2a53403867de050b7297101  backend/docs/decisions/ORG-STRUCTURE-ENGINE-DECISION-OWNERS-AND-APPROVAL-REQUESTS-2026-10-26.md

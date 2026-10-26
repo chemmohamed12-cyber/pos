@@ -1,0 +1,37 @@
+// FULL-CHAIN PREVIEW of the legacy backfill for Alpha: the real backfill runs inside ONE transaction that is ALWAYS rolled back (nothing is committed).
+// Needed because the plain dry-run cannot show children (invoices, fulfillment orders, shipments): they derive from the parent order's stamp, which only exists once the parent step wrote.
+const path = require('path');
+const fs = require('fs');
+const [appRoot, envFile, outFile] = process.argv.slice(2);
+const env = Object.fromEntries(fs.readFileSync(envFile, 'utf8').split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+if (String(env.DB_PORT) !== '5433' || env.DB_NAME !== 'daii_dev') throw new Error('refusing: daii_dev on :5433 only');
+const req = (p) => require(path.join(appRoot, p));
+const { DataSource } = req('node_modules/typeorm');
+const { Client } = req('node_modules/pg');
+const { OrgLegacyService } = req('dist/foundation/organization/org-legacy.service.js');
+class Rollback extends Error {}
+(async () => {
+  const cp = new Client({ host: env.DB_HOST, port: Number(env.DB_PORT), user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
+  await cp.connect();
+  const db = (await cp.query(`SELECT r."databaseName" FROM database_registries r JOIN companies c ON c.id=r."companyId" WHERE c.name='Alpha Trading Co'`)).rows[0].databaseName;
+  await cp.end();
+  const ds = new DataSource({ type: 'postgres', host: env.DB_HOST, port: Number(env.DB_PORT), username: env.DB_USER, password: env.DB_PASSWORD, database: db });
+  await ds.initialize();
+  const svc = new OrgLegacyService(ds);
+  const count = async (sql) => Number((await ds.query(sql))[0].n);
+  const before = { stamped: await count(`SELECT (SELECT count("branchOrgUnitId") FROM sales_orders)+(SELECT count("branchOrgUnitId") FROM sales_invoices)+(SELECT count("branchOrgUnitId") FROM fulfillment_orders)+(SELECT count("branchOrgUnitId") FROM shipments)+(SELECT count("orgUnitId") FROM purchase_orders) AS n`), log: await count(`SELECT count(*)::int n FROM org_migration_log`) };
+  let preview;
+  try {
+    await ds.transaction(async (m) => {
+      preview = await svc.backfill({ actorUserId: null }, m);
+      const rows = await m.query(`SELECT "tableName", count(*)::int n, string_agg(DISTINCT "toValue"::text, ',') branches FROM org_migration_log GROUP BY 1 ORDER BY 1`);
+      preview.logRowsInsideTransaction = rows;
+      throw new Rollback('preview only');
+    });
+  } catch (e) { if (!(e instanceof Rollback)) throw e; }
+  const after = { stamped: await count(`SELECT (SELECT count("branchOrgUnitId") FROM sales_orders)+(SELECT count("branchOrgUnitId") FROM sales_invoices)+(SELECT count("branchOrgUnitId") FROM fulfillment_orders)+(SELECT count("branchOrgUnitId") FROM shipments)+(SELECT count("orgUnitId") FROM purchase_orders) AS n`), log: await count(`SELECT count(*)::int n FROM org_migration_log`) };
+  const out = { mode: 'FULL-CHAIN PREVIEW (transaction rolled back)', database: db, committed: false, beforeRollback: before, afterRollback: after, nothingPersisted: before.stamped === after.stamped && before.log === after.log, preview, at: new Date().toISOString() };
+  fs.writeFileSync(outFile, JSON.stringify(out, null, 2));
+  console.log(JSON.stringify({ nothingPersisted: out.nothingPersisted, steps: preview.steps.map((s) => `${s.table}=${s.assigned}`), checksumsEqual: preview.steps.every((s) => JSON.stringify(s.checksumBefore) === JSON.stringify(s.checksumAfter)), log: preview.logRowsInsideTransaction.map((r) => `${r.tableName}:${r.n}`) }));
+  await ds.destroy();
+})().catch((e) => { console.error('ERR', e.message); process.exit(1); });

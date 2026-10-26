@@ -1,0 +1,47 @@
+﻿// Applies the owner-approved Alpha warehouse -> branch assignment through the application's own InventoryService.setWarehouseOrgUnit (the method behind the warehouse screen:
+// audited, `inventory.warehouse.org_unit_changed`). Pre-validation replicates the controller's rule: the target must be an ACTIVE unit of type `branch` of THIS Company.
+// Dry run unless --apply. Targets only daii_dev :5433, company "Alpha Trading Co".
+const path = require('path');
+const fs = require('fs');
+const [appRoot, envFile, branchId, outFile] = process.argv.slice(2);
+const apply = process.argv.includes('--apply');
+const env = Object.fromEntries(fs.readFileSync(envFile, 'utf8').split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+if (String(env.DB_PORT) !== '5433' || env.DB_NAME !== 'daii_dev') throw new Error('refusing: daii_dev on :5433 only');
+const req = (p) => require(path.join(appRoot, p));
+const { DataSource } = req('node_modules/typeorm');
+const { Client } = req('node_modules/pg');
+const { Warehouse } = req('dist/domains/inventory-warehouse/infrastructure/warehouse.entity.js');
+const { InventoryService } = req('dist/domains/inventory-warehouse/application/inventory.service.js');
+const { AuditRecord } = req('dist/foundation/audit/audit-record.entity.js');
+const { AuditService } = req('dist/foundation/audit/audit.service.js');
+const { NumberingService } = req('dist/foundation/numbering/numbering.service.js');
+(async () => {
+  const cp = new Client({ host: env.DB_HOST, port: Number(env.DB_PORT), user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
+  await cp.connect();
+  const db = (await cp.query(`SELECT r."databaseName" FROM database_registries r JOIN companies c ON c.id=r."companyId" WHERE c.name='Alpha Trading Co'`)).rows[0].databaseName;
+  await cp.end();
+  const ds = new DataSource({ type: 'postgres', host: env.DB_HOST, port: Number(env.DB_PORT), username: env.DB_USER, password: env.DB_PASSWORD, database: db, entities: [Warehouse, AuditRecord] });
+  await ds.initialize();
+  const unit = (await ds.query(`SELECT id,type,name,status FROM org_units WHERE id=$1`, [branchId]))[0];
+  if (!unit || unit.type !== 'branch' || unit.status !== 'active') throw new Error('target is not an active branch of Alpha: ' + JSON.stringify(unit));
+  const inert = {};
+  const audit = new AuditService(ds);
+  const inventory = new InventoryService(ds, audit, inert, inert, new NumberingService(ds), inert, undefined);
+  const whs = await ds.query(`SELECT id,code,name,kind,"parentWarehouseId","orgUnitId" FROM warehouses ORDER BY code`);
+  const plan = whs.map((w) => ({ code: w.code, name: w.name, kind: w.kind, before: w.orgUnitId, after: branchId, action: w.orgUnitId === branchId ? 'already' : w.orgUnitId ? 'CHANGE-EXISTING(skipped)' : 'assign' }));
+  const done = [];
+  if (apply) {
+    for (const w of whs) {
+      if (w.orgUnitId) continue; // never overwrite an existing link
+      await ds.transaction(async (m) => { await inventory.setWarehouseOrgUnit(w.id, branchId, null, m); });
+      done.push(w.code);
+    }
+  }
+  const after = await ds.query(`SELECT code,"orgUnitId" FROM warehouses ORDER BY code`);
+  const audits = await ds.query(`SELECT count(*)::int n FROM audit_records WHERE action='inventory.warehouse.org_unit_changed'`);
+  const result = { mode: apply ? 'APPLY' : 'DRY-RUN', database: db, branch: unit, plan, applied: done, afterAllAssigned: after.every((r) => r.orgUnitId === branchId), auditRowsForAction: audits[0].n, at: new Date().toISOString() };
+  fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+  console.log(JSON.stringify({ mode: result.mode, branch: unit.name, toAssign: plan.filter((p) => p.action === 'assign').length, applied: done.length, afterAllAssigned: result.afterAllAssigned, auditRows: result.auditRowsForAction }));
+  await ds.destroy();
+})().catch((e) => { console.error('ERR', e.message); process.exit(1); });
+
