@@ -1,0 +1,53 @@
+﻿{
+ "up1": {
+  "ranCount": 322,
+  "newInRun": 7,
+  "orgStatusCol": true,
+  "singleRootIdx": true,
+  "parentFk": [
+   "r"
+  ],
+  "vehicleCol": true,
+  "soCol": true,
+  "logTable": true,
+  "executed": 322,
+  "newNamesPresent": 7
+ },
+ "upAgainNoop": true,
+ "afterDown": {
+  "undoCount": 7,
+  "orgStatusCol": false,
+  "singleRootIdx": false,
+  "parentFk": [
+   "r"
+  ],
+  "vehicleCol": false,
+  "soCol": false,
+  "logTable": false,
+  "executed": 315,
+  "newNamesPresent": 0
+ },
+ "up2": {
+  "ranCount": 7,
+  "names": [
+   "OrgUnitLifecycle1790021000000",
+   "AddVehicleOrgUnit1790021100000",
+   "AddSalesOrderBranch1790021200000",
+   "AddSalesInvoiceBranch1790021300000",
+   "AddFulfillmentOrderBranch1790021400000",
+   "AddShipmentBranch1790021500000",
+   "OrgMigrationLog1790021600000"
+  ],
+  "orgStatusCol": true,
+  "singleRootIdx": true,
+  "parentFk": [
+   "r"
+  ],
+  "vehicleCol": true,
+  "soCol": true,
+  "logTable": true,
+  "executed": 322,
+  "newNamesPresent": 7,
+  "seededRowSurvived": 1
+ }
+}
