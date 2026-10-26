@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABS, availableActions, canRecordCollection, collectionDecisionOptions, newClientKey, openExpenseCount, collectionOf, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
+import { TABS, availableActions, expenseCanBeReversed, floatHasRoom, canRecordCollection, collectionDecisionOptions, newClientKey, openExpenseCount, collectionOf, currentTrip, custodyRowStatus, filterByTab, isOpen, tabCounts, tripSummary, unknownStateCount, vehicleAvailability } from '../src/pages/vehicle-workspace/workspaceModel';
 import type { WsCollection, WsShipment } from '../src/pages/vehicle-workspace/workspaceModel';
 
 const mk = (id: string, state: string, extra: Partial<WsShipment> = {}): WsShipment => ({
@@ -120,4 +120,16 @@ test('open expense count and client keys', () => {
   assert.equal(openExpenseCount([e('pending_approval'), e('approved'), e('posted'), e('rejected'), e('cancelled')]), 2);
   assert.match(newClientKey(), /^[A-Za-z0-9_.:-]{8,64}$/);
   assert.notEqual(newClientKey(), newClientKey());
+});
+
+test('float room: unknown when no float / no figure; otherwise the server-reported availability decides', () => {
+  assert.equal(floatHasRoom(null, '10.00'), null);
+  assert.equal(floatHasRoom({ assigned: false, availableAfterCommitments: '100.00' }, '10.00'), null);
+  assert.equal(floatHasRoom({ assigned: true, availableAfterCommitments: null }, '10.00'), null);
+  assert.equal(floatHasRoom({ assigned: true, availableAfterCommitments: '100.00' }, '100.00'), true);
+  assert.equal(floatHasRoom({ assigned: true, availableAfterCommitments: '100.00' }, '100.01'), false);
+  const e = (status: string) => ({ id: 'x', expenseNumber: 'x', category: 'c', amount: '1.00', reason: 'r', incurredOn: '2026-10-26', status: status as never, claimedByUserId: 'u', decisionNote: null });
+  assert.equal(expenseCanBeReversed(e('posted')), true);
+  assert.equal(expenseCanBeReversed(e('approved')), false);
+  assert.equal(expenseCanBeReversed(e('reversed')), false);
 });

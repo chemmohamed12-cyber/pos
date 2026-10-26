@@ -4,6 +4,8 @@ import { fmtDateTime } from '../../lib/formatDateTime';
 import { money, useTr } from '../treasury/treasuryUi';
 import {
   canRecordCollection,
+  expenseCanBeReversed,
+  floatHasRoom,
   collectionDecisionOptions,
   expenseNeedsApproval,
   expenseReadyToPost,
@@ -275,9 +277,90 @@ const EXPENSE_LABEL: Record<string, [string, string, string]> = {
   rejected: ['مرفوض', 'Rejected', 'bad'],
   posted: ['تم الصرف', 'Posted', 'ok'],
   cancelled: ['ملغى', 'Cancelled', 'muted'],
+  reversed: ['تم عكس الصرف', 'Reversed', 'muted'],
 };
 
+/** The vehicle's separate expense float: status, balance, what is already committed, and (for who may) the assignment of the float account. */
+function FloatCard(props: { vehicleId: string; float: WsReconciliation['float'] | null; canAssign: boolean; onChanged: () => void }) {
+  const tr = useTr();
+  const { busy, error, run } = useAction();
+  const [accounts, setAccounts] = useState<Array<{ id: string; code: string; name: string }> | null>(null);
+  const [pick, setPick] = useState('');
+  useEffect(() => {
+    if (!props.canAssign) return;
+    api.get<Array<{ id: string; code: string; name: string }>>('/treasury/accounts').then(setAccounts).catch(() => setAccounts(null));
+  }, [props.canAssign]);
+  const fl = props.float;
+  return (
+    <div className="vw-panel">
+      <div className="vw-panel-title">{tr('عهدة المصروفات المنفصلة (Float)', 'Separate expense float')}</div>
+      {!fl ? (
+        <div className="vw-na">{tr('بيانات الفلوت غير متاحة لصلاحياتك', 'Float figures are not available for your role')}</div>
+      ) : !fl.assigned ? (
+        <div className="vw-banner warn" role="status">
+          {tr('لا يوجد حساب فلوت مخصص لهذه السيارة، لذلك لا يمكن تسجيل مصروفات. تُموَّل المصروفات من الفلوت فقط — لا من تحصيلات العملاء.', 'No expense float account is assigned to this vehicle, so no expense can be claimed. Expenses are paid from the float only — never from customer collections.')}
+        </div>
+      ) : (
+        <dl className="vw-kv">
+          <div>
+            <dt>{tr('رصيد الفلوت', 'Float balance')}</dt>
+            <dd dir="ltr">{fl.balance === null ? tr('غير متاح', 'n/a') : money(fl.balance)}</dd>
+          </div>
+          <div>
+            <dt>{tr('المتاح بعد الطلبات المعلّقة', 'Available after pending claims')}</dt>
+            <dd dir="ltr">{fl.availableAfterCommitments === null ? '—' : money(fl.availableAfterCommitments)}</dd>
+          </div>
+          <div>
+            <dt>{tr('مصروفات مصروفة', 'Posted expenses')}</dt>
+            <dd dir="ltr">{money(fl.posted)}</dd>
+          </div>
+          <div>
+            <dt>{tr('الفرق عن المتوقع', 'Difference from expected')}</dt>
+            <dd dir="ltr">{fl.difference === null ? '—' : money(fl.difference)}</dd>
+          </div>
+        </dl>
+      )}
+      <div className="vw-note">{tr('التمويل والتعويض يتمان بمستند تحويل خزينة معتمد من شخص آخر (من شاشة مستندات الخزينة) إلى حساب الفلوت.', 'Funding and replenishment are done by a Treasury transfer document, approved by another person (Treasury documents screen), into the float account.')}</div>
+      {props.canAssign && (
+        <div className="vw-confirm">
+          {accounts ? (
+            <select className="vw-input" value={pick} onChange={(e) => setPick(e.target.value)} aria-label={tr('حساب الفلوت', 'Float account')}>
+              <option value="">{tr('اختر حساب الفلوت', 'Choose the float account')}</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code} — {a.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input className="vw-input" dir="ltr" value={pick} onChange={(e) => setPick(e.target.value.trim())} placeholder={tr('معرّف حساب الخزينة', 'Treasury account id')} aria-label={tr('معرّف حساب الفلوت', 'Float account id')} />
+          )}
+          <div className="vw-confirm-buttons">
+            <button type="button" className="vw-btn vw-btn-primary" disabled={busy || !pick} onClick={() => void run(() => api.post(`/shipments/vehicles/${props.vehicleId}/expense-float`, { treasuryAccountId: pick }), () => { setPick(''); props.onChanged(); })}>
+              {tr('تخصيص الفلوت', 'Assign float')}
+            </button>
+            {fl?.assigned && (
+              <button type="button" className="vw-btn vw-btn-ghost" disabled={busy} onClick={() => void run(() => api.post(`/shipments/vehicles/${props.vehicleId}/expense-float`, {}), props.onChanged)}>
+                {tr('إلغاء التخصيص', 'Unassign')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="vw-banner bad" role="alert">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ExpensesPanel(props: {
+  vehicleId: string;
+  float: WsReconciliation['float'] | null;
+  canAssignFloat: boolean;
+  canReverse: boolean;
   expenses: Array<WsExpense & { shipmentLabel: string }> | null;
   openShipments: Array<{ id: string; label: string }>;
   canApprove: boolean;
@@ -301,10 +384,12 @@ export function ExpensesPanel(props: {
 
   if (props.expenses === null) return <div className="vw-na">{tr('سجل المصروفات غير متاح لصلاحياتك', 'The expense record is not available for your role')}</div>;
   const canClaim = props.openShipments.length > 0;
+  const room = floatHasRoom(props.float, amount);
   return (
     <section>
+      <FloatCard vehicleId={props.vehicleId} float={props.float} canAssign={props.canAssignFloat} onChanged={props.onChanged} />
       <div className="vw-panel">
-        <div className="vw-panel-title">{tr('مصروف جديد من عهدة السيارة', 'New expense from the vehicle custody')}</div>
+        <div className="vw-panel-title">{tr('مصروف جديد من فلوت السيارة', 'New expense from the vehicle float')}</div>
         {categories !== null && categories.length === 0 ? (
           <div className="vw-banner warn" role="status">
             {tr('لم تعتمد المالية تصنيفات مصروفات للعهدة بعد، لذلك لا يمكن تسجيل مصروف. اطلب من المحاسبة ربط تصنيفات custody_* بحساباتها.', 'Finance has not mapped any custody expense categories yet, so no expense can be claimed. Ask Accounting to map the custody_* categories to their accounts.')}
@@ -349,6 +434,7 @@ export function ExpensesPanel(props: {
             >
               {busy ? '…' : tr('إرسال للاعتماد', 'Submit for approval')}
             </button>
+            {room === false && <div className="vw-banner warn" role="status">{tr('المبلغ أكبر من المتاح في الفلوت بعد الطلبات المعلّقة — سيُرفض الصرف حتى يُعوَّض الفلوت.', 'The amount is more than the float has available after pending claims — posting will be refused until the float is replenished.')}</div>}
             <div className="vw-note">{tr('كل مصروف يحتاج اعتماد شخص آخر ثم صرفًا صريحًا من المالية. لا يُحتسب شيء قبل ذلك.', 'Every expense needs another person to approve it and finance to post it explicitly. Nothing counts before that.')}</div>
           </div>
         )}
@@ -388,6 +474,14 @@ export function ExpensesPanel(props: {
                   <button type="button" className="vw-btn vw-btn-primary" disabled={busy} onClick={() => void run(() => api.post(`/delivery/custody-expenses/${e.id}/post`, {}), props.onChanged)}>
                     {tr('صرف المبلغ من العهدة', 'Pay out of the custody')}
                   </button>
+                )}
+                {expenseCanBeReversed(e) && props.canReverse && (
+                  <div className="vw-confirm">
+                    <input className="vw-input" value={note[`r:${e.id}`] ?? ''} maxLength={255} onChange={(ev) => setNote((m) => ({ ...m, [`r:${e.id}`]: ev.target.value }))} placeholder={tr('سبب العكس (إلزامي)', 'Reversal reason (required)')} aria-label={tr('سبب العكس', 'Reversal reason')} />
+                    <button type="button" className="vw-btn vw-btn-danger" disabled={busy || (note[`r:${e.id}`] ?? '').trim().length < 3} onClick={() => void run(() => api.post(`/delivery/custody-expenses/${e.id}/reverse`, { reason: (note[`r:${e.id}`] ?? '').trim() }), props.onChanged)}>
+                      {tr('عكس الصرف', 'Reverse the payout')}
+                    </button>
+                  </div>
                 )}
                 {mine && (e.status === 'pending_approval' || e.status === 'approved') && (
                   <button type="button" className="vw-btn vw-btn-ghost" disabled={busy} onClick={() => void run(() => api.post(`/delivery/custody-expenses/${e.id}/cancel`, { reason: 'cancelled by the claimant' }), props.onChanged)}>
@@ -443,11 +537,27 @@ export function ReconciliationPanel(props: {
           {row('تم توريده (المالية)', 'Remitted (finance)', r.collections.remitted)}
           {row('بانتظار التوريد', 'Not yet remitted', r.collections.notYetRemitted)}
         </dl>
-        <div className="vw-panel-title">{tr('المصروفات', 'Expenses')}</div>
+        <div className="vw-panel-title">{tr('المصروفات (تُصرف من الفلوت فقط)', 'Expenses (paid from the float only)')}</div>
         <dl className="vw-kv">
           {row('بانتظار الاعتماد', 'Awaiting approval', r.expenses.pendingApproval)}
           {row('معتمد ولم يُصرف', 'Approved, not posted', r.expenses.approvedNotPosted)}
           {row('تم صرفه', 'Posted', r.expenses.posted)}
+        </dl>
+        <div className="vw-panel-title">{tr('فلوت المصروفات (منفصل عن التحصيلات)', 'Expense float (separate from collections)')}</div>
+        <dl className="vw-kv">
+          {r.float.assigned ? (
+            <>
+              {r.float.balance !== null && row('رصيد الفلوت', 'Float balance', r.float.balance)}
+              {r.float.expectedBalance !== null && row('الرصيد المتوقع', 'Expected balance', r.float.expectedBalance)}
+              {r.float.difference !== null && row('الفرق', 'Difference', r.float.difference)}
+              {row('مصروفات معتمدة لم تُصرف', 'Approved, not posted', r.float.approvedNotPosted)}
+            </>
+          ) : (
+            <div>
+              <dt>{tr('لا يوجد فلوت مخصص', 'No float assigned')}</dt>
+              <dd>—</dd>
+            </div>
+          )}
         </dl>
         <div className="vw-panel-title">{tr('التسليم للخزينة (إقرار السائق)', 'Handed to the cashier (driver declaration)')}</div>
         <dl className="vw-kv">

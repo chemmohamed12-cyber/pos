@@ -354,6 +354,10 @@ export function VehicleWorkspace() {
           )}
           {section === 'expenses' && (
             <ExpensesPanel
+              vehicleId={vehicle.id}
+              float={reconciliation ? reconciliation.float : null}
+              canAssignFloat={can('logistics.vehicle.edit', 'editable')}
+              canReverse={can('finance.cash_document.reverse', 'editable')}
               expenses={expensesVisible ? allExpenses : null}
               openShipments={shipments.filter((s) => s.collectionVisible && s.state !== 'delivered' && s.state !== 'returned').map((s) => ({ id: s.id, label: `${s.rshNumber ?? s.waybillNumber} — ${s.customerName ?? ''}` }))}
               canApprove={can('finance.cash_document.approve', 'editable')}

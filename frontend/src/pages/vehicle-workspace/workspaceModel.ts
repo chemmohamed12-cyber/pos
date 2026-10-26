@@ -229,7 +229,7 @@ export interface WsLineProgress {
   lines: WsLineProgressRow[];
 }
 
-export type WsExpenseStatus = 'pending_approval' | 'approved' | 'rejected' | 'posted' | 'cancelled';
+export type WsExpenseStatus = 'pending_approval' | 'approved' | 'rejected' | 'posted' | 'cancelled' | 'reversed';
 export interface WsExpense {
   id: string;
   expenseNumber: string;
@@ -254,6 +254,8 @@ export interface WsHandover {
 export interface WsReconciliation {
   collections: { recorded: string; confirmed: string; rejected: string; counted: string; remitted: string; notYetRemitted: string };
   expenses: { pendingApproval: string; approvedNotPosted: string; posted: string; rejectedOrCancelled: string };
+  /** The separate expense float (policy 2026-10-26): about the float account only - expenses never touch collections. */
+  float: { assigned: boolean; balance: string | null; expectedBalance: string | null; difference: string | null; pendingApproval: string; approvedNotPosted: string; posted: string; reversed: string; availableAfterCommitments: string | null };
   handovers: { declared: string; confirmed: string; rejected: string; handedOver: string };
   derived: { cashInDriverHand: string; cashInDriverHandFormula: string; expectedCustodyAccountBalance: string; expectedCustodyAccountFormula: string; ledgerDifference: string | null };
 }
@@ -274,6 +276,17 @@ export function collectionDecisionOptions(c: WsCollection, canDecide: boolean, i
 export function expenseNeedsApproval(e: WsExpense): boolean {
   return e.status === 'pending_approval';
 }
+/** Can this posted expense be reversed (finance, with a reason)? */
+export function expenseCanBeReversed(e: WsExpense): boolean {
+  return e.status === 'posted';
+}
+
+/** The float can fund a new claim only while the server-reported amount available after pending commitments is positive; unknown = not available. */
+export function floatHasRoom(float: { assigned: boolean; availableAfterCommitments: string | null } | null | undefined, amount: string): boolean | null {
+  if (!float || !float.assigned || float.availableAfterCommitments === null) return null;
+  return Math.round(Number(amount) * 100) <= Math.round(Number(float.availableAfterCommitments) * 100);
+}
+
 export function expenseReadyToPost(e: WsExpense): boolean {
   return e.status === 'approved';
 }
