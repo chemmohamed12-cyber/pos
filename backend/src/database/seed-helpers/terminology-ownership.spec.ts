@@ -5,8 +5,13 @@ import { seedTerminologyOwned, TerminologyRow, unseedTerminologyOwned } from './
 class FakeRunner {
   entries = new Map<string, { category: string; ar: string; en: string }>();
   owners = new Map<string, { owner: string; migration: string }>();
+  tableDropped = false;
   async query(sql: string, p: unknown[] = []): Promise<unknown[]> {
     if (sql.startsWith('CREATE TABLE IF NOT EXISTS')) return [];
+    if (sql.startsWith('DO $$')) {
+      if (this.owners.size === 0) this.tableDropped = true;
+      return [];
+    }
     if (sql.startsWith('INSERT INTO "terminology_entries"')) {
       const [code, category, ar, en] = p as string[];
       if (this.entries.has(code)) return [];
@@ -88,6 +93,16 @@ describe('ownership-aware terminology seeding (D-3)', () => {
     expect([...f.entries.keys()].sort()).toEqual(['early', 'pre', 't']);
     expect(f.owners.has('own')).toBe(false);
     expect(f.owners.get('early')?.migration).toBe('M1');
+  });
+
+  it('dropping the bookkeeping table only when the last ownership record is gone', async () => {
+    const f = new FakeRunner();
+    await seedTerminologyOwned(qr(f), 'manufacturing', 'M1', [row('a', 'أ', 'A')], 'update');
+    await seedTerminologyOwned(qr(f), 'manufacturing', 'M2', [row('b', 'ب', 'B')], 'update');
+    await unseedTerminologyOwned(qr(f), 'manufacturing', 'M2', [row('b', 'ب', 'B')]);
+    expect(f.tableDropped).toBe(false);
+    await unseedTerminologyOwned(qr(f), 'manufacturing', 'M1', [row('a', 'أ', 'A')]);
+    expect(f.tableDropped).toBe(true);
   });
 
   it('down on a database seeded before the ownership table existed deletes nothing', async () => {
