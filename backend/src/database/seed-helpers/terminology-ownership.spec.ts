@@ -98,7 +98,7 @@ describe('ownership-aware terminology seeding (D-3)', () => {
   });
 });
 
-describe('seed migrations stay self-contained (the release engine copies only numbered migration files)', () => {
+describe('seed migrations stay self-contained (the release engine copies only numbered migration files; a helper inside migrations/ is reported as tag/migration drift and blocks the deploy)', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { readFileSync } = require('fs') as typeof import('fs');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -121,7 +121,7 @@ describe('seed migrations stay self-contained (the release engine copies only nu
     'payroll/1790100100000-SeedPayrollGapClosureTerminology.ts',
   ];
   it.each(seeds)('%s embeds the canonical ownership block, imports nothing from the helper file', (rel) => {
-    const src = norm(readFileSync(join(__dirname, rel), 'utf8'));
+    const src = norm(readFileSync(join(__dirname, '..', 'migrations', rel), 'utf8'));
     const m = /\/\/ <terminology-ownership:begin>[^\n]*\n([\s\S]*?)\n\/\/ <terminology-ownership:end>/.exec(src);
     expect(m).not.toBeNull();
     expect(norm(m![1])).toBe(canonical);
