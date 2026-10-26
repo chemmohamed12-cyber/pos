@@ -2,14 +2,25 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryOutcome } from './infrastructure/delivery-outcome.entity';
 import { Collection } from './infrastructure/collection.entity';
+import { ShipmentCustody } from './infrastructure/shipment-custody.entity';
+import { ShipmentLineDelivery } from './infrastructure/shipment-line-delivery.entity';
+import { LineDeliveryService } from './application/line-delivery.service';
+import { CustodyExpense } from './infrastructure/custody-expense.entity';
+import { CustodyExpenseService } from './application/custody-expense.service';
+import { CustodyHandover } from './infrastructure/custody-handover.entity';
+import { CustodyHandoverService } from './application/custody-handover.service';
+import { ApprovalEngineModule } from '../../foundation/approval-engine/approval-engine.module';
 import { DeliveryService } from './application/delivery.service';
 import { DeliveryController } from './interface/delivery.controller';
+import { VehicleWorkspaceService } from './application/vehicle-workspace.service';
+import { VehicleWorkspaceController } from './interface/vehicle-workspace.controller';
 import { ShipmentModule } from '../shipment/shipment.module';
 import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 import { SalesOrdersModule } from '../sales-orders/sales-orders.module';
 import { TreasuryModule } from '../treasury/treasury.module';
 import { InventoryWarehouseModule } from '../inventory-warehouse/inventory-warehouse.module';
 import { AuditModule } from '../../foundation/audit/audit.module';
+import { NumberingModule } from '../../foundation/numbering/numbering.module';
 import { EventsModule } from '../../foundation/events/events.module';
 import { AuthenticationModule } from '../../foundation/authentication/authentication.module';
 import { AuthorizationModule } from '../../foundation/authorization/authorization.module';
@@ -21,13 +32,15 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeliveryOutcome, Collection]),
+    TypeOrmModule.forFeature([DeliveryOutcome, Collection, ShipmentCustody, ShipmentLineDelivery, CustodyExpense, CustodyHandover]),
     ShipmentModule,
     FulfillmentModule,
     SalesOrdersModule,
     TreasuryModule,
     InventoryWarehouseModule,
     AuditModule,
+    NumberingModule,
+    ApprovalEngineModule,
     EventsModule,
     AuthenticationModule,
     AuthorizationModule,
@@ -42,8 +55,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     CompanyModule,
     DatabaseRegistryModule,
   ],
-  controllers: [DeliveryController],
-  providers: [DeliveryService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
+  controllers: [DeliveryController, VehicleWorkspaceController],
+  providers: [DeliveryService, LineDeliveryService, CustodyExpenseService, CustodyHandoverService, VehicleWorkspaceService, { provide: LOGISTICS_DELIVERY_CONTRACT, useExisting: DeliveryService }],
   exports: [DeliveryService, LOGISTICS_DELIVERY_CONTRACT],
 })
 export class DeliveryModule {}

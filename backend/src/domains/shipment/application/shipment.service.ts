@@ -606,6 +606,61 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     };
   }
 
+  /**
+   * Vehicle Driver Workspace, Stage C / F-4 (2026-10-22) — the shipments of ONE vehicle, filtered on the server (the board read had no vehicle filter, so the screen downloaded every
+   * shipment and filtered in the browser). Same scope rule as the board: whoever may see every shipment of the Company (`board_all`, `read_any`, `act_any`) gets all of this
+   * vehicle's shipments, everyone else only the ones they are the assigned driver of. States come from ONE batched read of the process instances (not one per row); newest
+   * first, capped at `limit` (default 300) with an explicit `truncated` flag so a cut-off list is never presented as complete. Read-only.
+   */
+  async listShipmentsForVehicle(
+    vehicleId: string,
+    actorUserId: string,
+    opts: { limit?: number } = {},
+    manager?: EntityManager,
+  ): Promise<{ rows: Array<Shipment & { state: string; customerName: string | null; governorate: string | null; totalAmount: string | null }>; truncated: boolean }> {
+    const limit = Math.min(500, Math.max(1, opts.limit ?? 300));
+    const runner = manager ?? this.dataSource;
+    const access = await this.authorization.workflowAccess(actorUserId, manager);
+    const seesAll = access.allows('logistics.shipment.board_all') || access.allows('logistics.shipment.read_any') || access.allows('logistics.shipment.act_any');
+    const found = await runner.getRepository(Shipment).find({
+      where: seesAll ? { vehicleId } : { vehicleId, driverUserId: actorUserId },
+      order: { createdAt: 'DESC' },
+      take: limit + 1,
+    });
+    const truncated = found.length > limit;
+    const shipments = truncated ? found.slice(0, limit) : found;
+    const stateRows: Array<{ id: string; state: string }> = shipments.length
+      ? await runner.query(
+          `SELECT "entityId"::text AS id, "currentState" AS state FROM "process_instances" WHERE "definitionKey" = $1 AND "entityType" = $2 AND "entityId"::text = ANY($3::text[])`,
+          [SHIPMENT_PROCESS.key, ENTITY_TYPE, shipments.map((s) => s.id)],
+        )
+      : [];
+    const stateById = new Map(stateRows.map((r) => [r.id, r.state]));
+    const orderCache = new Map<string, { customerName: string | null; governorate: string | null; totalAmount: string | null }>();
+    const rows = [];
+    for (const s of shipments) {
+      let extra = { customerName: null as string | null, governorate: null as string | null, totalAmount: null as string | null };
+      if (s.salesOrderId) {
+        const cached = orderCache.get(s.salesOrderId);
+        if (cached) extra = cached;
+        else {
+          const order = await this.salesOrders.getOrderSnapshot(s.salesOrderId, manager);
+          const customer = order ? await this.customers.getCustomerSnapshot(order.customerId, manager) : null;
+          extra = { customerName: customer?.name ?? null, governorate: customer?.governorate ?? null, totalAmount: order?.totalAmount ?? null };
+          orderCache.set(s.salesOrderId, extra);
+        }
+      }
+      rows.push({ ...s, state: stateById.get(s.id) ?? 'created', ...extra });
+    }
+    return { rows, truncated };
+  }
+
+  /** F-3: a driver's display NAME (and nothing else about the user) for the workspace header — resolved on the server so the screen needs no user-list permission. */
+  async getUserDisplayName(userId: string): Promise<string | null> {
+    const found = await this.users.findByIds([userId]);
+    return found[0]?.fullName ?? null;
+  }
+
   private async buildUserNameMap(): Promise<Map<string, string>> {
     const all = await this.users.listAll();
     return new Map(all.map((u) => [u.id, u.fullName]));
@@ -769,6 +824,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
     fulfillmentOrderId: string;
     shippingCompanyId: string | null;
     vehicleId: string | null;
+    driverUserId: string | null;
     codAmount: string | null;
     salesOrderId: string | null;
   } | null> {
@@ -779,6 +835,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
       fulfillmentOrderId: shipment.fulfillmentOrderId,
       shippingCompanyId: shipment.shippingCompanyId,
       vehicleId: shipment.vehicleId,
+      driverUserId: shipment.driverUserId,
       codAmount: shipment.codAmount,
       // Returns Engine Phase B — `Shipment.salesOrderId` already exists on
       // the entity (RSH migration) but this snapshot never surfaced it,
@@ -923,6 +980,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   ): Promise<ShippingCompany> {
     const repo = (manager ?? this.dataSource).getRepository(ShippingCompany);
     const company = await this.getShippingCompany(shippingCompanyId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     const before = { treasuryAccountId: company.treasuryAccountId };
     company.treasuryAccountId = treasuryAccountId;
     const saved = await repo.save(company);
@@ -1114,6 +1172,7 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
   async setVehicleSettlementAccount(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
     const repo = (manager ?? this.dataSource).getRepository(Vehicle);
     const vehicle = await this.getVehicle(vehicleId, manager);
+    await this.assertNotAnExpenseFloat(treasuryAccountId, manager);
     vehicle.settlementAccountId = treasuryAccountId;
     const saved = await repo.save(vehicle);
     await this.audit.record(
@@ -1127,6 +1186,64 @@ export class ShipmentService implements OnModuleInit, LogisticsShipmentContract 
         correlationId: null,
         after: { treasuryAccountId },
       },
+      manager,
+    );
+    return saved;
+  }
+
+  /**
+   * Separate EXPENSE FLOAT (CTO policy 2026-10-26): assign the Treasury account a vehicle's driver expenses are paid from. Fail closed - the account must exist, be active, GL-mapped, of type
+   * `cash`, and must not be (or be used as) any collection custody account, settlement account, shipping-company account or another vehicle's float: expenses can never reach customer
+   * collections. Unassigning is refused while the float still holds money or a claim is waiting. Funding / replenishment are ordinary Treasury transfer documents.
+   */
+  /** Collections can never be settled into a driver expense float: a settlement / company account may not be any vehicle's float. */
+  async assertNotAnExpenseFloat(treasuryAccountId: string | null, manager?: EntityManager): Promise<void> {
+    if (!treasuryAccountId) return;
+    const rows: Array<{ n: number }> = await (manager ?? this.dataSource).query(`SELECT count(*)::int AS n FROM "vehicles" WHERE "expenseFloatAccountId" = $1`, [treasuryAccountId]);
+    if (rows[0].n > 0) throw new ConflictException('This account is a vehicle expense float - customer collections can never be settled into it.');
+  }
+
+  async setVehicleExpenseFloat(vehicleId: string, treasuryAccountId: string | null, actorUserId: string, manager?: EntityManager): Promise<Vehicle> {
+    const m = manager ?? this.dataSource.manager;
+    const vehicle = await this.getVehicle(vehicleId, m);
+    if (treasuryAccountId === null) {
+      if (vehicle.expenseFloatAccountId) {
+        const { balances } = await this.treasury.getAllTreasuryBalances(undefined, m);
+        const bal = balances.find((b) => b.treasuryAccountId === vehicle.expenseFloatAccountId)?.balance ?? '0.00';
+        if (Math.round(Number(bal) * 100) !== 0) throw new ConflictException(`The expense float still holds ${bal} - return it to a company account (a transfer document) before unassigning it.`);
+        const open: Array<{ n: number }> = await m.query(`SELECT count(*)::int AS n FROM "custody_expenses" WHERE "vehicleId" = $1 AND "status" IN ('pending_approval','approved')`, [vehicleId]);
+        if (open[0].n > 0) throw new ConflictException('There are expense claims waiting for approval or posting on this float - finish or cancel them first.');
+      }
+    } else {
+      const acct: Array<{ status: string; glAccountCode: string | null; type: string }> = await m.query(
+        `SELECT a."status", a."glAccountCode", t."code" AS type FROM "treasury_accounts" a JOIN "treasury_account_types" t ON t.id = a."accountTypeId" WHERE a.id = $1`,
+        [treasuryAccountId],
+      );
+      if (acct.length === 0) throw new NotFoundException(`Treasury account "${treasuryAccountId}" not found.`);
+      if (acct[0].status !== 'active') throw new ConflictException('The expense float account is inactive.');
+      if (!acct[0].glAccountCode?.trim()) throw new ConflictException('The expense float account is not GL-mapped - Accounting must map it first.');
+      const clash: Array<{ n: number }> = await m.query(
+        `SELECT (SELECT count(*) FROM "vehicles" WHERE ("custodyAccountId" = $1 OR "settlementAccountId" = $1 OR "expenseFloatAccountId" = $1) AND id <> $2)
+              + (SELECT count(*) FROM "shipping_companies" WHERE "custodyAccountId" = $1 OR "treasuryAccountId" = $1) AS n`,
+        [treasuryAccountId, vehicleId],
+      );
+      if (Number(clash[0].n) > 0) throw new ConflictException('This account is already used as a collection custody / settlement account or as another vehicle\'s float - an expense float must be its own account.');
+      if (vehicle.custodyAccountId === treasuryAccountId || vehicle.settlementAccountId === treasuryAccountId) {
+        throw new ConflictException('The expense float cannot be the vehicle\'s own collection custody or settlement account.');
+      }
+      if (acct[0].type !== 'cash') throw new ConflictException(`The expense float must be a cash account (this one is "${acct[0].type}").`);
+    }
+    vehicle.expenseFloatAccountId = treasuryAccountId;
+    let saved: Vehicle;
+    try {
+      saved = await m.getRepository(Vehicle).save(vehicle);
+    } catch (e) {
+      // the database backstops (unique float per vehicle, float never a collection account) win a race the checks above could not see
+      if ((e as { code?: string }).code === '23505' || (e as { code?: string }).code === '23514') throw new ConflictException('This account cannot be this vehicle\'s expense float (already another vehicle\'s float, or a collection account).');
+      throw e;
+    }
+    await this.audit.record(
+      { actorUserId, organizationId: null, action: 'shipment.vehicle.expense_float_set', resource: 'vehicle', resourceId: vehicleId, result: 'success', correlationId: null, after: { treasuryAccountId } },
       manager,
     );
     return saved;

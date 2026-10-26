@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -77,7 +77,7 @@ interface CustodyShipmentSearchResult {
  */
 export function CustodianDetail() {
   const { type, id } = useParams<{ type: 'company' | 'vehicle'; id: string }>();
-  const { t, preload } = useLanguage();
+  const { t, preload, lang } = useLanguage();
   const { can } = useAuth();
   const navigate = useNavigate();
   preload([
@@ -219,6 +219,11 @@ export function CustodianDetail() {
         <button className="btn btn-secondary" onClick={() => window.open(`/print/custody/${type}/${id}`, '_blank')}>
           {t('action.print')}
         </button>
+        {isVehicle && id && (
+          <Link className="btn btn-primary" to={`/vehicle-workspace/${id}`}>
+            {lang === 'ar' ? 'مساحة عمل السيارة والسائق' : 'Vehicle & driver workspace'}
+          </Link>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>

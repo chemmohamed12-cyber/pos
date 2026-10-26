@@ -42,6 +42,10 @@ export class Vehicle {
   @Column({ type: 'uuid', nullable: true })
   custodyAccountId!: string | null;
 
+  /** Separate EXPENSE FLOAT Treasury account (policy 2026-10-26): driver expenses are paid from here, never from customer collections. Must differ from `custodyAccountId`. */
+  @Column({ type: 'uuid', nullable: true })
+  expenseFloatAccountId!: string | null;
+
   /** Where remitted money ultimately lands for this vehicle specifically — falls back to the owning company's settlement account when null (see `DeliveryService.remitCollection`). */
   @Column({ type: 'uuid', nullable: true })
   settlementAccountId!: string | null;

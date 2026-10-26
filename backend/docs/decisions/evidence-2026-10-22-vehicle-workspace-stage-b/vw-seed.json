@@ -1,0 +1,110 @@
+{
+ "V1": {
+  "id": "b91793ae-392a-48f8-8941-db61a36d03b0",
+  "code": "VH-101"
+ },
+ "V2": {
+  "id": "4a2de4e7-cbfe-49d3-9d17-b8efa778cc1d",
+  "code": "VH-202"
+ },
+ "d1": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+ "d2": "028bdf31-7994-46b0-8fc1-056ad609f066",
+ "shipments": [
+  {
+   "id": "fa978e28-cf16-4c6d-b6be-591dc9216b24",
+   "wb": "WB-2026-000101",
+   "state": "created",
+   "cod": null,
+   "driver": null,
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "9747bd90-e5b6-475f-b333-a44bf1cf245e",
+   "wb": "WB-2026-000102",
+   "state": "assigned",
+   "cod": null,
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "bfd1565d-fc17-4a36-acb8-c864762b74f2",
+   "wb": "WB-2026-000103",
+   "state": "picked_up",
+   "cod": "800.00",
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "2688061f-b9ec-4a02-bc85-850da617280b",
+   "wb": "WB-2026-000104",
+   "state": "in_transit",
+   "cod": null,
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "8c924698-4a80-4d7a-8888-525b0959a147",
+   "wb": "WB-2026-000105",
+   "state": "out_for_delivery",
+   "cod": "1200.00",
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "a65f5e73-beb8-49ef-8d2d-0dcf1e73f4dd",
+   "wb": "WB-2026-000106",
+   "state": "out_for_delivery",
+   "cod": null,
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "437b085c-9d7b-49d3-89a2-ffa81e35214e",
+   "wb": "WB-2026-000107",
+   "state": "delivered",
+   "cod": "900.00",
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "47c6dac0-a21e-4d77-938e-3a8910e10d02",
+   "wb": "WB-2026-000108",
+   "state": "delivered",
+   "cod": "700.00",
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "40a4bcc8-a65f-4791-ab22-0d545242afb7",
+   "wb": "WB-2026-000109",
+   "state": "failed",
+   "cod": null,
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "f0d757b7-3669-47c4-a599-3e487e278e9a",
+   "wb": "WB-2026-000110",
+   "state": "returned",
+   "cod": null,
+   "driver": "82cab754-8adb-4c03-926f-0b712fb98c4d",
+   "vehicle": "VH-101"
+  },
+  {
+   "id": "055bf221-633b-41ee-830f-d0bee0aed12c",
+   "wb": "WB-2026-000111",
+   "state": "assigned",
+   "cod": null,
+   "driver": "028bdf31-7994-46b0-8fc1-056ad609f066",
+   "vehicle": "VH-202"
+  },
+  {
+   "id": "d70e7a73-8d9a-4c82-bb2b-8b029d8348de",
+   "wb": "WB-2026-000112",
+   "state": "out_for_delivery",
+   "cod": "450.00",
+   "driver": "028bdf31-7994-46b0-8fc1-056ad609f066",
+   "vehicle": "VH-202"
+  }
+ ]
+}

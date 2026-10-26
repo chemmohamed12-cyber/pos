@@ -263,10 +263,16 @@ function ShipmentDetail({
     setBusy('deliver');
     setError(null);
     try {
-      await api.post('/delivery/outcomes', { shipmentId: shipment.id, outcome: 'delivered' });
+      // F-2: the server refuses "delivered" for a cash-on-delivery shipment that has no recorded collection, so the collection is recorded FIRST (a retry after a failed
+      // delivery request finds the collection already there — that conflict is not an error here).
       if (collectionAmount && Number(collectionAmount) > 0) {
-        await api.post('/delivery/collections', { shipmentId: shipment.id, amount: collectionAmount, method: 'cash' });
+        try {
+          await api.post('/delivery/collections', { shipmentId: shipment.id, amount: collectionAmount, method: 'cash' });
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 409 && /already has a recorded collection/i.test(err.message))) throw err;
+        }
       }
+      await api.post('/delivery/outcomes', { shipmentId: shipment.id, outcome: 'delivered' });
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to record delivery.');

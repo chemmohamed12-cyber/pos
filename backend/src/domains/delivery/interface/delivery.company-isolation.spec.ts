@@ -128,7 +128,7 @@ describe('DeliveryController Area 21 retrofit — real-Postgres Company isolatio
     } as unknown as FulfillmentContract;
     const salesOrders = { getOrderSnapshot: async () => null } as unknown as SalesOrdersReadContract;
 
-    service = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inert, audit, events, inert, inert);
+    service = new DeliveryService(h.controlPlane, shipments, fulfillment, salesOrders, treasury, inert, audit, events, numbering, inert, inert);
   });
 
   afterAll(async () => {

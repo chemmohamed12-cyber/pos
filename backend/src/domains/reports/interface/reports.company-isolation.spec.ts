@@ -97,7 +97,7 @@ describe('ReportsController Area 21 retrofit — real-Postgres Company isolation
       return manager;
     };
     const processEngine = new ProcessEngineService(h.controlPlane);
-    const delivery = new DeliveryService(inert, inert, inert, inert, inert, inert, inert, inert, inert, inert);
+    const delivery = new DeliveryService(inert, inert, inert, inert, inert, inert, inert, inert, inert, inert, inert);
     const returns = new ReturnsService(inert, processEngine, inert, inert, inert, inert, inert, inert, inert, inert, inert, inert, inert);
 
     const salesOrders = {
