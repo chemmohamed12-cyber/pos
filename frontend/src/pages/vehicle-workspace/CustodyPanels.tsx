@@ -283,6 +283,19 @@ const EXPENSE_LABEL: Record<string, [string, string, string]> = {
 };
 
 /** The vehicle's separate expense float: status, balance, what is already committed, and (for who may) the assignment of the float account. */
+/** Readable names for the standard custody expense categories (the stored value stays the configured key; an unknown key is shown as it is). */
+const CATEGORY_LABELS: Record<string, [string, string]> = {
+  custody_fuel: ['وقود', 'Fuel'],
+  custody_toll: ['رسوم طريق', 'Tolls'],
+  custody_parking: ['انتظار سيارات', 'Parking'],
+  custody_repair: ['صيانة طفيفة', 'Minor repairs'],
+  custody_other: ['مصروفات تشغيل أخرى', 'Other operating expense'],
+};
+function categoryLabel(key: string, tr: (ar: string, en: string) => string): string {
+  const l = CATEGORY_LABELS[key];
+  return l ? tr(l[0], l[1]) : key;
+}
+
 function FloatCard(props: { vehicleId: string; float: WsReconciliation['float'] | null; canAssign: boolean; onChanged: () => void }) {
   const tr = useTr();
   const { busy, error, run } = useAction();
@@ -290,8 +303,8 @@ function FloatCard(props: { vehicleId: string; float: WsReconciliation['float'] 
   const [pick, setPick] = useState('');
   useEffect(() => {
     if (!props.canAssign) return;
-    api.get<Array<{ id: string; code: string; name: string }>>('/treasury/accounts').then(setAccounts).catch(() => setAccounts(null));
-  }, [props.canAssign]);
+    api.get<Array<{ id: string; code: string; name: string }>>(`/shipments/vehicles/${props.vehicleId}/expense-float-candidates`).then(setAccounts).catch(() => setAccounts(null));
+  }, [props.canAssign, props.vehicleId]);
   const fl = props.float;
   return (
     <div className="vw-panel">
@@ -412,7 +425,7 @@ export function ExpensesPanel(props: {
               <option value="">{tr('اختر التصنيف', 'Choose the category')}</option>
               {(categories ?? []).map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {categoryLabel(c, tr)}
                 </option>
               ))}
             </select>
@@ -455,7 +468,7 @@ export function ExpensesPanel(props: {
                 </div>
                 <span className={`vw-chip ${l[2]}`}>{tr(l[0], l[1])}</span>
                 <div className="vw-note">
-                  {e.category} — {e.reason} ({e.incurredOn}) · {e.shipmentLabel}
+                  {categoryLabel(e.category, tr)} — {e.reason} ({e.incurredOn}) · {e.shipmentLabel}
                 </div>
                 {e.decisionNote && <div className="vw-note">{e.decisionNote}</div>}
                 {expenseNeedsApproval(e) && props.canApprove && !mine && (
