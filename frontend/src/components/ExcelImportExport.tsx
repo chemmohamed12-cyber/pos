@@ -27,11 +27,17 @@ export function ExcelImportExport({
   exportUrl,
   importUrl,
   onImported,
+  importBlockedReason,
+  children,
 }: {
   templateUrl: string;
   exportUrl?: string;
   importUrl: string;
   onImported?: () => void;
+  /** When set, importing is disabled and this is shown (e.g. a required choice has not been made). */
+  importBlockedReason?: string;
+  /** Extra controls rendered next to the buttons (e.g. the branch the imported rows belong to). */
+  children?: React.ReactNode;
 }) {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,11 +108,13 @@ export function ExcelImportExport({
             {t('action.export_excel')}
           </button>
         )}
-        <button className="btn btn-primary" disabled={busy === 'import'} onClick={() => fileInputRef.current?.click()}>
+        <button className="btn btn-primary" disabled={busy === 'import' || Boolean(importBlockedReason)} title={importBlockedReason} onClick={() => fileInputRef.current?.click()}>
           {t('action.import_excel')}
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onFileChosen} />
+        {children}
       </div>
+      {importBlockedReason && <div style={{ marginTop: 8, fontSize: '0.85rem', opacity: 0.8 }}>{importBlockedReason}</div>}
 
       {error && <div className="error-text" style={{ marginTop: 10 }}>{error}</div>}
 

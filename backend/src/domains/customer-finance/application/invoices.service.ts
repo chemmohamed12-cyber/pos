@@ -80,7 +80,7 @@ export class InvoiceService implements FinanceInvoiceContract {
     return {
       idempotencyKey: `customer-finance:invoice:${invoice.id}:${kind}`,
       businessDate: new Date().toISOString().slice(0, 10),
-      orgUnitId: null,
+      orgUnitId: invoice.branchOrgUnitId ?? null, // Org engine Stage 6 — the invoice's branch (inherited from its order)
       currency: 'EGP',
       sourceEntityType: 'invoice' as const,
       sourceEntityId: invoice.id,
@@ -205,6 +205,7 @@ export class InvoiceService implements FinanceInvoiceContract {
           invoiceNumber,
           customerId: order.customerId,
           salesOrderId,
+          branchOrgUnitId: order.branchOrgUnitId ?? null, // inherited from the order
           shipmentId: null,
           subtotal: subtotal.toFixed(2),
           discountAmount: discountAmount.toFixed(2),

@@ -5,6 +5,7 @@ import { ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { currentLang } from '../lib/displayNames';
 
 interface AdminUser {
   id: string;
@@ -27,7 +28,13 @@ interface Vehicle {
   driverUserId: string | null;
   shippingCompanyId: string | null;
   branch: string | null;
+  /** Validated owning branch (org engine); `branch` is the legacy free text. */
+  orgUnitId?: string | null;
   status: 'active' | 'retired';
+}
+interface BranchUnit {
+  id: string;
+  name: string;
 }
 interface CustodianOverview {
   custodyBalance: string | null;
@@ -87,6 +94,8 @@ export function ShippingMethods() {
   const [newVehiclePlate, setNewVehiclePlate] = useState('');
   const [newVehicleCompanyId, setNewVehicleCompanyId] = useState('');
   const [newVehicleBranch, setNewVehicleBranch] = useState('');
+  const [branches, setBranches] = useState<BranchUnit[]>([]);
+  const ar = currentLang() === 'ar';
   const [vehicleDriverSelections, setVehicleDriverSelections] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,11 +105,15 @@ export function ShippingMethods() {
   async function loadAll() {
     if (!canView) return;
     try {
-      const [companies, vehicleData, users] = await Promise.all([
+      const [companies, vehicleData, users, units] = await Promise.all([
         api.get<ShippingCompany[]>('/shipments/shipping-companies'),
         api.get<Vehicle[]>('/shipments/vehicles'),
-        api.get<AdminUser[]>('/admin/users'),
+        api.get<AdminUser[]>('/admin/users').catch(() => [] as AdminUser[]), // drivers are optional context: a caller without the platform user-view permission still gets the vehicles
+        api.get<Array<BranchUnit & { type: string; status?: string }>>('/organization/units').catch(() => []),
       ]);
+      const activeBranches = units.filter((u) => u.type === 'branch' && (u.status ?? 'active') === 'active');
+      setBranches(activeBranches);
+      setNewVehicleBranch((prev) => prev || (activeBranches.length === 1 ? activeBranches[0].id : ''));
       setShippingCompanies(companies);
       setVehicles(vehicleData);
       setDrivers(users);
@@ -149,6 +162,19 @@ export function ShippingMethods() {
     }
   }
 
+  async function assignVehicleBranch(vehicleId: string, orgUnitId: string) {
+    setBusy(vehicleId + 'branch');
+    setError(null);
+    try {
+      await api.post(`/shipments/vehicles/${vehicleId}`, { orgUnitId });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to assign the branch.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function addVehicle() {
     if (!newVehicleCode || !newVehiclePlate) return;
     setBusy('add-vehicle');
@@ -158,12 +184,13 @@ export function ShippingMethods() {
         code: newVehicleCode,
         plateNumber: newVehiclePlate,
         ...(newVehicleCompanyId ? { shippingCompanyId: newVehicleCompanyId } : {}),
-        ...(newVehicleBranch ? { branch: newVehicleBranch } : {}),
+        // the branch is chosen from the organization tree and validated again on the server
+        ...(newVehicleBranch ? (branches.length > 0 ? { orgUnitId: newVehicleBranch } : { branch: newVehicleBranch }) : {}),
       });
       setNewVehicleCode('');
       setNewVehiclePlate('');
       setNewVehicleCompanyId('');
-      setNewVehicleBranch('');
+      setNewVehicleBranch(branches.length === 1 ? branches[0].id : '');
       await loadAll();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to add vehicle.');
@@ -305,7 +332,27 @@ export function ShippingMethods() {
                 <td>{v.code}</td>
                 <td>{v.plateNumber}</td>
                 <td>{v.shippingCompanyId ? (shippingCompanies.find((c) => c.id === v.shippingCompanyId)?.name ?? '—') : '—'}</td>
-                <td>{v.branch ?? '—'}</td>
+                <td>
+                  {v.orgUnitId ? (
+                    (branches.find((b) => b.id === v.orgUnitId)?.name ?? v.branch ?? '—')
+                  ) : (
+                    <>
+                      {v.branch ?? '—'}
+                      {branches.length > 0 && (
+                        <div>
+                          <select value="" onChange={(e) => e.target.value && assignVehicleBranch(v.id, e.target.value)} data-testid="vehicle-assign-branch">
+                            <option value="">{ar ? 'غير مرتبط — حدد الفرع' : 'Unassigned — choose branch'}</option>
+                            {branches.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </td>
                 <td>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <select
@@ -368,11 +415,22 @@ export function ShippingMethods() {
           </div>
           <div className="form-field" style={{ width: 160, marginBottom: 0 }}>
             <label>{t('field.branch')}</label>
-            <input value={newVehicleBranch} onChange={(e) => setNewVehicleBranch(e.target.value)} />
+            {branches.length > 0 ? (
+              <select value={newVehicleBranch} onChange={(e) => setNewVehicleBranch(e.target.value)} data-testid="vehicle-branch-select">
+                <option value="">{ar ? 'اختر الفرع' : 'Select branch'}</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input value={newVehicleBranch} onChange={(e) => setNewVehicleBranch(e.target.value)} />
+            )}
           </div>
           <button
             className="btn btn-secondary"
-            disabled={!newVehicleCode || !newVehiclePlate || busy === 'add-vehicle'}
+            disabled={!newVehicleCode || !newVehiclePlate || (branches.length > 0 && !newVehicleBranch) || busy === 'add-vehicle'}
             onClick={addVehicle}
           >
             {t('action.add_vehicle')}

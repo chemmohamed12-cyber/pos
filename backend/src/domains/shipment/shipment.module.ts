@@ -23,6 +23,7 @@ import { IdentityModule } from '../../foundation/identity/identity.module';
 import { LOGISTICS_SHIPMENT_CONTRACT } from '../../foundation/module-registry/contracts/logistics.contract';
 import { CompanyModule } from '../../foundation/company/company.module';
 import { DatabaseRegistryModule } from '../../foundation/database-registry/database-registry.module';
+import { ScopeModule } from '../../foundation/scope/scope.module';
 
 @Module({
   imports: [
@@ -55,6 +56,8 @@ import { DatabaseRegistryModule } from '../../foundation/database-registry/datab
     // retrofit.
     CompanyModule,
     DatabaseRegistryModule,
+    // Org engine Stage 2 — server-side branch resolution for vehicles (reuses the existing scope infrastructure).
+    ScopeModule,
   ],
   controllers: [ShipmentController],
   providers: [ShipmentService, { provide: LOGISTICS_SHIPMENT_CONTRACT, useExisting: ShipmentService }],

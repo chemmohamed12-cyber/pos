@@ -13,6 +13,7 @@ import { AuditService } from '../../../foundation/audit/audit.service';
 import { EventBusService } from '../../../foundation/events/event-bus.service';
 import { InventoryPostingPolicyRegistry } from '../../../foundation/inventory-posting-policy/inventory-posting-policy.registry';
 import { AP_EVENT_TOPICS } from '../../../foundation/module-registry/contracts/ap-events.contract';
+import { purchaseOrderBranchOf } from './procurement-org';
 
 const ENTITY_TYPE = 'supplier_credit_note';
 const DOCUMENT_TYPE = 'supplier_credit_note';
@@ -267,7 +268,7 @@ export class SupplierCreditNoteService {
       const byId = new Map(lineRows.map((r) => [r.id, r]));
       const base = {
         businessDate: new Date().toISOString().slice(0, 10),
-        orgUnitId: null,
+        orgUnitId: await purchaseOrderBranchOf(m, invoice.purchaseOrderId),
         currency: 'EGP',
         sourceEntityType: 'supplier_credit_note' as const,
         sourceEntityId: id,

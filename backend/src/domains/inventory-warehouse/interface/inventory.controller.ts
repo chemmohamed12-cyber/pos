@@ -13,6 +13,7 @@ import { RequireModuleGuard, RequireModule } from '../../../foundation/module-re
 import { PermissionGuard } from '../../../foundation/permission/permission.guard';
 import { RequirePermission } from '../../../foundation/permission/require-permission.decorator';
 import { AccessScopeService } from '../../../foundation/scope/access-scope.service';
+import { OrgContextService } from '../../../foundation/scope/org-context.service';
 import { WarehouseScopeGuard } from '../../../foundation/scope/warehouse-scope.guard';
 import { WarehouseScopeExempt, WarehouseScopeFiltered, WarehouseScoped } from '../../../foundation/scope/warehouse-scope.decorator';
 import { MovementType } from '../domain/movement-type';
@@ -189,7 +190,14 @@ export class InventoryController {
     private readonly scopes: AccessScopeService,
     // C2: optional so a direct construction keeps compiling; Nest always provides it.
     @Optional() private readonly dispatch?: InventoryPostingDispatchService,
+    // Org engine Stage 4: optional only so isolation specs can keep constructing the controller positionally; Nest always provides it.
+    @Optional() private readonly orgContextService?: OrgContextService,
   ) {}
+
+  private orgCtx(): OrgContextService {
+    if (!this.orgContextService) throw new Error('OrgContextService is not available.');
+    return this.orgContextService;
+  }
 
   /** F6 — the warehouses the caller may see: `'ALL'` (unrestricted) or the list; lists, reports and exports filter by it BEFORE returning/aggregating. */
   private async visibleWarehouses(req: CompanyScopedRequest): Promise<'ALL' | string[]> {
@@ -209,6 +217,18 @@ export class InventoryController {
     return { sku: product?.sku ?? productId, productName: product?.name ?? productId };
   }
 
+  /** Org engine Stage 4 — read-only audit of warehouse ↔ organization references (unassigned / not a branch / archived / dangling / custody mismatch). Balances and history are never touched. */
+  @UseGuards(PermissionGuard)
+  @RequirePermission('inventory.warehouse.edit', 'editable')
+  @WarehouseScopeFiltered('org audit: rows are limited to the caller\'s visible warehouses')
+  @Get('warehouses-org-audit')
+  async warehouseOrgAudit(@Req() req: CompanyScopedRequest) {
+    if (!req.companyContext) throw new UnauthorizedException();
+    const report = await this.inventory.warehouseOrgAudit(req.companyContext.dataSource.manager);
+    const visible = await this.visibleWarehouses(req);
+    return visible === 'ALL' ? report : { ...report, rows: report.rows.filter((r) => visible.includes(r.warehouseId)) };
+  }
+
   @WarehouseScopeFiltered('listWarehouses: only the caller\'s visible warehouses')
   @Get('warehouses')
   async listWarehouses(@Req() req: CompanyScopedRequest) {
@@ -223,7 +243,8 @@ export class InventoryController {
   @Post('warehouses')
   async createWarehouse(@Req() req: CompanyScopedRequest, @Body() dto: CreateWarehouseDto) {
     if (!req.companyContext) throw new UnauthorizedException();
-    if (dto.orgUnitId) this.scopes.assertUnit(await this.scopes.forRequest(req), dto.orgUnitId); // a unit outside the caller's scope is invisible to them
+    // Org engine Stage 4 — the owning branch is resolved and validated on the server; required once the Company has active branches (branchless Companies unchanged).
+    const orgUnitId = await this.orgCtx().resolveBranch(req, { requested: dto.orgUnitId, required: true, legacyUnitWhenBranchless: true });
     return this.inventory.createWarehouse(
       dto.code,
       dto.name,
@@ -232,7 +253,7 @@ export class InventoryController {
       null,
       'main',
       req.companyContext.dataSource.manager,
-      dto.orgUnitId ?? null,
+      orgUnitId,
     );
   }
 
@@ -243,8 +264,8 @@ export class InventoryController {
   @Post('warehouses/:id/org-unit')
   async setWarehouseOrgUnit(@Req() req: CompanyScopedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SetWarehouseOrgUnitDto) {
     if (!req.user || !req.companyContext) throw new UnauthorizedException();
-    if (dto.orgUnitId) this.scopes.assertUnit(await this.scopes.forRequest(req), dto.orgUnitId);
-    return this.inventory.setWarehouseOrgUnit(id, dto.orgUnitId ?? null, req.user.id, req.companyContext.dataSource.manager);
+    const orgUnitId = dto.orgUnitId ? await this.orgCtx().resolveBranch(req, { requested: dto.orgUnitId, legacyUnitWhenBranchless: true }) : null;
+    return this.inventory.setWarehouseOrgUnit(id, orgUnitId, req.user.id, req.companyContext.dataSource.manager);
   }
 
   /** Warehouse ERP V1 / Phase 1 Integration (CTO directive §3) — active/inactive toggle. */
@@ -294,16 +315,18 @@ export class InventoryController {
 
   @UseGuards(PermissionGuard)
   @RequirePermission('inventory.warehouse.create', 'editable')
-  @WarehouseScopeExempt('bulk-creates NEW warehouses, which start unlinked (unscoped)')
+  @WarehouseScopeExempt('bulk-creates NEW warehouses, all under ONE validated branch (resolved on the server)')
   @Post('warehouses/import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
-  async warehouseImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File) {
+  async warehouseImport(@Req() req: CompanyScopedRequest, @UploadedFile() file: Express.Multer.File, @Query('orgUnitId') orgUnitIdParam?: string) {
     if (!req.companyContext) throw new UnauthorizedException();
+    const orgUnitId = await this.orgCtx().resolveBranch(req, { requested: orgUnitIdParam, required: true, legacyUnitWhenBranchless: true });
     const { rows, headerErrors } = await this.excel.parseWorkbook(file.buffer, WAREHOUSE_IMPORT_COLUMNS);
     if (headerErrors.length > 0) return { totalRows: 0, succeededCount: 0, rejected: [], headerErrors };
     const { succeeded, rejected } = await this.inventory.importWarehouseRows(
       rows as Array<{ code: string; name: string }>,
       req.companyContext.dataSource.manager,
+      orgUnitId,
     );
     return { totalRows: rows.length, succeededCount: succeeded.length, rejectedCount: rejected.length, rejected, headerErrors: [] };
   }

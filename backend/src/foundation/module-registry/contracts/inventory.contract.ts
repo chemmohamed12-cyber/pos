@@ -37,6 +37,8 @@ export interface WarehouseSnapshot {
 export interface InventoryReservationContract {
   /** Rejects (never resolves null) when the warehouse doesn't exist — callers that need a soft-fail already `.catch()` this themselves, unchanged from the pre-refactor direct-import behavior. Area 21 Operational Company Scoping Retrofit (2026-09-27) — `manager?` added, same additive shape as `releasePreliminaryHoldsForOrder` below. */
   getWarehouse(warehouseId: string, manager?: EntityManager): Promise<WarehouseSnapshot>;
+  /** Org engine Stage 5 — the warehouse's owning branch (its own link, else its parent warehouse's); `null` = unassigned / legacy. */
+  getWarehouseBranchId(warehouseId: string, manager?: EntityManager): Promise<string | null>;
 
   reserveStockInTransaction(
     manager: EntityManager,
@@ -137,6 +139,8 @@ export interface InventoryLogisticsContract {
     parentWarehouseId: string | null,
     kind: 'main' | 'operational',
     manager?: EntityManager,
+    /** Org engine Stage 2 — owning branch (validated by the caller); an operational custody sub-location inherits its custodian's branch. */
+    orgUnitId?: string | null,
   ): Promise<{ id: string }>;
 
   listWarehouses(manager?: EntityManager): Promise<WarehouseView[]>;

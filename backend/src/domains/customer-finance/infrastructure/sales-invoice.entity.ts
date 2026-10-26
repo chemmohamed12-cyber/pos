@@ -97,6 +97,11 @@ export class SalesInvoice {
   @Column({ type: 'varchar', length: 128, nullable: true })
   externalDocumentSecondaryId!: string | null;
 
+  /** Org engine Stage 5 — the branch this document belongs to, stamped by the server at creation (from the owning warehouse / the parent document). `null` = legacy / unassigned. Never rewritten afterwards. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  branchOrgUnitId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

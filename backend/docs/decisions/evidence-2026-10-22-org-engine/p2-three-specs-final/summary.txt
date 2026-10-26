@@ -1,0 +1,9 @@
+﻿round 1 | area14-company-audit.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts | 143s
+round 1 | memberships-mine.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts | 38s
+round 1 | release-upload.http | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/release/release-upload.http.spec.ts | 31s
+round 2 | area14-company-audit.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts | 32s
+round 2 | memberships-mine.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts | 22s
+round 2 | release-upload.http | quietAtStart=True peersAtStart=0 peersAfter=2 | RESULT PASS src/foundation/release/release-upload.http.spec.ts | 20s
+round 3 | area14-company-audit.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/audit/area14-company-audit.real-pg.spec.ts | 36s
+round 3 | memberships-mine.real-pg | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/company/memberships-mine.real-pg.spec.ts | 35s
+round 3 | release-upload.http | quietAtStart=True peersAtStart=0 peersAfter=0 | RESULT PASS src/foundation/release/release-upload.http.spec.ts | 26s
