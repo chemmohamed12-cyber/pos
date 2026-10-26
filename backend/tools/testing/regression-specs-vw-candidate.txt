@@ -38,3 +38,4 @@ src/domains/sales-orders/interface/org-legacy.real-pg.spec.ts
 src/foundation/release/company-fanout.real-pg.spec.ts
 src/foundation/release/company-schema-check.real-pg.spec.ts
 src/foundation/database-registry/company-schema-admission.real-pg.spec.ts
+src/foundation/organization/org-units-parent-fk.rollback.real-pg.spec.ts
