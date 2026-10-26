@@ -705,7 +705,6 @@ export class WorkOrderService {
     const saved = await (manager ?? this.dataSource).transaction(async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`manufacturing:work_order:${workOrderId}:results`]);
       const repo = tx.getRepository(WorkOrderResult);
-      const primary = finals.find((o) => o.role === 'good' && o.productId === wo.finishedProductId) ?? finals[0];
       const done = await repo.find({ where: { workOrderId, requestId: Like(`${requestId}:%`) } });
       if (done.length > 0) return done;
       const fresh = await tx.getRepository(WorkOrder).findOneOrFail({ where: { id: workOrderId } });

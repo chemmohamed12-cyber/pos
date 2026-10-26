@@ -7,7 +7,7 @@ import { INVENTORY_VALUATION_CONTRACT, InventoryValuationContract } from '../../
 import { WorkOrder } from '../infrastructure/work-order.entity';
 import { WorkOrderComponent } from '../infrastructure/work-order-component.entity';
 import { OperationFlow, OperationRun } from '../infrastructure/operation-run.entity';
-import { ProcessEdge, ProcessInput, ProcessOperation, ProcessOutput } from '../infrastructure/process-definition.entity';
+import { ProcessInput, ProcessOperation, ProcessOutput } from '../infrastructure/process-definition.entity';
 import { WorkOrderService } from './work-order.service';
 import { ProcessDefinitionService, ProcessVersionView } from './process-definition.service';
 
@@ -71,7 +71,6 @@ export class ProcessExecutionService {
     if (ids.length) for (const p of (await m.query(`SELECT "id","sku" FROM "products" WHERE "id" = ANY($1)`, [ids])) as Array<{ id: string; sku: string }>) skuOf.set(p.id, p.sku);
     const preds = new Map<string, string[]>();
     for (const e of def.edges) (preds.get(e.to) ?? preds.set(e.to, []).get(e.to)!).push(e.from);
-    const byOp = new Map(def.operations.map((o) => [o.code, o]));
     const runsOf = (code: string) => runs.filter((r) => r.operationCode === code);
     const optionalOf = new Map(def.operations.map((o) => [o.code, o.optional]));
     const sum = (rows: OperationFlow[]) => {
@@ -162,7 +161,6 @@ export class ProcessExecutionService {
       if (runs.some((r) => r.status === 'running')) throw new ConflictException(`Operation "${operationCode}" already has a run in progress.`);
       if (runs.length >= op.maxRuns) throw new ConflictException(`Operation "${operationCode}" has used its ${op.maxRuns} permitted run(s).`);
       const allRuns = await tx.getRepository(OperationRun).find({ where: { workOrderId } });
-      const byId = new Map(def.operations.map((o) => [o.id, o]));
       const predMap = new Map<string, string[]>();
       for (const e of def.edges) (predMap.get(e.to) ?? predMap.set(e.to, []).get(e.to)!).push(e.from);
       const blocking = unmetPredecessors(operationCode, predMap, new Map(def.operations.map((o) => [o.code, o.optional])), allRuns).map((code) => ({ code }));
@@ -194,7 +192,7 @@ export class ProcessExecutionService {
   async recordConsumption(workOrderId: string, runId: string, productId: string, quantity: number, actorUserId: string | null, requestId: string = randomUUID(), manager?: EntityManager): Promise<OperationFlow> {
     if (!Number.isInteger(quantity) || quantity <= 0) throw new ConflictException('quantity must be a positive whole number of base units.');
     return (manager ?? this.dataSource).transaction(async (tx) => {
-      const { wo, def, run, op } = await this.runContext(workOrderId, runId, tx);
+      const { wo, def, op } = await this.runContext(workOrderId, runId, tx);
       this.assertExecutable(wo, await this.workOrders.getWorkOrderState(workOrderId, tx));
       await this.lock(workOrderId, tx);
       const dup = await tx.getRepository(OperationFlow).findOne({ where: { runId, direction: 'in', productId, requestId } });

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { conflict, notFound } from './payroll-refusal';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { PayrollException, PayrollExceptionClass } from '../infrastructure/payroll-exception.entity';
