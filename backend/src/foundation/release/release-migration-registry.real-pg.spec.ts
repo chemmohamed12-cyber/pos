@@ -66,6 +66,9 @@ function buildTree(exclude: (file: string) => boolean = () => false): string {
       cpSync(join(DIST_MIGRATIONS, tag.name, f), join(out, f));
     }
   }
+  // migrations import `../../seed-helpers/*` (ownership-aware terminology seeds): the cut-off tree must carry that sibling folder exactly as the real package does
+  const helpers = join(process.cwd(), 'dist', 'database', 'seed-helpers');
+  if (existsSync(helpers)) cpSync(helpers, join(root, 'dist', 'database', 'seed-helpers'), { recursive: true, filter: (src) => !/\.spec\.(js|d\.ts|js\.map)$/.test(src) });
   return root;
 }
 
