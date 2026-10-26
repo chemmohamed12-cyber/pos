@@ -71,6 +71,8 @@ export interface JournalDraftLine {
   debit?: string;
   credit?: string;
   description?: string | null;
+  /** Org engine: attributes THIS line to an organization unit (overrides the entry's unit). Absent/null = the entry's unit. */
+  orgUnitId?: string | null;
   dimensions?: Array<{ dimensionTypeId: string; dimensionValueId: string }>;
 }
 
