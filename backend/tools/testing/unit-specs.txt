@@ -77,5 +77,5 @@ src/foundation/release/release-operation-lock.spec.ts
 src/foundation/database-registry/company-schema-admission.spec.ts
 src/domains/shipment/domain/shipment-process.direct-handover.spec.ts
 src/domains/manufacturing/application/process-readiness.spec.ts
-src/database/seed-helpers/terminology-ownership.spec.ts
+src/database/migrations/terminology-ownership.spec.ts
 src/database/payroll-seed-tag.spec.ts

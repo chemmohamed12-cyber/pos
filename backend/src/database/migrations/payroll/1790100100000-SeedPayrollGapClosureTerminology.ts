@@ -1,5 +1,48 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { seedTerminologyOwned, unseedTerminologyOwned } from '../../seed-helpers/terminology-ownership';
+
+// <terminology-ownership:begin> (identical in every seed migration; guarded by terminology-ownership.spec.ts - migrations must stay self-contained)
+type TerminologyRow = readonly [code: string, category: string, ar: string, en: string];
+type TerminologySeedMode = 'preserve' | 'update';
+
+const TABLE = 'terminology_seed_ownership';
+
+async function ensureTable(q: QueryRunner): Promise<void> {
+  await q.query(
+    `CREATE TABLE IF NOT EXISTS "${TABLE}" ("code" VARCHAR(128) PRIMARY KEY, "owner" VARCHAR(64) NOT NULL, "migration" VARCHAR(160) NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now())`,
+  );
+}
+
+async function seedTerminologyOwned(q: QueryRunner, owner: string, migration: string, rows: readonly TerminologyRow[], mode: TerminologySeedMode): Promise<void> {
+  await ensureTable(q);
+  for (const [code, category, ar, en] of rows) {
+    const inserted: Array<{ code: string }> = await q.query(
+      `INSERT INTO "terminology_entries" ("code", "category", "ar", "en") VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING RETURNING "code"`,
+      [code, category, ar, en],
+    );
+    if (inserted.length > 0) {
+      await q.query(`INSERT INTO "${TABLE}" ("code", "owner", "migration") VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING`, [code, owner, migration]);
+      continue;
+    }
+    if (mode === 'update') {
+      await q.query(
+        `UPDATE "terminology_entries" SET "ar" = $2, "en" = $3 WHERE "code" = $1 AND EXISTS (SELECT 1 FROM "${TABLE}" o WHERE o."code" = $1 AND o."owner" = $4)`,
+        [code, ar, en, owner],
+      );
+    }
+  }
+}
+
+async function unseedTerminologyOwned(q: QueryRunner, owner: string, migration: string, rows: readonly TerminologyRow[]): Promise<void> {
+  await ensureTable(q);
+  const codes = rows.map(([code]) => code);
+  await q.query(
+    `DELETE FROM "terminology_entries" WHERE "code" IN (SELECT "code" FROM "${TABLE}" WHERE "owner" = $2 AND "migration" = $3 AND "code" = ANY($1))`,
+    [codes, owner, migration],
+  );
+  await q.query(`DELETE FROM "${TABLE}" WHERE "owner" = $2 AND "migration" = $3 AND "code" = ANY($1)`, [codes, owner, migration]);
+}
+// <terminology-ownership:end>
+
 
 /**
  * Payroll gap closure (2026-10-25) — Arabic / English labels for the new Run Detail panels (exceptions, inputs, actors, payouts, reconciliation), the revision /
