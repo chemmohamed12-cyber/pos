@@ -1,4 +1,4 @@
-﻿SHA-256 manifest of the org-engine evidence and documents - generated 2026-10-26; candidate a4e0daf; 60 files; (self-excluded)
+﻿SHA-256 manifest of the org-engine evidence and documents - regenerated 2026-10-26 after the closure-directive documents; candidate a4e0daf; 62 files; (self-excluded)
 4cbae0c85345c7e61712d208606dff503b1cf803680453063b7b6b713b3f6e18  backend/docs/decisions/evidence-2026-10-22-org-engine/10b-guard-denials.txt
 becb36b07e8259c816c3d9724e1c0529bbe82875db4504992afe41af04871c15  backend/docs/decisions/evidence-2026-10-22-org-engine/10c-mutation-negative-control.log
 676007cf18478919ac1974d53f84d9f914a92fd231cfccd6093f757523745563  backend/docs/decisions/evidence-2026-10-22-org-engine/10-phase1-review-2026-10-26.md
@@ -54,6 +54,8 @@ dd8f39e22055cb82f380cca0ec894ddd1903ca01de477561e3f2b6b5df469fef  backend/docs/d
 8f26ea21f68cb341c69813ad2eb71da5d3c9bb7b2132e4baca3e3d05ce9c6638  backend/docs/decisions/evidence-2026-10-22-org-engine/PROPOSED-approved-test-databases-5544-entry.json
 c94fc1e1bebd1952cb71f565bee429317c6c2927983020efc14872d5fffee150  backend/docs/decisions/ORG-STRUCTURE-ENGINE-ATTRIBUTION-DECISION-REGISTER-2026-10-26.md
 3d5960a22a050efcf3bed4b7bb0794fe5d4df2ea24d2daa3aca4fb0efe4e7108  backend/docs/decisions/ORG-STRUCTURE-ENGINE-CANDIDATE-REGISTER-2026-10-26.md
+1a0e93596ef197675f35056c661df1f1156b5baa0ee6bc5145103340c7c73ed3  backend/docs/decisions/ORG-STRUCTURE-ENGINE-DECISION-IMPACT-PLAN-2026-10-26.md
+5735526246f7fb4976bd698eeef90e39836403b5c2a53403867de050b7297101  backend/docs/decisions/ORG-STRUCTURE-ENGINE-DECISION-OWNERS-AND-APPROVAL-REQUESTS-2026-10-26.md
 16f98aa48f394bde2165a1ad038c668a54a66d6324503ece1331933b015f367a  backend/docs/decisions/ORG-STRUCTURE-ENGINE-FINAL-REPORT-2026-10-26.md
 9354510b0d64d3b723363b79d537765fb0b208d7a2dc02177669e1904ad5b96d  backend/docs/decisions/ORG-STRUCTURE-ENGINE-FINAL-VERIFICATION-GATE-2026-10-26.md
 60b8f189337a4c2c8d30367f4403c5b7d8cf50ec6e6e6ed5383fdb0e3989c646  backend/docs/decisions/ORG-STRUCTURE-ENGINE-GATE0-2026-10-22.md
