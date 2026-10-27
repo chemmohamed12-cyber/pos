@@ -1,14 +1,16 @@
-# Central integration — final report (2026-10-26 / 27)
+# Central integration - final report (2026-10-26 / 27)
 
-**Status: READY FOR RELEASE DECISION — candidate package built and verified; NOT released, NOT deployed, NOT merged into `release/1.1.12`.** Financial activation stays blocked (section 8).
+**Status: CANDIDATE VERIFIED - READY FOR THE RELEASE DECISION. Not released, not deployed, not merged into `release/1.1.12`.** Financial activation stays blocked (section 8).
+
+> **Final candidate: `d18a4f02a0f6a08414cd015e11b66b7bea74a575`** on `integration/central-2026-10-26` - package `Daii-Release-v1.1.15-2026-10-27.zip`, SHA-256 **`a993e0b8b7f7daa68c9d73f46ade94f1151eab73440872362b9ba647e43893a6`**, 351 migrations. Three source points were verified in sequence because a second session kept committing to the same branch (see 4a): `6936c44` (package 5e20da2d... - superseded), `e952ca7` (full regression, package 6c619415... - superseded) and `d18a4f0` (final). Evidence of the superseded points is kept; only `d18a4f0` is the candidate.
 
 ## 1. Candidate identity
 | | |
 |---|---|
 | Integration branch | `integration/central-2026-10-26` (built on the other session's `integration/final-mfg-hr-org-vw-2026-10-26` 2c58ada; worktrees `central`, `central-th`) |
-| Source commit of the package | **`6936c44516674a70668d4728dfafd4321c2d694e`** (the evidence/report commit on top of it changes documentation only) |
+| Source commit of the package | **`d18a4f02a0f6a08414cd015e11b66b7bea74a575`** (this report/evidence is a documentation-only commit on top of it) |
 | Version | **1.1.15** (history 1.1.10 → 1.1.11 → 1.1.12 → 1.1.13 → 1.1.14 = Vehicle Workspace baseline; no branch holds a higher number; bump commit 0366732) |
-| Package | `Daii-Release-v1.1.15-2026-10-27.zip`, SHA-256 **`5e20da2dc23889b77c2b73bf72db20fbcad1e481050c9a63f04846732c392c8f`**, built from `git archive 6936c44`, `VERIFY: PASSED`, secret scan clean |
+| Package | `Daii-Release-v1.1.15-2026-10-27.zip`, SHA-256 **`a993e0b8b7f7daa68c9d73f46ade94f1151eab73440872362b9ba647e43893a6`**, built from `git archive d18a4f0` (`D:\DAII-LOCAL-DEPLOY-R1111O\out`), `VERIFY: PASSED` |
 | Migrations | 351 in the package (320 on the 1.1.13 baseline → +31) |
 | Preserved baseline | `release/1.1.12` 1a0d187 / d05520f (Vehicle Workspace 1.1.14) is untouched; this candidate contains it |
 
@@ -31,21 +33,26 @@ See `CENTRAL-INTEGRATION-REGISTER-2026-10-26.md` for the full table. In order: r
 | Regression: Treasury Documents HTTP spec | controller gained ledger-report / company dependencies | inert stand-ins provided |
 | `company-audit-access.real-pg.spec.ts` | refused by the DB guard (unapproved disposable DB name); never part of the regression lists | removed from the central list |
 
-## 4. Verification (all on the final source; product code of the package is identical to the code of the browser/regression runs — the only later differences are three spec files, two test lists and documentation)
-| Check | Result |
-|---|---|
-| Backend `tsc --noEmit`, build | 0 errors |
-| ESLint | exit 0, **0 errors**, 5 warnings (pre-existing) |
-| Unit tests | **83 suites / 684 tests** pass |
-| Frontend `tsc -b`, production build, model tests | pass (build fixed, see Layout.css); 14/14 |
-| Central PostgreSQL regression (clean run, ns `biz_t90_`, 171 specs, source 0366732) | 168 pass; 2 failed: Treasury Documents HTTP (fixed, re-run PASS) and `company-audit-access` (guard refusal, removed). First informational run (pre-hotfix source, ns `biz_t91_`) kept in full; its 4 missing-`dist` failures were **not** counted as resolved by building — they are covered by the clean run |
-| Re-run after fixes on `7b32e2e` (ns `biz_t87_`): treasury-documents.http 10/10, payment-reversal 10/10, H3 registry 21/21, vehicle-branch 10/10 (incl. expense-float scope), custody-expenses 14/14 (incl. candidate list) | **PASS** |
-| Release Engine on the unmodified 1.1.13 engine, final package | deploy succeeded, 320→351, company gate/fan-out; upgrade schema == fresh install (`1e7c6928…` / `b7828f7e…`); up / no-op / down / up proved; smoke 36/36; Stage C acceptance 42 PASS 0 FAIL; previous 1.1.13 slot runs on the upgraded schema (health 200, Stage C route 404) |
-| Browser acceptance on the deployed packaged build (package from 0366732) | float picker lists only eligible accounts (FLT-VH101, MAIN-CASH; no custody accounts, no bank); categories read وقود / رسوم طريق; reason cleared after submit; Treasury menu shows Workspace/Documents/Bank statements/Cash sessions/Settings/Balances/Ledger; Ledger page loads 17 rows, report + export 200; customer statement 200 and PDF/XLSX/CSV in ar and en (pdfkit/bidi-js present); orders list shows incomplete/completed tiles; Vehicle Workspace scenarios 1–10 earlier on 282ed63 |
-| Source ↔ package | package built from `git archive 6936c44`; `package-source-commit.txt`; `git diff 0366732 6936c44` = specs, lists, docs only |
+## 4. Verification
+### 4a. How the final candidate was reached
+The integration branch is shared with another session ("DAII Integration"), which kept adding fixes while this work ran: self-contained ownership-aware terminology seeds (88db305), a payroll inverted-period refusal (10d7a38), the same `Layout.css` brace fix (b16dc38), the seed-helper kept outside `migrations/` (8ddae1e) and, last, the removal of the empty bookkeeping table on full rollback (16ef3aa). This work's line (Treasury hotfix, 1.1.15, vehicle-workspace fixes, spec fixes) was merged with theirs (`e952ca7`), then their last increment arrived (`d18a4f0`). Every point was verified; the later one needed only a focused re-run.
 
-## 5. Migration evidence and accepted exceptions
-Rollback of all 31 new migrations (down) leaves the baseline schema except: **E1** `org_units` parent FK stays `RESTRICT` (was `CASCADE`; deliberate protection, migration `core/1790021000000-OrgUnitLifecycle`, accepted by the CTO); **E2** an **empty** helper table `terminology_seed_ownership` (0 rows after down) created on first use by the ownership-aware terminology seeds — additive residue, no data. Data recovery relies on application rollback with the schema kept or the engine's per-Company restore point, never on destructive down.
+### 4b. Results
+| Check | Candidate | Result |
+|---|---|---|
+| Backend build, `tsc --noEmit` | d18a4f0 | 0 errors |
+| ESLint | d18a4f0 | exit 0, **0 errors**, 5 pre-existing warnings |
+| Unit tests | d18a4f0 | **83 suites / 694 tests** pass (e952ca7: 693) |
+| Frontend `tsc -b`, production build, model tests | e952ca7 (frontend identical at d18a4f0: the later increment touches only backend seed migrations/helper) | pass; model 14/14 |
+| **Central PostgreSQL regression, full** (170 specs, ns `biz_t85_`) | **e952ca7** | **170 RESULT PASS, 0 FAIL, 1227 tests, harness exit 0** (`regression/full-170-specs-on-e952ca7.log.gz`) |
+| Regression, focused re-run on the final candidate (14 specs: H3 migration registry, payroll gap closure, 6 manufacturing, vehicle-branch + custody-expense float/scope, Treasury documents HTTP, payment reversal, customer statement; ns `biz_t83_`) | **d18a4f0** | **14/14 PASS**, exit 0 (`regression/focused-14-specs-on-d18a4f0.log.gz`). The increment d18a4f0 differs from e952ca7 by 11 files: nine seed migrations (+2 lines each), the seed helper and its spec |
+| Earlier runs kept for the record | 0366732 (ns `biz_t90_`, 168/171, the 2 failures fixed - see section 3), 42c74b1-era informational run (ns `biz_t91_`, 163/171: 4 missing-`dist` failures NOT counted as resolved by the later build, the others = section 3) | in `evidence-2026-10-27-central-integration/` |
+| Release Engine, unmodified 1.1.13 engine, final package | **d18a4f0** | deploy succeeded, 320 -> 351, company gate + fan-out; **upgrade schema == fresh install** (`1e7c6928...` / `b7828f7e...`); up / no-op / down / up proved; smoke 36/36; Stage C acceptance **42 PASS, 0 FAIL**; previous 1.1.13 slot on the upgraded schema: health 200, Stage C route 404 |
+| Browser acceptance on the deployed package | e952ca7 package (same frontend and same product code as d18a4f0) | float picker offers only eligible accounts (FLT-VH101, MAIN-CASH); categories read as words; Treasury menu = Workspace, Documents, Bank statements, Cash sessions, Settings, Balances, Ledger; ledger report + export 200; customer statement 200 and PDF (ar) valid; earlier on 0366732: reason field cleared after submit, orders-list tiles, statement PDF/XLSX/CSV in ar/en; Vehicle Workspace scenarios 1-10 on 282ed63 |
+| Source <-> package | d18a4f0 | package built from `git archive d18a4f0`; `package-source-commit.txt`; no uncommitted file can enter a git archive |
+
+## 5. Migration evidence and accepted exception
+Rolling back all 31 new migrations (`down`) on the final package leaves the 1.1.13 baseline schema **except one constraint**: **E1** - the `org_units` parent foreign key stays `RESTRICT` (was `CASCADE`); deliberate deletion protection, migration `core/1790021000000-OrgUnitLifecycle`, accepted by the CTO, covered by specs R1-R3. Verified element by element on the platform and the Company database (columns, indexes, constraints: no other difference). The earlier residue **E2** (an empty `terminology_seed_ownership` table) was **fixed by the other session in 16ef3aa** and is confirmed gone on d18a4f0. Data recovery relies on application rollback with the schema kept or the engine's per-Company restore point, never on destructive `down`.
 
 ## 6. Deployment prerequisite found (not a code defect)
 The 1.1.15 package declares two **new runtime dependencies** (`pdfkit@0.15.2`, `bidi-js@1.0.3`, used by the customer statement PDF). The Release Engine correctly **refused** the first rehearsal (`CANDIDATE verification failed: dependencies_resolve (missing from node_modules: bidi-js, pdfkit)`; log kept in `rehearsal-dependency-refusal/`) — the same class as the 2026-09-15 incident. **Before deploying 1.1.15 on any host, install those two packages into the host's shared `node_modules`** (exact versions from `package-lock.json`). With them present the deployment succeeded.
@@ -60,4 +67,4 @@ The 1.1.15 package declares two **new runtime dependencies** (`pdfkit@0.15.2`, `
 Still **BLOCKED**: no company-specific float account, expense-category → account mapping or role assignment has been verified; the code fails closed.
 
 ## 9. Merge / release status
-Not merged into `release/1.1.12`, no tag, no release artifact published, no deployment. The package exists only in the local build folder `D:\DAII-LOCAL-DEPLOY-R1111K\out`. Verdict: **candidate verified; awaiting the release decision.**
+Not merged into `release/1.1.12`, no tag, no release artifact published, no deployment. The package exists only in the local build folder `D:\DAII-LOCAL-DEPLOY-R1111O\out`. Verdict: **candidate verified; awaiting the release decision.**
