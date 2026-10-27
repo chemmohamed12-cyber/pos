@@ -11,7 +11,7 @@ import { QueryRunner } from 'typeorm';
  *  - up, code present, owned by this owner and `update` mode -> refresh ar/en (a later stage of the same feature may correct its own wording).
  *  - up, code present otherwise -> left untouched (pre-existing, shared, or another feature's): never overwritten.
  *  - down                        -> delete a row only when this exact migration created it (owner + migration match) and remove its ownership record.
- *    Rows created before this helper existed have no ownership record and are therefore never deleted by `down`.
+ *    Rows created before this helper existed have no ownership record and are therefore never deleted by `down`. The bookkeeping table is dropped when its last record is removed.
  */
 export type TerminologyRow = readonly [code: string, category: string, ar: string, en: string];
 export type TerminologySeedMode = 'preserve' | 'update';
@@ -52,4 +52,6 @@ export async function unseedTerminologyOwned(q: QueryRunner, owner: string, migr
     [codes, owner, migration],
   );
   await q.query(`DELETE FROM "${TABLE}" WHERE "owner" = $2 AND "migration" = $3 AND "code" = ANY($1)`, [codes, owner, migration]);
+  // once the last ownership record is gone the bookkeeping table is removed too, so a full rollback leaves no schema residue (it is re-created on demand by the next seed)
+  await q.query(`DO $$ BEGIN IF to_regclass('"${TABLE}"') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "${TABLE}") THEN DROP TABLE "${TABLE}"; END IF; END $$`);
 }
