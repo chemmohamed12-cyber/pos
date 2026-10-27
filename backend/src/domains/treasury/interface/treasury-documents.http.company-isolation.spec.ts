@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TreasuryService } from '../application/treasury.service';
+import { TreasuryLedgerReportService } from '../application/treasury-ledger-report.service';
+import { CompanyService } from '../../../foundation/company/company.service';
 import { TreasuryDocumentService } from '../application/treasury-document.service';
 import { TreasuryController } from './treasury.controller';
 import { TreasuryDocumentsController } from './treasury-documents.controller';
@@ -164,6 +166,9 @@ describe('Treasury Documents — HTTP, real guards, real PostgreSQL, A/B', () =>
       controllers: [TreasuryController, TreasuryDocumentsController, PaymentsController, BankStatementsController, CashSessionsController],
       providers: [
         { provide: TreasuryService, useValue: treasury },
+        // the Financial Movement Ledger routes of the same controller are not exercised here: inert stand-ins satisfy its constructor
+        { provide: TreasuryLedgerReportService, useValue: {} },
+        { provide: CompanyService, useValue: {} },
         { provide: TreasuryDocumentService, useValue: docs },
         { provide: BankStatementService, useValue: new BankStatementService(h.controlPlane, treasury, numbering, audit) },
         { provide: CashSessionService, useValue: new CashSessionService(h.controlPlane, treasury, docs, numbering, audit) },

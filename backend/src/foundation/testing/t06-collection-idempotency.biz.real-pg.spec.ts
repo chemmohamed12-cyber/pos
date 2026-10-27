@@ -85,7 +85,7 @@ describe('T-06 — a replayed collection request has exactly one financial effec
       result(e, 'T-06x-INFO', rows === 1 ? 'PASS' : 'FAIL-DEFECT', `treasury cash-in with the SAME idempotency key sent 5x concurrently produced ${rows} treasury movement(s) (INFORMATIONAL — outside the frozen T-06 scope)`);
 
       // ---- T-06y (informational, after remediation of T-06x): the REAL TreasuryController composition (withIdempotencyInTransaction) with a plain Company manager ----
-      const controller = new TreasuryController(e.treasury, e.idempotency, e.events);
+      const controller = new TreasuryController(e.treasury, e.idempotency, e.events, undefined as never, undefined as never);
       const fakeReq = { user: { id: e.actor }, companyContext: { dataSource: wide } } as never;
       const ky = `T06Y-${randomUUID()}`;
       const ysRaw = await Promise.allSettled(Array.from({ length: 5 }, () => controller.cashIn(fakeReq, { accountId: e.bankAccountId, amount: '10.00', reference: ky, reason: 'T-06y' } as never, ky)));

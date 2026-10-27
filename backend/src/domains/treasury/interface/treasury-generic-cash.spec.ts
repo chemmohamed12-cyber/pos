@@ -9,7 +9,7 @@ describe('TreasuryController — generic cash entry restrictions', () => {
   const idempotency = { withIdempotencyInTransaction: jest.fn() };
   const treasury = { cashInDirect: jest.fn(), cashOutDirect: jest.fn() };
   const events = { dispatchAfterCommit: jest.fn() };
-  const controller = new TreasuryController(treasury as never, idempotency as never, events as never);
+  const controller = new TreasuryController(treasury as never, idempotency as never, events as never, undefined as never, undefined as never);
   const req = { user: { id: 'u1' }, companyContext: { dataSource: { manager: {} } } } as never;
   const base = { accountId: '11111111-1111-1111-1111-111111111111', amount: '10.00', reason: 'Petty cash top-up', reference: 'DOC-1' };
 
